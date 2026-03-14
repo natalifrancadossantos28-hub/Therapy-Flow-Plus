@@ -1,0 +1,98 @@
+import { Router, type IRouter } from "express";
+import { db } from "@workspace/db";
+import { waitingListTable, patientsTable, professionalsTable } from "@workspace/db";
+import { eq, and, asc, sql } from "drizzle-orm";
+
+const router: IRouter = Router();
+
+const priorityOrder = sql`CASE priority WHEN 'alta' THEN 1 WHEN 'media' THEN 2 WHEN 'baixa' THEN 3 ELSE 4 END`;
+
+router.get("/waiting-list", async (req, res) => {
+  const conditions = [];
+  if (req.query.professionalId) {
+    conditions.push(eq(waitingListTable.professionalId, Number(req.query.professionalId)));
+  }
+
+  const rows = await db.select({
+    id: waitingListTable.id,
+    patientId: waitingListTable.patientId,
+    patientName: patientsTable.name,
+    patientPhone: patientsTable.phone,
+    professionalId: waitingListTable.professionalId,
+    professionalName: professionalsTable.name,
+    priority: waitingListTable.priority,
+    notes: waitingListTable.notes,
+    entryDate: waitingListTable.entryDate,
+    createdAt: waitingListTable.createdAt,
+    updatedAt: waitingListTable.updatedAt,
+  })
+    .from(waitingListTable)
+    .leftJoin(patientsTable, eq(waitingListTable.patientId, patientsTable.id))
+    .leftJoin(professionalsTable, eq(waitingListTable.professionalId, professionalsTable.id))
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(priorityOrder, asc(waitingListTable.entryDate));
+
+  res.json(rows.map(r => ({
+    ...r,
+    patientName: r.patientName ?? "",
+    patientPhone: r.patientPhone ?? null,
+    professionalName: r.professionalName ?? null,
+  })));
+});
+
+router.post("/waiting-list", async (req, res) => {
+  const { patientId, professionalId, priority, notes, entryDate } = req.body;
+  const [row] = await db.insert(waitingListTable).values({
+    patientId: Number(patientId),
+    professionalId: professionalId ? Number(professionalId) : null,
+    priority: priority ?? "media",
+    notes: notes ?? null,
+    entryDate,
+  }).returning();
+
+  const patient = await db.select({ name: patientsTable.name, phone: patientsTable.phone })
+    .from(patientsTable).where(eq(patientsTable.id, row.patientId));
+  const prof = row.professionalId
+    ? await db.select({ name: professionalsTable.name }).from(professionalsTable).where(eq(professionalsTable.id, row.professionalId))
+    : [];
+
+  res.status(201).json({
+    ...row,
+    patientName: patient[0]?.name ?? "",
+    patientPhone: patient[0]?.phone ?? null,
+    professionalName: prof[0]?.name ?? null,
+  });
+});
+
+router.put("/waiting-list/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const { professionalId, priority, notes } = req.body;
+  const updateData: Record<string, unknown> = {};
+  if (priority !== undefined) updateData.priority = priority;
+  if (notes !== undefined) updateData.notes = notes;
+  if (professionalId !== undefined) updateData.professionalId = professionalId;
+
+  const [row] = await db.update(waitingListTable).set(updateData).where(eq(waitingListTable.id, id)).returning();
+  if (!row) return res.status(404).json({ error: "Entry not found" });
+
+  const patient = await db.select({ name: patientsTable.name, phone: patientsTable.phone })
+    .from(patientsTable).where(eq(patientsTable.id, row.patientId));
+  const prof = row.professionalId
+    ? await db.select({ name: professionalsTable.name }).from(professionalsTable).where(eq(professionalsTable.id, row.professionalId))
+    : [];
+
+  res.json({
+    ...row,
+    patientName: patient[0]?.name ?? "",
+    patientPhone: patient[0]?.phone ?? null,
+    professionalName: prof[0]?.name ?? null,
+  });
+});
+
+router.delete("/waiting-list/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  await db.delete(waitingListTable).where(eq(waitingListTable.id, id));
+  res.status(204).send();
+});
+
+export default router;

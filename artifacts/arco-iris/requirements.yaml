@@ -1,0 +1,18 @@
+packages:
+  "framer-motion": "For page transitions and premium micro-interactions"
+  "date-fns": "For date formatting in Portuguese"
+  "jspdf": "For generating patient PDFs"
+  "jspdf-autotable": "For PDF tables"
+  "react-hook-form": "For form state management"
+  "@hookform/resolvers": "For Zod integration with forms"
+
+images:
+  - path: "artifacts/arco-iris/public/images/logo.png"
+    description: "Minimal elegant abstract rainbow and leaf logo for a therapy clinic, teal and soft green colors, clean transparent background"
+    aspect_ratio: "1:1"
+  - path: "artifacts/arco-iris/public/images/hero-bg.png"
+    description: "Soft abstract medical healthcare background, calm teal and mint green gradients, clean, modern, subtle light leaks"
+    aspect_ratio: "16:9"
+
+notes:
+  - "Using generated hooks from @workspace/api-client-react as instructed."

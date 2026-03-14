@@ -1,22 +1,28 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Arco-Íris Gestão Terapêutica API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: professionals
+    description: Professional management
+  - name: patients
+    description: Patient management
+  - name: appointments
+    description: Appointment scheduling
+  - name: waiting-list
+    description: Waiting list management
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +30,496 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /professionals:
+    get:
+      operationId: getProfessionals
+      tags: [professionals]
+      summary: List all professionals
+      responses:
+        "200":
+          description: List of professionals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Professional"
+    post:
+      operationId: createProfessional
+      tags: [professionals]
+      summary: Create a professional
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProfessionalBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Professional"
+
+  /professionals/{id}:
+    get:
+      operationId: getProfessional
+      tags: [professionals]
+      summary: Get a professional
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Professional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Professional"
+        "404":
+          description: Not found
+    put:
+      operationId: updateProfessional
+      tags: [professionals]
+      summary: Update a professional
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProfessionalBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Professional"
+    delete:
+      operationId: deleteProfessional
+      tags: [professionals]
+      summary: Delete a professional
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /professionals/{id}/capacity:
+    get:
+      operationId: getProfessionalCapacity
+      tags: [professionals]
+      summary: Get professional capacity info
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Capacity info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfessionalCapacity"
+
+  /professionals/{id}/schedule:
+    get:
+      operationId: getProfessionalSchedule
+      tags: [professionals]
+      summary: Get professional schedule for a date
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Schedule with slots
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailySchedule"
+
+  /professionals/{id}/vacancy-alert:
+    get:
+      operationId: getProfessionalVacancyAlert
+      tags: [professionals]
+      summary: Check if professional has free slots and suggest from waiting list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vacancy alert info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VacancyAlert"
+
+  /patients:
+    get:
+      operationId: getPatients
+      tags: [patients]
+      summary: List all patients
+      parameters:
+        - name: professionalId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Patient"
+    post:
+      operationId: createPatient
+      tags: [patients]
+      summary: Create a patient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatientBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+
+  /patients/{id}:
+    get:
+      operationId: getPatient
+      tags: [patients]
+      summary: Get a patient
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "404":
+          description: Not found
+    put:
+      operationId: updatePatient
+      tags: [patients]
+      summary: Update a patient
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePatientBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+    delete:
+      operationId: deletePatient
+      tags: [patients]
+      summary: Discharge/delete a patient
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /patients/{id}/absences:
+    get:
+      operationId: getPatientAbsences
+      tags: [patients]
+      summary: Get patient absence count and history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Absence info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientAbsenceInfo"
+
+  /patients/{id}/pdf:
+    get:
+      operationId: getPatientPdf
+      tags: [patients]
+      summary: Get patient PDF data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient data for PDF generation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientPdfData"
+
+  /appointments:
+    get:
+      operationId: getAppointments
+      tags: [appointments]
+      summary: List appointments
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: professionalId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: patientId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
+    post:
+      operationId: createAppointment
+      tags: [appointments]
+      summary: Create an appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppointmentBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+
+  /appointments/today:
+    get:
+      operationId: getTodayAppointments
+      tags: [appointments]
+      summary: Get today appointments for reception
+      parameters:
+        - name: professionalId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Today appointments with patient and professional info
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AppointmentWithDetails"
+
+  /appointments/{id}:
+    get:
+      operationId: getAppointment
+      tags: [appointments]
+      summary: Get an appointment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+    patch:
+      operationId: updateAppointmentStatus
+      tags: [appointments]
+      summary: Update appointment status (present/absent/reschedule)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppointmentStatusBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+    delete:
+      operationId: deleteAppointment
+      tags: [appointments]
+      summary: Delete an appointment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /waiting-list:
+    get:
+      operationId: getWaitingList
+      tags: [waiting-list]
+      summary: Get the waiting list ordered by priority and entry date
+      parameters:
+        - name: professionalId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Waiting list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WaitingListEntry"
+    post:
+      operationId: createWaitingListEntry
+      tags: [waiting-list]
+      summary: Add a patient to the waiting list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWaitingListEntryBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitingListEntry"
+
+  /waiting-list/{id}:
+    put:
+      operationId: updateWaitingListEntry
+      tags: [waiting-list]
+      summary: Update a waiting list entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWaitingListEntryBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitingListEntry"
+    delete:
+      operationId: deleteWaitingListEntry
+      tags: [waiting-list]
+      summary: Remove from waiting list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +530,467 @@ components:
       required:
         - status
 
+    Professional:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        specialty:
+          type: string
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - specialty
+        - email
+        - phone
+        - createdAt
+        - updatedAt
+
+    CreateProfessionalBody:
+      type: object
+      properties:
+        name:
+          type: string
+        specialty:
+          type: string
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+      required:
+        - name
+        - specialty
+
+    ProfessionalCapacity:
+      type: object
+      properties:
+        professionalId:
+          type: integer
+        professionalName:
+          type: string
+        activePatients:
+          type: integer
+        maxCapacity:
+          type: integer
+        availableSlots:
+          type: integer
+      required:
+        - professionalId
+        - professionalName
+        - activePatients
+        - maxCapacity
+        - availableSlots
+
+    ScheduleSlot:
+      type: object
+      properties:
+        time:
+          type: string
+        appointmentId:
+          type: ["integer", "null"]
+        patientId:
+          type: ["integer", "null"]
+        patientName:
+          type: ["string", "null"]
+        status:
+          type: ["string", "null"]
+        isLunchBreak:
+          type: boolean
+      required:
+        - time
+        - appointmentId
+        - patientId
+        - patientName
+        - status
+        - isLunchBreak
+
+    DailySchedule:
+      type: object
+      properties:
+        professionalId:
+          type: integer
+        date:
+          type: string
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleSlot"
+      required:
+        - professionalId
+        - date
+        - slots
+
+    VacancyAlert:
+      type: object
+      properties:
+        professionalId:
+          type: integer
+        hasVacancy:
+          type: boolean
+        availableSlots:
+          type: integer
+        nextWaitingPatient:
+          $ref: "#/components/schemas/WaitingListEntry"
+      required:
+        - professionalId
+        - hasVacancy
+        - availableSlots
+
+    Patient:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        dateOfBirth:
+          type: ["string", "null"]
+        cpf:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        guardianName:
+          type: ["string", "null"]
+        guardianPhone:
+          type: ["string", "null"]
+        diagnosis:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        professionalId:
+          type: ["integer", "null"]
+        status:
+          type: string
+        absenceCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - dateOfBirth
+        - cpf
+        - phone
+        - email
+        - address
+        - guardianName
+        - guardianPhone
+        - diagnosis
+        - notes
+        - professionalId
+        - status
+        - absenceCount
+        - createdAt
+        - updatedAt
+
+    CreatePatientBody:
+      type: object
+      properties:
+        name:
+          type: string
+        dateOfBirth:
+          type: ["string", "null"]
+        cpf:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        guardianName:
+          type: ["string", "null"]
+        guardianPhone:
+          type: ["string", "null"]
+        diagnosis:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        professionalId:
+          type: ["integer", "null"]
+        status:
+          type: string
+      required:
+        - name
+        - status
+
+    UpdatePatientBody:
+      type: object
+      properties:
+        name:
+          type: string
+        dateOfBirth:
+          type: ["string", "null"]
+        cpf:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        guardianName:
+          type: ["string", "null"]
+        guardianPhone:
+          type: ["string", "null"]
+        diagnosis:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        professionalId:
+          type: ["integer", "null"]
+        status:
+          type: string
+
+    PatientAbsenceInfo:
+      type: object
+      properties:
+        patientId:
+          type: integer
+        patientName:
+          type: string
+        absenceCount:
+          type: integer
+        hasWarning:
+          type: boolean
+        absences:
+          type: array
+          items:
+            $ref: "#/components/schemas/AbsenceRecord"
+      required:
+        - patientId
+        - patientName
+        - absenceCount
+        - hasWarning
+        - absences
+
+    AbsenceRecord:
+      type: object
+      properties:
+        appointmentId:
+          type: integer
+        date:
+          type: string
+        time:
+          type: string
+      required:
+        - appointmentId
+        - date
+        - time
+
+    PatientPdfData:
+      type: object
+      properties:
+        patient:
+          $ref: "#/components/schemas/Patient"
+        professional:
+          $ref: "#/components/schemas/Professional"
+        absenceCount:
+          type: integer
+        totalAppointments:
+          type: integer
+        lastAppointmentDate:
+          type: ["string", "null"]
+      required:
+        - patient
+        - absenceCount
+        - totalAppointments
+        - lastAppointmentDate
+
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: integer
+        professionalId:
+          type: integer
+        date:
+          type: string
+        time:
+          type: string
+        status:
+          type: string
+        notes:
+          type: ["string", "null"]
+        rescheduledTo:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - patientId
+        - professionalId
+        - date
+        - time
+        - status
+        - notes
+        - rescheduledTo
+        - createdAt
+        - updatedAt
+
+    AppointmentWithDetails:
+      type: object
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: integer
+        professionalId:
+          type: integer
+        date:
+          type: string
+        time:
+          type: string
+        status:
+          type: string
+        notes:
+          type: ["string", "null"]
+        rescheduledTo:
+          type: ["string", "null"]
+        patientName:
+          type: string
+        patientPhone:
+          type: ["string", "null"]
+        patientAbsenceCount:
+          type: integer
+        professionalName:
+          type: string
+        professionalSpecialty:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - patientId
+        - professionalId
+        - date
+        - time
+        - status
+        - notes
+        - rescheduledTo
+        - patientName
+        - patientPhone
+        - patientAbsenceCount
+        - professionalName
+        - professionalSpecialty
+        - createdAt
+        - updatedAt
+
+    CreateAppointmentBody:
+      type: object
+      properties:
+        patientId:
+          type: integer
+        professionalId:
+          type: integer
+        date:
+          type: string
+        time:
+          type: string
+        notes:
+          type: ["string", "null"]
+      required:
+        - patientId
+        - professionalId
+        - date
+        - time
+
+    UpdateAppointmentStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+        rescheduledTo:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+      required:
+        - status
+
+    WaitingListEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: integer
+        patientName:
+          type: string
+        patientPhone:
+          type: ["string", "null"]
+        professionalId:
+          type: ["integer", "null"]
+        professionalName:
+          type: ["string", "null"]
+        priority:
+          type: string
+        notes:
+          type: ["string", "null"]
+        entryDate:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - patientId
+        - patientName
+        - patientPhone
+        - professionalId
+        - professionalName
+        - priority
+        - notes
+        - entryDate
+        - createdAt
+        - updatedAt
+
+    CreateWaitingListEntryBody:
+      type: object
+      properties:
+        patientId:
+          type: integer
+        professionalId:
+          type: ["integer", "null"]
+        priority:
+          type: string
+        notes:
+          type: ["string", "null"]
+        entryDate:
+          type: string
+      required:
+        - patientId
+        - priority
+        - entryDate
+
+    UpdateWaitingListEntryBody:
+      type: object
+      properties:
+        professionalId:
+          type: ["integer", "null"]
+        priority:
+          type: string
+        notes:
+          type: ["string", "null"]
