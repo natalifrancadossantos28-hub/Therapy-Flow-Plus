@@ -155,6 +155,7 @@ type Resultado = {
   nomePaciente: string;
   nomeResponsavel: string;
   profissional: string;
+  especialidade: string;
   idade: string;
   data: string;
 };
@@ -164,6 +165,7 @@ function Formulario({ onSubmit }: { onSubmit: (r: Resultado) => void }) {
   const [nomePaciente, setNomePaciente] = useState("");
   const [nomeResponsavel, setNomeResponsavel] = useState("");
   const [profissional, setProfissional] = useState("");
+  const [especialidade, setEspecialidade] = useState("");
   const [idade, setIdade] = useState("");
   const [areaAtiva, setAreaAtiva] = useState(AREAS[0]);
 
@@ -172,7 +174,7 @@ function Formulario({ onSubmit }: { onSubmit: (r: Resultado) => void }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ respostas, nomePaciente, nomeResponsavel, profissional, idade, data: new Date().toLocaleDateString("pt-BR") });
+    onSubmit({ respostas, nomePaciente, nomeResponsavel, profissional, especialidade, idade, data: new Date().toLocaleDateString("pt-BR") });
   };
 
   return (
@@ -212,6 +214,12 @@ function Formulario({ onSubmit }: { onSubmit: (r: Resultado) => void }) {
               <input value={profissional} onChange={(e) => setProfissional(e.target.value)}
                 className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                 placeholder="Nome do profissional" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-muted-foreground mb-1">Especialidade</label>
+              <input value={especialidade} onChange={(e) => setEspecialidade(e.target.value)}
+                className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                placeholder="Ex.: Psicologia, Fonoaudiologia" />
             </div>
           </div>
         </div>
@@ -312,7 +320,7 @@ function Formulario({ onSubmit }: { onSubmit: (r: Resultado) => void }) {
 }
 
 function Relatorio({ resultado, onNova }: { resultado: Resultado; onNova: () => void }) {
-  const { respostas, nomePaciente, nomeResponsavel, profissional, idade, data } = resultado;
+  const { respostas, nomePaciente, nomeResponsavel, profissional, especialidade, idade, data } = resultado;
 
   const porArea = AREAS.map((area) => {
     const pergs = PERGUNTAS.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === area);
@@ -361,8 +369,10 @@ function Relatorio({ resultado, onNova }: { resultado: Resultado; onNova: () => 
           </div>
           {profissional && (
             <div className="mt-4 pt-4 border-t border-border text-sm">
-              <p className="text-muted-foreground font-semibold">Profissional Responsável</p>
-              <p className="font-bold text-foreground">{profissional}</p>
+              <p className="text-muted-foreground font-semibold">Profissional Responsável pela Triagem</p>
+              <p className="font-bold text-foreground">
+                {profissional}{especialidade ? ` — ${especialidade}` : ""}
+              </p>
             </div>
           )}
         </div>

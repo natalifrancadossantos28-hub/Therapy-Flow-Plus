@@ -1,0 +1,131 @@
+from flask import Flask, request, render_template_string
+from collections import defaultdict
+
+app = Flask(__name__)
+
+# ÁREAS
+areas = [
+    "Psicológico",
+    "Psicomotricidade",
+    "Fisioterapia",
+    "Terapia Ocupacional",
+    "Fonoaudiologia",
+    "Nutrição",
+    "Psicopedagogia",
+    "Educação Física"
+]
+
+# PERGUNTAS (exemplo inicial)
+questions = [
+    {"area": "Psicológico", "pergunta": "Déficit de atenção sustentada", "explicacao": "Dificuldade de manter o foco"},
+    {"area": "Psicológico", "pergunta": "Ansiedade frequente", "explicacao": "Fica muito nervoso ou preocupado"},
+    {"area": "Fonoaudiologia", "pergunta": "Atraso na fala", "explicacao": "Demora para falar ou se comunicar"},
+    {"area": "Terapia Ocupacional", "pergunta": "Dificuldade motora fina", "explicacao": "Dificuldade para usar as mãos"},
+]
+
+def classificar(pontos):
+    if pontos <= 10:
+        return "Baixo indicativo"
+    elif pontos <= 20:
+        return "Indício moderado"
+    else:
+        return "Indício elevado"
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        dados = request.form
+
+        # DADOS DO PACIENTE
+        nome = dados.get("nome")
+        idade = dados.get("idade")
+        responsavel = dados.get("responsavel")
+
+        # PROFISSIONAL
+        profissional = dados.get("profissional")
+        especialidade = dados.get("especialidade")
+
+        pontuacao_areas = defaultdict(int)
+
+        for i, q in enumerate(questions):
+            valor = int(dados.get(f"q{i}", 0))
+            pontuacao_areas[q["area"]] += valor
+
+        # RANKING
+        ranking = sorted(pontuacao_areas.items(), key=lambda x: x[1], reverse=True)
+
+        top3 = ranking[:3]
+
+        # SUGESTÃO DE ENCAMINHAMENTO
+        encaminhamento = "<ul>"
+        for area, pontos in top3:
+            encaminhamento += f"<li>Encaminhar para: <b>{area}</b></li>"
+        encaminhamento += "</ul>"
+
+        resultado_html = f"""
+        <h1>Relatório de Triagem Multidisciplinar</h1>
+
+        <h3>Dados do paciente</h3>
+        Nome: {nome}<br>
+        Idade: {idade}<br>
+        Responsável: {responsavel}<br>
+
+        <h3>Profissional responsável pela triagem</h3>
+        {profissional} - {especialidade}<br><br>
+
+        <h3>Resultado por área</h3>
+        """
+
+        for area, pontos in ranking:
+            resultado_html += f"{area}: {pontos} pontos - {classificar(pontos)}<br>"
+
+        resultado_html += "<h3>Prioridades (Top 3)</h3>"
+        for area, pontos in top3:
+            resultado_html += f"{area} ({pontos} pontos)<br>"
+
+        resultado_html += "<h3>Sugestão de encaminhamento</h3>"
+        resultado_html += encaminhamento
+
+        resultado_html += """
+        <br><br>
+        <b>
+        Este documento refere-se a uma triagem inicial, baseada em observações estruturadas,
+        não constituindo diagnóstico clínico ou laudo profissional.
+        Os resultados indicam possíveis necessidades e servem como apoio para encaminhamento
+        para avaliação com profissionais especializados.
+        </b>
+        """
+
+        return resultado_html
+
+    html = """
+    <h1>NFs – Triagem Multidisciplinar</h1>
+
+    <form method="post">
+
+    <h3>Cadastro do paciente</h3>
+    Nome: <input name="nome"><br>
+    Idade: <input name="idade"><br>
+    Responsável: <input name="responsavel"><br>
+
+    <h3>Profissional que realizou a triagem</h3>
+    Nome: <input name="profissional"><br>
+    Especialidade: <input name="especialidade"><br><br>
+    """
+
+    for i, q in enumerate(questions):
+        html += f"<p><b>{q['area']} - {q['pergunta']}</b><br><i>{q['explicacao']}</i></p>"
+        html += f"""
+        <select name='q{i}'>
+            <option value='0'>0 - Não apresenta</option>
+            <option value='1'>1 - Leve</option>
+            <option value='2'>2 - Moderado</option>
+            <option value='3'>3 - Frequente</option>
+        </select><br><br>
+        """
+
+    html += "<button type='submit'>Finalizar Triagem</button></form>"
+
+    return render_template_string(html)
+
+app.run(host='0.0.0.0', port=81)
