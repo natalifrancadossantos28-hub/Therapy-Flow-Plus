@@ -2,3 +2,4 @@ export * from "./professionals";
 export * from "./patients";
 export * from "./appointments";
 export * from "./waiting-list";
+export * from "./triagens";

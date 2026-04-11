@@ -1,0 +1,161 @@
+from flask import Flask, request, render_template_string
+from collections import defaultdict
+import sqlite3
+from datetime import datetime
+
+app = Flask(__name__)
+
+# BANCO DE DADOS
+conn = sqlite3.connect('triagem.db', check_same_thread=False)
+cursor = conn.cursor()
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS pacientes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT,
+    data_nascimento TEXT,
+    idade TEXT,
+    responsavel TEXT,
+    telefone TEXT,
+    endereco TEXT,
+    diagnostico TEXT,
+    cid TEXT,
+    profissional TEXT,
+    especialidade TEXT,
+    data TEXT,
+    resultado TEXT
+)
+''')
+
+conn.commit()
+
+# PERGUNTAS (exemplo inicial)
+questions = [
+    {"area": "Psicológico", "pergunta": "Déficit de atenção sustentada", "explicacao": "Dificuldade de manter o foco"},
+    {"area": "Psicológico", "pergunta": "Ansiedade frequente", "explicacao": "Fica muito nervoso ou preocupado"},
+    {"area": "Fonoaudiologia", "pergunta": "Atraso na fala", "explicacao": "Demora para falar ou se comunicar"},
+    {"area": "Terapia Ocupacional", "pergunta": "Dificuldade motora fina", "explicacao": "Dificuldade para usar as mãos"},
+]
+
+def classificar(pontos):
+    if pontos <= 10:
+        return "Baixo indicativo"
+    elif pontos <= 20:
+        return "Indício moderado"
+    else:
+        return "Indício elevado"
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        dados = request.form
+
+        # DADOS
+        nome = dados.get("nome")
+        data_nascimento = dados.get("data_nascimento")
+        idade = dados.get("idade")
+        responsavel = dados.get("responsavel")
+        telefone = dados.get("telefone")
+        endereco = dados.get("endereco")
+        diagnostico = dados.get("diagnostico")
+        cid = dados.get("cid")
+
+        profissional = dados.get("profissional")
+        especialidade = dados.get("especialidade")
+
+        pontuacao_areas = defaultdict(int)
+
+        for i, q in enumerate(questions):
+            valor = int(dados.get(f"q{i}", 0))
+            pontuacao_areas[q["area"]] += valor
+
+        ranking = sorted(pontuacao_areas.items(), key=lambda x: x[1], reverse=True)
+        top3 = ranking[:3]
+
+        resultado = ""
+        for area, pontos in ranking:
+            resultado += f"{area}: {pontos} pontos - {classificar(pontos)} | "
+
+        # SALVAR
+        cursor.execute('''
+        INSERT INTO pacientes 
+        (nome, data_nascimento, idade, responsavel, telefone, endereco, diagnostico, cid, profissional, especialidade, data, resultado)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            nome, data_nascimento, idade, responsavel, telefone, endereco,
+            diagnostico, cid, profissional, especialidade,
+            datetime.now().strftime("%d/%m/%Y"), resultado
+        ))
+
+        conn.commit()
+
+        return """
+        <h2>Triagem salva com sucesso!</h2>
+        <a href='/lista'>Ver pacientes</a><br><br>
+        <a href='/'>Nova triagem</a>
+        """
+
+    html = """
+    <h1>NFs – Triagem Multidisciplinar</h1>
+
+    <form method="post">
+
+    <h3>Dados do paciente</h3>
+    Nome: <input name="nome"><br>
+    Data de nascimento: <input name="data_nascimento"><br>
+    Idade: <input name="idade"><br>
+    Responsável: <input name="responsavel"><br>
+
+    <h3>Contato</h3>
+    Telefone: <input name="telefone"><br>
+    Endereço: <input name="endereco"><br>
+
+    <h3>Informações clínicas</h3>
+    Diagnóstico informado: <input name="diagnostico"><br>
+    CID informado (se houver): <input name="cid"><br>
+
+    <h3>Profissional</h3>
+    Nome: <input name="profissional"><br>
+    Especialidade: <input name="especialidade"><br><br>
+    """
+
+    for i, q in enumerate(questions):
+        html += f"<p><b>{q['area']} - {q['pergunta']}</b><br><i>{q['explicacao']}</i></p>"
+        html += f"""
+        <select name='q{i}'>
+            <option value='0'>0</option>
+            <option value='1'>1</option>
+            <option value='2'>2</option>
+            <option value='3'>3</option>
+        </select><br><br>
+        """
+
+    html += "<button type='submit'>Salvar Triagem</button></form>"
+
+    return render_template_string(html)
+
+@app.route("/lista")
+def lista():
+    cursor.execute("SELECT * FROM pacientes")
+    dados = cursor.fetchall()
+
+    html = "<h1>Pacientes atendidos</h1>"
+
+    for p in dados:
+        html += f"""
+        <p>
+        <b>{p[1]}</b> | Idade: {p[3]} | Data: {p[11]}<br>
+        Responsável: {p[4]}<br>
+        Telefone: {p[5]}<br>
+        Diagnóstico informado: {p[7]} | CID: {p[8]}<br>
+        Profissional: {p[9]} ({p[10]})<br>
+        Resultado: {p[12]}
+        </p>
+        <hr>
+        """
+
+    html += "<a href='/'>Nova triagem</a>"
+
+    return html
+
+app.run(host='0.0.0.0', port=81)

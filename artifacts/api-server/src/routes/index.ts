@@ -4,6 +4,7 @@ import professionalsRouter from "./professionals";
 import patientsRouter from "./patients";
 import appointmentsRouter from "./appointments";
 import waitingListRouter from "./waiting-list";
+import triagemRouter from "./triagens";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(professionalsRouter);
 router.use(patientsRouter);
 router.use(appointmentsRouter);
 router.use(waitingListRouter);
+router.use(triagemRouter);
 
 export default router;
