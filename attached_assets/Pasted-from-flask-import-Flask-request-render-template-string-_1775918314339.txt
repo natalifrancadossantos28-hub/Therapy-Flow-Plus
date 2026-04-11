@@ -1,0 +1,79 @@
+from flask import Flask, request, render_template_string
+from collections import defaultdict
+
+app = Flask(__name__)
+
+# ÁREAS
+areas = [
+    "Psicológico",
+    "Psicomotricidade",
+    "Fisioterapia",
+    "Terapia Ocupacional",
+    "Fonoaudiologia",
+    "Nutrição",
+    "Psicopedagogia",
+    "Educação Física"
+]
+
+# PERGUNTAS (exemplo inicial - vamos expandir depois)
+questions = [
+    {"area": "Psicológico", "pergunta": "Déficit de atenção sustentada", "explicacao": "Dificuldade de manter o foco"},
+    {"area": "Psicológico", "pergunta": "Ansiedade frequente", "explicacao": "Fica muito nervoso ou preocupado"},
+    {"area": "Fonoaudiologia", "pergunta": "Atraso na fala", "explicacao": "Demora para falar ou se comunicar"},
+    {"area": "Terapia Ocupacional", "pergunta": "Dificuldade motora fina", "explicacao": "Dificuldade para usar as mãos"},
+]
+
+def classificar(pontos):
+    if pontos <= 10:
+        return "Baixo indicativo"
+    elif pontos <= 20:
+        return "Indício moderado"
+    else:
+        return "Indício elevado"
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        dados = request.form
+
+        nome = dados.get("nome")
+        idade = dados.get("idade")
+        responsavel = dados.get("responsavel")
+        profissional = dados.get("profissional")
+
+        pontuacao_areas = defaultdict(int)
+
+        for i, q in enumerate(questions):
+            valor = int(dados.get(f"q{i}", 0))
+            pontuacao_areas[q["area"]] += valor
+
+        # Ordenar ranking
+        ranking = sorted(pontuacao_areas.items(), key=lambda x: x[1], reverse=True)
+
+        # Top 3
+        top3 = ranking[:3]
+
+        resultado_html = f"""
+        <h1>Relatório de Triagem Multidisciplinar</h1>
+
+        <h3>Paciente</h3>
+        Nome: {nome}<br>
+        Idade: {idade}<br>
+        Responsável: {responsavel}<br>
+
+        <h3>Profissional responsável</h3>
+        {profissional}<br><br>
+
+        <h3>Resultado por área</h3>
+        """
+
+        for area, pontos in ranking:
+            resultado_html += f"{area}: {pontos} pontos - {classificar(pontos)}<br>"
+
+        resultado_html += "<h3>Prioridades (Top 3)</h3>"
+        for area, pontos in top3:
+            resultado_html += f"{area} ({pontos} pontos)<br>"
+
+        resultado_html += """
+        <br><br>
+        <b>Este documento refere-se a uma triagem inicial e não constitui diagnóstico clínico. Recomenda-se avaliação por profissional habilitado.</b>
