@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, triagens } from "@workspace/db";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -16,10 +16,13 @@ router.get("/triagens", async (_req, res) => {
 
 router.post("/triagens", async (req, res) => {
   try {
-    const { nome, idade, responsavel, profissional, especialidade, data, resultado } = req.body;
+    const {
+      nome, dataNascimento, idade, responsavel, telefone, endereco,
+      diagnostico, cid, profissional, especialidade, data, resultado,
+    } = req.body;
     const [row] = await db
       .insert(triagens)
-      .values({ nome, idade, responsavel, profissional, especialidade, data, resultado })
+      .values({ nome, dataNascimento, idade, responsavel, telefone, endereco, diagnostico, cid, profissional, especialidade, data, resultado })
       .returning();
     res.status(201).json(row);
   } catch (err) {
@@ -30,10 +33,7 @@ router.post("/triagens", async (req, res) => {
 
 router.delete("/triagens/:id", async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    await db.delete(triagens).where(
-      (await import("drizzle-orm")).eq(triagens.id, id)
-    );
+    await db.delete(triagens).where(eq(triagens.id, Number(req.params.id)));
     res.status(204).end();
   } catch (err) {
     console.error(err);

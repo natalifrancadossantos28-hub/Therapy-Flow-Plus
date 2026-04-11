@@ -156,7 +156,12 @@ function classificar(pontos: number): { label: string; cor: string; bg: string }
 type FormData = {
   respostas: number[];
   nomePaciente: string;
+  dataNascimento: string;
   nomeResponsavel: string;
+  telefone: string;
+  endereco: string;
+  diagnostico: string;
+  cid: string;
   profissional: string;
   especialidade: string;
   idade: string;
@@ -165,8 +170,13 @@ type FormData = {
 type TriagemSalva = {
   id: number;
   nome: string;
+  dataNascimento: string | null;
   idade: string | null;
   responsavel: string | null;
+  telefone: string | null;
+  endereco: string | null;
+  diagnostico: string | null;
+  cid: string | null;
   profissional: string | null;
   especialidade: string | null;
   data: string | null;
@@ -198,7 +208,12 @@ function Header({ showLista = false }: { showLista?: boolean }) {
 function Formulario({ onSubmit }: { onSubmit: (f: FormData) => void }) {
   const [respostas, setRespostas] = useState<number[]>(Array(PERGUNTAS.length).fill(0));
   const [nomePaciente, setNomePaciente] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
   const [nomeResponsavel, setNomeResponsavel] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [endereco, setEndereco] = useState("");
+  const [diagnostico, setDiagnostico] = useState("");
+  const [cid, setCid] = useState("");
   const [profissional, setProfissional] = useState("");
   const [especialidade, setEspecialidade] = useState("");
   const [idade, setIdade] = useState("");
@@ -209,45 +224,98 @@ function Formulario({ onSubmit }: { onSubmit: (f: FormData) => void }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ respostas, nomePaciente, nomeResponsavel, profissional, especialidade, idade });
+    onSubmit({ respostas, nomePaciente, dataNascimento, nomeResponsavel, telefone, endereco, diagnostico, cid, profissional, especialidade, idade });
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
-        <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-foreground mb-4">Dados de Identificação</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome do Paciente *</label>
-              <input required value={nomePaciente} onChange={(e) => setNomePaciente(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                placeholder="Nome completo" />
+        <div className="bg-white rounded-2xl border border-border p-6 shadow-sm space-y-6">
+          {/* Dados do paciente */}
+          <div>
+            <h2 className="text-base font-bold text-foreground mb-3">Dados do Paciente</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome completo *</label>
+                <input required value={nomePaciente} onChange={(e) => setNomePaciente(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Nome completo" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Data de Nascimento</label>
+                <input type="date" value={dataNascimento} onChange={(e) => setDataNascimento(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Idade</label>
+                <input value={idade} onChange={(e) => setIdade(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Ex.: 8 anos" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Responsável</label>
+                <input value={nomeResponsavel} onChange={(e) => setNomeResponsavel(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Nome do responsável" />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-muted-foreground mb-1">Idade</label>
-              <input value={idade} onChange={(e) => setIdade(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                placeholder="Ex.: 8 anos" />
+          </div>
+
+          {/* Contato */}
+          <div className="pt-4 border-t border-border">
+            <h2 className="text-base font-bold text-foreground mb-3">Contato</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Telefone</label>
+                <input value={telefone} onChange={(e) => setTelefone(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="(00) 00000-0000" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Endereço</label>
+                <input value={endereco} onChange={(e) => setEndereco(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Rua, número, bairro" />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-muted-foreground mb-1">Responsável</label>
-              <input value={nomeResponsavel} onChange={(e) => setNomeResponsavel(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                placeholder="Nome do responsável" />
+          </div>
+
+          {/* Informações clínicas */}
+          <div className="pt-4 border-t border-border">
+            <h2 className="text-base font-bold text-foreground mb-3">Informações Clínicas</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Diagnóstico informado</label>
+                <input value={diagnostico} onChange={(e) => setDiagnostico(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Ex.: TEA, TDAH, sem diagnóstico" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">CID (se houver)</label>
+                <input value={cid} onChange={(e) => setCid(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Ex.: F84.0, F90.0" />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-muted-foreground mb-1">Profissional Responsável</label>
-              <input value={profissional} onChange={(e) => setProfissional(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                placeholder="Nome do profissional" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-muted-foreground mb-1">Especialidade</label>
-              <input value={especialidade} onChange={(e) => setEspecialidade(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                placeholder="Ex.: Psicologia, Fonoaudiologia" />
+          </div>
+
+          {/* Profissional */}
+          <div className="pt-4 border-t border-border">
+            <h2 className="text-base font-bold text-foreground mb-3">Profissional Responsável pela Triagem</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome</label>
+                <input value={profissional} onChange={(e) => setProfissional(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Nome do profissional" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Especialidade</label>
+                <input value={especialidade} onChange={(e) => setEspecialidade(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Ex.: Psicologia, Fonoaudiologia" />
+              </div>
             </div>
           </div>
         </div>
@@ -343,7 +411,7 @@ function Formulario({ onSubmit }: { onSubmit: (f: FormData) => void }) {
 }
 
 function Relatorio({ formData, onNova }: { formData: FormData; onNova: () => void }) {
-  const { respostas, nomePaciente, nomeResponsavel, profissional, especialidade, idade } = formData;
+  const { respostas, nomePaciente, dataNascimento, nomeResponsavel, telefone, endereco, diagnostico, cid, profissional, especialidade, idade } = formData;
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
   const [, navigate] = useLocation();
@@ -375,8 +443,13 @@ function Relatorio({ formData, onNova }: { formData: FormData; onNova: () => voi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nome: nomePaciente,
+          dataNascimento,
           idade,
           responsavel: nomeResponsavel,
+          telefone,
+          endereco,
+          diagnostico,
+          cid,
           profissional,
           especialidade,
           data,
@@ -393,16 +466,25 @@ function Relatorio({ formData, onNova }: { formData: FormData; onNova: () => voi
     <div className="min-h-screen bg-background">
       <Header showLista />
       <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
-        <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
-          <h2 className="font-bold text-base text-muted-foreground uppercase tracking-wider mb-4">Paciente</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><p className="text-muted-foreground font-semibold">Nome</p><p className="font-bold text-foreground">{nomePaciente || "—"}</p></div>
-            <div><p className="text-muted-foreground font-semibold">Idade</p><p className="font-bold text-foreground">{idade || "—"}</p></div>
-            <div><p className="text-muted-foreground font-semibold">Responsável</p><p className="font-bold text-foreground">{nomeResponsavel || "—"}</p></div>
-            <div><p className="text-muted-foreground font-semibold">Data</p><p className="font-bold text-foreground">{data}</p></div>
+        <div className="bg-white rounded-2xl border border-border p-6 shadow-sm space-y-4">
+          <h2 className="font-bold text-base text-muted-foreground uppercase tracking-wider">Dados do Paciente</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Nome</p><p className="font-bold text-foreground">{nomePaciente || "—"}</p></div>
+            <div><p className="text-muted-foreground font-semibold">Data da Triagem</p><p className="font-bold text-foreground">{data}</p></div>
+            {dataNascimento && <div><p className="text-muted-foreground font-semibold">Data de Nascimento</p><p className="font-bold text-foreground">{new Date(dataNascimento + "T12:00:00").toLocaleDateString("pt-BR")}</p></div>}
+            {idade && <div><p className="text-muted-foreground font-semibold">Idade</p><p className="font-bold text-foreground">{idade}</p></div>}
+            {nomeResponsavel && <div><p className="text-muted-foreground font-semibold">Responsável</p><p className="font-bold text-foreground">{nomeResponsavel}</p></div>}
+            {telefone && <div><p className="text-muted-foreground font-semibold">Telefone</p><p className="font-bold text-foreground">{telefone}</p></div>}
+            {endereco && <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Endereço</p><p className="font-bold text-foreground">{endereco}</p></div>}
           </div>
+          {(diagnostico || cid) && (
+            <div className="pt-4 border-t border-border text-sm grid grid-cols-2 gap-4">
+              {diagnostico && <div><p className="text-muted-foreground font-semibold">Diagnóstico informado</p><p className="font-bold text-foreground">{diagnostico}</p></div>}
+              {cid && <div><p className="text-muted-foreground font-semibold">CID</p><p className="font-bold text-foreground">{cid}</p></div>}
+            </div>
+          )}
           {profissional && (
-            <div className="mt-4 pt-4 border-t border-border text-sm">
+            <div className="pt-4 border-t border-border text-sm">
               <p className="text-muted-foreground font-semibold">Profissional Responsável pela Triagem</p>
               <p className="font-bold text-foreground">{profissional}{especialidade ? ` — ${especialidade}` : ""}</p>
             </div>
@@ -558,14 +640,23 @@ function ListaPacientes() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="font-bold text-lg text-foreground">{t.nome}</p>
-                      <div className="flex flex-wrap gap-3 mt-1 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
                         {t.idade && <span>Idade: {t.idade}</span>}
                         {t.responsavel && <span>Resp.: {t.responsavel}</span>}
-                        {t.profissional && (
-                          <span>{t.profissional}{t.especialidade ? ` — ${t.especialidade}` : ""}</span>
-                        )}
+                        {t.telefone && <span>📞 {t.telefone}</span>}
                         {t.data && <span>📅 {t.data}</span>}
                       </div>
+                      {(t.diagnostico || t.cid) && (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm">
+                          {t.diagnostico && <span className="text-muted-foreground">Diag.: <span className="font-semibold text-foreground">{t.diagnostico}</span></span>}
+                          {t.cid && <span className="text-muted-foreground">CID: <span className="font-semibold text-foreground">{t.cid}</span></span>}
+                        </div>
+                      )}
+                      {t.profissional && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Prof.: <span className="font-semibold text-foreground">{t.profissional}{t.especialidade ? ` — ${t.especialidade}` : ""}</span>
+                        </p>
+                      )}
                     </div>
                     <button onClick={() => excluir(t.id)}
                       className="text-muted-foreground hover:text-destructive transition-colors text-xl flex-shrink-0"
