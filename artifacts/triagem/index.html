@@ -14,3 +14,13 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+<script>
+document.querySelector('input[type="date"]')?.addEventListener('change', function(e) {
+    const nasc = new Date(e.target.value);
+    const hoje = new Date();
+    let idade = hoje.getFullYear() - nasc.getFullYear();
+    if (hoje.getMonth() < nasc.getMonth() || (hoje.getMonth() === nasc.getMonth() && hoje.getDate() < nasc.getDate())) idade--;
+    const campoIdade = document.querySelector('input[placeholder*="idade"]') || document.querySelector('input[name*="idade"]');
+    if (campoIdade) campoIdade.value = idade + (idade === 1 ? " ano" : "idade");
+});
+</script>

@@ -244,7 +244,18 @@ function Formulario({ onSubmit }: { onSubmit: (f: FormData) => void }) {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-muted-foreground mb-1">Data de Nascimento</label>
-                <input type="date" value={dataNascimento} onChange={(e) => setDataNascimento(e.target.value)}
+                <input type="date" value={dataNascimento} onChange={(e) => {
+                    const val = e.target.value;
+                    setDataNascimento(val);
+                    if (val) {
+                      const nascimento = new Date(val + "T12:00:00");
+                      const hoje = new Date();
+                      let anos = hoje.getFullYear() - nascimento.getFullYear();
+                      const m = hoje.getMonth() - nascimento.getMonth();
+                      if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) anos--;
+                      setIdade(anos + (anos === 1 ? " ano" : " anos"));
+                    }
+                  }}
                   className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
               </div>
               <div>
