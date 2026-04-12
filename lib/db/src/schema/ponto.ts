@@ -10,6 +10,9 @@ export const pontoEmployeesTable = pgTable("ponto_employees", {
   photo: text("photo"),
   weeklyHours: integer("weekly_hours").notNull().default(44),
   active: boolean("active").notNull().default(true),
+  entryTime: text("entry_time"),
+  exitTime: text("exit_time"),
+  breakMinutes: integer("break_minutes").notNull().default(60),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

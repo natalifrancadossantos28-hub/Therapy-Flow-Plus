@@ -47,6 +47,9 @@ const formSchema = z.object({
   weeklyHours: z.number().int().min(1).max(60).default(44),
   photo: z.string().nullable(),
   active: z.boolean().default(true),
+  entryTime: z.string().nullable().optional(),
+  exitTime: z.string().nullable().optional(),
+  breakMinutes: z.number().int().default(60),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -81,6 +84,9 @@ export default function EmployeeForm() {
       weeklyHours: 44,
       photo: null,
       active: true,
+      entryTime: null,
+      exitTime: null,
+      breakMinutes: 60,
     }
   });
 
@@ -93,6 +99,9 @@ export default function EmployeeForm() {
         weeklyHours: employee.weeklyHours ?? 44,
         photo: employee.photo ?? null,
         active: employee.active,
+        entryTime: (employee as any).entryTime ?? null,
+        exitTime: (employee as any).exitTime ?? null,
+        breakMinutes: (employee as any).breakMinutes ?? 60,
       });
     }
   }, [employee, isNew, form]);
@@ -328,6 +337,98 @@ export default function EmployeeForm() {
                     </FormControl>
                   </FormItem>
                 )} />
+              </div>
+
+              {/* ── Schedule Section ─────────────────────────────────────────── */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-1 border-b border-white/10">
+                  <span className="text-sm font-semibold text-foreground">Horário de Trabalho</span>
+                  <span className="text-xs text-muted-foreground">(opcional — usado para controle de horas extras)</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField control={form.control} name="entryTime" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Horário de Entrada</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="time"
+                          value={field.value ?? ""}
+                          onChange={e => field.onChange(e.target.value || null)}
+                          className="bg-background/50 border-white/10"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="exitTime" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Horário de Saída</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="time"
+                          value={field.value ?? ""}
+                          onChange={e => field.onChange(e.target.value || null)}
+                          className="bg-background/50 border-white/10"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="breakMinutes" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tempo de Intervalo</FormLabel>
+                      <Select
+                        value={String(field.value)}
+                        onValueChange={v => field.onChange(Number(v))}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="bg-background/50 border-white/10">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="15">15 minutos</SelectItem>
+                          <SelectItem value="60">1 hora</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+
+                {/* Preview do cálculo de saída efetiva */}
+                {form.watch("entryTime") && form.watch("exitTime") && (() => {
+                  const entry = form.watch("entryTime")!;
+                  const exit = form.watch("exitTime")!;
+                  const brk = form.watch("breakMinutes") ?? 60;
+                  const effMins = (() => {
+                    const [eh, em] = exit.split(":").map(Number);
+                    return (eh * 60 + em) - (60 - brk);
+                  })();
+                  const effTime = `${String(Math.floor(effMins / 60)).padStart(2, "0")}:${String(effMins % 60).padStart(2, "0")}`;
+                  const sameAsExit = brk === 60;
+                  return (
+                    <div className="flex items-start gap-2 text-xs rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-muted-foreground">
+                      <span className="text-primary font-semibold shrink-0">Resumo:</span>
+                      <span>
+                        Entrada liberada a partir das <strong className="text-foreground">{entry.slice(0, 5).replace(/^(\d{2}):(\d{2})$/, (_, h, m) => {
+                          const t = Number(h)*60+Number(m)-10;
+                          return `${String(Math.floor(t/60)).padStart(2,"0")}:${String(t%60).padStart(2,"0")}`;
+                        })}</strong>.
+                        {" "}Saída bloqueada após{" "}
+                        <strong className="text-foreground">{(() => {
+                          const [h, m] = effTime.split(":").map(Number);
+                          const t = h*60+m+10;
+                          return `${String(Math.floor(t/60)).padStart(2,"0")}:${String(t%60).padStart(2,"0")}`;
+                        })()}</strong>
+                        {!sameAsExit && <span className="text-amber-400"> (saída real: {effTime} por intervalo de {brk} min)</span>}.
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="flex justify-end gap-4 pt-4 border-t border-white/10">

@@ -5,13 +5,29 @@ import { eq, and, desc, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+// ── Schedule helpers ──────────────────────────────────────────────────────────
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+function minutesToTime(m: number): string {
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+// Effective exit = scheduled exit adjusted for break duration
+// (standard break assumed = 60 min; shorter break means earlier exit)
+function effectiveExitMinutes(exitTime: string, breakMinutes: number): number {
+  return timeToMinutes(exitTime) - (60 - breakMinutes);
+}
+
 router.get("/ponto/employees", async (req, res) => {
   const rows = await db.select().from(pontoEmployeesTable).orderBy(pontoEmployeesTable.name);
   res.json(rows);
 });
 
 router.post("/ponto/employees", async (req, res) => {
-  const { name, cpf, role, photo, weeklyHours, active } = req.body;
+  const { name, cpf, role, photo, weeklyHours, active, entryTime, exitTime, breakMinutes } = req.body;
   const [row] = await db.insert(pontoEmployeesTable).values({
     name,
     cpf: cpf.replace(/\D/g, ""),
@@ -19,6 +35,9 @@ router.post("/ponto/employees", async (req, res) => {
     photo: photo ?? null,
     weeklyHours: weeklyHours !== undefined ? Number(weeklyHours) : 44,
     active: active !== undefined ? active : true,
+    entryTime: entryTime ?? null,
+    exitTime: exitTime ?? null,
+    breakMinutes: breakMinutes !== undefined ? Number(breakMinutes) : 60,
   }).returning();
   res.status(201).json(row);
 });
@@ -39,7 +58,7 @@ router.get("/ponto/employees/:id", async (req, res) => {
 
 router.put("/ponto/employees/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { name, cpf, role, photo, weeklyHours, active } = req.body;
+  const { name, cpf, role, photo, weeklyHours, active, entryTime, exitTime, breakMinutes } = req.body;
   const updateData: Record<string, unknown> = {};
   if (name !== undefined) updateData.name = name;
   if (cpf !== undefined) updateData.cpf = cpf.replace(/\D/g, "");
@@ -47,6 +66,9 @@ router.put("/ponto/employees/:id", async (req, res) => {
   if (photo !== undefined) updateData.photo = photo;
   if (weeklyHours !== undefined) updateData.weeklyHours = Number(weeklyHours);
   if (active !== undefined) updateData.active = active;
+  if (entryTime !== undefined) updateData.entryTime = entryTime || null;
+  if (exitTime !== undefined) updateData.exitTime = exitTime || null;
+  if (breakMinutes !== undefined) updateData.breakMinutes = Number(breakMinutes);
 
   const [row] = await db.update(pontoEmployeesTable).set(updateData).where(eq(pontoEmployeesTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Funcionário não encontrado" });
@@ -166,6 +188,32 @@ router.post("/ponto/records", async (req, res) => {
 
   const [employee] = await db.select().from(pontoEmployeesTable).where(eq(pontoEmployeesTable.id, Number(employeeId)));
   if (!employee) return res.status(404).json({ error: "Funcionário não encontrado" });
+
+  // ── Schedule validation ───────────────────────────────────────────────────
+  // Use local time in Brazil (UTC-3) for clock checks
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const TOLERANCE = 10; // minutes
+
+  if (type === "entrada" && employee.entryTime) {
+    const earliest = timeToMinutes(employee.entryTime) - TOLERANCE;
+    if (nowMinutes < earliest) {
+      return res.status(422).json({
+        error: `Muito cedo para registrar. A entrada é liberada a partir das ${minutesToTime(earliest)}.`,
+      });
+    }
+  }
+
+  if (type === "saida" && employee.exitTime) {
+    const effExit = effectiveExitMinutes(employee.exitTime, employee.breakMinutes ?? 60);
+    const deadline = effExit + TOLERANCE;
+    if (nowMinutes > deadline) {
+      return res.status(422).json({
+        error: `Horário limite de saída excedido. Procure a administração para autorizar hora extra.`,
+        detail: `Saída prevista: ${minutesToTime(effExit)} · Limite: ${minutesToTime(deadline)}`,
+      });
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [row] = await db.insert(pontoRecordsTable).values({
     employeeId: Number(employeeId),

@@ -124,8 +124,12 @@ export default function KioskPage() {
           setScanState("success");
           scheduleReset();
         },
-        onError: () => {
-          showError("Erro ao registrar ponto. Tente novamente.");
+        onError: (err: any) => {
+          const msg =
+            err?.response?.data?.error ??
+            err?.message ??
+            "Erro ao registrar ponto. Tente novamente.";
+          showError(msg);
         },
       }
     );
