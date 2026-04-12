@@ -4,6 +4,49 @@ import { desc, eq } from "drizzle-orm";
 
 const router = Router();
 
+const extractFields = (body: any) => ({
+  nome: body.nome,
+  dataNascimento: body.dataNascimento,
+  idade: body.idade,
+  responsavel: body.responsavel,
+  telefone: body.telefone,
+  endereco: body.endereco,
+  naturalidade: body.naturalidade,
+  rg: body.rg,
+  cpf: body.cpf,
+  sus: body.sus,
+  nomeMae: body.nomeMae,
+  escolaridadeMae: body.escolaridadeMae,
+  profissaoMae: body.profissaoMae,
+  nomePai: body.nomePai,
+  escolaridadePai: body.escolaridadePai,
+  profissaoPai: body.profissaoPai,
+  numIrmaos: body.numIrmaos,
+  tipoImovel: body.tipoImovel,
+  bolsaFamilia: !!body.bolsaFamilia,
+  bpc: !!body.bpc,
+  pensao: !!body.pensao,
+  auxilioDoenca: !!body.auxilioDoenca,
+  outrosAuxilios: body.outrosAuxilios,
+  rendaFamiliar: body.rendaFamiliar,
+  diagnostico: body.diagnostico,
+  cid: body.cid,
+  cid11: body.cid11,
+  medico: body.medico,
+  dataUltimaCons: body.dataUltimaCons,
+  cadeiraDeRodas: !!body.cadeiraDeRodas,
+  ortesesProteses: !!body.ortesesProteses,
+  aparelhoAuditivo: !!body.aparelhoAuditivo,
+  medicacaoContinua: body.medicacaoContinua,
+  alergias: body.alergias,
+  problemasSaude: body.problemasSaude,
+  profissional: body.profissional,
+  especialidade: body.especialidade,
+  data: body.data,
+  resultado: body.resultado,
+  respostas: body.respostas ? JSON.stringify(body.respostas) : null,
+});
+
 router.get("/triagens", async (_req, res) => {
   try {
     const rows = await db.select().from(triagens).orderBy(desc(triagens.createdAt));
@@ -27,29 +70,7 @@ router.get("/triagens/:id", async (req, res) => {
 
 router.post("/triagens", async (req, res) => {
   try {
-    const {
-      nome, dataNascimento, idade, responsavel, telefone, endereco,
-      naturalidade, rg, cpf, sus,
-      nomeMae, escolaridadeMae, profissaoMae,
-      nomePai, escolaridadePai, profissaoPai,
-      numIrmaos, tipoImovel, bolsaFamilia, bpc,
-      diagnostico, cid, medico, dataUltimaCons,
-      profissional, especialidade, data, resultado, respostas,
-    } = req.body;
-    const [row] = await db
-      .insert(triagens)
-      .values({
-        nome, dataNascimento, idade, responsavel, telefone, endereco,
-        naturalidade, rg, cpf, sus,
-        nomeMae, escolaridadeMae, profissaoMae,
-        nomePai, escolaridadePai, profissaoPai,
-        numIrmaos, tipoImovel,
-        bolsaFamilia: !!bolsaFamilia, bpc: !!bpc,
-        diagnostico, cid, medico, dataUltimaCons,
-        profissional, especialidade, data, resultado,
-        respostas: respostas ? JSON.stringify(respostas) : null,
-      })
-      .returning();
+    const [row] = await db.insert(triagens).values(extractFields(req.body)).returning();
     res.status(201).json(row);
   } catch (err) {
     console.error(err);
@@ -59,28 +80,9 @@ router.post("/triagens", async (req, res) => {
 
 router.put("/triagens/:id", async (req, res) => {
   try {
-    const {
-      nome, dataNascimento, idade, responsavel, telefone, endereco,
-      naturalidade, rg, cpf, sus,
-      nomeMae, escolaridadeMae, profissaoMae,
-      nomePai, escolaridadePai, profissaoPai,
-      numIrmaos, tipoImovel, bolsaFamilia, bpc,
-      diagnostico, cid, medico, dataUltimaCons,
-      profissional, especialidade, data, resultado, respostas,
-    } = req.body;
     const [row] = await db
       .update(triagens)
-      .set({
-        nome, dataNascimento, idade, responsavel, telefone, endereco,
-        naturalidade, rg, cpf, sus,
-        nomeMae, escolaridadeMae, profissaoMae,
-        nomePai, escolaridadePai, profissaoPai,
-        numIrmaos, tipoImovel,
-        bolsaFamilia: !!bolsaFamilia, bpc: !!bpc,
-        diagnostico, cid, medico, dataUltimaCons,
-        profissional, especialidade, data, resultado,
-        respostas: respostas ? JSON.stringify(respostas) : null,
-      })
+      .set(extractFields(req.body))
       .where(eq(triagens.id, Number(req.params.id)))
       .returning();
     if (!row) return res.status(404).json({ error: "Triagem não encontrada" });

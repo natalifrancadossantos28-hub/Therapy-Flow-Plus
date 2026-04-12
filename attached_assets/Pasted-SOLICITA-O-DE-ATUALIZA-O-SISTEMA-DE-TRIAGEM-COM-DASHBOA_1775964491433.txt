@@ -1,0 +1,28 @@
+SOLICITAÇÃO DE ATUALIZAÇÃO: SISTEMA DE TRIAGEM COM DASHBOARD SOCIAL
+​Objetivo: Implementar ficha social completa, ficha de saúde avançada e um Dashboard de estatísticas automáticas.
+​1. FICHA SOCIAL E DE AUXÍLIOS (ABANDONANDO O PAPEL):
+​Adicione campos de seleção para: [ ] Bolsa Família, [ ] BPC, [ ] Pensão, [ ] Auxílio-Doença, [ ] Outros Auxílios.
+​Adicione campo de Renda Familiar Total.
+​Contador Automático: O sistema deve somar internamente quantos pacientes estão marcados em cada auxílio.
+​2. FICHA DE SAÚDE AVANÇADA:
+​Diagnóstico: Campos para CID-10 e CID-11.
+​Dispositivos: Checkboxes para [ ] Cadeira de Rodas, [ ] Órteses/Próteses, [ ] Aparelho Auditivo.
+​Alertas Críticos: Campos para Medicação Contínua (nome e dose), Alergias (destacar em vermelho se preenchido) e Problemas de Saúde Associados (ex: convulsões).
+​3. DASHBOARD ESTATÍSTICO (NOVIDADE):
+​Crie uma tela de Dashboard (Painel de Controle) que exiba cards com contagem automática:
+​"Total de Pacientes com BPC"
+​"Total de Pacientes com Bolsa Família"
+​"Total de Cadeirantes"
+​"Pacientes com Alergias Graves"
+​Use gráficos simples (Barras ou Pizza) para mostrar a distribuição de diagnósticos e auxílios.
+​4. TRIAGEM UNIVERSAL PCD (0-18 ANOS):
+​15 Perguntas por Especialidade: Use o modelo [Termo Técnico em Negrito] + (Explicação Simples em Itálico).
+​Foco: TEA, Deficiência Física, Intelectual, Auditiva e Visual.
+​Resultado: Gráfico de Radar (Teia de Aranha) colorido por gravidade (Verde a Vermelho).
+​5. FLUXO DE PDF E EDIÇÃO:
+​Na lista de pacientes, adicione os botões [Editar] e [Imprimir PDF].
+​O PDF deve ser um relatório oficial contendo todos os dados sociais, alertas de saúde e o gráfico de triagem.
+​Por que esse pacote é sensacional:
+​Dados na Mão: Se alguém te perguntar: "Quantos pacientes da sua clínica dependem do BPC?", você abre o Dashboard e responde em 1 segundo.
+​Segurança: O alerta de alergia e medicação visível protege a criança e a clínica.
+​Tecnologia: O CID-11 e o Gráfico de Radar mostram que seu sistema é de última geração.

@@ -2,15 +2,16 @@ import { useState, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, Link, useLocation, useParams } from "wouter";
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  PieChart, Pie, Cell, Legend,
 } from "recharts";
 
 // ─── WHITE LABEL CONFIG ──────────────────────────────────────────────────────
-// Altere aqui para personalizar para cada clínica
 export const CLINIC_CONFIG = {
   name: "NFs – Triagem Multidisciplinar",
   subtitle: "Avaliação multidisciplinar para crianças e adolescentes (0–18 anos)",
   copyright: "© 2026 NFs – Triagem Multidisciplinar",
-  // logoUrl: "/logo.png", // Descomente e configure para usar logotipo personalizado
+  // logoUrl: "/logo.png",
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -19,29 +20,19 @@ const API = "/api";
 type Pergunta = { area: string; pergunta: string; explicacao: string };
 
 const AREAS = [
-  "Psicológico",
-  "Psicomotricidade",
-  "Fisioterapia",
-  "Terapia Ocupacional",
-  "Fonoaudiologia",
-  "Nutrição",
-  "Psicopedagogia",
-  "Educação Física",
+  "Psicológico", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
+  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
 ];
 
 const SHORT_NAMES: Record<string, string> = {
-  "Psicológico": "Psicol.",
-  "Psicomotricidade": "Psicomotr.",
-  "Fisioterapia": "Fisio.",
-  "Terapia Ocupacional": "T. Ocup.",
-  "Fonoaudiologia": "Fono.",
-  "Nutrição": "Nutrição",
-  "Psicopedagogia": "Psicoped.",
-  "Educação Física": "Ed. Física",
+  "Psicológico": "Psicol.", "Psicomotricidade": "Psicomotr.",
+  "Fisioterapia": "Fisio.", "Terapia Ocupacional": "T. Ocup.",
+  "Fonoaudiologia": "Fono.", "Nutrição": "Nutrição",
+  "Psicopedagogia": "Psicoped.", "Educação Física": "Ed. Física",
 };
 
 const PERGUNTAS: Pergunta[] = [
-  // ── PSICOLÓGICO (15) ──────────────────────────────────────────────────────
+  // ── PSICOLÓGICO (15)
   { area: "Psicológico", pergunta: "Déficit de atenção sustentada", explicacao: "Dificuldade de manter o foco por períodos esperados para a idade" },
   { area: "Psicológico", pergunta: "Ansiedade frequente", explicacao: "Fica muito nervoso, agitado ou preocupado sem causa aparente" },
   { area: "Psicológico", pergunta: "Baixa autoestima", explicacao: "Demonstra insegurança ou se deprecia com frequência" },
@@ -57,8 +48,7 @@ const PERGUNTAS: Pergunta[] = [
   { area: "Psicológico", pergunta: "Enurese ou encoprese", explicacao: "Molha a cama ou tem acidentes intestinais além do esperado para a faixa etária" },
   { area: "Psicológico", pergunta: "Comportamento autolesivo", explicacao: "Bate, morde ou machuca a si mesmo sem intenção de suicídio" },
   { area: "Psicológico", pergunta: "Somatização frequente", explicacao: "Queixas físicas (dor de cabeça, barriga) sem causa médica identificada" },
-
-  // ── PSICOMOTRICIDADE (15) ─────────────────────────────────────────────────
+  // ── PSICOMOTRICIDADE (15)
   { area: "Psicomotricidade", pergunta: "Dificuldade de coordenação motora global", explicacao: "Problemas para correr, pular ou realizar movimentos amplos" },
   { area: "Psicomotricidade", pergunta: "Dificuldade de equilíbrio estático", explicacao: "Dificuldade para ficar parado em uma posição sem se desequilibrar" },
   { area: "Psicomotricidade", pergunta: "Dificuldade de equilíbrio dinâmico", explicacao: "Desequilíbrio ao caminhar, subir escadas ou mudar de direção" },
@@ -74,8 +64,7 @@ const PERGUNTAS: Pergunta[] = [
   { area: "Psicomotricidade", pergunta: "Dificuldade de percepção tátil", explicacao: "Não identifica objetos pelo toque ou tem reações excessivas ao contato físico" },
   { area: "Psicomotricidade", pergunta: "Dificuldade de projeção espacial", explicacao: "Não calcula distâncias ao pular, escalar ou alcançar objetos" },
   { area: "Psicomotricidade", pergunta: "Dificuldade de sequência motora", explicacao: "Não consegue reproduzir sequências de movimentos demonstrados" },
-
-  // ── FISIOTERAPIA (15) ─────────────────────────────────────────────────────
+  // ── FISIOTERAPIA (15)
   { area: "Fisioterapia", pergunta: "Atraso no desenvolvimento motor global", explicacao: "Demora a rolar, sentar, engatinhar ou andar conforme o esperado" },
   { area: "Fisioterapia", pergunta: "Tônus muscular alterado", explicacao: "Músculos muito flácidos (hipotonia) ou muito rígidos (hipertonia)" },
   { area: "Fisioterapia", pergunta: "Desvio postural", explicacao: "Escoliose, cifose, lordose excessiva ou outras alterações posturais" },
@@ -91,8 +80,7 @@ const PERGUNTAS: Pergunta[] = [
   { area: "Fisioterapia", pergunta: "Fraqueza nos membros", explicacao: "Força reduzida em braços ou pernas comparada com a faixa etária" },
   { area: "Fisioterapia", pergunta: "Lentidão em reabilitação", explicacao: "Recuperação anormalmente lenta após lesões ou procedimentos" },
   { area: "Fisioterapia", pergunta: "Uso de órteses ou próteses", explicacao: "Uso atual ou anterior de aparelhos de suporte motor" },
-
-  // ── TERAPIA OCUPACIONAL (15) ──────────────────────────────────────────────
+  // ── TERAPIA OCUPACIONAL (15)
   { area: "Terapia Ocupacional", pergunta: "Dificuldade na coordenação motora fina", explicacao: "Dificuldade com recortar, escrever, montar ou encaixar objetos pequenos" },
   { area: "Terapia Ocupacional", pergunta: "Hipersensibilidade sensorial", explicacao: "Reação excessiva a texturas, sons, luzes ou odores" },
   { area: "Terapia Ocupacional", pergunta: "Hiposensibilidade sensorial", explicacao: "Baixa resposta a estímulos sensoriais; busca por sensações intensas" },
@@ -105,11 +93,10 @@ const PERGUNTAS: Pergunta[] = [
   { area: "Terapia Ocupacional", pergunta: "Dificuldade de adaptação a mudanças de rotina", explicacao: "Reage mal a novas rotinas, ambientes ou mudanças inesperadas" },
   { area: "Terapia Ocupacional", pergunta: "Dificuldade com utensílios", explicacao: "Não segura talheres, tesoura ou lápis de forma funcional para a idade" },
   { area: "Terapia Ocupacional", pergunta: "Comportamento autoestimulatório", explicacao: "Balanceio, estalar de dedos ou movimentos sensoriais repetidos" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade de regulação sensorial", explicacao: "Oscila entre busca e fuga de estímulos de modo que prejudica o funcionamento" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade de regulação sensorial", explicacao: "Oscila entre busca e fuga de estímulos de modo prejudicial" },
   { area: "Terapia Ocupacional", pergunta: "Dificuldade de higiene independente", explicacao: "Precisa de ajuda para escovar os dentes, banhar-se ou pentear acima do esperado" },
   { area: "Terapia Ocupacional", pergunta: "Dificuldade de adaptação ambiental", explicacao: "Reage excessivamente a ruídos, luzes ou locais diferentes do habitual" },
-
-  // ── FONOAUDIOLOGIA (15) ───────────────────────────────────────────────────
+  // ── FONOAUDIOLOGIA (15)
   { area: "Fonoaudiologia", pergunta: "Atraso na fala", explicacao: "Demora para falar ou se comunicar adequadamente para a idade" },
   { area: "Fonoaudiologia", pergunta: "Dificuldade de articulação", explicacao: "Troca ou omite sons na fala de forma frequente" },
   { area: "Fonoaudiologia", pergunta: "Gagueira ou disfluência", explicacao: "Repetições, prolongamentos ou bloqueios na fala" },
@@ -125,8 +112,7 @@ const PERGUNTAS: Pergunta[] = [
   { area: "Fonoaudiologia", pergunta: "Funções comunicativas restritas", explicacao: "Só pede ou rejeita; não comenta, narra ou questiona" },
   { area: "Fonoaudiologia", pergunta: "Alteração de nasalidade", explicacao: "Voz com timbre nasal excessivo (hipernasalidade) ou insuficiente (hiponasalidade)" },
   { area: "Fonoaudiologia", pergunta: "Dificuldade de segmentação silábica", explicacao: "Não identifica ou separa as sílabas de palavras ao ler ou escrever" },
-
-  // ── NUTRIÇÃO (15) ─────────────────────────────────────────────────────────
+  // ── NUTRIÇÃO (15)
   { area: "Nutrição", pergunta: "Seletividade alimentar intensa", explicacao: "Recusa grande variedade de alimentos por textura, cor ou sabor" },
   { area: "Nutrição", pergunta: "Baixo peso ou sobrepeso para a idade", explicacao: "Peso significativamente abaixo ou acima do esperado para a faixa etária" },
   { area: "Nutrição", pergunta: "Baixa ingestão de frutas e vegetais", explicacao: "Come muito poucas frutas ou verduras no dia a dia" },
@@ -142,8 +128,7 @@ const PERGUNTAS: Pergunta[] = [
   { area: "Nutrição", pergunta: "Rituais alimentares rígidos", explicacao: "Come os mesmos alimentos, no mesmo prato ou mesma ordem sem flexibilidade" },
   { area: "Nutrição", pergunta: "Déficit de micronutrientes", explicacao: "Exames indicando deficiência de ferro, zinco, vitamina D ou outros nutrientes" },
   { area: "Nutrição", pergunta: "Dificuldade no histórico de amamentação", explicacao: "Dificuldades de sucção, pega ou deglutição no período de amamentação" },
-
-  // ── PSICOPEDAGOGIA (15) ───────────────────────────────────────────────────
+  // ── PSICOPEDAGOGIA (15)
   { area: "Psicopedagogia", pergunta: "Dificuldade de aprendizagem da leitura", explicacao: "Dificuldade em decodificar palavras, sílabas ou textos" },
   { area: "Psicopedagogia", pergunta: "Dificuldade de aprendizagem da escrita", explicacao: "Letra ilegível, trocas, omissões ou inversões frequentes" },
   { area: "Psicopedagogia", pergunta: "Dificuldade em matemática", explicacao: "Dificuldade com contagem, operações ou conceitos numéricos" },
@@ -159,8 +144,7 @@ const PERGUNTAS: Pergunta[] = [
   { area: "Psicopedagogia", pergunta: "Dificuldade de transferência do aprendizado", explicacao: "Aprende a lição mas não aplica o conhecimento em situações reais" },
   { area: "Psicopedagogia", pergunta: "Ausência de motivação para aprender", explicacao: "Desinteresse persistente por qualquer tipo de atividade educacional" },
   { area: "Psicopedagogia", pergunta: "Dificuldade de resolução de problemas", explicacao: "Não consegue pensar em estratégias para superar desafios cotidianos" },
-
-  // ── EDUCAÇÃO FÍSICA (15) ──────────────────────────────────────────────────
+  // ── EDUCAÇÃO FÍSICA (15)
   { area: "Educação Física", pergunta: "Baixa resistência cardiovascular", explicacao: "Cansa muito rapidamente em atividades físicas leves ou moderadas" },
   { area: "Educação Física", pergunta: "Dificuldade em jogos coletivos", explicacao: "Não consegue participar adequadamente de esportes ou jogos em grupo" },
   { area: "Educação Física", pergunta: "Dificuldade de habilidades motoras esportivas", explicacao: "Dificuldade com chutar, arremessar, rebater ou quicar uma bola" },
@@ -186,107 +170,65 @@ const ESCALA = [
 ];
 
 const ESCOLARIDADE_OPTIONS = [
-  "Não alfabetizado",
-  "Ensino Fundamental Incompleto",
-  "Ensino Fundamental Completo",
-  "Ensino Médio Incompleto",
-  "Ensino Médio Completo",
-  "Ensino Superior Incompleto",
-  "Ensino Superior Completo",
-  "Pós-graduação",
+  "Não alfabetizado", "Ensino Fundamental Incompleto", "Ensino Fundamental Completo",
+  "Ensino Médio Incompleto", "Ensino Médio Completo",
+  "Ensino Superior Incompleto", "Ensino Superior Completo", "Pós-graduação",
 ];
 
 const CORES_AREA: Record<string, string> = {
-  "Psicológico":         "bg-purple-100 text-purple-800 border-purple-200",
-  "Psicomotricidade":    "bg-indigo-100 text-indigo-800 border-indigo-200",
-  "Fisioterapia":        "bg-orange-100 text-orange-800 border-orange-200",
+  "Psicológico": "bg-purple-100 text-purple-800 border-purple-200",
+  "Psicomotricidade": "bg-indigo-100 text-indigo-800 border-indigo-200",
+  "Fisioterapia": "bg-orange-100 text-orange-800 border-orange-200",
   "Terapia Ocupacional": "bg-teal-100 text-teal-800 border-teal-200",
-  "Fonoaudiologia":      "bg-blue-100 text-blue-800 border-blue-200",
-  "Nutrição":            "bg-green-100 text-green-800 border-green-200",
-  "Psicopedagogia":      "bg-yellow-100 text-yellow-800 border-yellow-200",
-  "Educação Física":     "bg-rose-100 text-rose-800 border-rose-200",
+  "Fonoaudiologia": "bg-blue-100 text-blue-800 border-blue-200",
+  "Nutrição": "bg-green-100 text-green-800 border-green-200",
+  "Psicopedagogia": "bg-yellow-100 text-yellow-800 border-yellow-200",
+  "Educação Física": "bg-rose-100 text-rose-800 border-rose-200",
 };
 
-const BARRA_AREA: Record<string, string> = {
-  "Psicológico":         "bg-purple-500",
-  "Psicomotricidade":    "bg-indigo-500",
-  "Fisioterapia":        "bg-orange-500",
-  "Terapia Ocupacional": "bg-teal-500",
-  "Fonoaudiologia":      "bg-blue-500",
-  "Nutrição":            "bg-green-500",
-  "Psicopedagogia":      "bg-yellow-500",
-  "Educação Física":     "bg-rose-500",
-};
-
-function classificar(pontos: number, max: number): { label: string; cor: string; bg: string; hex: string } {
+function classificar(pontos: number, max: number) {
   const pct = (pontos / max) * 100;
-  if (pct <= 25) return { label: "Baixo indicativo",  cor: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200",  hex: "#10b981" };
-  if (pct <= 50) return { label: "Indício leve",       cor: "text-blue-700",    bg: "bg-blue-50 border-blue-200",         hex: "#3b82f6" };
-  if (pct <= 75) return { label: "Indício moderado",   cor: "text-amber-700",   bg: "bg-amber-50 border-amber-200",       hex: "#f59e0b" };
-  return               { label: "Indício elevado",     cor: "text-rose-700",    bg: "bg-rose-50 border-rose-200",         hex: "#f43f5e" };
+  if (pct <= 25) return { label: "Baixo indicativo", cor: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", hex: "#10b981" };
+  if (pct <= 50) return { label: "Indício leve",     cor: "text-blue-700",    bg: "bg-blue-50 border-blue-200",       hex: "#3b82f6" };
+  if (pct <= 75) return { label: "Indício moderado", cor: "text-amber-700",   bg: "bg-amber-50 border-amber-200",     hex: "#f59e0b" };
+  return               { label: "Indício elevado",   cor: "text-rose-700",    bg: "bg-rose-50 border-rose-200",       hex: "#f43f5e" };
 }
+
+// ─── TYPES ────────────────────────────────────────────────────────────────────
 
 type FormData = {
   respostas: number[];
-  nomePaciente: string;
-  dataNascimento: string;
-  idade: string;
-  nomeResponsavel: string;
-  telefone: string;
-  endereco: string;
-  naturalidade: string;
-  rg: string;
-  cpf: string;
-  sus: string;
-  nomeMae: string;
-  escolaridadeMae: string;
-  profissaoMae: string;
-  nomePai: string;
-  escolaridadePai: string;
-  profissaoPai: string;
-  numIrmaos: string;
-  tipoImovel: string;
-  bolsaFamilia: boolean;
-  bpc: boolean;
-  diagnostico: string;
-  cid: string;
-  medico: string;
-  dataUltimaCons: string;
-  profissional: string;
-  especialidade: string;
+  nomePaciente: string; dataNascimento: string; idade: string;
+  nomeResponsavel: string; telefone: string; endereco: string;
+  naturalidade: string; rg: string; cpf: string; sus: string;
+  nomeMae: string; escolaridadeMae: string; profissaoMae: string;
+  nomePai: string; escolaridadePai: string; profissaoPai: string;
+  numIrmaos: string; tipoImovel: string;
+  bolsaFamilia: boolean; bpc: boolean; pensao: boolean;
+  auxilioDoenca: boolean; outrosAuxilios: string; rendaFamiliar: string;
+  diagnostico: string; cid: string; cid11: string;
+  medico: string; dataUltimaCons: string;
+  cadeiraDeRodas: boolean; ortesesProteses: boolean; aparelhoAuditivo: boolean;
+  medicacaoContinua: string; alergias: string; problemasSaude: string;
+  profissional: string; especialidade: string;
 };
 
 type TriagemSalva = {
-  id: number;
-  nome: string;
-  dataNascimento: string | null;
-  idade: string | null;
-  responsavel: string | null;
-  telefone: string | null;
-  endereco: string | null;
-  naturalidade: string | null;
-  rg: string | null;
-  cpf: string | null;
-  sus: string | null;
-  nomeMae: string | null;
-  escolaridadeMae: string | null;
-  profissaoMae: string | null;
-  nomePai: string | null;
-  escolaridadePai: string | null;
-  profissaoPai: string | null;
-  numIrmaos: string | null;
-  tipoImovel: string | null;
-  bolsaFamilia: boolean | null;
-  bpc: boolean | null;
-  diagnostico: string | null;
-  cid: string | null;
-  medico: string | null;
-  dataUltimaCons: string | null;
-  profissional: string | null;
-  especialidade: string | null;
-  data: string | null;
-  resultado: string | null;
-  respostas: string | null;
+  id: number; nome: string; dataNascimento: string | null; idade: string | null;
+  responsavel: string | null; telefone: string | null; endereco: string | null;
+  naturalidade: string | null; rg: string | null; cpf: string | null; sus: string | null;
+  nomeMae: string | null; escolaridadeMae: string | null; profissaoMae: string | null;
+  nomePai: string | null; escolaridadePai: string | null; profissaoPai: string | null;
+  numIrmaos: string | null; tipoImovel: string | null;
+  bolsaFamilia: boolean | null; bpc: boolean | null;
+  pensao: boolean | null; auxilioDoenca: boolean | null;
+  outrosAuxilios: string | null; rendaFamiliar: string | null;
+  diagnostico: string | null; cid: string | null; cid11: string | null;
+  medico: string | null; dataUltimaCons: string | null;
+  cadeiraDeRodas: boolean | null; ortesesProteses: boolean | null; aparelhoAuditivo: boolean | null;
+  medicacaoContinua: string | null; alergias: string | null; problemasSaude: string | null;
+  profissional: string | null; especialidade: string | null;
+  data: string | null; resultado: string | null; respostas: string | null;
   createdAt: string;
 };
 
@@ -296,363 +238,327 @@ function triSalvaToFormData(t: TriagemSalva): FormData {
     try {
       const parsed = JSON.parse(t.respostas);
       if (Array.isArray(parsed)) {
-        respostas = Array(PERGUNTAS.length).fill(0);
-        for (let i = 0; i < Math.min(parsed.length, PERGUNTAS.length); i++) {
+        for (let i = 0; i < Math.min(parsed.length, PERGUNTAS.length); i++)
           respostas[i] = Number(parsed[i]) || 0;
-        }
       }
     } catch { /* ignore */ }
   }
   return {
     respostas,
-    nomePaciente: t.nome || "",
-    dataNascimento: t.dataNascimento || "",
-    idade: t.idade || "",
-    nomeResponsavel: t.responsavel || "",
-    telefone: t.telefone || "",
-    endereco: t.endereco || "",
-    naturalidade: t.naturalidade || "",
-    rg: t.rg || "",
-    cpf: t.cpf || "",
-    sus: t.sus || "",
-    nomeMae: t.nomeMae || "",
-    escolaridadeMae: t.escolaridadeMae || "",
-    profissaoMae: t.profissaoMae || "",
-    nomePai: t.nomePai || "",
-    escolaridadePai: t.escolaridadePai || "",
-    profissaoPai: t.profissaoPai || "",
-    numIrmaos: t.numIrmaos || "",
-    tipoImovel: t.tipoImovel || "",
-    bolsaFamilia: !!t.bolsaFamilia,
-    bpc: !!t.bpc,
-    diagnostico: t.diagnostico || "",
-    cid: t.cid || "",
-    medico: t.medico || "",
-    dataUltimaCons: t.dataUltimaCons || "",
-    profissional: t.profissional || "",
-    especialidade: t.especialidade || "",
+    nomePaciente: t.nome || "", dataNascimento: t.dataNascimento || "",
+    idade: t.idade || "", nomeResponsavel: t.responsavel || "",
+    telefone: t.telefone || "", endereco: t.endereco || "",
+    naturalidade: t.naturalidade || "", rg: t.rg || "",
+    cpf: t.cpf || "", sus: t.sus || "",
+    nomeMae: t.nomeMae || "", escolaridadeMae: t.escolaridadeMae || "",
+    profissaoMae: t.profissaoMae || "", nomePai: t.nomePai || "",
+    escolaridadePai: t.escolaridadePai || "", profissaoPai: t.profissaoPai || "",
+    numIrmaos: t.numIrmaos || "", tipoImovel: t.tipoImovel || "",
+    bolsaFamilia: !!t.bolsaFamilia, bpc: !!t.bpc,
+    pensao: !!t.pensao, auxilioDoenca: !!t.auxilioDoenca,
+    outrosAuxilios: t.outrosAuxilios || "", rendaFamiliar: t.rendaFamiliar || "",
+    diagnostico: t.diagnostico || "", cid: t.cid || "", cid11: t.cid11 || "",
+    medico: t.medico || "", dataUltimaCons: t.dataUltimaCons || "",
+    cadeiraDeRodas: !!t.cadeiraDeRodas, ortesesProteses: !!t.ortesesProteses,
+    aparelhoAuditivo: !!t.aparelhoAuditivo,
+    medicacaoContinua: t.medicacaoContinua || "",
+    alergias: t.alergias || "", problemasSaude: t.problemasSaude || "",
+    profissional: t.profissional || "", especialidade: t.especialidade || "",
   };
 }
 
-// ── COMPONENTES ───────────────────────────────────────────────────────────────
+// ─── HEADER ───────────────────────────────────────────────────────────────────
 
-function Header({ showLista = false }: { showLista?: boolean }) {
+function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" }) {
   return (
-    <div className="bg-primary text-primary-foreground py-6 px-6 shadow-md no-print">
-      <div className="max-w-4xl mx-auto flex items-center justify-between">
+    <div className="bg-primary text-primary-foreground py-5 px-6 shadow-md no-print">
+      <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold">{CLINIC_CONFIG.name}</h1>
-          <p className="mt-0.5 text-primary-foreground/80 text-xs md:text-sm">{CLINIC_CONFIG.subtitle}</p>
+          <h1 className="text-lg md:text-xl font-bold">{CLINIC_CONFIG.name}</h1>
+          <p className="mt-0.5 text-primary-foreground/75 text-xs hidden md:block">{CLINIC_CONFIG.subtitle}</p>
         </div>
-        <Link
-          href={showLista ? "/" : "/lista"}
-          className="ml-4 px-4 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-colors flex-shrink-0"
-        >
-          {showLista ? "← Nova Triagem" : "Ver Pacientes →"}
-        </Link>
+        <div className="flex gap-2 flex-shrink-0">
+          {page !== "dashboard" && (
+            <Link href="/dashboard" className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors">
+              Dashboard
+            </Link>
+          )}
+          {page !== "lista" && page !== "form" && (
+            <Link href="/lista" className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors">
+              Pacientes
+            </Link>
+          )}
+          {page !== "form" && (
+            <Link href="/" className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors">
+              Nova Triagem
+            </Link>
+          )}
+          {page === "form" && (
+            <Link href="/lista" className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors">
+              Ver Pacientes →
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function PrintHeader({ nomePaciente, data }: { nomePaciente: string; data: string }) {
-  return (
-    <div className="print-only hidden border-b-2 border-gray-800 pb-4 mb-6">
-      <h1 className="text-2xl font-bold text-gray-900">{CLINIC_CONFIG.name}</h1>
-      <p className="text-sm text-gray-600">{CLINIC_CONFIG.subtitle}</p>
-      <div className="flex justify-between mt-3 text-sm">
-        <span><strong>Paciente:</strong> {nomePaciente}</span>
-        <span><strong>Data:</strong> {data}</span>
-      </div>
-    </div>
-  );
-}
+// ─── GRÁFICO RADAR ────────────────────────────────────────────────────────────
 
 function GraficoRadar({ porArea }: { porArea: { area: string; pct: number; nivel: ReturnType<typeof classificar> }[] }) {
-  const data = porArea.map(({ area, pct }) => ({
-    area: SHORT_NAMES[area] ?? area,
-    pct,
-    fullMark: 100,
-  }));
-
-  const pctTotal = Math.round(porArea.reduce((a, b) => a + b.pct, 0) / porArea.length);
-  const radarColor = pctTotal >= 65 ? "#f43f5e" : pctTotal >= 45 ? "#f59e0b" : pctTotal >= 25 ? "#3b82f6" : "#10b981";
-
+  const data = porArea.map(({ area, pct }) => ({ area: SHORT_NAMES[area] ?? area, pct, fullMark: 100 }));
+  const pctMedio = Math.round(porArea.reduce((a, b) => a + b.pct, 0) / porArea.length);
+  const cor = pctMedio >= 65 ? "#f43f5e" : pctMedio >= 45 ? "#f59e0b" : pctMedio >= 25 ? "#3b82f6" : "#10b981";
   return (
-    <div style={{ width: "100%", height: 340 }}>
+    <div style={{ width: "100%", height: 320 }}>
       <ResponsiveContainer width="100%" height="100%">
         <RadarChart data={data} margin={{ top: 20, right: 40, bottom: 20, left: 40 }}>
           <PolarGrid stroke="#e5e7eb" />
-          <PolarAngleAxis
-            dataKey="area"
-            tick={{ fontSize: 11, fontWeight: 600, fill: "#374151" }}
-          />
-          <PolarRadiusAxis
-            angle={90}
-            domain={[0, 100]}
-            tickCount={5}
-            tick={{ fontSize: 9, fill: "#9ca3af" }}
-          />
-          <Radar
-            name="Índice (%)"
-            dataKey="pct"
-            stroke={radarColor}
-            fill={radarColor}
-            fillOpacity={0.25}
-            strokeWidth={2}
-          />
+          <PolarAngleAxis dataKey="area" tick={{ fontSize: 11, fontWeight: 600, fill: "#374151" }} />
+          <PolarRadiusAxis angle={90} domain={[0, 100]} tickCount={5} tick={{ fontSize: 9, fill: "#9ca3af" }} />
+          <Radar name="Índice (%)" dataKey="pct" stroke={cor} fill={cor} fillOpacity={0.22} strokeWidth={2} />
         </RadarChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-// ── FORMULÁRIO ────────────────────────────────────────────────────────────────
+// ─── FORMULÁRIO ───────────────────────────────────────────────────────────────
 
 function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void; initialData?: FormData }) {
-  const base = initialData ?? null;
-  const [respostas, setRespostas] = useState<number[]>(base?.respostas ?? Array(PERGUNTAS.length).fill(0));
-  const [nomePaciente, setNomePaciente] = useState(base?.nomePaciente ?? "");
-  const [dataNascimento, setDataNascimento] = useState(base?.dataNascimento ?? "");
-  const [idade, setIdade] = useState(base?.idade ?? "");
-  const [nomeResponsavel, setNomeResponsavel] = useState(base?.nomeResponsavel ?? "");
-  const [telefone, setTelefone] = useState(base?.telefone ?? "");
-  const [endereco, setEndereco] = useState(base?.endereco ?? "");
-  const [naturalidade, setNaturalidade] = useState(base?.naturalidade ?? "");
-  const [rg, setRg] = useState(base?.rg ?? "");
-  const [cpf, setCpf] = useState(base?.cpf ?? "");
-  const [sus, setSus] = useState(base?.sus ?? "");
-  const [nomeMae, setNomeMae] = useState(base?.nomeMae ?? "");
-  const [escolaridadeMae, setEscolaridadeMae] = useState(base?.escolaridadeMae ?? "");
-  const [profissaoMae, setProfissaoMae] = useState(base?.profissaoMae ?? "");
-  const [nomePai, setNomePai] = useState(base?.nomePai ?? "");
-  const [escolaridadePai, setEscolaridadePai] = useState(base?.escolaridadePai ?? "");
-  const [profissaoPai, setProfissaoPai] = useState(base?.profissaoPai ?? "");
-  const [numIrmaos, setNumIrmaos] = useState(base?.numIrmaos ?? "");
-  const [tipoImovel, setTipoImovel] = useState(base?.tipoImovel ?? "");
-  const [bolsaFamilia, setBolsaFamilia] = useState(base?.bolsaFamilia ?? false);
-  const [bpc, setBpc] = useState(base?.bpc ?? false);
-  const [diagnostico, setDiagnostico] = useState(base?.diagnostico ?? "");
-  const [cid, setCid] = useState(base?.cid ?? "");
-  const [medico, setMedico] = useState(base?.medico ?? "");
-  const [dataUltimaCons, setDataUltimaCons] = useState(base?.dataUltimaCons ?? "");
-  const [profissional, setProfissional] = useState(base?.profissional ?? "");
-  const [especialidade, setEspecialidade] = useState(base?.especialidade ?? "");
+  const b = initialData;
+  const [respostas, setRespostas] = useState<number[]>(b?.respostas ?? Array(PERGUNTAS.length).fill(0));
+  const [nomePaciente, setNomePaciente] = useState(b?.nomePaciente ?? "");
+  const [dataNascimento, setDataNascimento] = useState(b?.dataNascimento ?? "");
+  const [idade, setIdade] = useState(b?.idade ?? "");
+  const [nomeResponsavel, setNomeResponsavel] = useState(b?.nomeResponsavel ?? "");
+  const [telefone, setTelefone] = useState(b?.telefone ?? "");
+  const [endereco, setEndereco] = useState(b?.endereco ?? "");
+  const [naturalidade, setNaturalidade] = useState(b?.naturalidade ?? "");
+  const [rg, setRg] = useState(b?.rg ?? "");
+  const [cpf, setCpf] = useState(b?.cpf ?? "");
+  const [sus, setSus] = useState(b?.sus ?? "");
+  const [nomeMae, setNomeMae] = useState(b?.nomeMae ?? "");
+  const [escolaridadeMae, setEscolaridadeMae] = useState(b?.escolaridadeMae ?? "");
+  const [profissaoMae, setProfissaoMae] = useState(b?.profissaoMae ?? "");
+  const [nomePai, setNomePai] = useState(b?.nomePai ?? "");
+  const [escolaridadePai, setEscolaridadePai] = useState(b?.escolaridadePai ?? "");
+  const [profissaoPai, setProfissaoPai] = useState(b?.profissaoPai ?? "");
+  const [numIrmaos, setNumIrmaos] = useState(b?.numIrmaos ?? "");
+  const [tipoImovel, setTipoImovel] = useState(b?.tipoImovel ?? "");
+  const [bolsaFamilia, setBolsaFamilia] = useState(b?.bolsaFamilia ?? false);
+  const [bpc, setBpc] = useState(b?.bpc ?? false);
+  const [pensao, setPensao] = useState(b?.pensao ?? false);
+  const [auxilioDoenca, setAuxilioDoenca] = useState(b?.auxilioDoenca ?? false);
+  const [outrosAuxilios, setOutrosAuxilios] = useState(b?.outrosAuxilios ?? "");
+  const [rendaFamiliar, setRendaFamiliar] = useState(b?.rendaFamiliar ?? "");
+  const [diagnostico, setDiagnostico] = useState(b?.diagnostico ?? "");
+  const [cid, setCid] = useState(b?.cid ?? "");
+  const [cid11, setCid11] = useState(b?.cid11 ?? "");
+  const [medico, setMedico] = useState(b?.medico ?? "");
+  const [dataUltimaCons, setDataUltimaCons] = useState(b?.dataUltimaCons ?? "");
+  const [cadeiraDeRodas, setCadeiraDeRodas] = useState(b?.cadeiraDeRodas ?? false);
+  const [ortesesProteses, setOrtesesProteses] = useState(b?.ortesesProteses ?? false);
+  const [aparelhoAuditivo, setAparelhoAuditivo] = useState(b?.aparelhoAuditivo ?? false);
+  const [medicacaoContinua, setMedicacaoContinua] = useState(b?.medicacaoContinua ?? "");
+  const [alergias, setAlergias] = useState(b?.alergias ?? "");
+  const [problemasSaude, setProblemasSaude] = useState(b?.problemasSaude ?? "");
+  const [profissional, setProfissional] = useState(b?.profissional ?? "");
+  const [especialidade, setEspecialidade] = useState(b?.especialidade ?? "");
   const [areaAtiva, setAreaAtiva] = useState(AREAS[0]);
 
   const perguntasDaArea = PERGUNTAS.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === areaAtiva);
   const areaIdx = AREAS.indexOf(areaAtiva);
-
-  const fieldClass = "w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white";
+  const fc = "w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
       respostas, nomePaciente, dataNascimento, idade, nomeResponsavel,
       telefone, endereco, naturalidade, rg, cpf, sus,
-      nomeMae, escolaridadeMae, profissaoMae,
-      nomePai, escolaridadePai, profissaoPai,
-      numIrmaos, tipoImovel, bolsaFamilia, bpc,
-      diagnostico, cid, medico, dataUltimaCons,
+      nomeMae, escolaridadeMae, profissaoMae, nomePai, escolaridadePai, profissaoPai,
+      numIrmaos, tipoImovel, bolsaFamilia, bpc, pensao, auxilioDoenca, outrosAuxilios, rendaFamiliar,
+      diagnostico, cid, cid11, medico, dataUltimaCons,
+      cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
+      medicacaoContinua, alergias, problemasSaude,
       profissional, especialidade,
     });
   };
 
+  const Sec = ({ title }: { title: string }) => (
+    <h2 className="text-sm font-bold text-primary uppercase tracking-wide mb-3">{title}</h2>
+  );
+  const Chk = ({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) => (
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="w-4 h-4 rounded accent-primary" />
+      <span className="text-sm font-semibold text-muted-foreground">{label}</span>
+    </label>
+  );
+
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
+      <Header page="form" />
+      <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
 
-        {/* ── Dados do Paciente ── */}
+        {/* ── Dados Pessoais ── */}
         <div className="bg-white rounded-2xl border border-border p-6 shadow-sm space-y-6">
           <div>
-            <h2 className="text-base font-bold text-foreground mb-3 uppercase tracking-wide text-primary">Dados do Paciente</h2>
+            <Sec title="Dados do Paciente" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome completo *</label>
-                <input required value={nomePaciente} onChange={(e) => setNomePaciente(e.target.value)}
-                  className={fieldClass} placeholder="Nome completo" />
+                <input required value={nomePaciente} onChange={e => setNomePaciente(e.target.value)} className={fc} placeholder="Nome completo" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-muted-foreground mb-1">Data de Nascimento</label>
-                <input type="date" value={dataNascimento} onChange={(e) => {
-                    const val = e.target.value;
-                    setDataNascimento(val);
-                    if (val) {
-                      const nasc = new Date(val + "T12:00:00");
-                      const hoje = new Date();
-                      let anos = hoje.getFullYear() - nasc.getFullYear();
-                      const m = hoje.getMonth() - nasc.getMonth();
-                      if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) anos--;
-                      setIdade(anos + (anos === 1 ? " ano" : " anos"));
-                    }
-                  }} className={fieldClass} />
+                <input type="date" value={dataNascimento} onChange={e => {
+                  const val = e.target.value; setDataNascimento(val);
+                  if (val) {
+                    const nasc = new Date(val + "T12:00:00"), hoje = new Date();
+                    let anos = hoje.getFullYear() - nasc.getFullYear();
+                    const m = hoje.getMonth() - nasc.getMonth();
+                    if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) anos--;
+                    setIdade(anos + (anos === 1 ? " ano" : " anos"));
+                  }
+                }} className={fc} />
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Idade</label>
-                <input value={idade} onChange={(e) => setIdade(e.target.value)}
-                  className={fieldClass} placeholder="Ex.: 8 anos" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Responsável</label>
-                <input value={nomeResponsavel} onChange={(e) => setNomeResponsavel(e.target.value)}
-                  className={fieldClass} placeholder="Nome do responsável" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Telefone</label>
-                <input value={telefone} onChange={(e) => setTelefone(e.target.value)}
-                  className={fieldClass} placeholder="(00) 00000-0000" />
-              </div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Idade</label>
+                <input value={idade} onChange={e => setIdade(e.target.value)} className={fc} placeholder="Ex.: 8 anos" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Responsável</label>
+                <input value={nomeResponsavel} onChange={e => setNomeResponsavel(e.target.value)} className={fc} placeholder="Nome do responsável" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Telefone</label>
+                <input value={telefone} onChange={e => setTelefone(e.target.value)} className={fc} placeholder="(00) 00000-0000" /></div>
             </div>
           </div>
 
-          {/* ── Documentos ── */}
+          {/* Documentos */}
           <div className="pt-4 border-t border-border">
-            <h2 className="text-base font-bold text-foreground mb-3 uppercase tracking-wide text-primary">Documentos e Localização</h2>
+            <Sec title="Documentos e Localização" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">RG</label>
-                <input value={rg} onChange={(e) => setRg(e.target.value)}
-                  className={fieldClass} placeholder="Nº do RG" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">CPF</label>
-                <input value={cpf} onChange={(e) => setCpf(e.target.value)}
-                  className={fieldClass} placeholder="000.000.000-00" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Cartão SUS (CNS)</label>
-                <input value={sus} onChange={(e) => setSus(e.target.value)}
-                  className={fieldClass} placeholder="Nº do cartão SUS" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Naturalidade</label>
-                <input value={naturalidade} onChange={(e) => setNaturalidade(e.target.value)}
-                  className={fieldClass} placeholder="Cidade / Estado" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Endereço</label>
-                <input value={endereco} onChange={(e) => setEndereco(e.target.value)}
-                  className={fieldClass} placeholder="Rua, número, bairro" />
-              </div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">RG</label>
+                <input value={rg} onChange={e => setRg(e.target.value)} className={fc} placeholder="Nº do RG" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">CPF</label>
+                <input value={cpf} onChange={e => setCpf(e.target.value)} className={fc} placeholder="000.000.000-00" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Cartão SUS (CNS)</label>
+                <input value={sus} onChange={e => setSus(e.target.value)} className={fc} placeholder="Nº do cartão SUS" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Naturalidade</label>
+                <input value={naturalidade} onChange={e => setNaturalidade(e.target.value)} className={fc} placeholder="Cidade / Estado" /></div>
+              <div className="md:col-span-2"><label className="block text-sm font-semibold text-muted-foreground mb-1">Endereço</label>
+                <input value={endereco} onChange={e => setEndereco(e.target.value)} className={fc} placeholder="Rua, número, bairro" /></div>
             </div>
           </div>
 
-          {/* ── Núcleo Familiar ── */}
+          {/* Núcleo Familiar */}
           <div className="pt-4 border-t border-border">
-            <h2 className="text-base font-bold text-foreground mb-3 uppercase tracking-wide text-primary">Núcleo Familiar e Situação Socioeconômica</h2>
+            <Sec title="Núcleo Familiar" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome da Mãe</label>
-                <input value={nomeMae} onChange={(e) => setNomeMae(e.target.value)}
-                  className={fieldClass} placeholder="Nome completo" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Escolaridade da Mãe</label>
-                <select value={escolaridadeMae} onChange={(e) => setEscolaridadeMae(e.target.value)} className={fieldClass}>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Nome da Mãe</label>
+                <input value={nomeMae} onChange={e => setNomeMae(e.target.value)} className={fc} placeholder="Nome completo" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Escolaridade da Mãe</label>
+                <select value={escolaridadeMae} onChange={e => setEscolaridadeMae(e.target.value)} className={fc}>
                   <option value="">Selecione...</option>
                   {ESCOLARIDADE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Profissão da Mãe</label>
-                <input value={profissaoMae} onChange={(e) => setProfissaoMae(e.target.value)}
-                  className={fieldClass} placeholder="Profissão" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome do Pai</label>
-                <input value={nomePai} onChange={(e) => setNomePai(e.target.value)}
-                  className={fieldClass} placeholder="Nome completo" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Escolaridade do Pai</label>
-                <select value={escolaridadePai} onChange={(e) => setEscolaridadePai(e.target.value)} className={fieldClass}>
+                </select></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Profissão da Mãe</label>
+                <input value={profissaoMae} onChange={e => setProfissaoMae(e.target.value)} className={fc} placeholder="Profissão" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Nome do Pai</label>
+                <input value={nomePai} onChange={e => setNomePai(e.target.value)} className={fc} placeholder="Nome completo" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Escolaridade do Pai</label>
+                <select value={escolaridadePai} onChange={e => setEscolaridadePai(e.target.value)} className={fc}>
                   <option value="">Selecione...</option>
                   {ESCOLARIDADE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Profissão do Pai</label>
-                <input value={profissaoPai} onChange={(e) => setProfissaoPai(e.target.value)}
-                  className={fieldClass} placeholder="Profissão" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Nº de Irmãos</label>
-                <input type="number" min="0" value={numIrmaos} onChange={(e) => setNumIrmaos(e.target.value)}
-                  className={fieldClass} placeholder="0" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Situação de Moradia</label>
-                <select value={tipoImovel} onChange={(e) => setTipoImovel(e.target.value)} className={fieldClass}>
+                </select></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Profissão do Pai</label>
+                <input value={profissaoPai} onChange={e => setProfissaoPai(e.target.value)} className={fc} placeholder="Profissão" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Nº de Irmãos</label>
+                <input type="number" min="0" value={numIrmaos} onChange={e => setNumIrmaos(e.target.value)} className={fc} placeholder="0" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Situação de Moradia</label>
+                <select value={tipoImovel} onChange={e => setTipoImovel(e.target.value)} className={fc}>
                   <option value="">Selecione...</option>
-                  <option value="Próprio">Próprio</option>
-                  <option value="Alugado">Alugado</option>
-                  <option value="Cedido">Cedido</option>
-                  <option value="Abrigo / Instituição">Abrigo / Instituição</option>
-                  <option value="Área de risco">Área de risco</option>
-                </select>
+                  {["Próprio", "Alugado", "Cedido", "Abrigo / Instituição", "Área de risco"].map(o => <option key={o} value={o}>{o}</option>)}
+                </select></div>
+            </div>
+          </div>
+
+          {/* Benefícios Sociais */}
+          <div className="pt-4 border-t border-border">
+            <Sec title="Benefícios Sociais e Renda" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+              <Chk checked={bolsaFamilia} onChange={setBolsaFamilia} label="Bolsa Família" />
+              <Chk checked={bpc} onChange={setBpc} label="BPC" />
+              <Chk checked={pensao} onChange={setPensao} label="Pensão" />
+              <Chk checked={auxilioDoenca} onChange={setAuxilioDoenca} label="Auxílio-Doença" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Outros Auxílios</label>
+                <input value={outrosAuxilios} onChange={e => setOutrosAuxilios(e.target.value)} className={fc} placeholder="Ex.: Auxílio moradia, cesta básica..." /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Renda Familiar Total</label>
+                <input value={rendaFamiliar} onChange={e => setRendaFamiliar(e.target.value)} className={fc} placeholder="Ex.: R$ 1.500 / 2 salários mínimos" /></div>
+            </div>
+          </div>
+
+          {/* Dados de Saúde */}
+          <div className="pt-4 border-t border-border">
+            <Sec title="Dados de Saúde e Laudo" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Diagnóstico informado</label>
+                <input value={diagnostico} onChange={e => setDiagnostico(e.target.value)} className={fc} placeholder="Ex.: TEA, TDAH, sem diagnóstico" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">CID-10</label>
+                <input value={cid} onChange={e => setCid(e.target.value)} className={fc} placeholder="Ex.: F84.0, F90.0" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">CID-11</label>
+                <input value={cid11} onChange={e => setCid11(e.target.value)} className={fc} placeholder="Ex.: 6A02.0" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Médico Responsável</label>
+                <input value={medico} onChange={e => setMedico(e.target.value)} className={fc} placeholder="Nome do médico" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Data da Última Consulta</label>
+                <input type="date" value={dataUltimaCons} onChange={e => setDataUltimaCons(e.target.value)} className={fc} /></div>
+            </div>
+          </div>
+
+          {/* Dispositivos */}
+          <div className="pt-4 border-t border-border">
+            <Sec title="Dispositivos de Apoio" />
+            <div className="flex flex-wrap gap-4 mb-4">
+              <Chk checked={cadeiraDeRodas} onChange={setCadeiraDeRodas} label="Cadeira de Rodas" />
+              <Chk checked={ortesesProteses} onChange={setOrtesesProteses} label="Órteses / Próteses" />
+              <Chk checked={aparelhoAuditivo} onChange={setAparelhoAuditivo} label="Aparelho Auditivo" />
+            </div>
+          </div>
+
+          {/* Alertas Críticos */}
+          <div className="pt-4 border-t border-border">
+            <Sec title="⚠ Alertas Críticos de Saúde" />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Medicação Contínua (nome + dose)</label>
+                <input value={medicacaoContinua} onChange={e => setMedicacaoContinua(e.target.value)} className={fc} placeholder="Ex.: Risperidona 1mg/dia, Ritalina 10mg 2x ao dia" />
               </div>
-              <div className="flex items-center gap-6 md:col-span-2 pt-1">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={bolsaFamilia} onChange={(e) => setBolsaFamilia(e.target.checked)}
-                    className="w-4 h-4 rounded accent-primary" />
-                  <span className="text-sm font-semibold text-muted-foreground">Bolsa Família</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={bpc} onChange={(e) => setBpc(e.target.checked)}
-                    className="w-4 h-4 rounded accent-primary" />
-                  <span className="text-sm font-semibold text-muted-foreground">BPC</span>
-                </label>
+              <div>
+                <label className="block text-sm font-semibold text-red-600 mb-1">Alergias ⚠</label>
+                <input value={alergias} onChange={e => setAlergias(e.target.value)}
+                  className={`${fc} ${alergias ? "border-red-400 focus:ring-red-300" : ""}`}
+                  placeholder="Ex.: Penicilina, dipirona, látex (destacado em vermelho se preenchido)" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Problemas de Saúde Associados</label>
+                <input value={problemasSaude} onChange={e => setProblemasSaude(e.target.value)} className={fc} placeholder="Ex.: Convulsões, cardiopatia, epilepsia" />
               </div>
             </div>
           </div>
 
-          {/* ── Saúde ── */}
+          {/* Profissional */}
           <div className="pt-4 border-t border-border">
-            <h2 className="text-base font-bold text-foreground mb-3 uppercase tracking-wide text-primary">Dados de Saúde e Laudo</h2>
+            <Sec title="Profissional Responsável pela Triagem" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Diagnóstico informado / Laudo</label>
-                <input value={diagnostico} onChange={(e) => setDiagnostico(e.target.value)}
-                  className={fieldClass} placeholder="Ex.: TEA, TDAH, sem diagnóstico" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">CID-10</label>
-                <input value={cid} onChange={(e) => setCid(e.target.value)}
-                  className={fieldClass} placeholder="Ex.: F84.0, F90.0" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Médico Responsável</label>
-                <input value={medico} onChange={(e) => setMedico(e.target.value)}
-                  className={fieldClass} placeholder="Nome do médico" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Data da Última Consulta</label>
-                <input type="date" value={dataUltimaCons} onChange={(e) => setDataUltimaCons(e.target.value)}
-                  className={fieldClass} />
-              </div>
-            </div>
-          </div>
-
-          {/* ── Profissional ── */}
-          <div className="pt-4 border-t border-border">
-            <h2 className="text-base font-bold text-foreground mb-3 uppercase tracking-wide text-primary">Profissional Responsável pela Triagem</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome</label>
-                <input value={profissional} onChange={(e) => setProfissional(e.target.value)}
-                  className={fieldClass} placeholder="Nome do profissional" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">Especialidade</label>
-                <input value={especialidade} onChange={(e) => setEspecialidade(e.target.value)}
-                  className={fieldClass} placeholder="Ex.: Psicologia, Fonoaudiologia" />
-              </div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Nome</label>
+                <input value={profissional} onChange={e => setProfissional(e.target.value)} className={fc} placeholder="Nome do profissional" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Especialidade</label>
+                <input value={especialidade} onChange={e => setEspecialidade(e.target.value)} className={fc} placeholder="Ex.: Psicologia, Fonoaudiologia" /></div>
             </div>
           </div>
         </div>
 
-        {/* ── Navegação de áreas ── */}
+        {/* Navegação áreas */}
         <div className="flex flex-wrap gap-2">
           {AREAS.map((area) => {
             const pergs = PERGUNTAS.map((p, idx) => ({ ...p, idx })).filter((p) => p.area === area);
@@ -660,8 +566,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
             return (
               <button key={area} type="button" onClick={() => setAreaAtiva(area)}
                 className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
-                  areaAtiva === area
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  areaAtiva === area ? "bg-primary text-primary-foreground border-primary shadow-sm"
                     : "bg-white text-muted-foreground border-border hover:border-primary/40"
                 }`}>
                 {temResposta ? "● " : ""}{area}
@@ -670,7 +575,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
           })}
         </div>
 
-        {/* ── Perguntas da área ── */}
+        {/* Perguntas */}
         <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className={`px-6 py-4 border-b border-border ${CORES_AREA[areaAtiva] ?? "bg-gray-50"}`}>
             <h2 className="font-bold text-lg">{areaAtiva}</h2>
@@ -684,7 +589,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
                     <p className="font-bold text-foreground">[{pergunta}]</p>
                     <p className="text-sm text-muted-foreground italic mt-0.5">({explicacao})</p>
                   </div>
-                  <div className="flex gap-2 flex-shrink-0 items-center">
+                  <div className="flex gap-2 flex-shrink-0">
                     {ESCALA.map((e) => (
                       <button key={e.valor} type="button"
                         onClick={() => { const n = [...respostas]; n[idx] = e.valor; setRespostas(n); }}
@@ -696,9 +601,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
                               : e.valor === 2 ? "bg-amber-500 text-white border-amber-500"
                               : "bg-rose-500 text-white border-rose-500"
                             : "bg-white text-muted-foreground border-border hover:border-primary/50"
-                        }`}>
-                        {e.valor}
-                      </button>
+                        }`}>{e.valor}</button>
                     ))}
                   </div>
                 </div>
@@ -708,25 +611,25 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
           <div className="px-6 py-4 bg-muted/30 flex justify-between items-center border-t border-border">
             <button type="button" onClick={() => setAreaAtiva(AREAS[Math.max(0, areaIdx - 1)])}
               disabled={areaIdx === 0}
-              className="px-4 py-2 rounded-lg border border-border text-sm font-semibold disabled:opacity-40 hover:bg-secondary transition-colors">
+              className="px-4 py-2 rounded-lg border border-border text-sm font-semibold disabled:opacity-40 hover:bg-secondary">
               ← Anterior
             </button>
             <span className="text-sm text-muted-foreground">{areaIdx + 1} / {AREAS.length}</span>
             {areaIdx < AREAS.length - 1 ? (
               <button type="button" onClick={() => setAreaAtiva(AREAS[areaIdx + 1])}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity">
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90">
                 Próxima →
               </button>
             ) : (
               <button type="submit"
-                className="px-6 py-2 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm">
+                className="px-6 py-2 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 shadow-sm">
                 Ver Resultado ✓
               </button>
             )}
           </div>
         </div>
 
-        {/* ── Legenda ── */}
+        {/* Legenda */}
         <div className="bg-white rounded-2xl border border-border p-4 shadow-sm">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Escala de Pontuação</p>
           <div className="flex flex-wrap gap-4">
@@ -745,24 +648,19 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
   );
 }
 
-// ── RELATÓRIO ─────────────────────────────────────────────────────────────────
+// ─── RELATÓRIO ────────────────────────────────────────────────────────────────
 
-function Relatorio({
-  formData,
-  onNova,
-  editId,
-}: {
-  formData: FormData;
-  onNova: () => void;
-  editId?: number;
+function Relatorio({ formData, onNova, editId, viewOnly }: {
+  formData: FormData; onNova: () => void; editId?: number; viewOnly?: boolean;
 }) {
   const {
-    respostas, nomePaciente, dataNascimento, idade, nomeResponsavel,
-    telefone, endereco, naturalidade, rg, cpf, sus,
-    nomeMae, escolaridadeMae, profissaoMae,
-    nomePai, escolaridadePai, profissaoPai,
-    numIrmaos, tipoImovel, bolsaFamilia, bpc,
-    diagnostico, cid, medico, dataUltimaCons,
+    respostas, nomePaciente, dataNascimento, idade, nomeResponsavel, telefone, endereco,
+    naturalidade, rg, cpf, sus,
+    nomeMae, escolaridadeMae, profissaoMae, nomePai, escolaridadePai, profissaoPai,
+    numIrmaos, tipoImovel, bolsaFamilia, bpc, pensao, auxilioDoenca, outrosAuxilios, rendaFamiliar,
+    diagnostico, cid, cid11, medico, dataUltimaCons,
+    cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
+    medicacaoContinua, alergias, problemasSaude,
     profissional, especialidade,
   } = formData;
 
@@ -784,61 +682,98 @@ function Relatorio({
   const totalPontos = respostas.reduce((a, b) => a + b, 0);
   const totalMax = PERGUNTAS.length * 3;
   const pctTotal = Math.round((totalPontos / totalMax) * 100);
-
-  const resultadoTexto = ranking.map(({ area, pontos, nivel }) =>
-    `${area}: ${pontos} pontos - ${nivel.label}`
-  ).join(" | ");
+  const resultadoTexto = ranking.map(({ area, pontos, nivel }) => `${area}: ${pontos} pontos - ${nivel.label}`).join(" | ");
 
   const bodyParaSalvar = {
-    nome: nomePaciente,
-    dataNascimento, idade, responsavel: nomeResponsavel,
+    nome: nomePaciente, dataNascimento, idade, responsavel: nomeResponsavel,
     telefone, endereco, naturalidade, rg, cpf, sus,
-    nomeMae, escolaridadeMae, profissaoMae,
-    nomePai, escolaridadePai, profissaoPai,
-    numIrmaos, tipoImovel, bolsaFamilia, bpc,
-    diagnostico, cid, medico, dataUltimaCons,
-    profissional, especialidade,
-    data, resultado: resultadoTexto,
-    respostas,
+    nomeMae, escolaridadeMae, profissaoMae, nomePai, escolaridadePai, profissaoPai,
+    numIrmaos, tipoImovel, bolsaFamilia, bpc, pensao, auxilioDoenca, outrosAuxilios, rendaFamiliar,
+    diagnostico, cid, cid11, medico, dataUltimaCons,
+    cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
+    medicacaoContinua, alergias, problemasSaude,
+    profissional, especialidade, data, resultado: resultadoTexto, respostas,
   };
 
   const salvarTriagem = async () => {
     setSalvando(true);
     try {
-      if (editId) {
-        await fetch(`${API}/triagens/${editId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(bodyParaSalvar),
-        });
-      } else {
-        await fetch(`${API}/triagens`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(bodyParaSalvar),
-        });
-      }
+      await fetch(editId ? `${API}/triagens/${editId}` : `${API}/triagens`, {
+        method: editId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyParaSalvar),
+      });
       setSalvo(true);
-    } finally {
-      setSalvando(false);
-    }
+    } finally { setSalvando(false); }
   };
+
+  const beneficios = [
+    bolsaFamilia && "Bolsa Família", bpc && "BPC",
+    pensao && "Pensão", auxilioDoenca && "Auxílio-Doença",
+    outrosAuxilios,
+  ].filter(Boolean).join(", ");
+
+  const dispositivos = [
+    cadeiraDeRodas && "Cadeira de Rodas",
+    ortesesProteses && "Órteses/Próteses",
+    aparelhoAuditivo && "Aparelho Auditivo",
+  ].filter(Boolean).join(", ");
 
   return (
     <div className="min-h-screen bg-background">
-      <Header showLista />
-      <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
+      <Header page="relatorio" />
+      <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-5">
 
         {/* Cabeçalho de impressão */}
-        <PrintHeader nomePaciente={nomePaciente} data={data} />
+        <div className="print-only hidden border-b-2 border-gray-800 pb-4 mb-5">
+          <h1 className="text-2xl font-bold text-gray-900">{CLINIC_CONFIG.name}</h1>
+          <p className="text-sm text-gray-600">{CLINIC_CONFIG.subtitle}</p>
+          <div className="flex justify-between mt-3 text-sm">
+            <span><strong>Paciente:</strong> {nomePaciente}</span>
+            <span><strong>Data:</strong> {data}</span>
+          </div>
+        </div>
 
-        {/* ── Dados do Paciente ── */}
+        {/* ⚠ Alerta de Alergia */}
+        {alergias && (
+          <div className="bg-red-50 border-2 border-red-400 rounded-2xl p-4 flex gap-3 items-start">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="font-bold text-red-700 text-base">ALERTA DE ALERGIA</p>
+              <p className="text-red-800 font-semibold text-sm mt-0.5">{alergias}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Medicação */}
+        {medicacaoContinua && (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex gap-3 items-start">
+            <span className="text-xl">💊</span>
+            <div>
+              <p className="font-bold text-amber-800 text-sm">Medicação Contínua</p>
+              <p className="text-amber-900 text-sm mt-0.5">{medicacaoContinua}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Problemas de saúde */}
+        {problemasSaude && (
+          <div className="bg-orange-50 border border-orange-300 rounded-2xl p-4 flex gap-3 items-start">
+            <span className="text-xl">🏥</span>
+            <div>
+              <p className="font-bold text-orange-800 text-sm">Problemas de Saúde Associados</p>
+              <p className="text-orange-900 text-sm mt-0.5">{problemasSaude}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Dados do Paciente */}
         <div className="bg-white rounded-2xl border border-border p-6 shadow-sm space-y-4">
-          <h2 className="font-bold text-base text-primary uppercase tracking-wider">Dados do Paciente</h2>
+          <h2 className="font-bold text-sm text-primary uppercase tracking-wider">Dados do Paciente</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-            <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Nome</p><p className="font-bold text-foreground">{nomePaciente || "—"}</p></div>
-            <div><p className="text-muted-foreground font-semibold">Data da Triagem</p><p className="font-bold text-foreground">{data}</p></div>
-            {dataNascimento && <div><p className="text-muted-foreground font-semibold">Data de Nascimento</p><p className="font-bold">{new Date(dataNascimento + "T12:00:00").toLocaleDateString("pt-BR")}</p></div>}
+            <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Nome</p><p className="font-bold">{nomePaciente || "—"}</p></div>
+            <div><p className="text-muted-foreground font-semibold">Data da Triagem</p><p className="font-bold">{data}</p></div>
+            {dataNascimento && <div><p className="text-muted-foreground font-semibold">Nascimento</p><p className="font-bold">{new Date(dataNascimento + "T12:00:00").toLocaleDateString("pt-BR")}</p></div>}
             {idade && <div><p className="text-muted-foreground font-semibold">Idade</p><p className="font-bold">{idade}</p></div>}
             {naturalidade && <div><p className="text-muted-foreground font-semibold">Naturalidade</p><p className="font-bold">{naturalidade}</p></div>}
             {rg && <div><p className="text-muted-foreground font-semibold">RG</p><p className="font-bold">{rg}</p></div>}
@@ -848,30 +783,35 @@ function Relatorio({
             {telefone && <div><p className="text-muted-foreground font-semibold">Telefone</p><p className="font-bold">{telefone}</p></div>}
             {endereco && <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Endereço</p><p className="font-bold">{endereco}</p></div>}
           </div>
-          {(nomeMae || nomePai || numIrmaos || tipoImovel || bolsaFamilia || bpc) && (
-            <div className="pt-4 border-t border-border text-sm grid grid-cols-2 md:grid-cols-3 gap-4">
-              <h3 className="md:col-span-3 font-bold text-muted-foreground uppercase text-xs tracking-wider">Núcleo Familiar</h3>
-              {nomeMae && <div><p className="text-muted-foreground font-semibold">Mãe</p><p className="font-bold">{nomeMae}{escolaridadeMae ? ` | ${escolaridadeMae}` : ""}{profissaoMae ? ` | ${profissaoMae}` : ""}</p></div>}
-              {nomePai && <div><p className="text-muted-foreground font-semibold">Pai</p><p className="font-bold">{nomePai}{escolaridadePai ? ` | ${escolaridadePai}` : ""}{profissaoPai ? ` | ${profissaoPai}` : ""}</p></div>}
-              {numIrmaos && <div><p className="text-muted-foreground font-semibold">Nº de Irmãos</p><p className="font-bold">{numIrmaos}</p></div>}
-              {tipoImovel && <div><p className="text-muted-foreground font-semibold">Moradia</p><p className="font-bold">{tipoImovel}</p></div>}
-              {(bolsaFamilia || bpc) && (
-                <div className="md:col-span-2">
-                  <p className="text-muted-foreground font-semibold">Benefícios</p>
-                  <p className="font-bold">{[bolsaFamilia && "Bolsa Família", bpc && "BPC"].filter(Boolean).join(", ")}</p>
-                </div>
-              )}
+
+          {(nomeMae || nomePai || numIrmaos || tipoImovel || beneficios || rendaFamiliar) && (
+            <div className="pt-4 border-t border-border text-sm space-y-1">
+              <p className="font-bold text-muted-foreground uppercase text-xs tracking-wider mb-2">Núcleo Familiar e Social</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {nomeMae && <div><p className="text-muted-foreground font-semibold">Mãe</p><p className="font-bold">{nomeMae}{escolaridadeMae ? ` | ${escolaridadeMae}` : ""}{profissaoMae ? ` | ${profissaoMae}` : ""}</p></div>}
+                {nomePai && <div><p className="text-muted-foreground font-semibold">Pai</p><p className="font-bold">{nomePai}{escolaridadePai ? ` | ${escolaridadePai}` : ""}{profissaoPai ? ` | ${profissaoPai}` : ""}</p></div>}
+                {numIrmaos && <div><p className="text-muted-foreground font-semibold">Nº de Irmãos</p><p className="font-bold">{numIrmaos}</p></div>}
+                {tipoImovel && <div><p className="text-muted-foreground font-semibold">Moradia</p><p className="font-bold">{tipoImovel}</p></div>}
+                {rendaFamiliar && <div><p className="text-muted-foreground font-semibold">Renda Familiar</p><p className="font-bold">{rendaFamiliar}</p></div>}
+                {beneficios && <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Benefícios</p><p className="font-bold">{beneficios}</p></div>}
+              </div>
             </div>
           )}
-          {(diagnostico || cid || medico || dataUltimaCons) && (
-            <div className="pt-4 border-t border-border text-sm grid grid-cols-2 md:grid-cols-3 gap-4">
-              <h3 className="md:col-span-3 font-bold text-muted-foreground uppercase text-xs tracking-wider">Dados de Saúde</h3>
-              {diagnostico && <div><p className="text-muted-foreground font-semibold">Diagnóstico / Laudo</p><p className="font-bold">{diagnostico}</p></div>}
-              {cid && <div><p className="text-muted-foreground font-semibold">CID-10</p><p className="font-bold">{cid}</p></div>}
-              {medico && <div><p className="text-muted-foreground font-semibold">Médico</p><p className="font-bold">{medico}</p></div>}
-              {dataUltimaCons && <div><p className="text-muted-foreground font-semibold">Última Consulta</p><p className="font-bold">{new Date(dataUltimaCons + "T12:00:00").toLocaleDateString("pt-BR")}</p></div>}
+
+          {(diagnostico || cid || cid11 || medico || dispositivos) && (
+            <div className="pt-4 border-t border-border text-sm">
+              <p className="font-bold text-muted-foreground uppercase text-xs tracking-wider mb-2">Saúde e Dispositivos</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {diagnostico && <div><p className="text-muted-foreground font-semibold">Diagnóstico</p><p className="font-bold">{diagnostico}</p></div>}
+                {cid && <div><p className="text-muted-foreground font-semibold">CID-10</p><p className="font-bold">{cid}</p></div>}
+                {cid11 && <div><p className="text-muted-foreground font-semibold">CID-11</p><p className="font-bold">{cid11}</p></div>}
+                {medico && <div><p className="text-muted-foreground font-semibold">Médico</p><p className="font-bold">{medico}</p></div>}
+                {dataUltimaCons && <div><p className="text-muted-foreground font-semibold">Última Consulta</p><p className="font-bold">{new Date(dataUltimaCons + "T12:00:00").toLocaleDateString("pt-BR")}</p></div>}
+                {dispositivos && <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Dispositivos</p><p className="font-bold">{dispositivos}</p></div>}
+              </div>
             </div>
           )}
+
           {profissional && (
             <div className="pt-4 border-t border-border text-sm">
               <p className="text-muted-foreground font-semibold">Profissional Responsável pela Triagem</p>
@@ -880,21 +820,16 @@ function Relatorio({
           )}
         </div>
 
-        {/* ── Pontuação total ── */}
+        {/* Pontuação total */}
         <div className="bg-white rounded-2xl border border-border p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Pontuação Total</p>
-            <p className="text-4xl font-bold text-foreground mt-1">{totalPontos} <span className="text-lg font-normal text-muted-foreground">/ {totalMax}</span></p>
+            <p className="text-4xl font-bold mt-1">{totalPontos} <span className="text-lg font-normal text-muted-foreground">/ {totalMax}</span></p>
             <p className="text-sm text-muted-foreground mt-1">{pctTotal}% da pontuação máxima</p>
-            <div className="flex gap-2 mt-3 flex-wrap">
-              {[
-                { label: "Verde – Baixo", cor: "bg-emerald-500" },
-                { label: "Azul – Leve", cor: "bg-blue-500" },
-                { label: "Laranja – Moderado", cor: "bg-amber-500" },
-                { label: "Vermelho – Elevado", cor: "bg-rose-500" },
-              ].map(({ label, cor }) => (
+            <div className="flex gap-3 mt-3 flex-wrap">
+              {[["bg-emerald-500","Verde – Baixo"],["bg-blue-500","Azul – Leve"],["bg-amber-500","Laranja – Moderado"],["bg-rose-500","Vermelho – Elevado"]].map(([cor,label]) => (
                 <span key={label} className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <span className={`w-3 h-3 rounded-full ${cor} inline-block`} /> {label}
+                  <span className={`w-3 h-3 rounded-full ${cor}`} /> {label}
                 </span>
               ))}
             </div>
@@ -907,14 +842,14 @@ function Relatorio({
                 strokeWidth="3" strokeDasharray={`${pctTotal} ${100 - pctTotal}`} strokeLinecap="round" />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-xl font-bold text-foreground">{pctTotal}%</span>
+              <span className="text-xl font-bold">{pctTotal}%</span>
             </div>
           </div>
         </div>
 
-        {/* ── Gráfico Radar ── */}
+        {/* Radar */}
         <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
-          <h2 className="font-bold text-lg text-foreground mb-2">Teia de Aranha – Perfil Multidisciplinar</h2>
+          <h2 className="font-bold text-lg mb-1">Teia de Aranha – Perfil Multidisciplinar</h2>
           <p className="text-sm text-muted-foreground mb-4">Percentual de indicativo por área avaliada</p>
           <GraficoRadar porArea={porArea} />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
@@ -928,20 +863,20 @@ function Relatorio({
           </div>
         </div>
 
-        {/* ── Top prioridades ── */}
+        {/* Prioridades */}
         {top3.length > 0 && (
           <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
-            <h2 className="font-bold text-lg text-foreground mb-4">Prioridades Identificadas (Top {top3.length})</h2>
+            <h2 className="font-bold text-lg mb-4">Prioridades Identificadas (Top {top3.length})</h2>
             <div className="space-y-3">
               {top3.map(({ area, pontos, max, nivel }, i) => (
                 <div key={area} className={`flex items-center gap-4 p-4 rounded-xl border ${nivel.bg}`}>
                   <span className="text-2xl font-black text-muted-foreground/40 w-8 text-center">{i + 1}</span>
                   <div className="flex-1">
-                    <p className={`font-bold text-base ${nivel.cor}`}>{area}</p>
+                    <p className={`font-bold ${nivel.cor}`}>{area}</p>
                     <p className={`text-sm font-semibold ${nivel.cor}`}>{nivel.label}</p>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-bold text-foreground">{pontos}</span>
+                    <span className="text-2xl font-bold">{pontos}</span>
                     <p className="text-xs text-muted-foreground">/{max}</p>
                   </div>
                 </div>
@@ -950,9 +885,9 @@ function Relatorio({
           </div>
         )}
 
-        {/* ── Resultado por área ── */}
+        {/* Resultado por área */}
         <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
-          <h2 className="font-bold text-lg text-foreground mb-5">Resultado Detalhado por Área</h2>
+          <h2 className="font-bold text-lg mb-5">Resultado Detalhado por Área</h2>
           <div className="space-y-4">
             {ranking.map(({ area, pontos, max, pct, nivel }) => (
               <div key={area}>
@@ -964,46 +899,51 @@ function Relatorio({
                   </div>
                 </div>
                 <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${pct}%`, backgroundColor: nivel.hex }}
-                  />
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: nivel.hex }} />
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── Nota técnica ── */}
+        {/* Nota técnica */}
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-sm text-blue-900">
           <p className="font-bold mb-1">Nota Técnica</p>
           <p>Este documento refere-se a uma triagem inicial baseada em observações estruturadas, não constituindo diagnóstico clínico ou laudo profissional. Os resultados indicam possíveis necessidades e servem como apoio para encaminhamento para avaliação especializada.</p>
         </div>
 
-        {/* ── Ações ── */}
+        {/* Ações */}
         <div className="flex flex-wrap gap-3 justify-center pb-8 no-print">
           <button onClick={() => window.print()}
-            className="px-6 py-3 rounded-xl border border-border text-sm font-semibold hover:bg-secondary transition-colors">
+            className="px-6 py-3 rounded-xl border border-border text-sm font-semibold hover:bg-secondary">
             Imprimir / Salvar PDF
           </button>
-          {!salvo ? (
+          {!viewOnly && !salvo && (
             <button onClick={salvarTriagem} disabled={salvando}
-              className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60">
+              className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-60">
               {salvando ? "Salvando…" : editId ? "Atualizar Triagem" : "Salvar Triagem"}
             </button>
-          ) : (
+          )}
+          {!viewOnly && salvo && (
             <button onClick={() => navigate("/lista")}
-              className="px-6 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
+              className="px-6 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
               ✓ {editId ? "Atualizado!" : "Salvo!"} Ver Pacientes →
             </button>
           )}
-          <button onClick={onNova}
-            className="px-6 py-3 rounded-xl border border-border text-sm font-semibold hover:bg-secondary transition-colors">
-            {editId ? "Editar Respostas" : "Nova Triagem"}
-          </button>
+          {viewOnly && (
+            <button onClick={() => navigate("/lista")}
+              className="px-6 py-3 rounded-xl border border-border text-sm font-semibold hover:bg-secondary">
+              ← Voltar à Lista
+            </button>
+          )}
+          {!viewOnly && (
+            <button onClick={onNova}
+              className="px-6 py-3 rounded-xl border border-border text-sm font-semibold hover:bg-secondary">
+              {editId ? "Editar Respostas" : "Nova Triagem"}
+            </button>
+          )}
         </div>
 
-        {/* Rodapé de impressão */}
         <div className="print-only hidden text-center text-xs text-gray-500 border-t border-gray-200 pt-4 mt-4">
           {CLINIC_CONFIG.copyright} — Documento gerado em {data}
         </div>
@@ -1012,7 +952,7 @@ function Relatorio({
   );
 }
 
-// ── LISTA DE PACIENTES ────────────────────────────────────────────────────────
+// ─── LISTA DE PACIENTES ───────────────────────────────────────────────────────
 
 function ListaPacientes() {
   const [triagens, setTriagens] = useState<TriagemSalva[]>([]);
@@ -1021,22 +961,18 @@ function ListaPacientes() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    fetch(`${API}/triagens`)
-      .then((r) => r.json())
-      .then((data) => setTriagens(data))
-      .catch(console.error)
-      .finally(() => setCarregando(false));
+    fetch(`${API}/triagens`).then(r => r.json()).then(setTriagens).catch(console.error).finally(() => setCarregando(false));
   }, []);
 
   const excluir = async (id: number) => {
     if (!confirm("Excluir esta triagem permanentemente?")) return;
     await fetch(`${API}/triagens/${id}`, { method: "DELETE" });
-    setTriagens((prev) => prev.filter((t) => t.id !== id));
+    setTriagens(prev => prev.filter(t => t.id !== id));
   };
 
   const parseResultado = (resultado: string | null) => {
     if (!resultado) return [];
-    return resultado.split(" | ").filter(Boolean).map((item) => {
+    return resultado.split(" | ").filter(Boolean).map(item => {
       const [area, resto] = item.split(": ");
       const [pontos, nivel] = (resto ?? "").split(" pontos - ");
       return { area: area?.trim(), pontos: pontos?.trim(), nivel: nivel?.trim() };
@@ -1051,20 +987,17 @@ function ListaPacientes() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header showLista />
+      <Header page="lista" />
       <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Pacientes Triados</h2>
+            <h2 className="text-2xl font-bold">Pacientes Triados</h2>
             <p className="text-muted-foreground text-sm mt-0.5">{triagens.length} triagem(ns) registrada(s)</p>
           </div>
           {triagens.length > 0 && (
-            <input
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
+            <input value={busca} onChange={e => setBusca(e.target.value)}
               placeholder="Buscar por nome, diagnóstico ou CID..."
-              className="w-full sm:w-72 border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
+              className="w-full sm:w-72 border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
           )}
         </div>
 
@@ -1073,63 +1006,63 @@ function ListaPacientes() {
         ) : triagens.length === 0 ? (
           <div className="bg-white rounded-2xl border border-border p-12 text-center">
             <p className="text-4xl mb-4">📋</p>
-            <p className="font-semibold text-foreground">Nenhuma triagem salva ainda</p>
-            <p className="text-sm text-muted-foreground mt-1">Realize uma triagem e clique em "Salvar Triagem" para ela aparecer aqui.</p>
-            <Link href="/" className="mt-4 inline-block px-6 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90">
+            <p className="font-semibold">Nenhuma triagem salva ainda</p>
+            <Link href="/" className="mt-4 inline-block px-6 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
               Iniciar Triagem
             </Link>
           </div>
         ) : filtradas.length === 0 ? (
           <div className="bg-white rounded-2xl border border-border p-8 text-center text-muted-foreground">
-            Nenhum paciente encontrado para "{busca}".
+            Nenhum resultado para "{busca}".
           </div>
         ) : (
           <div className="space-y-4">
             {filtradas.map((t) => {
               const areas = parseResultado(t.resultado);
-              const top3 = [...areas].slice(0, 3);
+              const top3 = areas.slice(0, 3);
               return (
-                <div key={t.id} className="bg-white rounded-2xl border border-border p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div key={t.id} className="bg-white rounded-2xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-lg text-foreground truncate">{t.nome}</p>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
-                        {t.idade && <span>Idade: {t.idade}</span>}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-lg truncate">{t.nome}</p>
+                        {t.alergias && (
+                          <span className="text-xs font-bold bg-red-100 text-red-700 border border-red-300 px-2 py-0.5 rounded-full">⚠ Alergia</span>
+                        )}
+                        {t.cadeiraDeRodas && (
+                          <span className="text-xs font-bold bg-blue-100 text-blue-700 border border-blue-300 px-2 py-0.5 rounded-full">♿ CDR</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-sm text-muted-foreground">
+                        {t.idade && <span>{t.idade}</span>}
                         {t.responsavel && <span>Resp.: {t.responsavel}</span>}
                         {t.telefone && <span>{t.telefone}</span>}
                         {t.data && <span>{t.data}</span>}
                       </div>
                       {(t.diagnostico || t.cid) && (
-                        <div className="flex flex-wrap gap-x-4 mt-1 text-sm">
+                        <div className="flex flex-wrap gap-x-3 mt-1 text-sm">
                           {t.diagnostico && <span className="text-muted-foreground">Diag.: <span className="font-semibold text-foreground">{t.diagnostico}</span></span>}
-                          {t.cid && <span className="text-muted-foreground">CID: <span className="font-semibold text-foreground">{t.cid}</span></span>}
+                          {t.cid && <span className="text-muted-foreground">CID-10: <span className="font-semibold text-foreground">{t.cid}</span></span>}
+                          {t.cid11 && <span className="text-muted-foreground">CID-11: <span className="font-semibold text-foreground">{t.cid11}</span></span>}
                         </div>
                       )}
-                      {t.profissional && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Prof.: <span className="font-semibold text-foreground">{t.profissional}{t.especialidade ? ` — ${t.especialidade}` : ""}</span>
-                        </p>
-                      )}
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => navigate(`/editar/${t.id}`)}
-                        className="px-3 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/5 transition-colors"
-                        title="Visualizar / Editar"
-                      >
-                        Editar / Ver
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      <button onClick={() => navigate(`/relatorio/${t.id}`)}
+                        className="px-3 py-1.5 rounded-lg border border-border text-muted-foreground text-xs font-semibold hover:bg-secondary transition-colors">
+                        Imprimir PDF
+                      </button>
+                      <button onClick={() => navigate(`/editar/${t.id}`)}
+                        className="px-3 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/5 transition-colors">
+                        Editar
                       </button>
                       <button onClick={() => excluir(t.id)}
-                        className="text-muted-foreground hover:text-destructive transition-colors text-xl"
-                        title="Excluir">
-                        ×
-                      </button>
+                        className="text-muted-foreground hover:text-destructive transition-colors text-xl px-1" title="Excluir">×</button>
                     </div>
                   </div>
 
                   {top3.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-border">
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Top Prioridades</p>
+                    <div className="mt-3 pt-3 border-t border-border">
                       <div className="flex flex-wrap gap-2">
                         {top3.map(({ area, pontos, nivel }) => {
                           const cor = nivel === "Indício elevado" ? "bg-rose-100 text-rose-800 border-rose-200"
@@ -1155,7 +1088,247 @@ function ListaPacientes() {
   );
 }
 
-// ── EDITAR TRIAGEM ────────────────────────────────────────────────────────────
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+
+const PIE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#f43f5e", "#8b5cf6", "#06b6d4"];
+
+function Dashboard() {
+  const [triagens, setTriagens] = useState<TriagemSalva[]>([]);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API}/triagens`).then(r => r.json()).then(setTriagens).catch(console.error).finally(() => setCarregando(false));
+  }, []);
+
+  if (carregando) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header page="dashboard" />
+        <div className="flex items-center justify-center pt-24 text-muted-foreground">Carregando dados…</div>
+      </div>
+    );
+  }
+
+  const total = triagens.length;
+  const stats = {
+    bpc: triagens.filter(t => t.bpc).length,
+    bolsaFamilia: triagens.filter(t => t.bolsaFamilia).length,
+    pensao: triagens.filter(t => t.pensao).length,
+    auxilioDoenca: triagens.filter(t => t.auxilioDoenca).length,
+    cadeiraDeRodas: triagens.filter(t => t.cadeiraDeRodas).length,
+    ortesesProteses: triagens.filter(t => t.ortesesProteses).length,
+    aparelhoAuditivo: triagens.filter(t => t.aparelhoAuditivo).length,
+    comAlergias: triagens.filter(t => t.alergias && t.alergias.trim()).length,
+    comMedicacao: triagens.filter(t => t.medicacaoContinua && t.medicacaoContinua.trim()).length,
+  };
+
+  const pct = (n: number) => total === 0 ? 0 : Math.round((n / total) * 100);
+
+  const beneficiosData = [
+    { name: "BPC", value: stats.bpc },
+    { name: "Bolsa Família", value: stats.bolsaFamilia },
+    { name: "Pensão", value: stats.pensao },
+    { name: "Auxílio-Doença", value: stats.auxilioDoenca },
+  ].filter(d => d.value > 0);
+
+  const dispositivosData = [
+    { name: "Cadeira de Rodas", value: stats.cadeiraDeRodas },
+    { name: "Órteses/Próteses", value: stats.ortesesProteses },
+    { name: "Ap. Auditivo", value: stats.aparelhoAuditivo },
+  ].filter(d => d.value > 0);
+
+  // Diagnósticos mais frequentes
+  const diagContagem: Record<string, number> = {};
+  triagens.forEach(t => {
+    if (t.diagnostico?.trim()) {
+      const d = t.diagnostico.trim();
+      diagContagem[d] = (diagContagem[d] || 0) + 1;
+    }
+  });
+  const diagData = Object.entries(diagContagem)
+    .sort((a, b) => b[1] - a[1]).slice(0, 7)
+    .map(([name, value]) => ({ name: name.length > 20 ? name.slice(0, 20) + "…" : name, value }));
+
+  const Card = ({ label, value, sub, color }: { label: string; value: number | string; sub?: string; color?: string }) => (
+    <div className={`bg-white rounded-2xl border border-border p-5 shadow-sm ${color ? `border-l-4 ${color}` : ""}`}>
+      <p className="text-sm font-semibold text-muted-foreground">{label}</p>
+      <p className="text-3xl font-bold mt-1">{value}</p>
+      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header page="dashboard" />
+      <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold">Dashboard Estatístico</h2>
+          <p className="text-muted-foreground text-sm mt-0.5">Visão geral dos pacientes triados — atualizado em tempo real</p>
+        </div>
+
+        {total === 0 ? (
+          <div className="bg-white rounded-2xl border border-border p-12 text-center">
+            <p className="text-4xl mb-4">📊</p>
+            <p className="font-semibold">Nenhuma triagem registrada ainda</p>
+            <Link href="/" className="mt-4 inline-block px-6 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+              Iniciar primeira triagem
+            </Link>
+          </div>
+        ) : (
+          <>
+            {/* Cards principais */}
+            <div>
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Visão Geral</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card label="Total de Pacientes" value={total} color="border-l-primary" />
+                <Card label="Com Alergias ⚠" value={stats.comAlergias} sub={`${pct(stats.comAlergias)}% do total`} color="border-l-red-500" />
+                <Card label="Medicação Contínua 💊" value={stats.comMedicacao} sub={`${pct(stats.comMedicacao)}% do total`} color="border-l-amber-500" />
+                <Card label="Cadeirantes ♿" value={stats.cadeiraDeRodas} sub={`${pct(stats.cadeiraDeRodas)}% do total`} color="border-l-blue-500" />
+              </div>
+            </div>
+
+            {/* Cards benefícios */}
+            <div>
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Benefícios Sociais</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card label="BPC" value={stats.bpc} sub={`${pct(stats.bpc)}% dos pacientes`} color="border-l-emerald-500" />
+                <Card label="Bolsa Família" value={stats.bolsaFamilia} sub={`${pct(stats.bolsaFamilia)}% dos pacientes`} color="border-l-emerald-400" />
+                <Card label="Pensão" value={stats.pensao} sub={`${pct(stats.pensao)}% dos pacientes`} color="border-l-teal-500" />
+                <Card label="Auxílio-Doença" value={stats.auxilioDoenca} sub={`${pct(stats.auxilioDoenca)}% dos pacientes`} color="border-l-teal-400" />
+              </div>
+            </div>
+
+            {/* Cards dispositivos */}
+            <div>
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Dispositivos de Apoio</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Card label="Cadeira de Rodas" value={stats.cadeiraDeRodas} sub={`${pct(stats.cadeiraDeRodas)}% do total`} />
+                <Card label="Órteses / Próteses" value={stats.ortesesProteses} sub={`${pct(stats.ortesesProteses)}% do total`} />
+                <Card label="Aparelho Auditivo" value={stats.aparelhoAuditivo} sub={`${pct(stats.aparelhoAuditivo)}% do total`} />
+              </div>
+            </div>
+
+            {/* Gráficos */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Diagnósticos */}
+              {diagData.length > 0 && (
+                <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+                  <h3 className="font-bold text-base mb-4">Diagnósticos Mais Frequentes</h3>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={diagData} layout="vertical" margin={{ left: 8, right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#0ea5e9" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11 }} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Benefícios */}
+              {beneficiosData.length > 0 && (
+                <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+                  <h3 className="font-bold text-base mb-4">Distribuição de Benefícios</h3>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={beneficiosData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => `${name}: ${value}`} labelLine={false}>
+                        {beneficiosData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Dispositivos */}
+              {dispositivosData.length > 0 && (
+                <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+                  <h3 className="font-bold text-base mb-4">Dispositivos de Apoio</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={dispositivosData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} label={{ position: "top", fontSize: 11 }} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Alertas críticos */}
+              <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+                <h3 className="font-bold text-base mb-4">Alertas Críticos</h3>
+                <div className="space-y-3">
+                  {[
+                    { label: "Pacientes com Alergias", value: stats.comAlergias, cor: "bg-red-500" },
+                    { label: "Uso de Medicação Contínua", value: stats.comMedicacao, cor: "bg-amber-500" },
+                    { label: "Cadeirantes", value: stats.cadeiraDeRodas, cor: "bg-blue-500" },
+                    { label: "Órteses / Próteses", value: stats.ortesesProteses, cor: "bg-purple-500" },
+                    { label: "Aparelho Auditivo", value: stats.aparelhoAuditivo, cor: "bg-teal-500" },
+                  ].map(({ label, value, cor }) => (
+                    <div key={label} className="flex items-center gap-3">
+                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cor}`} />
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-0.5">
+                          <span className="text-sm text-foreground">{label}</span>
+                          <span className="text-sm font-bold">{value} <span className="text-muted-foreground font-normal">({pct(value)}%)</span></span>
+                        </div>
+                        <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${cor}`} style={{ width: `${pct(value)}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── RELATÓRIO VIEW (Imprimir PDF da lista) ───────────────────────────────────
+
+function RelatorioView() {
+  const params = useParams<{ id: string }>();
+  const id = Number(params.id);
+  const [formData, setFormData] = useState<FormData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    fetch(`${API}/triagens/${id}`)
+      .then(r => { if (!r.ok) throw new Error("Não encontrado"); return r.json(); })
+      .then((t: TriagemSalva) => setFormData(triSalvaToFormData(t)))
+      .catch(() => setErro("Triagem não encontrada."))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <p className="text-muted-foreground">Carregando relatório…</p>
+    </div>
+  );
+
+  if (erro || !formData) return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-destructive font-semibold">{erro || "Erro ao carregar."}</p>
+        <button onClick={() => navigate("/lista")} className="mt-4 text-primary underline text-sm">← Voltar à lista</button>
+      </div>
+    </div>
+  );
+
+  return <Relatorio formData={formData} onNova={() => navigate("/")} editId={id} viewOnly />;
+}
+
+// ─── EDITAR TRIAGEM ───────────────────────────────────────────────────────────
 
 function EditarTriagem() {
   const params = useParams<{ id: string }>();
@@ -1164,78 +1337,48 @@ function EditarTriagem() {
   const [resultado, setResultado] = useState(false);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     fetch(`${API}/triagens/${id}`)
-      .then(r => {
-        if (!r.ok) throw new Error("Não encontrado");
-        return r.json();
-      })
-      .then((t: TriagemSalva) => {
-        setFormData(triSalvaToFormData(t));
-      })
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((t: TriagemSalva) => setFormData(triSalvaToFormData(t)))
       .catch(() => setErro("Triagem não encontrada."))
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando triagem…</p>
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando…</div>;
+  if (erro || !formData) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-destructive font-semibold">{erro}</p>
+        <button onClick={() => navigate("/lista")} className="mt-4 text-primary underline text-sm">← Voltar</button>
       </div>
-    );
-  }
-
-  if (erro || !formData) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-destructive font-semibold">{erro || "Erro ao carregar triagem."}</p>
-          <Link href="/lista" className="mt-4 inline-block text-primary underline text-sm">
-            ← Voltar à lista
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (resultado) {
-    return (
-      <Relatorio
-        formData={formData}
-        onNova={() => setResultado(false)}
-        editId={id}
-      />
-    );
-  }
-
-  return (
-    <Formulario
-      initialData={formData}
-      onSubmit={(fd) => { setFormData(fd); setResultado(true); }}
-    />
+    </div>
   );
+
+  if (resultado) return <Relatorio formData={formData} onNova={() => setResultado(false)} editId={id} />;
+  return <Formulario initialData={formData} onSubmit={fd => { setFormData(fd); setResultado(true); }} />;
 }
 
-// ── FLUXO NOVA TRIAGEM ────────────────────────────────────────────────────────
+// ─── FLUXO NOVA TRIAGEM ───────────────────────────────────────────────────────
 
 function TriagemFlow() {
   const [formData, setFormData] = useState<FormData | null>(null);
-
-  if (formData) {
-    return <Relatorio formData={formData} onNova={() => setFormData(null)} />;
-  }
+  if (formData) return <Relatorio formData={formData} onNova={() => setFormData(null)} />;
   return <Formulario onSubmit={setFormData} />;
 }
 
-// ── APP ───────────────────────────────────────────────────────────────────────
+// ─── APP ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
   return (
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <Switch>
+        <Route path="/dashboard" component={Dashboard} />
         <Route path="/lista" component={ListaPacientes} />
         <Route path="/editar/:id" component={EditarTriagem} />
+        <Route path="/relatorio/:id" component={RelatorioView} />
         <Route path="/" component={TriagemFlow} />
       </Switch>
     </WouterRouter>
