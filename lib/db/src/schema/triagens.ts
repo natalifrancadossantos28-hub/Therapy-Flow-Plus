@@ -42,6 +42,10 @@ export const triagens = pgTable("triagens", {
   medicacaoContinua: text("medicacao_continua"),
   alergias: text("alergias"),
   problemasSaude: text("problemas_saude"),
+  // Contexto socioeconômico
+  tipoEscola: text("tipo_escola"),
+  trabalhoPais: text("trabalho_pais"),
+  outroAtendimento: boolean("outro_atendimento"),
   // Profissional
   profissional: text("profissional"),
   especialidade: text("especialidade"),

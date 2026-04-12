@@ -1,0 +1,23 @@
+COMANDO DE ATUALIZAÇÃO: PRIORIDADE SOCIAL E ESTABILIDADE DO LINK
+​1. Lógica de Prioridade por Vulnerabilidade (Ranking Automático):
+​Crie um sistema de pontos para a Fila de Espera. O paciente subirá no ranking se preencher estes critérios:
+​Educação: Estuda em Escola Municipal ou Estadual (+10 pontos).
+​Renda/Trabalho: Família trabalha na roça, setor informal ou está desempregada (+10 pontos).
+​Auxílios: Recebe BPC ou Bolsa Família (+5 pontos).
+​Isolamento: Não recebe atendimento em nenhum outro lugar atualmente (+15 pontos).
+​O sistema deve somar esses pontos ao score da triagem clínica. Assim, quem tem necessidade clínica E vulnerabilidade social aparece no topo da lista com um selo de "Prioridade Máxima".
+​2. Estabilidade e Domínio Próprio (O Link é Meu):
+​Persistência Total: Configure o banco de dados para que nenhum dado se perca, independentemente de atualizações no link do Replit.
+​Configuração de Produção: Otimize o sistema para que ele não entre em "modo de espera" (sleep mode). Preciso que o link esteja ativo e rápido para uso profissional imediato.
+​White Label: Certifique-se de que não existam nomes de cidades fixos no código, permitindo que o sistema seja adaptável para qualquer região no futuro.
+​3. Campos de Cadastro de Vulnerabilidade:
+​Adicione as perguntas:
+​"Trabalho dos pais: [ ] Formal (Carteira) [ ] Informal/Roça [ ] Desempregado".
+​"Já realiza terapias em outro local? [ ] Sim [ ] Não".
+​4. Dashboard de Impacto Social:
+​Crie um contador no painel principal: "Pacientes em situação de vulnerabilidade aguardando" e "Porcentagem de alunos da rede pública atendidos".
+​Dica sobre o Link para Segunda-feira:
+​Para garantir que o sistema seja "seu", faça o seguinte no Replit:
+​Vá em "Release" ou "Deploy" (geralmente um botão azul no topo).
+​Isso vai gerar um link de "Produção". Esse link é muito mais estável que o link de edição que você usa para programar.
+​Sobre o link ser seu: Se você quiser que o link seja, por exemplo, www.triagemdanati.com.br, você precisa comprar esse nome (domínio) e o Replit faz a ligação. Se quiser, me peça e eu te explico o passo a passo de como comprar e configurar.

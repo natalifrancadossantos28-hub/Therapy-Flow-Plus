@@ -210,6 +210,7 @@ type FormData = {
   medico: string; dataUltimaCons: string;
   cadeiraDeRodas: boolean; ortesesProteses: boolean; aparelhoAuditivo: boolean;
   medicacaoContinua: string; alergias: string; problemasSaude: string;
+  tipoEscola: string; trabalhoPais: string; outroAtendimento: boolean;
   profissional: string; especialidade: string;
 };
 
@@ -227,6 +228,7 @@ type TriagemSalva = {
   medico: string | null; dataUltimaCons: string | null;
   cadeiraDeRodas: boolean | null; ortesesProteses: boolean | null; aparelhoAuditivo: boolean | null;
   medicacaoContinua: string | null; alergias: string | null; problemasSaude: string | null;
+  tipoEscola: string | null; trabalhoPais: string | null; outroAtendimento: boolean | null;
   profissional: string | null; especialidade: string | null;
   data: string | null; resultado: string | null; respostas: string | null;
   createdAt: string;
@@ -263,8 +265,40 @@ function triSalvaToFormData(t: TriagemSalva): FormData {
     aparelhoAuditivo: !!t.aparelhoAuditivo,
     medicacaoContinua: t.medicacaoContinua || "",
     alergias: t.alergias || "", problemasSaude: t.problemasSaude || "",
+    tipoEscola: t.tipoEscola || "", trabalhoPais: t.trabalhoPais || "",
+    outroAtendimento: t.outroAtendimento !== false,
     profissional: t.profissional || "", especialidade: t.especialidade || "",
   };
+}
+
+// ─── PONTUAÇÃO DE VULNERABILIDADE ────────────────────────────────────────────
+
+function parsePontosTotal(resultado: string | null): number {
+  if (!resultado) return 0;
+  return resultado.split(" | ").filter(Boolean).reduce((acc, item) => {
+    const m = item.match(/: (\d+) pontos/);
+    return acc + (m ? parseInt(m[1]) : 0);
+  }, 0);
+}
+
+function calcVulnScore(t: {
+  tipoEscola?: string | null; trabalhoPais?: string | null;
+  bpc?: boolean | null; bolsaFamilia?: boolean | null; outroAtendimento?: boolean | null;
+}): number {
+  let score = 0;
+  if (t.tipoEscola === "Municipal" || t.tipoEscola === "Estadual") score += 10;
+  if (t.trabalhoPais === "Informal/Roça" || t.trabalhoPais === "Desempregado") score += 10;
+  if (t.bpc || t.bolsaFamilia) score += 5;
+  if (t.outroAtendimento === false) score += 15;
+  return score;
+}
+
+function getPrioridadeBadge(vulnScore: number, clinicalPts: number) {
+  const total = vulnScore + Math.round(clinicalPts / 8);
+  if (total >= 35 || vulnScore === 40) return { label: "Prioridade Máxima", cls: "bg-red-100 text-red-800 border-red-300", icon: "🔴" };
+  if (total >= 20) return { label: "Alta Prioridade", cls: "bg-orange-100 text-orange-800 border-orange-300", icon: "🟠" };
+  if (vulnScore >= 10) return { label: "Vulnerabilidade Social", cls: "bg-yellow-100 text-yellow-800 border-yellow-300", icon: "🟡" };
+  return null;
 }
 
 // ─── HEADER ───────────────────────────────────────────────────────────────────
@@ -364,6 +398,9 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
   const [medicacaoContinua, setMedicacaoContinua] = useState(b?.medicacaoContinua ?? "");
   const [alergias, setAlergias] = useState(b?.alergias ?? "");
   const [problemasSaude, setProblemasSaude] = useState(b?.problemasSaude ?? "");
+  const [tipoEscola, setTipoEscola] = useState(b?.tipoEscola ?? "");
+  const [trabalhoPais, setTrabalhoPais] = useState(b?.trabalhoPais ?? "");
+  const [outroAtendimento, setOutroAtendimento] = useState(b?.outroAtendimento ?? true);
   const [profissional, setProfissional] = useState(b?.profissional ?? "");
   const [especialidade, setEspecialidade] = useState(b?.especialidade ?? "");
   const [areaAtiva, setAreaAtiva] = useState(AREAS[0]);
@@ -382,6 +419,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
       diagnostico, cid, cid11, medico, dataUltimaCons,
       cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
       medicacaoContinua, alergias, problemasSaude,
+      tipoEscola, trabalhoPais, outroAtendimento,
       profissional, especialidade,
     });
   };
@@ -478,6 +516,41 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
                   <option value="">Selecione...</option>
                   {["Próprio", "Alugado", "Cedido", "Abrigo / Instituição", "Área de risco"].map(o => <option key={o} value={o}>{o}</option>)}
                 </select></div>
+            </div>
+          </div>
+
+          {/* Contexto Socioeconômico — Vulnerabilidade */}
+          <div className="pt-4 border-t border-border">
+            <Sec title="Contexto Socioeconômico (Índice de Vulnerabilidade)" />
+            <p className="text-xs text-muted-foreground mb-4 -mt-2">Esses dados geram o ranking automático de prioridade na lista de pacientes.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Tipo de Escola</label>
+                <select value={tipoEscola} onChange={e => setTipoEscola(e.target.value)} className={fc}>
+                  <option value="">Selecione...</option>
+                  {["Municipal", "Estadual", "Particular", "Filantrópica", "Não escolarizado"].map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Situação de Trabalho dos Pais</label>
+                <select value={trabalhoPais} onChange={e => setTrabalhoPais(e.target.value)} className={fc}>
+                  <option value="">Selecione...</option>
+                  {["Formal (Carteira Assinada)", "Informal/Roça", "Desempregado", "Aposentado/Pensionista"].map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-muted-foreground mb-2">Já realiza terapias em outro local atualmente?</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" checked={outroAtendimento === true} onChange={() => setOutroAtendimento(true)} className="accent-primary w-4 h-4" />
+                    <span className="text-sm font-semibold text-muted-foreground">Sim</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" checked={outroAtendimento === false} onChange={() => setOutroAtendimento(false)} className="accent-primary w-4 h-4" />
+                    <span className="text-sm font-semibold text-muted-foreground">Não — atendimento exclusivo aqui (+15 pts prioridade)</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -661,6 +734,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
     diagnostico, cid, cid11, medico, dataUltimaCons,
     cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
     medicacaoContinua, alergias, problemasSaude,
+    tipoEscola, trabalhoPais, outroAtendimento,
     profissional, especialidade,
   } = formData;
 
@@ -692,6 +766,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
     diagnostico, cid, cid11, medico, dataUltimaCons,
     cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
     medicacaoContinua, alergias, problemasSaude,
+    tipoEscola, trabalhoPais, outroAtendimento,
     profissional, especialidade, data, resultado: resultadoTexto, respostas,
   };
 
@@ -979,11 +1054,17 @@ function ListaPacientes() {
     });
   };
 
-  const filtradas = triagens.filter(t =>
-    !busca || t.nome.toLowerCase().includes(busca.toLowerCase()) ||
-    (t.diagnostico ?? "").toLowerCase().includes(busca.toLowerCase()) ||
-    (t.cid ?? "").toLowerCase().includes(busca.toLowerCase())
-  );
+  const filtradas = triagens
+    .filter(t =>
+      !busca || t.nome.toLowerCase().includes(busca.toLowerCase()) ||
+      (t.diagnostico ?? "").toLowerCase().includes(busca.toLowerCase()) ||
+      (t.cid ?? "").toLowerCase().includes(busca.toLowerCase())
+    )
+    .sort((a, b) => {
+      const scoreA = calcVulnScore(a) * 3 + parsePontosTotal(a.resultado);
+      const scoreB = calcVulnScore(b) * 3 + parsePontosTotal(b.resultado);
+      return scoreB - scoreA;
+    });
 
   return (
     <div className="min-h-screen bg-background">
@@ -1020,12 +1101,20 @@ function ListaPacientes() {
             {filtradas.map((t) => {
               const areas = parseResultado(t.resultado);
               const top3 = areas.slice(0, 3);
+              const vulnScore = calcVulnScore(t);
+              const clinicalPts = parsePontosTotal(t.resultado);
+              const prioridade = getPrioridadeBadge(vulnScore, clinicalPts);
               return (
-                <div key={t.id} className="bg-white rounded-2xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow">
+                <div key={t.id} className={`bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md transition-shadow ${prioridade?.label === "Prioridade Máxima" ? "border-red-300 border-l-4 border-l-red-500" : prioridade?.label === "Alta Prioridade" ? "border-orange-200 border-l-4 border-l-orange-400" : "border-border"}`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-bold text-lg truncate">{t.nome}</p>
+                        {prioridade && (
+                          <span className={`text-xs font-bold border px-2 py-0.5 rounded-full ${prioridade.cls}`}>
+                            {prioridade.icon} {prioridade.label}
+                          </span>
+                        )}
                         {t.alergias && (
                           <span className="text-xs font-bold bg-red-100 text-red-700 border border-red-300 px-2 py-0.5 rounded-full">⚠ Alergia</span>
                         )}
@@ -1120,6 +1209,13 @@ function Dashboard() {
     aparelhoAuditivo: triagens.filter(t => t.aparelhoAuditivo).length,
     comAlergias: triagens.filter(t => t.alergias && t.alergias.trim()).length,
     comMedicacao: triagens.filter(t => t.medicacaoContinua && t.medicacaoContinua.trim()).length,
+    vulnAguardando: triagens.filter(t => calcVulnScore(t) >= 15).length,
+    redePublica: triagens.filter(t => t.tipoEscola === "Municipal" || t.tipoEscola === "Estadual").length,
+    semOutroAtend: triagens.filter(t => t.outroAtendimento === false).length,
+    prioridadeMaxima: triagens.filter(t => {
+      const v = calcVulnScore(t); const c = parsePontosTotal(t.resultado);
+      return getPrioridadeBadge(v, c)?.label === "Prioridade Máxima";
+    }).length,
   };
 
   const pct = (n: number) => total === 0 ? 0 : Math.round((n / total) * 100);
@@ -1176,6 +1272,33 @@ function Dashboard() {
           </div>
         ) : (
           <>
+            {/* Impacto Social — destaque */}
+            <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-6">
+              <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-4">Impacto Social — Fila de Prioridade</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white rounded-xl border border-red-200 border-l-4 border-l-red-500 p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-muted-foreground">🔴 Prioridade Máxima</p>
+                  <p className="text-3xl font-bold mt-1 text-red-700">{stats.prioridadeMaxima}</p>
+                  <p className="text-xs text-muted-foreground mt-1">pacientes no topo da fila</p>
+                </div>
+                <div className="bg-white rounded-xl border border-orange-200 border-l-4 border-l-orange-400 p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-muted-foreground">Em Vulnerabilidade</p>
+                  <p className="text-3xl font-bold mt-1 text-orange-700">{stats.vulnAguardando}</p>
+                  <p className="text-xs text-muted-foreground mt-1">aguardando atendimento</p>
+                </div>
+                <div className="bg-white rounded-xl border border-border border-l-4 border-l-blue-500 p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-muted-foreground">Alunos Rede Pública</p>
+                  <p className="text-3xl font-bold mt-1">{pct(stats.redePublica)}%</p>
+                  <p className="text-xs text-muted-foreground mt-1">{stats.redePublica} de {total} pacientes</p>
+                </div>
+                <div className="bg-white rounded-xl border border-border border-l-4 border-l-emerald-500 p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-muted-foreground">Atend. Exclusivo Aqui</p>
+                  <p className="text-3xl font-bold mt-1">{stats.semOutroAtend}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{pct(stats.semOutroAtend)}% sem outro serviço</p>
+                </div>
+              </div>
+            </div>
+
             {/* Cards principais */}
             <div>
               <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Visão Geral</h3>
