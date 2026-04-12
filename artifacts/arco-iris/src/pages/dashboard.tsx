@@ -33,10 +33,11 @@ export default function Dashboard() {
 
   const absentPatients = patients?.filter(p => p.absenceCount >= 3) || [];
 
-  // Historical count by year
+  // Historical count by year — prefer entryDate, fallback to createdAt
   const byYear: Record<number, number> = {};
   for (const p of patients || []) {
-    const yr = new Date(p.createdAt).getFullYear();
+    const dateStr = (p as any).entryDate || p.createdAt;
+    const yr = new Date(dateStr).getFullYear();
     byYear[yr] = (byYear[yr] || 0) + 1;
   }
   const anos = [2023, 2024, 2025, 2026];

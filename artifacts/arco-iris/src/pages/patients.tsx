@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "wouter";
 import { useGetPatients, useCreatePatient, useGetProfessionals } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
@@ -8,12 +7,15 @@ import { useToast } from "@/hooks/use-toast";
 import { getStatusColor } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
+  { value: "Fila de Espera", label: "Fila de Espera" },
   { value: "pré-cadastro", label: "Pré-cadastro" },
   { value: "Atendimento", label: "Atendimento" },
   { value: "Alta", label: "Alta" },
   { value: "Óbito", label: "Óbito" },
   { value: "Desistência", label: "Desistência" },
 ];
+
+const today = () => new Date().toISOString().split("T")[0];
 
 export default function Patients() {
   const [search, setSearch] = useState("");
@@ -36,29 +38,33 @@ export default function Patients() {
     guardianName: "",
     guardianPhone: "",
     diagnosis: "",
-    status: "pré-cadastro",
-    professionalId: "",
+    status: "Fila de Espera",
+    entryDate: today(),
   });
 
   const filteredPatients = (patients || []).filter(p => {
-    const matchName = p.name.toLowerCase().includes(search.toLowerCase());
+    const matchName = p.name.toLowerCase().includes(search.toLowerCase()) ||
+      ((p as any).prontuario || "").toLowerCase().includes(search.toLowerCase());
     const matchStatus = !statusFilter || p.status === statusFilter;
     return matchName && matchStatus;
+  });
+
+  const resetForm = () => setFormData({
+    name: "", prontuario: "", cpf: "", cns: "", phone: "", dateOfBirth: "",
+    motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
+    status: "Fila de Espera", entryDate: today(),
   });
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createMutation.mutateAsync({
-        data: {
-          ...formData,
-          professionalId: formData.professionalId ? parseInt(formData.professionalId) : undefined,
-        },
-      });
+      await createMutation.mutateAsync({ data: { ...formData } });
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      toast({ title: "Sucesso", description: "Paciente cadastrado." });
+      queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
+      toast({ title: "Paciente cadastrado com sucesso!" });
       setIsDialogOpen(false);
-      setFormData({ name: "", prontuario: "", cpf: "", cns: "", phone: "", dateOfBirth: "", motherName: "", guardianName: "", guardianPhone: "", diagnosis: "", status: "pré-cadastro", professionalId: "" });
+      resetForm();
     } catch {
       toast({ title: "Erro", description: "Falha ao criar paciente.", variant: "destructive" });
     }
@@ -98,11 +104,11 @@ export default function Patients() {
             <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 rounded-lg">
               <tr>
                 <th className="px-4 py-3 rounded-l-lg">Prontuário</th>
-                <th className="px-4 py-3">Nome</th>
+                <th className="px-4 py-3">Nome do Paciente</th>
+                <th className="px-4 py-3">Nome da Mãe</th>
                 <th className="px-4 py-3">Profissional</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Faltas</th>
-                <th className="px-4 py-3 text-right rounded-r-lg">Ação</th>
+                <th className="px-4 py-3 rounded-r-lg">Faltas</th>
               </tr>
             </thead>
             <tbody>
@@ -120,7 +126,8 @@ export default function Patients() {
                         {(patient as any).prontuario || `#${String(patient.id).padStart(4, "0")}`}
                       </td>
                       <td className="px-4 py-4 font-semibold text-foreground">{patient.name}</td>
-                      <td className="px-4 py-4 text-muted-foreground">{prof?.name || "Não atribuído"}</td>
+                      <td className="px-4 py-4 text-muted-foreground">{(patient as any).motherName || "—"}</td>
+                      <td className="px-4 py-4 text-muted-foreground">{prof?.name || "—"}</td>
                       <td className="px-4 py-4">
                         <Badge className={getStatusColor(patient.status)}>{patient.status}</Badge>
                       </td>
@@ -132,11 +139,6 @@ export default function Patients() {
                         ) : (
                           <span className="text-muted-foreground ml-2">{patient.absenceCount}</span>
                         )}
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <Link href={`/patients/${patient.id}`}>
-                          <Button variant="outline" className="text-xs h-8">Abrir Prontuário</Button>
-                        </Link>
                       </td>
                     </tr>
                   );
@@ -162,6 +164,16 @@ export default function Patients() {
                   <Input value={formData.prontuario} onChange={e => setFormData({ ...formData, prontuario: e.target.value })} placeholder="Ex.: PRON-0001" />
                 </div>
                 <div>
+                  <Label>Data de Entrada *</Label>
+                  <Input type="date" required value={formData.entryDate} onChange={e => setFormData({ ...formData, entryDate: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Status</Label>
+                  <Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
+                    {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </Select>
+                </div>
+                <div>
                   <Label>Data de Nascimento</Label>
                   <Input type="date" value={formData.dateOfBirth} onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })} />
                 </div>
@@ -176,12 +188,6 @@ export default function Patients() {
                 <div>
                   <Label>Telefone</Label>
                   <Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="(00) 00000-0000" />
-                </div>
-                <div>
-                  <Label>Status</Label>
-                  <Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
-                    {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </Select>
                 </div>
                 <div className="col-span-2">
                   <Label>Nome da Mãe</Label>
@@ -199,16 +205,9 @@ export default function Patients() {
                   <Label>Diagnóstico</Label>
                   <Input value={formData.diagnosis} onChange={e => setFormData({ ...formData, diagnosis: e.target.value })} placeholder="Ex.: TEA, TDAH, sem diagnóstico" />
                 </div>
-                <div className="col-span-2">
-                  <Label>Profissional</Label>
-                  <Select value={formData.professionalId} onChange={e => setFormData({ ...formData, professionalId: e.target.value })}>
-                    <option value="">Selecione...</option>
-                    {professionals?.map(p => <option key={p.id} value={p.id}>{p.name} – {p.specialty}</option>)}
-                  </Select>
-                </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
-                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                <Button type="button" variant="ghost" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>
                 <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Salvando..." : "Salvar"}</Button>
               </div>
             </form>

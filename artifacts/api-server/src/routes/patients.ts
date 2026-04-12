@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { patientsTable, appointmentsTable, professionalsTable } from "@workspace/db";
+import { patientsTable, appointmentsTable, professionalsTable, waitingListTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -8,18 +8,22 @@ const router: IRouter = Router();
 router.get("/patients", async (req, res) => {
   let query = db.select({
     id: patientsTable.id,
+    prontuario: patientsTable.prontuario,
     name: patientsTable.name,
     dateOfBirth: patientsTable.dateOfBirth,
     cpf: patientsTable.cpf,
+    cns: patientsTable.cns,
     phone: patientsTable.phone,
     email: patientsTable.email,
     address: patientsTable.address,
+    motherName: patientsTable.motherName,
     guardianName: patientsTable.guardianName,
     guardianPhone: patientsTable.guardianPhone,
     diagnosis: patientsTable.diagnosis,
     notes: patientsTable.notes,
     professionalId: patientsTable.professionalId,
     status: patientsTable.status,
+    entryDate: patientsTable.entryDate,
     absenceCount: patientsTable.absenceCount,
     createdAt: patientsTable.createdAt,
     updatedAt: patientsTable.updatedAt,
@@ -41,21 +45,40 @@ router.get("/patients", async (req, res) => {
 
 router.post("/patients", async (req, res) => {
   const body = req.body;
+  const today = new Date().toISOString().split("T")[0];
+  const entryDate = body.entryDate ?? today;
+  const status = body.status ?? "pré-cadastro";
+
   const [row] = await db.insert(patientsTable).values({
+    prontuario: body.prontuario ?? null,
     name: body.name,
     dateOfBirth: body.dateOfBirth ?? null,
     cpf: body.cpf ?? null,
+    cns: body.cns ?? null,
     phone: body.phone ?? null,
     email: body.email ?? null,
     address: body.address ?? null,
+    motherName: body.motherName ?? null,
     guardianName: body.guardianName ?? null,
     guardianPhone: body.guardianPhone ?? null,
     diagnosis: body.diagnosis ?? null,
     notes: body.notes ?? null,
     professionalId: body.professionalId ?? null,
-    status: body.status ?? "ativo",
+    status,
+    entryDate,
     absenceCount: 0,
   }).returning();
+
+  if (status === "Fila de Espera") {
+    await db.insert(waitingListTable).values({
+      patientId: row.id,
+      professionalId: body.professionalId ? Number(body.professionalId) : null,
+      priority: body.priority ?? "media",
+      notes: body.notes ?? null,
+      entryDate,
+    });
+  }
+
   res.status(201).json(row);
 });
 
@@ -71,17 +94,21 @@ router.put("/patients/:id", async (req, res) => {
   const body = req.body;
   const updateData: Record<string, unknown> = {};
   if (body.name !== undefined) updateData.name = body.name;
+  if (body.prontuario !== undefined) updateData.prontuario = body.prontuario;
   if (body.dateOfBirth !== undefined) updateData.dateOfBirth = body.dateOfBirth;
   if (body.cpf !== undefined) updateData.cpf = body.cpf;
+  if (body.cns !== undefined) updateData.cns = body.cns;
   if (body.phone !== undefined) updateData.phone = body.phone;
   if (body.email !== undefined) updateData.email = body.email;
   if (body.address !== undefined) updateData.address = body.address;
+  if (body.motherName !== undefined) updateData.motherName = body.motherName;
   if (body.guardianName !== undefined) updateData.guardianName = body.guardianName;
   if (body.guardianPhone !== undefined) updateData.guardianPhone = body.guardianPhone;
   if (body.diagnosis !== undefined) updateData.diagnosis = body.diagnosis;
   if (body.notes !== undefined) updateData.notes = body.notes;
   if (body.professionalId !== undefined) updateData.professionalId = body.professionalId;
   if (body.status !== undefined) updateData.status = body.status;
+  if (body.entryDate !== undefined) updateData.entryDate = body.entryDate;
 
   const [row] = await db.update(patientsTable).set(updateData).where(eq(patientsTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Patient not found" });

@@ -23,6 +23,11 @@ export const getStatusColor = (status: string) => {
   if (s === "alta") return "bg-purple-100 text-purple-800 border-purple-200";
   if (s === "agendado") return "bg-blue-100 text-blue-800 border-blue-200";
   if (s === "remarcado") return "bg-amber-100 text-amber-800 border-amber-200";
+  if (s === "fila de espera") return "bg-orange-100 text-orange-800 border-orange-200";
+  if (s === "atendimento") return "bg-teal-100 text-teal-800 border-teal-200";
+  if (s === "pré-cadastro") return "bg-slate-100 text-slate-700 border-slate-200";
+  if (s === "desistência") return "bg-zinc-100 text-zinc-700 border-zinc-200";
+  if (s === "óbito") return "bg-neutral-200 text-neutral-700 border-neutral-300";
   return "bg-slate-100 text-slate-800 border-slate-200";
 };
 
