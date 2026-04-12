@@ -437,6 +437,60 @@ router.post("/ponto/records", async (req, res) => {
   // Auto-determine next punch type from sequence
   const nextType: PunchType = PUNCH_SEQUENCE[todayRecs.length];
 
+  // ── Per-day schedule validation ────────────────────────────────────────────
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  let tolerance = 10;
+  let overtimeBlockEnabled = true;
+  if (employee.companyId) {
+    const [company] = await db.select({
+      toleranceMinutes: pontoCompaniesTable.toleranceMinutes,
+      overtimeBlockEnabled: pontoCompaniesTable.overtimeBlockEnabled,
+    }).from(pontoCompaniesTable).where(eq(pontoCompaniesTable.id, employee.companyId));
+    if (company) {
+      tolerance = company.toleranceMinutes;
+      overtimeBlockEnabled = company.overtimeBlockEnabled;
+    }
+  }
+
+  // Map today's weekday to schedule key
+  const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+  const todayKey = WEEKDAY_KEYS[now.getDay()];
+
+  type DaySchedule = { in: string; out: string; dayOff: boolean };
+  let todaySchedule: DaySchedule | null = null;
+  try {
+    if ((employee as any).schedule) {
+      const weekSched = JSON.parse((employee as any).schedule) as Record<string, DaySchedule>;
+      const dayS = weekSched[todayKey];
+      if (dayS && !dayS.dayOff && dayS.in && dayS.out) todaySchedule = dayS;
+    }
+  } catch { /* ignore */ }
+
+  // Fallback to legacy entryTime/exitTime if no per-day schedule
+  if (!todaySchedule && employee.entryTime && employee.exitTime) {
+    todaySchedule = { in: employee.entryTime, out: employee.exitTime, dayOff: false };
+  }
+
+  // Validate ENTRADA_DIARIA: not too early
+  if (nextType === "ENTRADA_DIARIA" && todaySchedule) {
+    const earliest = timeToMinutes(todaySchedule.in) - tolerance;
+    if (nowMinutes < earliest) {
+      return res.status(422).json({
+        error: `Entrada muito cedo! Liberada a partir das ${minutesToTime(earliest)} (entrada de hoje: ${todaySchedule.in}).`,
+      });
+    }
+  }
+
+  // Validate SAIDA_FINAL: overtime block based on today's scheduled exit
+  if (nextType === "SAIDA_FINAL" && todaySchedule && overtimeBlockEnabled) {
+    const deadline = timeToMinutes(todaySchedule.out) + tolerance;
+    if (nowMinutes > deadline) {
+      return res.status(422).json({
+        error: `Saída fora do horário! Saída prevista para hoje: ${todaySchedule.out}. Procure a administração para registrar hora extra.`,
+      });
+    }
+  }
+
   const [row] = await db.insert(pontoRecordsTable).values({
     employeeId: Number(employeeId),
     type: nextType,
