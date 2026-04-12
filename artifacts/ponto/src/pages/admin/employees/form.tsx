@@ -15,6 +15,23 @@ import { Camera, Upload, Trash2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 
+// Resize + compress to JPEG before sending — keeps payload well under 100 KB
+const compressImage = (dataUrl: string, maxPx = 500, quality = 0.72): Promise<string> =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+      const w = Math.round(img.width * ratio);
+      const h = Math.round(img.height * ratio);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.src = dataUrl;
+  });
+
 const WEEKLY_HOURS_OPTIONS = [
   { value: "20", label: "20 horas" },
   { value: "30", label: "30 horas" },
@@ -109,30 +126,29 @@ export default function EmployeeForm() {
     setUseWebcam(false);
   };
 
-  const capturePhoto = () => {
-    if (videoRef.current) {
-      const canvas = document.createElement("canvas");
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-        form.setValue("photo", dataUrl);
-        stopWebcam();
-      }
-    }
+  const capturePhoto = async () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(videoRef.current, 0, 0);
+    const raw = canvas.toDataURL("image/jpeg", 1);
+    const compressed = await compressImage(raw);
+    form.setValue("photo", compressed);
+    stopWebcam();
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        form.setValue("photo", reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const compressed = await compressImage(reader.result as string);
+      form.setValue("photo", compressed);
+    };
+    reader.readAsDataURL(file);
   };
 
   const onSubmit = (data: FormValues) => {
