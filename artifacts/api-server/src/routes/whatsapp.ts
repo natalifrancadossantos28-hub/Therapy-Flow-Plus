@@ -653,7 +653,7 @@ pollStatus();
 /* ── Logout ── */
 async function fazerLogout(){
   var btn=document.getElementById('btn-logout');
-  if(!confirm('Desconectar o telefone da Carla?\n\nO bot vai parar de responder e um novo QR Code será gerado para reconectar.'))return;
+  if(!confirm('Desconectar o telefone da Carla?\\n\\nO bot vai parar de responder e um novo QR Code será gerado para reconectar.'))return;
   if(btn)btn.textContent='⏳ Desconectando...';
   try{
     var r=await fetch('/api/whatsapp/logout',{method:'POST'});

@@ -681,12 +681,19 @@ async function conectarWhatsApp() {
     }
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode;
-      const reconectar = code !== DisconnectReason.loggedOut;
       statusConexao = "desconectado";
       salvarStatus({ status: "desconectado", qrCode: null });
-      console.log(`🔴 Desconectado. Código: ${code}. Reconectando: ${reconectar}`);
-      logAtividade(`🔴 Desconectado (código ${code}) — reconectando...`, "erro");
-      if (reconectar) setTimeout(conectarWhatsApp, 5000);
+      console.log(`🔴 Desconectado. Código: ${code}`);
+      logAtividade(`🔴 Desconectado (código ${code})`, "erro");
+      if (code === DisconnectReason.loggedOut) {
+        // Sessão invalidada — limpa arquivos e gera novo QR
+        console.log("🗑️  Sessão 401 — limpando auth e gerando novo QR...");
+        try { fs.rmSync("./sessao_whatsapp", { recursive: true, force: true }); } catch(e) {}
+        setTimeout(conectarWhatsApp, 3000);
+      } else {
+        // Reconexão normal
+        setTimeout(conectarWhatsApp, 5000);
+      }
     }
   });
 
@@ -939,15 +946,11 @@ app.post(["/logout", "/assistente-nfs/logout"], async (req, res) => {
     }
 
     // Remove arquivos de autenticação para forçar novo QR
-    const fs = await import("fs");
-    const authDir = "./auth_info_baileys";
-    if (fs.existsSync(authDir)) {
-      fs.rmSync(authDir, { recursive: true, force: true });
-      console.log("🗑️  Sessão apagada — novo QR Code será gerado");
-    }
+    const authDir = "./sessao_whatsapp";
+    try { fs.rmSync(authDir, { recursive: true, force: true }); console.log("🗑️  Sessão apagada — novo QR Code será gerado"); } catch(e) {}
 
     // Reconecta (vai gerar novo QR)
-    setTimeout(() => connectToWhatsApp(), 2000);
+    setTimeout(() => conectarWhatsApp(), 2000);
 
     res.json({ ok: true, mensagem: "Sessão encerrada. Novo QR Code será gerado em instantes." });
   } catch (err) {
