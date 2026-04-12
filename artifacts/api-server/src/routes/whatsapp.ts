@@ -366,7 +366,10 @@ body{
         <div class="chat-title">💬 Fale com a Carla</div>
         <div class="chat-sub">Ela conhece toda a agenda e responde ao vivo</div>
       </div>
-      <button class="tts-btn" onclick="toggleTTS()" id="tts-label">🔊 Voz ON</button>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <button class="tts-btn" onclick="toggleTTS()" id="tts-label">🔊 Voz ON</button>
+        <div id="voz-nome" style="font-size:10px;color:rgba(255,255,255,.35);max-width:160px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="trocarVoz()" title="Clique para tentar outra voz">aguardando voz...</div>
+      </div>
     </div>
 
     <div class="iframe-warn" id="iframe-warn">
@@ -431,24 +434,53 @@ body{
 /* ── TTS ── */
 var ttsAtivo=true;
 var vozCache=null;
-function carregarVoz(){
-  if(!window.speechSynthesis)return;
+/* Nomes conhecidos de vozes MASCULINAS a excluir */
+var VOZES_MASC=/daniel|ricardo|benedito|carlos|jorge|antonio|joao|male|masculin/i;
+/* Nomes conhecidos de vozes FEMININAS a preferir (Google, Microsoft, Apple) */
+var VOZES_FEM=/maria|luciana|vitoria|francisca|edith|google portugu|female|feminino/i;
+function selecionarVoz(){
+  if(!window.speechSynthesis)return null;
   var vs=speechSynthesis.getVoices();
-  if(!vs.length)return;
-  /* Prioridade: vozes femininas BR conhecidas → qualquer pt-BR → qualquer pt */
-  var prioridade=[
-    function(x){return(x.lang==='pt-BR'||x.lang==='pt_BR')&&/luciana|vitoria|francisca|edith/i.test(x.name)},
-    function(x){return(x.lang==='pt-BR'||x.lang==='pt_BR')&&/female|feminino|woman|f\b/i.test(x.name)},
-    function(x){return(x.lang==='pt-BR'||x.lang==='pt_BR')&&!/male|masculino|man|m\b/i.test(x.name)},
-    function(x){return x.lang==='pt-BR'||x.lang==='pt_BR'},
-    function(x){return x.lang.startsWith('pt')}
-  ];
-  for(var i=0;i<prioridade.length;i++){var v=vs.find(prioridade[i]);if(v){vozCache=v;break;}}
+  if(!vs.length)return null;
+  var br=vs.filter(function(x){return x.lang==='pt-BR'||x.lang==='pt_BR'||x.lang==='pt-br';});
+  /* 1ª: voz BR com nome feminino explícito */
+  var v=br.find(function(x){return VOZES_FEM.test(x.name);});
+  /* 2ª: voz BR que NÃO tem nome masculino */
+  if(!v)v=br.find(function(x){return !VOZES_MASC.test(x.name);});
+  /* 3ª: qualquer voz BR */
+  if(!v)v=br[0];
+  /* 4ª: qualquer voz em pt */
+  if(!v)v=vs.find(function(x){return x.lang.startsWith('pt');});
+  return v||null;
 }
+function carregarVoz(){
+  var v=selecionarVoz();
+  if(v){
+    vozCache=v;
+    var el=document.getElementById('voz-nome');
+    if(el)el.textContent='🎙️ '+v.name;
+  }
+}
+var vozIdx=0;
+function trocarVoz(){
+  if(!window.speechSynthesis)return;
+  var vs=speechSynthesis.getVoices().filter(function(x){return x.lang==='pt-BR'||x.lang==='pt_BR'||x.lang==='pt-br'||x.lang.startsWith('pt');});
+  if(!vs.length){setStatus('Nenhuma voz pt-BR disponível no navegador');return;}
+  vozIdx=(vozIdx+1)%vs.length;
+  vozCache=vs[vozIdx];
+  var el=document.getElementById('voz-nome');
+  if(el)el.textContent='🎙️ '+vozCache.name;
+  /* Testa a nova voz imediatamente */
+  speechSynthesis.cancel();
+  var u=new SpeechSynthesisUtterance('Olá, sou a Carla!');
+  u.lang='pt-BR';u.rate=1.15;u.pitch=1.1;u.volume=1;u.voice=vozCache;
+  speechSynthesis.speak(u);
+}
+/* Tenta carregar imediatamente e nas mudanças de lista */
 if(window.speechSynthesis){
   speechSynthesis.onvoiceschanged=carregarVoz;
   carregarVoz();
-  setTimeout(carregarVoz,500);
+  [200,600,1200,2500].forEach(function(t){setTimeout(carregarVoz,t);});
 }
 function toggleTTS(){
   ttsAtivo=!ttsAtivo;
@@ -458,10 +490,14 @@ function toggleTTS(){
 function falar(texto,callback){
   if(!ttsAtivo||!window.speechSynthesis){if(callback)callback();return;}
   speechSynthesis.cancel();
+  /* Re-seleciona voz a cada fala para garantir escolha correta */
+  var voz=vozCache||selecionarVoz();
   var u=new SpeechSynthesisUtterance(texto);
-  u.lang='pt-BR';u.rate=1.15;u.pitch=1.2;u.volume=1;
-  carregarVoz();
-  if(vozCache)u.voice=vozCache;
+  u.lang='pt-BR';
+  u.rate=1.15;
+  u.pitch=voz&&VOZES_FEM.test(voz.name)?1.1:1.25; /* pitch mais alto se não tiver voz feminina confirmada */
+  u.volume=1;
+  if(voz)u.voice=voz;
   u.onend=function(){setStatus('');if(callback)callback();};
   u.onerror=function(){if(callback)callback();};
   speechSynthesis.speak(u);
