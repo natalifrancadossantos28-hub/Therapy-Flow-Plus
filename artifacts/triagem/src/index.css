@@ -27,20 +27,20 @@
   --radius-lg: var(--radius);
 }
 
+/* ── Dark Navy Premium – única fonte de verdade ── */
 :root {
-  /* ── Dark Navy Premium Theme ── */
-  --background: 226 45% 6%;
+  --background: 222 47% 8%;        /* #0f172a */
   --foreground: 213 35% 90%;
   --border: 220 25% 18%;
-  --input: 220 30% 13%;
+  --input: 222 40% 12%;
   --ring: 196 100% 50%;
-  --card: 224 40% 10%;
+  --card: 222 40% 11%;             /* #141e30 */
   --card-foreground: 213 35% 90%;
   --primary: 196 100% 48%;
-  --primary-foreground: 226 45% 6%;
-  --secondary: 224 35% 15%;
+  --primary-foreground: 222 47% 8%;
+  --secondary: 222 35% 16%;
   --secondary-foreground: 213 35% 75%;
-  --muted: 224 35% 13%;
+  --muted: 222 35% 14%;
   --muted-foreground: 215 20% 52%;
   --accent: 196 80% 16%;
   --accent-foreground: 196 100% 65%;
@@ -50,46 +50,59 @@
   --radius: 1rem;
 }
 
+/* ── Base: garante dark em TODO lugar ── */
 @layer base {
-  * { @apply border-border; }
-  body { @apply font-sans antialiased bg-background text-foreground; }
+  html {
+    background-color: #0f172a;
+  }
+  * { @apply border-border box-border; }
+  body {
+    @apply font-sans antialiased;
+    background-color: #0f172a !important;
+    color: hsl(var(--foreground));
+    min-height: 100vh;
+  }
+  #root {
+    background-color: #0f172a;
+    min-height: 100vh;
+  }
   ::selection { background: hsl(196 100% 48% / 0.3); }
   ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: hsl(var(--background)); }
+  ::-webkit-scrollbar-track { background: #0f172a; }
   ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
 }
 
 /* ── Glassmorphism ── */
 .glass {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.07);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.13);
   transition: all 0.2s ease;
 }
 .glass:hover {
-  background: rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.22);
 }
 
 /* ── Glow card ── */
 .glow-card {
   box-shadow:
-    0 0 0 1px rgba(0, 212, 255, 0.08),
-    0 8px 32px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 0 0 1px rgba(0, 212, 255, 0.07),
+    0 8px 32px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .glow-card-red {
   box-shadow:
     0 0 0 1px rgba(239, 68, 68, 0.25),
     -4px 0 20px rgba(239, 68, 68, 0.1),
-    0 8px 32px rgba(0, 0, 0, 0.5);
+    0 8px 32px rgba(0, 0, 0, 0.55);
 }
 .glow-card-orange {
   box-shadow:
     0 0 0 1px rgba(249, 115, 22, 0.25),
     -4px 0 20px rgba(249, 115, 22, 0.1),
-    0 8px 32px rgba(0, 0, 0, 0.5);
+    0 8px 32px rgba(0, 0, 0, 0.55);
 }
 
 /* ── Gradient text ── */
@@ -100,21 +113,21 @@
   background-clip: text;
 }
 
-/* ── Input dark ── */
+/* ── Força inputs escuros ── */
 input, select, textarea {
   color-scheme: dark;
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+}
+input::placeholder, textarea::placeholder {
+  color: hsl(var(--muted-foreground));
 }
 
-/* ── Header gradient ── */
+/* ── Header gradient escuro (#0f172a → #1e293b) ── */
 .header-gradient {
-  background: linear-gradient(135deg, #060d1f 0%, #0b1a3e 45%, #0d2050 70%, #060d1f 100%);
-  border-bottom: 1px solid rgba(0, 212, 255, 0.15);
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(0, 212, 255, 0.1);
-}
-
-/* ── Radar dot glow ── */
-.radar-dot {
-  filter: drop-shadow(0 0 4px currentColor);
+  background: linear-gradient(135deg, #0f172a 0%, #162032 40%, #1e293b 70%, #0f172a 100%);
+  border-bottom: 1px solid rgba(0, 212, 255, 0.12);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(0, 212, 255, 0.08);
 }
 
 /* ── Score ring glow ── */
@@ -130,12 +143,13 @@ input[type="checkbox"], input[type="radio"] {
   accent-color: hsl(196 100% 48%);
 }
 
-/* ── Print overrides (keeps white for PDF) ── */
+/* ── Print: fundo branco para PDF ── */
 @media print {
   .no-print { display: none !important; }
   .print-only { display: block !important; }
-  body {
+  html, body, #root {
     background: white !important;
+    background-color: white !important;
     color: black !important;
     font-size: 11px;
   }
@@ -143,13 +157,13 @@ input[type="checkbox"], input[type="radio"] {
     color: black !important;
     border-color: #e5e7eb !important;
     box-shadow: none !important;
-  }
-  .bg-card, .bg-background, .bg-secondary, .bg-muted,
-  .bg-primary\/10, .bg-red-50, .bg-amber-50, .bg-orange-50,
-  .bg-blue-50, .bg-emerald-50, .bg-rose-50 {
     background-color: white !important;
   }
-  .header-gradient, .glass { background: white !important; }
+  .header-gradient, .glass {
+    background: white !important;
+    border-color: #e5e7eb !important;
+    box-shadow: none !important;
+  }
   .glow-card, .glow-card-red, .glow-card-orange { box-shadow: 0 0 0 1px #e5e7eb !important; }
   @page { margin: 1.5cm; }
 }
