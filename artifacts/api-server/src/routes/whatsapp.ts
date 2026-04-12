@@ -201,32 +201,54 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div>
-        <div style="font-size:14px;font-weight:600;color:var(--cyan)">🎙️ Assistente de Voz</div>
-        <div style="font-size:11px;color:var(--dim);margin-top:2px">Fale e a IA responde em voz alta</div>
+        <div style="font-size:14px;font-weight:600;color:var(--cyan)">🤖 Assistente de Voz</div>
+        <div style="font-size:11px;color:var(--dim);margin-top:2px">Digite ou fale — a IA responde em voz alta</div>
       </div>
-      <div id="tts-toggle" style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleTTS()">
+      <div style="cursor:pointer" onclick="toggleTTS()">
         <span style="font-size:11px;color:var(--dim)" id="tts-label">🔊 Voz ON</span>
       </div>
     </div>
 
-    <div id="iframe-warn" class="warn-box" style="display:none;margin-bottom:14px">
-      <a id="open-link" href="#">🔗 Abrir em Nova Aba para usar o Microfone</a>
-      <p style="font-size:10px;color:var(--dim);margin-top:8px">Os atalhos abaixo funcionam normalmente</p>
+    <!-- Balões de resposta SEMPRE VISÍVEIS no topo -->
+    <div id="va-user" class="va-bubble" style="display:none;margin-bottom:8px"></div>
+    <div id="va-response" class="va-bubble" style="display:none;margin-bottom:14px;border-left-color:var(--cyan)"></div>
+    <div id="va-loading" style="display:none;text-align:center;padding:12px 0;color:var(--cyan);font-size:13px">
+      <span id="va-dots">⏳ Consultando a IA</span>
     </div>
 
-    <div class="va-wrap">
-      <button class="va-circle" id="mic-btn" title="Falar com a IA">🎤</button>
-      <p class="va-status" id="va-status">Pressione para falar</p>
-      <div class="va-bubble" id="va-user"></div>
-      <div class="va-bubble" id="va-response"></div>
+    <!-- Campo de texto + botão enviar -->
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input id="texto-input" type="text" placeholder="Digite sua pergunta aqui..."
+        style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;
+               padding:10px 14px;color:var(--text);font-size:13px;outline:none;
+               transition:border-color .2s"
+        onkeydown="if(event.key==='Enter')enviarTexto()"
+        onfocus="this.style.borderColor='var(--cyan)'"
+        onblur="this.style.borderColor='var(--border)'"
+      />
+      <button onclick="enviarTexto()"
+        style="background:linear-gradient(135deg,#003322,#006635);border:1px solid #00884455;
+               color:var(--green);border-radius:8px;padding:10px 16px;cursor:pointer;
+               font-size:16px;transition:all .2s;white-space:nowrap"
+        title="Enviar pergunta">➤</button>
+      <button id="mic-btn"
+        style="background:var(--bg);border:1px solid var(--border);border-radius:8px;
+               padding:10px 14px;cursor:pointer;font-size:18px;transition:all .2s"
+        title="Falar com a IA" onclick="clicarMic()">🎤</button>
     </div>
 
+    <!-- Atalhos rápidos -->
     <div class="chips">
       <span class="chip" onclick="perguntarIA('Quem faltou hoje?')">Quem faltou?</span>
       <span class="chip" onclick="perguntarIA('Quantas consultas temos hoje?')">Agenda de hoje</span>
       <span class="chip" onclick="perguntarIA('Qual é o próximo paciente da van?')">Próximo da van</span>
       <span class="chip" onclick="perguntarIA('Quantas confirmações recebemos?')">Confirmações</span>
       <span class="chip" onclick="perguntarIA('Algum paciente ainda não confirmou?')">Pendentes</span>
+    </div>
+
+    <div id="va-status" style="font-size:11px;color:var(--dim);text-align:center;margin-top:10px;min-height:16px"></div>
+    <div id="iframe-warn" class="warn-box" style="display:none;margin-top:12px">
+      <a id="open-link" href="#" target="_blank">🔗 Abrir em nova aba para usar o microfone</a>
     </div>
   </div>
 
@@ -247,153 +269,171 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 </div>
 
 <script>
-/* ─── iframe detection ─── */
+/* ─── TTS setup ─── */
+var ttsAtivo = true;
+if(window.speechSynthesis) speechSynthesis.getVoices();
+if(window.speechSynthesis) speechSynthesis.onvoiceschanged = function(){ speechSynthesis.getVoices(); };
+
+function toggleTTS(){
+  ttsAtivo = !ttsAtivo;
+  document.getElementById('tts-label').textContent = ttsAtivo ? '🔊 Voz ON' : '🔇 Voz OFF';
+  if(!ttsAtivo && window.speechSynthesis) speechSynthesis.cancel();
+}
+
+function falar(texto){
+  if(!ttsAtivo || !window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  var utter = new SpeechSynthesisUtterance(texto);
+  utter.lang = 'pt-BR';
+  utter.rate = 1.0;
+  utter.pitch = 1.1;
+  utter.volume = 1;
+  var vozes = speechSynthesis.getVoices();
+  var ptVoz = vozes.find(function(v){ return (v.lang==='pt-BR'||v.lang==='pt_BR') && v.name.toLowerCase().includes('female'); });
+  if(!ptVoz) ptVoz = vozes.find(function(v){ return v.lang==='pt-BR'||v.lang==='pt_BR'; });
+  if(ptVoz) utter.voice = ptVoz;
+  utter.onend = function(){ setStatus(''); };
+  speechSynthesis.speak(utter);
+}
+
+/* ─── UI helpers ─── */
+function setStatus(msg){
+  document.getElementById('va-status').textContent = msg;
+}
+
+function mostrarResposta(pergunta, resposta){
+  var u = document.getElementById('va-user');
+  var r = document.getElementById('va-response');
+  u.textContent = '🗣️ "' + pergunta + '"';
+  u.style.display = 'block';
+  r.textContent = '🤖 ' + resposta;
+  r.style.display = 'block';
+  document.getElementById('va-loading').style.display = 'none';
+}
+
+function mostrarCarregando(pergunta){
+  var u = document.getElementById('va-user');
+  u.textContent = '🗣️ "' + pergunta + '"';
+  u.style.display = 'block';
+  document.getElementById('va-response').style.display = 'none';
+  document.getElementById('va-loading').style.display = 'block';
+  setStatus('⏳ Consultando a IA...');
+}
+
+/* ─── Enviar pergunta via texto ─── */
+function enviarTexto(){
+  var input = document.getElementById('texto-input');
+  var pergunta = (input.value || '').trim();
+  if(!pergunta) return;
+  input.value = '';
+  perguntarIA(pergunta);
+}
+
+/* ─── Chamar IA ─── */
+async function perguntarIA(pergunta){
+  mostrarCarregando(pergunta);
+  try{
+    var resp = await fetch('/api/whatsapp/voice-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pergunta: pergunta })
+    });
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    var dados = await resp.json();
+    var texto = dados.resposta || 'Não consegui obter uma resposta.';
+    mostrarResposta(pergunta, texto);
+    setStatus('🔊 Falando resposta...');
+    falar(texto);
+  } catch(err){
+    var errMsg = 'Erro ao consultar a IA. Tente novamente.';
+    mostrarResposta(pergunta, errMsg);
+    setStatus('❌ ' + err.message);
+  }
+}
+
+/* ─── Microfone (STT) ─── */
+var recognition = null;
+var ouvindo = false;
+var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+/* Detectar iframe — mostrar link de nova aba mas NÃO esconder nada */
 (function(){
-  var inIframe=false;
-  try{inIframe=window.self!==window.top}catch(e){inIframe=true}
+  var inIframe = false;
+  try { inIframe = window.self !== window.top; } catch(e){ inIframe = true; }
   if(inIframe){
-    document.getElementById('iframe-warn').style.display='block';
-    var link=window.location.protocol+'//'+window.location.hostname+'/api/whatsapp/panel';
-    document.getElementById('open-link').href=link;
+    var link = window.location.protocol + '//' + window.location.hostname + '/api/whatsapp/panel';
+    document.getElementById('open-link').href = link;
+    document.getElementById('iframe-warn').style.display = 'block';
   }
 })();
 
-/* ─── TTS ─── */
-var ttsAtivo = true;
-function toggleTTS(){
-  ttsAtivo=!ttsAtivo;
-  document.getElementById('tts-label').textContent=ttsAtivo?'🔊 Voz ON':'🔇 Voz OFF';
-  if(!ttsAtivo) speechSynthesis.cancel();
-}
-function falar(texto){
-  if(!ttsAtivo||!window.speechSynthesis)return;
-  speechSynthesis.cancel();
-  var utter=new SpeechSynthesisUtterance(texto);
-  utter.lang='pt-BR';
-  utter.rate=1.05;
-  utter.pitch=1.0;
-  utter.volume=1;
-  // Priorizar voz feminina em português
-  var vozes=speechSynthesis.getVoices();
-  var ptVoz=vozes.find(v=>(v.lang==='pt-BR'||v.lang==='pt_BR')&&v.name.toLowerCase().includes('female'));
-  if(!ptVoz) ptVoz=vozes.find(v=>v.lang==='pt-BR'||v.lang==='pt_BR');
-  if(ptVoz) utter.voice=ptVoz;
-  setEstado('speaking','🔊 Falando...');
-  utter.onend=function(){setEstado('idle','Pressione para falar')};
-  speechSynthesis.speak(utter);
-}
-// Carregar vozes (async no Chrome)
-if(window.speechSynthesis){
-  speechSynthesis.getVoices();
-  speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices()};
-}
-
-/* ─── STT ─── */
-var recognition=null;
-var SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
-var estado='idle'; // idle | listen | thinking | speaking
-
-function setEstado(s, msg){
-  estado=s;
-  var btn=document.getElementById('mic-btn');
-  var st=document.getElementById('va-status');
-  btn.className='va-circle';
-  if(s==='listen')  {btn.classList.add('listen');  btn.textContent='⏹'; st.className='va-status active'; st.textContent=msg||'🎙️ Ouvindo...';}
-  else if(s==='thinking'){btn.classList.add('thinking');btn.textContent='⏳'; st.className='va-status active'; st.textContent=msg||'🤔 Processando...';}
-  else if(s==='speaking'){btn.classList.add('speaking');btn.textContent='🔊'; st.className='va-status active'; st.textContent=msg||'🔊 Falando...';}
-  else {btn.textContent='🎤'; st.className='va-status'; st.textContent=msg||'Pressione para falar';}
-}
-
-function mostrarBolha(tipo, texto){
-  var id=tipo==='user'?'va-user':'va-response';
-  var el=document.getElementById(id);
-  el.style.display='block';
-  el.textContent=texto;
-}
-
-async function perguntarIA(pergunta){
-  if(estado!=='idle'){speechSynthesis.cancel(); setEstado('idle'); return;}
-  mostrarBolha('user','🗣️ "'+pergunta+'"');
-  document.getElementById('va-response').style.display='none';
-  setEstado('thinking','🤔 Consultando a IA...');
-  try{
-    var r=await fetch('/api/whatsapp/voice-chat',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({pergunta})
-    });
-    var d=await r.json();
-    var resp=d.resposta||'Não consegui obter uma resposta.';
-    mostrarBolha('ai',resp);
-    falar(resp);
-  }catch(e){
-    var errMsg='Desculpe, ocorreu um erro ao consultar a IA.';
-    mostrarBolha('ai',errMsg);
-    falar(errMsg);
-    setEstado('idle');
-  }
-}
-
-document.getElementById('mic-btn').addEventListener('click',async function(){
-  if(estado==='speaking'){speechSynthesis.cancel();setEstado('idle');return;}
-  if(estado==='listen'){if(recognition)recognition.stop();return;}
-  if(estado==='thinking') return;
-
+function clicarMic(){
+  if(ouvindo){ pararMic(); return; }
   if(!SpeechRec){
-    alert('Use Google Chrome para comandos de voz.');
+    setStatus('⚠️ Use o Google Chrome para voz. Ou digite acima.');
     return;
   }
+  iniciarMic();
+}
 
-  // Pedir permissão explícita
+async function iniciarMic(){
   try{
-    var s=await navigator.mediaDevices.getUserMedia({audio:true});
-    s.getTracks().forEach(t=>t.stop());
-  }catch(e){
-    setEstado('idle','🚫 Permissão de microfone negada — clique no 🔒 e permita');
+    var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(function(t){ t.stop(); });
+  } catch(e){
+    setStatus('🚫 Microfone bloqueado — use o campo de texto acima ou abra em nova aba');
+    document.getElementById('iframe-warn').style.display = 'block';
     return;
   }
 
-  recognition=new SpeechRec();
-  recognition.lang='pt-BR';
-  recognition.continuous=false;
-  recognition.interimResults=true;
-  recognition.maxAlternatives=1;
+  recognition = new SpeechRec();
+  recognition.lang = 'pt-BR';
+  recognition.continuous = false;
+  recognition.interimResults = true;
 
-  var finalText='';
-  var autoStop=null;
+  var finalText = '';
 
-  recognition.onstart=function(){setEstado('listen')};
-
-  recognition.onresult=function(e){
-    clearTimeout(autoStop);
-    finalText='';
-    var interim='';
-    for(var i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal) finalText+=e.results[i][0].transcript;
-      else interim+=e.results[i][0].transcript;
-    }
-    if(finalText){
-      setEstado('thinking');
-    } else if(interim){
-      document.getElementById('va-status').textContent='⌛ '+interim;
-      autoStop=setTimeout(function(){if(recognition)recognition.stop()},3000);
-    }
+  recognition.onstart = function(){
+    ouvindo = true;
+    document.getElementById('mic-btn').textContent = '⏹';
+    document.getElementById('mic-btn').style.background = '#330011';
+    document.getElementById('mic-btn').style.borderColor = '#ff4455';
+    setStatus('🎙️ Ouvindo... clique ⏹ para parar');
   };
 
-  recognition.onerror=function(e){
-    if(e.error==='no-speech') setEstado('idle','🔇 Nenhuma fala — tente novamente');
-    else if(e.error==='not-allowed') setEstado('idle','🚫 Microfone bloqueado');
-    else setEstado('idle','❌ Erro: '+e.error);
+  recognition.onresult = function(e){
+    finalText = '';
+    var interim = '';
+    for(var i = e.resultIndex; i < e.results.length; i++){
+      if(e.results[i].isFinal) finalText += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    if(interim) setStatus('⌛ ' + interim);
   };
 
-  recognition.onend=function(){
-    clearTimeout(autoStop);
+  recognition.onerror = function(e){
+    if(e.error === 'not-allowed') setStatus('🚫 Microfone bloqueado — abra em nova aba');
+    else if(e.error === 'no-speech') setStatus('🔇 Nenhuma fala detectada');
+    else setStatus('❌ Erro: ' + e.error);
+    pararMic();
+  };
+
+  recognition.onend = function(){
+    pararMic();
     if(finalText.trim()) perguntarIA(finalText.trim());
-    else if(estado==='listen') setEstado('idle','Pressione para falar');
   };
 
   recognition.start();
-});
+}
+
+function pararMic(){
+  ouvindo = false;
+  var btn = document.getElementById('mic-btn');
+  btn.textContent = '🎤';
+  btn.style.background = 'var(--bg)';
+  btn.style.borderColor = 'var(--border)';
+  try{ if(recognition) recognition.stop(); } catch(e){}
+}
 
 /* ─── Status polling ─── */
 async function atualizarStatus(){
