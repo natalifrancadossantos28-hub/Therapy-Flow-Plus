@@ -24,6 +24,18 @@ const AREAS = [
   "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
 ];
 
+const AREA_ICONS: Record<string, string> = {
+  "Psicológico": "🧠", "Psicomotricidade": "🏃", "Fisioterapia": "💪",
+  "Terapia Ocupacional": "🤲", "Fonoaudiologia": "💬",
+  "Nutrição": "🥗", "Psicopedagogia": "📚", "Educação Física": "⚽",
+};
+
+const AREA_COLORS: Record<string, string> = {
+  "Psicológico": "#a855f7", "Psicomotricidade": "#6366f1", "Fisioterapia": "#f97316",
+  "Terapia Ocupacional": "#14b8a6", "Fonoaudiologia": "#3b82f6",
+  "Nutrição": "#22c55e", "Psicopedagogia": "#eab308", "Educação Física": "#f43f5e",
+};
+
 const SHORT_NAMES: Record<string, string> = {
   "Psicológico": "Psicol.", "Psicomotricidade": "Psicomotr.",
   "Fisioterapia": "Fisio.", "Terapia Ocupacional": "T. Ocup.",
@@ -176,22 +188,22 @@ const ESCOLARIDADE_OPTIONS = [
 ];
 
 const CORES_AREA: Record<string, string> = {
-  "Psicológico": "bg-purple-100 text-purple-800 border-purple-200",
-  "Psicomotricidade": "bg-indigo-100 text-indigo-800 border-indigo-200",
-  "Fisioterapia": "bg-orange-100 text-orange-800 border-orange-200",
-  "Terapia Ocupacional": "bg-teal-100 text-teal-800 border-teal-200",
-  "Fonoaudiologia": "bg-blue-100 text-blue-800 border-blue-200",
-  "Nutrição": "bg-green-100 text-green-800 border-green-200",
-  "Psicopedagogia": "bg-yellow-100 text-yellow-800 border-yellow-200",
-  "Educação Física": "bg-rose-100 text-rose-800 border-rose-200",
+  "Psicológico": "bg-purple-950/60 text-purple-300 border-purple-700/50",
+  "Psicomotricidade": "bg-indigo-950/60 text-indigo-300 border-indigo-700/50",
+  "Fisioterapia": "bg-orange-950/60 text-orange-300 border-orange-700/50",
+  "Terapia Ocupacional": "bg-teal-950/60 text-teal-300 border-teal-700/50",
+  "Fonoaudiologia": "bg-blue-950/60 text-blue-300 border-blue-700/50",
+  "Nutrição": "bg-green-950/60 text-green-300 border-green-700/50",
+  "Psicopedagogia": "bg-yellow-950/60 text-yellow-300 border-yellow-700/50",
+  "Educação Física": "bg-rose-950/60 text-rose-300 border-rose-700/50",
 };
 
 function classificar(pontos: number, max: number) {
   const pct = (pontos / max) * 100;
-  if (pct <= 25) return { label: "Baixo indicativo", cor: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", hex: "#10b981" };
-  if (pct <= 50) return { label: "Indício leve",     cor: "text-blue-700",    bg: "bg-blue-50 border-blue-200",       hex: "#3b82f6" };
-  if (pct <= 75) return { label: "Indício moderado", cor: "text-amber-700",   bg: "bg-amber-50 border-amber-200",     hex: "#f59e0b" };
-  return               { label: "Indício elevado",   cor: "text-rose-700",    bg: "bg-rose-50 border-rose-200",       hex: "#f43f5e" };
+  if (pct <= 25) return { label: "Baixo indicativo", cor: "text-emerald-400", bg: "bg-emerald-950/50 border-emerald-700/50", hex: "#10b981" };
+  if (pct <= 50) return { label: "Indício leve",     cor: "text-blue-400",    bg: "bg-blue-950/50 border-blue-700/50",       hex: "#3b82f6" };
+  if (pct <= 75) return { label: "Indício moderado", cor: "text-amber-400",   bg: "bg-amber-950/50 border-amber-700/50",     hex: "#f59e0b" };
+  return               { label: "Indício elevado",   cor: "text-rose-400",    bg: "bg-rose-950/50 border-rose-700/50",       hex: "#f43f5e" };
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -304,34 +316,25 @@ function getPrioridadeBadge(vulnScore: number, clinicalPts: number) {
 // ─── HEADER ───────────────────────────────────────────────────────────────────
 
 function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" }) {
+  const navBtn = "px-4 py-1.5 rounded-xl text-white text-xs font-semibold transition-all duration-200 glass";
   return (
-    <div className="bg-primary text-primary-foreground py-5 px-6 shadow-md no-print">
-      <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg md:text-xl font-bold">{CLINIC_CONFIG.name}</h1>
-          <p className="mt-0.5 text-primary-foreground/75 text-xs hidden md:block">{CLINIC_CONFIG.subtitle}</p>
+    <div className="header-gradient py-5 px-6 no-print">
+      <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+            style={{ background: "linear-gradient(135deg, #00d4ff22 0%, #7c3aed33 100%)", border: "1px solid rgba(0,212,255,0.3)" }}>
+            🧩
+          </div>
+          <div>
+            <h1 className="text-base md:text-lg font-bold text-white tracking-tight">{CLINIC_CONFIG.name}</h1>
+            <p className="mt-0 text-white/50 text-xs hidden md:block">{CLINIC_CONFIG.subtitle}</p>
+          </div>
         </div>
-        <div className="flex gap-2 flex-shrink-0">
-          {page !== "dashboard" && (
-            <Link href="/dashboard" className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors">
-              Dashboard
-            </Link>
-          )}
-          {page !== "lista" && page !== "form" && (
-            <Link href="/lista" className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors">
-              Pacientes
-            </Link>
-          )}
-          {page !== "form" && (
-            <Link href="/" className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors">
-              Nova Triagem
-            </Link>
-          )}
-          {page === "form" && (
-            <Link href="/lista" className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors">
-              Ver Pacientes →
-            </Link>
-          )}
+        <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end">
+          {page !== "dashboard" && <Link href="/dashboard" className={navBtn}>Dashboard</Link>}
+          {page !== "lista" && page !== "form" && <Link href="/lista" className={navBtn}>Pacientes</Link>}
+          {page !== "form" && <Link href="/" className={navBtn}>Nova Triagem</Link>}
+          {page === "form" && <Link href="/lista" className={navBtn}>Ver Pacientes →</Link>}
         </div>
       </div>
     </div>
@@ -344,14 +347,34 @@ function GraficoRadar({ porArea }: { porArea: { area: string; pct: number; nivel
   const data = porArea.map(({ area, pct }) => ({ area: SHORT_NAMES[area] ?? area, pct, fullMark: 100 }));
   const pctMedio = Math.round(porArea.reduce((a, b) => a + b.pct, 0) / porArea.length);
   const cor = pctMedio >= 65 ? "#f43f5e" : pctMedio >= 45 ? "#f59e0b" : pctMedio >= 25 ? "#3b82f6" : "#10b981";
+  const gradId = `radar-grad-${cor.replace("#", "")}`;
+  const CustomDot = (props: any) => {
+    const { cx, cy, value } = props;
+    if (!cx || !cy || value === 0) return null;
+    return (
+      <circle cx={cx} cy={cy} r={5} fill={cor} stroke="rgba(255,255,255,0.8)" strokeWidth={1.5}
+        style={{ filter: `drop-shadow(0 0 6px ${cor})` }} />
+    );
+  };
   return (
-    <div style={{ width: "100%", height: 320 }}>
+    <div style={{ width: "100%", height: 340 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <RadarChart data={data} margin={{ top: 20, right: 40, bottom: 20, left: 40 }}>
-          <PolarGrid stroke="#e5e7eb" />
-          <PolarAngleAxis dataKey="area" tick={{ fontSize: 11, fontWeight: 600, fill: "#374151" }} />
-          <PolarRadiusAxis angle={90} domain={[0, 100]} tickCount={5} tick={{ fontSize: 9, fill: "#9ca3af" }} />
-          <Radar name="Índice (%)" dataKey="pct" stroke={cor} fill={cor} fillOpacity={0.22} strokeWidth={2} />
+        <RadarChart data={data} margin={{ top: 24, right: 48, bottom: 24, left: 48 }}>
+          <defs>
+            <radialGradient id={gradId} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor={cor} stopOpacity={0.55} />
+              <stop offset="70%" stopColor={cor} stopOpacity={0.18} />
+              <stop offset="100%" stopColor={cor} stopOpacity={0.02} />
+            </radialGradient>
+          </defs>
+          <PolarGrid gridType="circle" stroke="rgba(255,255,255,0.08)" />
+          <PolarAngleAxis dataKey="area" tick={{ fontSize: 11, fontWeight: 700, fill: "rgba(255,255,255,0.7)" }} />
+          <PolarRadiusAxis angle={90} domain={[0, 100]} tickCount={5} tick={{ fontSize: 8, fill: "rgba(255,255,255,0.3)" }} />
+          <Radar name="Índice (%)" dataKey="pct"
+            stroke={cor} strokeWidth={2.5}
+            fill={`url(#${gradId})`} fillOpacity={1}
+            dot={<CustomDot />}
+          />
         </RadarChart>
       </ResponsiveContainer>
     </div>
@@ -407,7 +430,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
 
   const perguntasDaArea = PERGUNTAS.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === areaAtiva);
   const areaIdx = AREAS.indexOf(areaAtiva);
-  const fc = "w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white";
+  const fc = "w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-secondary text-foreground placeholder:text-muted-foreground transition-colors";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -440,7 +463,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
 
         {/* ── Dados Pessoais ── */}
-        <div className="bg-white rounded-2xl border border-border p-6 shadow-sm space-y-6">
+        <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card space-y-6">
           <div>
             <Sec title="Dados do Paciente" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -638,19 +661,21 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
             const temResposta = pergs.some((p) => respostas[p.idx] > 0);
             return (
               <button key={area} type="button" onClick={() => setAreaAtiva(area)}
-                className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
-                  areaAtiva === area ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-white text-muted-foreground border-border hover:border-primary/40"
+                className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all flex items-center gap-1.5 ${
+                  areaAtiva === area ? "bg-primary text-primary-foreground border-primary shadow-md"
+                    : "bg-secondary text-muted-foreground border-border hover:border-primary/40"
                 }`}>
-                {temResposta ? "● " : ""}{area}
+                <span>{AREA_ICONS[area] ?? "📋"}</span>
+                <span className="hidden md:inline">{area}</span>
+                {temResposta && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />}
               </button>
             );
           })}
         </div>
 
         {/* Perguntas */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-          <div className={`px-6 py-4 border-b border-border ${CORES_AREA[areaAtiva] ?? "bg-gray-50"}`}>
+        <div className="bg-card rounded-2xl border border-border/60 glow-card overflow-hidden">
+          <div className={`px-6 py-4 border-b border-border ${CORES_AREA[areaAtiva] ?? "bg-secondary"}`}>
             <h2 className="font-bold text-lg">{areaAtiva}</h2>
             <p className="text-sm opacity-80">Área {areaIdx + 1} de {AREAS.length} — {perguntasDaArea.length} perguntas</p>
           </div>
@@ -673,7 +698,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
                               : e.valor === 1 ? "bg-blue-500 text-white border-blue-500"
                               : e.valor === 2 ? "bg-amber-500 text-white border-amber-500"
                               : "bg-rose-500 text-white border-rose-500"
-                            : "bg-white text-muted-foreground border-border hover:border-primary/50"
+                            : "bg-secondary text-muted-foreground border-border hover:border-primary/50"
                         }`}>{e.valor}</button>
                     ))}
                   </div>
@@ -703,7 +728,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
         </div>
 
         {/* Legenda */}
-        <div className="bg-white rounded-2xl border border-border p-4 shadow-sm">
+        <div className="bg-card rounded-2xl border border-border/60 p-4 glow-card">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Escala de Pontuação</p>
           <div className="flex flex-wrap gap-4">
             {ESCALA.map((e) => (
@@ -801,8 +826,8 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
         {/* Cabeçalho de impressão */}
         <div className="print-only hidden border-b-2 border-gray-800 pb-4 mb-5">
-          <h1 className="text-2xl font-bold text-gray-900">{CLINIC_CONFIG.name}</h1>
-          <p className="text-sm text-gray-600">{CLINIC_CONFIG.subtitle}</p>
+          <h1 className="text-2xl font-bold text-foreground">{CLINIC_CONFIG.name}</h1>
+          <p className="text-sm text-muted-foreground">{CLINIC_CONFIG.subtitle}</p>
           <div className="flex justify-between mt-3 text-sm">
             <span><strong>Paciente:</strong> {nomePaciente}</span>
             <span><strong>Data:</strong> {data}</span>
@@ -843,7 +868,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
         )}
 
         {/* Dados do Paciente */}
-        <div className="bg-white rounded-2xl border border-border p-6 shadow-sm space-y-4">
+        <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card space-y-4">
           <h2 className="font-bold text-sm text-primary uppercase tracking-wider">Dados do Paciente</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Nome</p><p className="font-bold">{nomePaciente || "—"}</p></div>
@@ -896,7 +921,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
         </div>
 
         {/* Pontuação total */}
-        <div className="bg-white rounded-2xl border border-border p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Pontuação Total</p>
             <p className="text-4xl font-bold mt-1">{totalPontos} <span className="text-lg font-normal text-muted-foreground">/ {totalMax}</span></p>
@@ -911,7 +936,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
           </div>
           <div className="relative w-28 h-28 flex-shrink-0">
             <svg viewBox="0 0 36 36" className="w-28 h-28 -rotate-90">
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" strokeWidth="3" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
               <circle cx="18" cy="18" r="15.9" fill="none"
                 stroke={pctTotal >= 65 ? "#f43f5e" : pctTotal >= 45 ? "#f59e0b" : pctTotal >= 25 ? "#3b82f6" : "#10b981"}
                 strokeWidth="3" strokeDasharray={`${pctTotal} ${100 - pctTotal}`} strokeLinecap="round" />
@@ -923,7 +948,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
         </div>
 
         {/* Radar */}
-        <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+        <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card">
           <h2 className="font-bold text-lg mb-1">Teia de Aranha – Perfil Multidisciplinar</h2>
           <p className="text-sm text-muted-foreground mb-4">Percentual de indicativo por área avaliada</p>
           <GraficoRadar porArea={porArea} />
@@ -940,7 +965,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
         {/* Prioridades */}
         {top3.length > 0 && (
-          <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+          <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card">
             <h2 className="font-bold text-lg mb-4">Prioridades Identificadas (Top {top3.length})</h2>
             <div className="space-y-3">
               {top3.map(({ area, pontos, max, nivel }, i) => (
@@ -961,13 +986,13 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
         )}
 
         {/* Resultado por área */}
-        <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+        <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card">
           <h2 className="font-bold text-lg mb-5">Resultado Detalhado por Área</h2>
           <div className="space-y-4">
             {ranking.map(({ area, pontos, max, pct, nivel }) => (
               <div key={area}>
                 <div className="flex justify-between items-center mb-1.5">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${CORES_AREA[area] ?? "bg-gray-100"}`}>{area}</span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${CORES_AREA[area] ?? "bg-secondary text-foreground border-border"}`}>{area}</span>
                   <div className="flex items-center gap-3 text-sm">
                     <span className={`font-bold ${nivel.cor}`}>{nivel.label}</span>
                     <span className="text-muted-foreground">{pontos}/{max} ({pct}%)</span>
@@ -1083,9 +1108,9 @@ function ListaPacientes() {
         </div>
 
         {carregando ? (
-          <div className="bg-white rounded-2xl border border-border p-12 text-center text-muted-foreground">Carregando…</div>
+          <div className="bg-card rounded-2xl border border-border/60 p-12 text-center text-muted-foreground">Carregando…</div>
         ) : triagens.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-border p-12 text-center">
+          <div className="bg-card rounded-2xl border border-border/60 p-12 text-center">
             <p className="text-4xl mb-4">📋</p>
             <p className="font-semibold">Nenhuma triagem salva ainda</p>
             <Link href="/" className="mt-4 inline-block px-6 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
@@ -1093,7 +1118,7 @@ function ListaPacientes() {
             </Link>
           </div>
         ) : filtradas.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-border p-8 text-center text-muted-foreground">
+          <div className="bg-card rounded-2xl border border-border/60 p-8 text-center text-muted-foreground">
             Nenhum resultado para "{busca}".
           </div>
         ) : (
@@ -1105,7 +1130,7 @@ function ListaPacientes() {
               const clinicalPts = parsePontosTotal(t.resultado);
               const prioridade = getPrioridadeBadge(vulnScore, clinicalPts);
               return (
-                <div key={t.id} className={`bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md transition-shadow ${prioridade?.label === "Prioridade Máxima" ? "border-red-300 border-l-4 border-l-red-500" : prioridade?.label === "Alta Prioridade" ? "border-orange-200 border-l-4 border-l-orange-400" : "border-border"}`}>
+                <div key={t.id} className={`bg-card rounded-2xl border p-5 glow-card hover:border-primary/40 transition-all ${prioridade?.label === "Prioridade Máxima" ? "border-red-800/70 border-l-4 border-l-red-500" : prioridade?.label === "Alta Prioridade" ? "border-orange-800/70 border-l-4 border-l-orange-400" : "border-border/60"}`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1116,10 +1141,10 @@ function ListaPacientes() {
                           </span>
                         )}
                         {t.alergias && (
-                          <span className="text-xs font-bold bg-red-100 text-red-700 border border-red-300 px-2 py-0.5 rounded-full">⚠ Alergia</span>
+                          <span className="text-xs font-bold bg-red-950/60 text-red-400 border border-red-700/50 px-2 py-0.5 rounded-full">⚠ Alergia</span>
                         )}
                         {t.cadeiraDeRodas && (
-                          <span className="text-xs font-bold bg-blue-100 text-blue-700 border border-blue-300 px-2 py-0.5 rounded-full">♿ CDR</span>
+                          <span className="text-xs font-bold bg-blue-950/60 text-blue-400 border border-blue-700/50 px-2 py-0.5 rounded-full">♿ CDR</span>
                         )}
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-sm text-muted-foreground">
@@ -1246,7 +1271,7 @@ function Dashboard() {
     .map(([name, value]) => ({ name: name.length > 20 ? name.slice(0, 20) + "…" : name, value }));
 
   const Card = ({ label, value, sub, color }: { label: string; value: number | string; sub?: string; color?: string }) => (
-    <div className={`bg-white rounded-2xl border border-border p-5 shadow-sm ${color ? `border-l-4 ${color}` : ""}`}>
+    <div className={`bg-card rounded-2xl border border-border/60 p-5 glow-card ${color ? `border-l-4 ${color}` : ""}`}>
       <p className="text-sm font-semibold text-muted-foreground">{label}</p>
       <p className="text-3xl font-bold mt-1">{value}</p>
       {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
@@ -1263,7 +1288,7 @@ function Dashboard() {
         </div>
 
         {total === 0 ? (
-          <div className="bg-white rounded-2xl border border-border p-12 text-center">
+          <div className="bg-card rounded-2xl border border-border/60 p-12 text-center">
             <p className="text-4xl mb-4">📊</p>
             <p className="font-semibold">Nenhuma triagem registrada ainda</p>
             <Link href="/" className="mt-4 inline-block px-6 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
@@ -1276,22 +1301,22 @@ function Dashboard() {
             <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-6">
               <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-4">Impacto Social — Fila de Prioridade</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white rounded-xl border border-red-200 border-l-4 border-l-red-500 p-4 shadow-sm">
+                <div className="bg-card rounded-xl border border-red-900/50 border-l-4 border-l-red-500 p-4 shadow-sm">
                   <p className="text-xs font-semibold text-muted-foreground">🔴 Prioridade Máxima</p>
                   <p className="text-3xl font-bold mt-1 text-red-700">{stats.prioridadeMaxima}</p>
                   <p className="text-xs text-muted-foreground mt-1">pacientes no topo da fila</p>
                 </div>
-                <div className="bg-white rounded-xl border border-orange-200 border-l-4 border-l-orange-400 p-4 shadow-sm">
+                <div className="bg-card rounded-xl border border-orange-900/50 border-l-4 border-l-orange-400 p-4 shadow-sm">
                   <p className="text-xs font-semibold text-muted-foreground">Em Vulnerabilidade</p>
                   <p className="text-3xl font-bold mt-1 text-orange-700">{stats.vulnAguardando}</p>
                   <p className="text-xs text-muted-foreground mt-1">aguardando atendimento</p>
                 </div>
-                <div className="bg-white rounded-xl border border-border border-l-4 border-l-blue-500 p-4 shadow-sm">
+                <div className="bg-card rounded-xl border border-border/60 border-l-4 border-l-blue-500 p-4 shadow-sm">
                   <p className="text-xs font-semibold text-muted-foreground">Alunos Rede Pública</p>
                   <p className="text-3xl font-bold mt-1">{pct(stats.redePublica)}%</p>
                   <p className="text-xs text-muted-foreground mt-1">{stats.redePublica} de {total} pacientes</p>
                 </div>
-                <div className="bg-white rounded-xl border border-border border-l-4 border-l-emerald-500 p-4 shadow-sm">
+                <div className="bg-card rounded-xl border border-border/60 border-l-4 border-l-emerald-500 p-4 shadow-sm">
                   <p className="text-xs font-semibold text-muted-foreground">Atend. Exclusivo Aqui</p>
                   <p className="text-3xl font-bold mt-1">{stats.semOutroAtend}</p>
                   <p className="text-xs text-muted-foreground mt-1">{pct(stats.semOutroAtend)}% sem outro serviço</p>
@@ -1335,15 +1360,15 @@ function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Diagnósticos */}
               {diagData.length > 0 && (
-                <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+                <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card">
                   <h3 className="font-bold text-base mb-4">Diagnósticos Mais Frequentes</h3>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={diagData} layout="vertical" margin={{ left: 8, right: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#0ea5e9" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11 }} />
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.07)" />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)" }} allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "rgba(255,255,255,0.6)" }} width={90} />
+                      <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "#f1f5f9" }} />
+                      <Bar dataKey="value" fill="#0ea5e9" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11, fill: "rgba(255,255,255,0.7)" }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1351,7 +1376,7 @@ function Dashboard() {
 
               {/* Benefícios */}
               {beneficiosData.length > 0 && (
-                <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+                <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card">
                   <h3 className="font-bold text-base mb-4">Distribuição de Benefícios</h3>
                   <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
@@ -1367,22 +1392,22 @@ function Dashboard() {
 
               {/* Dispositivos */}
               {dispositivosData.length > 0 && (
-                <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+                <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card">
                   <h3 className="font-bold text-base mb-4">Dispositivos de Apoio</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={dispositivosData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} label={{ position: "top", fontSize: 11 }} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.07)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)" }} />
+                      <YAxis tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)" }} allowDecimals={false} />
+                      <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "#f1f5f9" }} />
+                      <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} label={{ position: "top", fontSize: 11, fill: "rgba(255,255,255,0.7)" }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               )}
 
               {/* Alertas críticos */}
-              <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+              <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card">
                 <h3 className="font-bold text-base mb-4">Alertas Críticos</h3>
                 <div className="space-y-3">
                   {[

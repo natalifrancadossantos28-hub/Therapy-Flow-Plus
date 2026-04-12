@@ -28,37 +28,128 @@
 }
 
 :root {
-  --background: 210 20% 98%;
-  --foreground: 222 47% 11%;
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 196 80% 40%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --primary: 196 80% 38%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 210 20% 94%;
-  --secondary-foreground: 222 47% 20%;
-  --muted: 210 20% 96%;
-  --muted-foreground: 215 20% 50%;
-  --accent: 196 50% 92%;
-  --accent-foreground: 196 80% 25%;
+  /* ── Dark Navy Premium Theme ── */
+  --background: 226 45% 6%;
+  --foreground: 213 35% 90%;
+  --border: 220 25% 18%;
+  --input: 220 30% 13%;
+  --ring: 196 100% 50%;
+  --card: 224 40% 10%;
+  --card-foreground: 213 35% 90%;
+  --primary: 196 100% 48%;
+  --primary-foreground: 226 45% 6%;
+  --secondary: 224 35% 15%;
+  --secondary-foreground: 213 35% 75%;
+  --muted: 224 35% 13%;
+  --muted-foreground: 215 20% 52%;
+  --accent: 196 80% 16%;
+  --accent-foreground: 196 100% 65%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --app-font-sans: 'Inter', sans-serif;
-  --radius: 0.625rem;
+  --app-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --radius: 1rem;
 }
 
 @layer base {
   * { @apply border-border; }
   body { @apply font-sans antialiased bg-background text-foreground; }
+  ::selection { background: hsl(196 100% 48% / 0.3); }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: hsl(var(--background)); }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
 }
 
+/* ── Glassmorphism ── */
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.2s ease;
+}
+.glass:hover {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* ── Glow card ── */
+.glow-card {
+  box-shadow:
+    0 0 0 1px rgba(0, 212, 255, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.glow-card-red {
+  box-shadow:
+    0 0 0 1px rgba(239, 68, 68, 0.25),
+    -4px 0 20px rgba(239, 68, 68, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.5);
+}
+.glow-card-orange {
+  box-shadow:
+    0 0 0 1px rgba(249, 115, 22, 0.25),
+    -4px 0 20px rgba(249, 115, 22, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Gradient text ── */
+.gradient-text {
+  background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Input dark ── */
+input, select, textarea {
+  color-scheme: dark;
+}
+
+/* ── Header gradient ── */
+.header-gradient {
+  background: linear-gradient(135deg, #060d1f 0%, #0b1a3e 45%, #0d2050 70%, #060d1f 100%);
+  border-bottom: 1px solid rgba(0, 212, 255, 0.15);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(0, 212, 255, 0.1);
+}
+
+/* ── Radar dot glow ── */
+.radar-dot {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+/* ── Score ring glow ── */
+circle[stroke="#10b981"],
+circle[stroke="#3b82f6"],
+circle[stroke="#f59e0b"],
+circle[stroke="#f43f5e"] {
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+/* ── Checkbox & Radio ── */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: hsl(196 100% 48%);
+}
+
+/* ── Print overrides (keeps white for PDF) ── */
 @media print {
   .no-print { display: none !important; }
   .print-only { display: block !important; }
-  body { background: white !important; }
-  .shadow-sm, .shadow-md { box-shadow: none !important; }
-  .rounded-2xl { border-radius: 8px !important; }
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11px;
+  }
+  * {
+    color: black !important;
+    border-color: #e5e7eb !important;
+    box-shadow: none !important;
+  }
+  .bg-card, .bg-background, .bg-secondary, .bg-muted,
+  .bg-primary\/10, .bg-red-50, .bg-amber-50, .bg-orange-50,
+  .bg-blue-50, .bg-emerald-50, .bg-rose-50 {
+    background-color: white !important;
+  }
+  .header-gradient, .glass { background: white !important; }
+  .glow-card, .glow-card-red, .glow-card-orange { box-shadow: 0 0 0 1px #e5e7eb !important; }
   @page { margin: 1.5cm; }
 }
