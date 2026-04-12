@@ -127,7 +127,8 @@ async function buscarPacientesAmanha() {
 // ─────────────────────────────────────────────────────────────────────────────
 // ESTADO DO BOT
 // ─────────────────────────────────────────────────────────────────────────────
-const STATUS_FILE = "/tmp/whatsapp_bot_status.json";
+const STATUS_FILE   = "/tmp/whatsapp_bot_status.json";
+const ACTIVITY_FILE = "/tmp/bot_activity.json";
 let sock           = null;
 let qrCodeBase64   = null;
 let statusConexao  = "aguardando";
@@ -137,6 +138,18 @@ const sessoes      = new Map();
 function salvarStatus(dados) {
   try {
     fs.writeFileSync(STATUS_FILE, JSON.stringify({ ...dados, horario: new Date().toLocaleString("pt-BR"), sessoes: sessoes.size }));
+  } catch {}
+}
+
+function logAtividade(mensagem, tipo = "info") {
+  try {
+    const agora = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const entrada = { t: agora, m: mensagem, tipo };
+    let lista = [];
+    try { lista = JSON.parse(fs.readFileSync(ACTIVITY_FILE, "utf8")); } catch {}
+    lista.unshift(entrada);
+    if (lista.length > 50) lista = lista.slice(0, 50); // manter últimas 50
+    fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(lista));
   } catch {}
 }
 
@@ -593,6 +606,7 @@ async function conectarWhatsApp() {
       numeroConectado = sock.user?.id?.split(":")[0] || "";
       salvarStatus({ status: "conectado", numero: numeroConectado });
       console.log(`✅ WhatsApp conectado! Número: +${numeroConectado}`);
+      logAtividade(`✅ WhatsApp conectado — +${numeroConectado}`, "sucesso");
     }
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode;
@@ -600,6 +614,7 @@ async function conectarWhatsApp() {
       statusConexao = "desconectado";
       salvarStatus({ status: "desconectado", qrCode: null });
       console.log(`🔴 Desconectado. Código: ${code}. Reconectando: ${reconectar}`);
+      logAtividade(`🔴 Desconectado (código ${code}) — reconectando...`, "erro");
       if (reconectar) setTimeout(conectarWhatsApp, 5000);
     }
   });
