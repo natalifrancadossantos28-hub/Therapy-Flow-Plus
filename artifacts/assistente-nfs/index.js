@@ -813,15 +813,19 @@ app.get(["/status", "/assistente-nfs/status"], (req, res) => {
 });
 
 // Redirect para painel
-app.get("/", (req, res) => {
+function redirectToPanel(req, res) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Assistente NFs</title>
   <style>body{font-family:sans-serif;background:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;min-height:100vh;gap:16px}.spin{width:36px;height:36px;border:4px solid #eee;border-top-color:#25D366;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}p{color:#555}a{color:#1a73e8}</style>
   <script>window.addEventListener('load',function(){var b=window.location.protocol+'//'+window.location.hostname;window.location.replace(b+'/api/whatsapp/panel');});</script>
-  </head><body><div class="spin"></div><p>Abrindo painel...</p><a id="l" href="#">Clique aqui se não redirecionar</a>
+  </head><body><div class="spin"></div><p>Abrindo painel da Carla...</p><a id="l" href="#">Clique aqui se não redirecionar</a>
   <script>document.getElementById('l').href=window.location.protocol+'//'+window.location.hostname+'/api/whatsapp/panel';</script>
   </body></html>`);
-});
+}
+
+app.get("/", redirectToPanel);
+app.get("/assistente-nfs", redirectToPanel);
+app.get("/assistente-nfs/", redirectToPanel);
 
 app.listen(PORT, () => {
   console.log(`\n💬 Assistente NFs — ${CLINICA_NOME}`);
