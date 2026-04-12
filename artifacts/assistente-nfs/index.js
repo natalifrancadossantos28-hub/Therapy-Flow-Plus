@@ -282,13 +282,13 @@ async function interpretarMensagem(mensagem, contexto) {
   const profissional    = consultaHoje?.profissional || "";
   const horarioConsulta = consultaHoje?.horario || "";
 
-  const prompt = `Você é a Carol, recepcionista da Clínica ${CLINICA_NOME} em Votorantim.
+  const prompt = `Você é a Carol, recepcionista da Unidade ${CLINICA_NOME} em Votorantim.
 
 ═══ QUEM VOCÊ É ═══
 - Você é uma PESSOA REAL que trabalha na recepção — não um robô, não uma IA.
 - Seu nome é Carol. Você é calorosa, próxima, competente e genuinamente se importa.
 - Você conhece as famílias pelo nome, sabe da rotina de cada criança, faz parte da vida deles.
-- Especialmente próxima com mães e responsáveis — eles confiam seus filhos à clínica.
+- Especialmente próxima com mães e responsáveis — eles confiam seus filhos à unidade.
 - Assine sempre: "_Carol — NFs gestão_ 🏥"
 
 ═══ COMO VOCÊ FALA ═══
@@ -424,7 +424,7 @@ async function executarAcoes(acoes, paciente, sessao) {
             const profId = consultas[0]?.professional_id || paciente.professional_id;
             await moverParaFilaEspera(paciente.id, profId);
             await enviar(numeroParaJid(paciente.guardian_phone),
-              `⚠️ *Aviso Importante*\n\nPrezado(a) *${paciente.guardian_name}*,\n\nInformamos que o(a) Paciente *${paciente.name}* acumulou *3 faltas consecutivas* sem justificativa.\n\nConforme a política da clínica (padrão SUS), a vaga foi devolvida à fila de espera da prefeitura.\n\nEm caso de dúvidas, entre em contato com a recepção.${ASSINATURA}`
+              `⚠️ *Aviso Importante*\n\nPrezado(a) *${paciente.guardian_name}*,\n\nInformamos que o(a) Paciente *${paciente.name}* acumulou *3 faltas consecutivas* sem justificativa.\n\nConforme a política da unidade (padrão SUS), a vaga foi devolvida à fila de espera da prefeitura.\n\nEm caso de dúvidas, entre em contato com a recepção.${ASSINATURA}`
             );
             await enviarGrupoProfissionais(`🔴 *REMOÇÃO AUTOMÁTICA*\n👤 Paciente: *${paciente.name}* (Prontuário: ${paciente.prontuario || "–"})\n📋 3 faltas consecutivas — removido(a) da agenda e retornado(a) à fila de espera.`);
           } else if (paciente && totalFaltas === 2) {
@@ -600,7 +600,7 @@ async function processarMotoristaACaminho() {
     if (c.guardian_phone) {
       const jid = numeroParaJid(c.guardian_phone);
       await enviar(jid,
-        `🚐 *Aviso da NFs — Transporte*\n\nOlá, *${c.guardian_name || "Responsável"}*!\n\nO transporte da clínica está a caminho para buscar o(a) Paciente *${c.patient_name}*.\n\nPor favor, deixe o(a) Paciente pronto(a) para embarcar em breve.${ASSINATURA}`
+        `🚐 *Aviso da NFs — Transporte*\n\nOlá, *${c.guardian_name || "Responsável"}*!\n\nO transporte da unidade está a caminho para buscar o(a) Paciente *${c.patient_name}*.\n\nPor favor, deixe o(a) Paciente pronto(a) para embarcar em breve.${ASSINATURA}`
       );
       count++;
     }
@@ -875,9 +875,9 @@ app.post(["/voice-chat", "/assistente-nfs/voice-chat"], async (req, res) => {
           `  ${p.name} | Status: ${p.status} | Profissional: ${p.profissional || "–"} (${p.specialty || "–"}) | Responsável: ${p.guardian_name || "–"} | Tel: ${p.guardian_phone || "–"} | Faltas: ${p.absence_count || 0}`
         ).join("\n");
 
-    const prompt = `Você é a Carla, recepcionista da Clínica NFs gestão em Votorantim.
+    const prompt = `Você é a Carla, recepcionista da Unidade NFs gestão em Votorantim.
 Você é uma pessoa real — calorosa, jovem, bem-humorada e muito competente.
-Trabalha na clínica há anos e conhece todo mundo pelo nome: pacientes, responsáveis, terapeutas.
+Trabalha na unidade há anos e conhece todo mundo pelo nome: pacientes, responsáveis, terapeutas.
 Está respondendo agora a um colega da equipe interna, de forma rápida e direta.
 
 Como você fala:

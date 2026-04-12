@@ -635,7 +635,7 @@ async function pollStatus(){
       setTimeout(pollStatus,30000);
     }else if(d.qrCode){
       pill.className='status-pill qr';pill.innerHTML='<span class="pulse-dot"></span> Escanear QR Code';
-      body.innerHTML='<div class="qr-container"><div class="qr-frame"><img src="'+d.qrCode+'" alt="QR Code"></div><div class="qr-steps"><b>Como conectar:</b><br>1. Abra o WhatsApp da clínica<br>2. Toque em ⋮ → <b>Dispositivos Vinculados</b><br>3. Toque em <b>Vincular um dispositivo</b><br>4. Aponte a câmera para o QR Code<br><span class="qr-warn">⚠️ Expira em ~60s — atualizando automaticamente</span></div></div>';
+      body.innerHTML='<div class="qr-container"><div class="qr-frame"><img src="'+d.qrCode+'" alt="QR Code"></div><div class="qr-steps"><b>Como conectar:</b><br>1. Abra o WhatsApp da unidade<br>2. Toque em ⋮ → <b>Dispositivos Vinculados</b><br>3. Toque em <b>Vincular um dispositivo</b><br>4. Aponte a câmera para o QR Code<br><span class="qr-warn">⚠️ Expira em ~60s — atualizando automaticamente</span></div></div>';
       loader.textContent='Aguardando leitura...';
       if(btnLogout)btnLogout.style.display='none';
       setTimeout(pollStatus,5000);
