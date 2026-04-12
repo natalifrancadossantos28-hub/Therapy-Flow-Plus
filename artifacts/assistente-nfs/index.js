@@ -124,6 +124,71 @@ async function buscarPacientesAmanha() {
   return buscarConsultasData(amanha);
 }
 
+async function buscarProfissionais() {
+  return query(
+    `SELECT name, specialty, phone, email FROM professionals WHERE company_id=$1 ORDER BY specialty, name`,
+    [COMPANY_ID]
+  );
+}
+
+async function buscarFilaEspera() {
+  return query(
+    `SELECT p.name AS paciente, prof.name AS profissional, prof.specialty,
+            wl.priority AS prioridade, wl.entry_date AS entrada
+       FROM waiting_list wl
+       JOIN patients p ON wl.patient_id = p.id
+       LEFT JOIN professionals prof ON wl.professional_id = prof.id
+      WHERE wl.company_id = $1
+      ORDER BY wl.priority DESC, wl.entry_date`,
+    [COMPANY_ID]
+  );
+}
+
+async function buscarPacientesComFaltas() {
+  return query(
+    `SELECT p.name, p.absence_count, p.guardian_name, p.guardian_phone,
+            prof.name AS profissional, prof.specialty
+       FROM patients p
+       LEFT JOIN professionals prof ON p.professional_id = prof.id
+      WHERE p.company_id = $1 AND p.absence_count > 0
+      ORDER BY p.absence_count DESC
+      LIMIT 20`,
+    [COMPANY_ID]
+  );
+}
+
+async function buscarConsultasSemana() {
+  const hoje = dataHoje();
+  const d = new Date(); d.setDate(d.getDate() + 6);
+  const fim = d.toISOString().split("T")[0];
+  return query(
+    `SELECT a.date, a.time, a.status,
+            p.name AS patient_name,
+            prof.name AS professional_name, prof.specialty
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN professionals prof ON a.professional_id = prof.id
+      WHERE a.company_id = $1 AND a.date BETWEEN $2 AND $3
+      ORDER BY a.date, a.time`,
+    [COMPANY_ID, hoje, fim]
+  );
+}
+
+async function buscarEstatisticas() {
+  const hoje = dataHoje();
+  const rows = await query(
+    `SELECT
+       COUNT(*) FILTER (WHERE status='agendado')   AS agendados,
+       COUNT(*) FILTER (WHERE status='presente')   AS presentes,
+       COUNT(*) FILTER (WHERE status='ausente')    AS ausentes,
+       COUNT(*) FILTER (WHERE status='cancelado')  AS cancelados
+     FROM appointments WHERE company_id=$1 AND date=$2`,
+    [COMPANY_ID, hoje]
+  );
+  const wl = await query(`SELECT COUNT(*) AS total FROM waiting_list WHERE company_id=$1`, [COMPANY_ID]);
+  return { ...rows[0], fila_espera: wl[0]?.total || 0 };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ESTADO DO BOT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -728,33 +793,79 @@ app.post(["/voice-chat", "/assistente-nfs/voice-chat"], async (req, res) => {
     if (!pergunta) return res.status(400).json({ error: "pergunta obrigatória" });
 
     const hoje = dataHoje();
-    const consultasHoje = await buscarConsultasData(hoje);
+    const dataFormatada = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
-    const resumo = consultasHoje.length === 0
+    // Busca em paralelo todos os dados do Arco-Íris
+    const [consultasHoje, profissionais, filaEspera, pacientesComFaltas, stats] = await Promise.all([
+      buscarConsultasData(hoje),
+      buscarProfissionais(),
+      buscarFilaEspera(),
+      buscarPacientesComFaltas(),
+      buscarEstatisticas(),
+    ]);
+
+    // ── Agenda de hoje ──
+    const resumoAgenda = consultasHoje.length === 0
       ? "Nenhuma consulta agendada para hoje."
       : consultasHoje.map(c =>
-          `- ${c.time}: ${c.patient_name} com ${c.professional_name} (${c.specialty}) — Status: ${c.status}`
+          `  ${c.time}: ${c.patient_name} | ${c.professional_name} (${c.specialty}) | ${c.status}`
+        ).join("\n");
+
+    // ── Profissionais ──
+    const resumoProfissionais = profissionais.length === 0
+      ? "Nenhum profissional cadastrado."
+      : profissionais.map(p => `  ${p.name} — ${p.specialty}${p.phone ? " | Tel: "+p.phone : ""}`).join("\n");
+
+    // ── Fila de espera ──
+    const resumoFila = filaEspera.length === 0
+      ? "Fila de espera vazia."
+      : filaEspera.slice(0, 15).map(f =>
+          `  ${f.paciente} → ${f.profissional || "sem profissional"} (${f.specialty || "–"}) | Prioridade: ${f.prioridade} | Desde: ${formatarData(f.entrada)}`
+        ).join("\n");
+
+    // ── Pacientes com faltas ──
+    const resumoFaltas = pacientesComFaltas.length === 0
+      ? "Nenhum paciente com faltas registradas."
+      : pacientesComFaltas.map(p =>
+          `  ${p.name}: ${p.absence_count} falta(s) | ${p.profissional || "sem profissional"} | Responsável: ${p.guardian_name || "–"}`
         ).join("\n");
 
     const prompt = `Você é a Carla, recepcionista da Clínica NFs gestão em Votorantim.
-Você é uma pessoa real — calorosa, atenciosa, bem-humorada e competente.
+Você é uma pessoa real — calorosa, jovem, bem-humorada e muito competente.
 Trabalha na clínica há anos e conhece todo mundo pelo nome: pacientes, responsáveis, terapeutas.
-Você está respondendo agora a um colega da equipe interna, de forma rápida e natural.
+Está respondendo agora a um colega da equipe interna, de forma rápida e direta.
 
-Regras do seu jeito de falar:
-- Fale como uma pessoa real, nunca como um robô ou assistente virtual
-- Use expressões do dia a dia: "oi!", "claro!", "olha...", "então...", "pode deixar!"
-- Seja direta e simpática — máximo 3 frases curtas (a resposta será lida em voz alta)
-- NÃO se apresente como "Assistente" — você é a Carla, ponto
-- NÃO use markdown, asteriscos ou emojis — só texto corrido para voz
-- Se não souber algo, diga naturalmente: "Olha, não tenho essa informação agora, mas posso verificar!"
+Como você fala:
+- Como uma pessoa real, nunca como robô
+- Use expressões do dia a dia: "oi!", "claro!", "olha...", "então...", "pode deixar!", "anotei!"
+- MÁXIMO 3 frases curtas — a resposta será lida em voz alta
+- NÃO use markdown, asteriscos ou emojis — só texto corrido
+- Se não tiver a informação, diga: "Não tenho isso aqui agora, mas posso verificar!"
+- Use os dados abaixo para responder com precisão
 
-AGENDA DE HOJE — ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}:
-${resumo}
+═══ SISTEMA ARCO-ÍRIS — DADOS AO VIVO ═══
+
+📅 AGENDA DE HOJE — ${dataFormatada}:
+${resumoAgenda}
+
+📊 RESUMO DO DIA:
+  Agendados: ${stats.agendados} | Presentes: ${stats.presentes} | Ausentes: ${stats.ausentes} | Cancelados: ${stats.cancelados}
+  Fila de espera total: ${stats.fila_espera} paciente(s)
+
+👩‍⚕️ EQUIPE DE PROFISSIONAIS:
+${resumoProfissionais}
+
+⏳ FILA DE ESPERA:
+${resumoFila}
+
+⚠️ PACIENTES COM FALTAS:
+${resumoFaltas}
+
+═══════════════════════════════════════
 
 COLEGA PERGUNTOU: "${pergunta}"
 
-Responda como a Carla responderia ao colega ao vivo, de forma humana e natural.`;
+Responda como a Carla responderia ao vivo — rápida, humana e com os dados acima.`;
 
     const response = await fetch(`${AI_BASE}/messages`, {
       method: "POST",
@@ -765,7 +876,7 @@ Responda como a Carla responderia ao colega ao vivo, de forma humana e natural.`
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5",
-        max_tokens: 300,
+        max_tokens: 400,
         messages: [{ role: "user", content: prompt }],
       }),
     });
