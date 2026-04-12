@@ -19,7 +19,7 @@ import { format } from "date-fns";
 
 function calcPriority(score: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
-  const baseIdx = score >= 270 ? 3 : score >= 180 ? 2 : score >= 90 ? 1 : 0;
+  const baseIdx = score >= 432 ? 3 : score >= 288 ? 2 : score >= 144 ? 1 : 0;
   const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0);
   return levels[Math.min(3, baseIdx + vuln)];
 }
@@ -81,6 +81,9 @@ export default function PatientDetail() {
   const [sFisioterapia, setSFisioterapia] = useState("");
   const [sPsicopedagogia, setSPsicopedagogia] = useState("");
   const [sEdFisica, setSEdFisica] = useState("");
+  const [sFono, setSFono] = useState("");
+  const [sTO, setSTO] = useState("");
+  const [sNutri, setSNutri] = useState("");
   const [escolaPublica, setEscolaPublica] = useState<boolean | null>(null);
   const [trabalhoNaRoca, setTrabalhoNaRoca] = useState<boolean | null>(null);
   const [savingTriagem, setSavingTriagem] = useState(false);
@@ -116,7 +119,7 @@ export default function PatientDetail() {
   };
 
   const p = patient as any;
-  const totalScore = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica]
+  const totalScore = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri]
     .reduce((acc, v) => acc + (parseInt(v) || 0), 0);
 
   const openTriagemEdit = () => {
@@ -125,13 +128,16 @@ export default function PatientDetail() {
     setSFisioterapia(p?.scoreFisioterapia != null ? String(p.scoreFisioterapia) : "");
     setSPsicopedagogia(p?.scorePsicopedagogia != null ? String(p.scorePsicopedagogia) : "");
     setSEdFisica(p?.scoreEdFisica != null ? String(p.scoreEdFisica) : "");
+    setSFono(p?.scoreFonoaudiologia != null ? String(p.scoreFonoaudiologia) : "");
+    setSTO(p?.scoreTO != null ? String(p.scoreTO) : "");
+    setSNutri(p?.scoreNutricionista != null ? String(p.scoreNutricionista) : "");
     setEscolaPublica(p?.escolaPublica ?? null);
     setTrabalhoNaRoca(p?.trabalhoNaRoca ?? null);
     setTriagemEdit(true);
   };
 
   const saveTriagem = async () => {
-    const scores = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica].map(v => parseInt(v) || 0);
+    const scores = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri].map(v => parseInt(v) || 0);
     if (scores.some(s => s < 0 || s > 72)) {
       toast({ title: "Score inválido", description: "Cada área deve ter um valor entre 0 e 72.", variant: "destructive" });
       return;
@@ -146,13 +152,16 @@ export default function PatientDetail() {
         scoreFisioterapia: scores[2],
         scorePsicopedagogia: scores[3],
         scoreEdFisica: scores[4],
+        scoreFonoaudiologia: scores[5],
+        scoreTO: scores[6],
+        scoreNutricionista: scores[7],
         escolaPublica: escolaPublica ?? false,
         trabalhoNaRoca: trabalhoNaRoca ?? false,
       });
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       setTriagemEdit(false);
-      toast({ title: "Triagem registrada!", description: `Score total: ${total}/360. Paciente apto para a fila.` });
+      toast({ title: "Triagem registrada!", description: `Score total: ${total}/576. Paciente apto para a fila.` });
     } catch {
       toast({ title: "Erro", description: "Falha ao salvar triagem.", variant: "destructive" });
     } finally {
@@ -319,13 +328,16 @@ export default function PatientDetail() {
 
             {triagemFeita ? (
               <div className="space-y-3 text-sm">
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
                   {[
                     { label: "Psicologia", val: p.scorePsicologia },
                     { label: "Psicomotr.", val: p.scorePsicomotricidade },
                     { label: "Fisioterapia", val: p.scoreFisioterapia },
                     { label: "Psicoped.", val: p.scorePsicopedagogia },
                     { label: "Ed. Física", val: p.scoreEdFisica },
+                    { label: "Fonoaud.", val: p.scoreFonoaudiologia },
+                    { label: "T.O.", val: p.scoreTO },
+                    { label: "Nutrição", val: p.scoreNutricionista },
                   ].map(area => (
                     <div key={area.label} className="p-2 bg-secondary/30 rounded-xl text-center">
                       <p className="text-muted-foreground font-semibold text-xs mb-1">{area.label}</p>
@@ -336,8 +348,8 @@ export default function PatientDetail() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
                     <p className="text-muted-foreground font-semibold mb-1">Score Total</p>
-                    <p className="text-2xl font-bold text-primary">{p.triagemScore}<span className="text-sm text-muted-foreground font-normal">/360</span></p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round((p.triagemScore / 360) * 100)}% do máximo</p>
+                    <p className="text-2xl font-bold text-primary">{p.triagemScore}<span className="text-sm text-muted-foreground font-normal">/576</span></p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round((p.triagemScore / 576) * 100)}% do máximo</p>
                   </div>
                   <div className="p-3 bg-secondary/30 rounded-xl">
                     <p className="text-muted-foreground font-semibold mb-1">Escola Pública</p>
@@ -416,6 +428,9 @@ export default function PatientDetail() {
                     { label: "Fisioterapia", val: sFisioterapia, set: setSFisioterapia },
                     { label: "Psicopedagogia", val: sPsicopedagogia, set: setSPsicopedagogia },
                     { label: "Ed. Física", val: sEdFisica, set: setSEdFisica },
+                    { label: "Fonoaudiologia", val: sFono, set: setSFono },
+                    { label: "T.O. (Ter. Ocupacional)", val: sTO, set: setSTO },
+                    { label: "Nutricionista", val: sNutri, set: setSNutri },
                   ] as const).map(area => (
                     <div key={area.label} className="space-y-1">
                       <Label className="text-sm">{area.label} <span className="text-muted-foreground font-normal">(0–72)</span></Label>
@@ -429,8 +444,8 @@ export default function PatientDetail() {
                   ))}
                   <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 flex flex-col justify-center">
                     <p className="text-xs text-muted-foreground font-semibold mb-0.5">Score Total</p>
-                    <p className="text-2xl font-bold text-primary">{totalScore}<span className="text-sm text-muted-foreground font-normal">/360</span></p>
-                    <p className="text-xs text-muted-foreground">{Math.round((totalScore / 360) * 100)}% do máximo</p>
+                    <p className="text-2xl font-bold text-primary">{totalScore}<span className="text-sm text-muted-foreground font-normal">/576</span></p>
+                    <p className="text-xs text-muted-foreground">{Math.round((totalScore / 576) * 100)}% do máximo</p>
                   </div>
                 </div>
               </div>
@@ -467,7 +482,7 @@ export default function PatientDetail() {
                     })}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Verde 0–89 · Azul 90–179 · Laranja 180–269 · Vermelho 270–360 (Vulnerabilidade sobe um nível)
+                    Verde 0–143 · Azul 144–287 · Laranja 288–431 · Vermelho 432–576 (Vulnerabilidade sobe um nível)
                   </p>
                 </div>
               )}
@@ -495,7 +510,7 @@ export default function PatientDetail() {
                 </span>
               </div>
               <div className="text-right text-sm text-muted-foreground">
-                <p>Score: <strong>{p.triagemScore}/360</strong></p>
+                <p>Score: <strong>{p.triagemScore}/576</strong></p>
                 <p>Escola Pública: <strong>{ep ? "Sim" : "Não"}</strong></p>
                 <p>Trabalho na Roça: <strong>{tnr ? "Sim" : "Não"}</strong></p>
               </div>

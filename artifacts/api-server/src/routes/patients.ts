@@ -7,7 +7,7 @@ const router: IRouter = Router();
 
 function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
-  const baseIdx = triagemScore >= 270 ? 3 : triagemScore >= 180 ? 2 : triagemScore >= 90 ? 1 : 0;
+  const baseIdx = triagemScore >= 432 ? 3 : triagemScore >= 288 ? 2 : triagemScore >= 144 ? 1 : 0;
   const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0);
   const idx = Math.min(3, baseIdx + vuln);
   return levels[idx];
@@ -39,6 +39,9 @@ router.get("/patients", async (req, res) => {
     scoreFisioterapia: patientsTable.scoreFisioterapia,
     scorePsicopedagogia: patientsTable.scorePsicopedagogia,
     scoreEdFisica: patientsTable.scoreEdFisica,
+    scoreFonoaudiologia: patientsTable.scoreFonoaudiologia,
+    scoreTO: patientsTable.scoreTO,
+    scoreNutricionista: patientsTable.scoreNutricionista,
     escolaPublica: patientsTable.escolaPublica,
     trabalhoNaRoca: patientsTable.trabalhoNaRoca,
     createdAt: patientsTable.createdAt,
@@ -89,6 +92,9 @@ router.post("/patients", async (req, res) => {
     scoreFisioterapia: body.scoreFisioterapia !== undefined ? Number(body.scoreFisioterapia) : null,
     scorePsicopedagogia: body.scorePsicopedagogia !== undefined ? Number(body.scorePsicopedagogia) : null,
     scoreEdFisica: body.scoreEdFisica !== undefined ? Number(body.scoreEdFisica) : null,
+    scoreFonoaudiologia: body.scoreFonoaudiologia !== undefined ? Number(body.scoreFonoaudiologia) : null,
+    scoreTO: body.scoreTO !== undefined ? Number(body.scoreTO) : null,
+    scoreNutricionista: body.scoreNutricionista !== undefined ? Number(body.scoreNutricionista) : null,
     escolaPublica: body.escolaPublica !== undefined ? Boolean(body.escolaPublica) : null,
     trabalhoNaRoca: body.trabalhoNaRoca !== undefined ? Boolean(body.trabalhoNaRoca) : null,
   }).returning();
@@ -129,6 +135,9 @@ router.put("/patients/:id", async (req, res) => {
   if (body.scoreFisioterapia !== undefined) updateData.scoreFisioterapia = body.scoreFisioterapia !== null ? Number(body.scoreFisioterapia) : null;
   if (body.scorePsicopedagogia !== undefined) updateData.scorePsicopedagogia = body.scorePsicopedagogia !== null ? Number(body.scorePsicopedagogia) : null;
   if (body.scoreEdFisica !== undefined) updateData.scoreEdFisica = body.scoreEdFisica !== null ? Number(body.scoreEdFisica) : null;
+  if (body.scoreFonoaudiologia !== undefined) updateData.scoreFonoaudiologia = body.scoreFonoaudiologia !== null ? Number(body.scoreFonoaudiologia) : null;
+  if (body.scoreTO !== undefined) updateData.scoreTO = body.scoreTO !== null ? Number(body.scoreTO) : null;
+  if (body.scoreNutricionista !== undefined) updateData.scoreNutricionista = body.scoreNutricionista !== null ? Number(body.scoreNutricionista) : null;
   if (body.escolaPublica !== undefined) updateData.escolaPublica = body.escolaPublica !== null ? Boolean(body.escolaPublica) : null;
   if (body.trabalhoNaRoca !== undefined) updateData.trabalhoNaRoca = body.trabalhoNaRoca !== null ? Boolean(body.trabalhoNaRoca) : null;
 

@@ -35,12 +35,16 @@ export default function Dashboard() {
   const absentPatients = patients?.filter(p => p.absenceCount >= 3) || [];
 
   const triadPatients = (patients || []).filter(p => (p as any).triagemScore != null);
+  const avg = (key: string) => triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any)[key] || 0), 0) / triadPatients.length) : 0;
   const radarData = [
-    { area: "Psicologia", score: triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any).scorePsicologia || 0), 0) / triadPatients.length) : 0, max: 72 },
-    { area: "Psicomotr.", score: triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any).scorePsicomotricidade || 0), 0) / triadPatients.length) : 0, max: 72 },
-    { area: "Fisioterapia", score: triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any).scoreFisioterapia || 0), 0) / triadPatients.length) : 0, max: 72 },
-    { area: "Psicoped.", score: triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any).scorePsicopedagogia || 0), 0) / triadPatients.length) : 0, max: 72 },
-    { area: "Ed. Física", score: triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any).scoreEdFisica || 0), 0) / triadPatients.length) : 0, max: 72 },
+    { area: "Psicologia", score: avg("scorePsicologia") },
+    { area: "Psicomotr.", score: avg("scorePsicomotricidade") },
+    { area: "Fisioterapia", score: avg("scoreFisioterapia") },
+    { area: "Psicoped.", score: avg("scorePsicopedagogia") },
+    { area: "Ed. Física", score: avg("scoreEdFisica") },
+    { area: "Fonoaud.", score: avg("scoreFonoaudiologia") },
+    { area: "T.O.", score: avg("scoreTO") },
+    { area: "Nutrição", score: avg("scoreNutricionista") },
   ].map(d => ({ ...d, pct: Math.round((d.score / 72) * 100) }));
 
   // Historical count by year — prefer entryDate, fallback to createdAt
@@ -148,7 +152,7 @@ export default function Dashboard() {
               ))}
               <div className="mt-3 pt-3 border-t border-border flex justify-between text-sm">
                 <span className="font-semibold text-muted-foreground">Score Médio Total</span>
-                <span className="font-bold text-primary">{Math.round(radarData.reduce((s, d) => s + d.score, 0))}/360</span>
+                <span className="font-bold text-primary">{Math.round(radarData.reduce((s, d) => s + d.score, 0))}/576</span>
               </div>
             </div>
           </div>

@@ -196,7 +196,7 @@ export default function WaitingList() {
                     const score = (p as any).triagemScore;
                     return (
                       <option key={p.id} value={p.id}>
-                        {p.name} — Score: {score}/360
+                        {p.name} — Score: {score}/576
                       </option>
                     );
                   })}
