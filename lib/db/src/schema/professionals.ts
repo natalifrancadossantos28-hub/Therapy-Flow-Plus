@@ -8,6 +8,7 @@ export const professionalsTable = pgTable("professionals", {
   specialty: text("specialty").notNull(),
   email: text("email"),
   phone: text("phone"),
+  pin: text("pin"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

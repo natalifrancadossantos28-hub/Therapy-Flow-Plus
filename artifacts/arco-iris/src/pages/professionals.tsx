@@ -92,6 +92,7 @@ export default function Professionals() {
     specialty: "",
     email: "",
     phone: "",
+    pin: "",
   });
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -101,7 +102,7 @@ export default function Professionals() {
       queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
       toast({ title: "Sucesso", description: "Profissional cadastrado." });
       setIsDialogOpen(false);
-      setFormData({ name: "", specialty: "", email: "", phone: "" });
+      setFormData({ name: "", specialty: "", email: "", phone: "", pin: "" });
     } catch {
       toast({
         title: "Erro",
@@ -238,6 +239,18 @@ export default function Professionals() {
                     placeholder="(00) 00000-0000"
                   />
                 </div>
+              </div>
+              <div>
+                <Label>PIN de Acesso à Agenda (4 dígitos)</Label>
+                <Input
+                  type="password"
+                  maxLength={4}
+                  value={formData.pin}
+                  onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/, "") })}
+                  placeholder="••••"
+                  className="tracking-widest font-mono"
+                />
+                <p className="text-xs text-muted-foreground mt-1">O profissional usará este PIN para acessar a Agenda.</p>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <Button

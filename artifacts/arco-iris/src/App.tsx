@@ -13,24 +13,30 @@ import PatientDetail from "@/pages/patient-detail";
 import Reception from "@/pages/reception";
 import WaitingList from "@/pages/waiting-list";
 import Agenda from "@/pages/agenda";
+import AgendaProfissionais from "@/pages/agenda-profissionais";
 
 const queryClient = new QueryClient();
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/professionals" component={Professionals} />
-        <Route path="/professionals/:id" component={ProfessionalDetail} />
-        <Route path="/patients" component={Patients} />
-        <Route path="/patients/:id" component={PatientDetail} />
-        <Route path="/reception" component={Reception} />
-        <Route path="/waiting-list" component={WaitingList} />
-        <Route path="/agenda" component={Agenda} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      <Route path="/agenda-profissionais" component={AgendaProfissionais} />
+      <Route>
+        <Layout>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/professionals" component={Professionals} />
+            <Route path="/professionals/:id" component={ProfessionalDetail} />
+            <Route path="/patients" component={Patients} />
+            <Route path="/patients/:id" component={PatientDetail} />
+            <Route path="/reception" component={Reception} />
+            <Route path="/waiting-list" component={WaitingList} />
+            <Route path="/agenda" component={Agenda} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 

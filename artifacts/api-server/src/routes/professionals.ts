@@ -13,9 +13,19 @@ router.get("/professionals", async (_req, res) => {
 });
 
 router.post("/professionals", async (req, res) => {
-  const { name, specialty, email, phone } = req.body;
-  const [row] = await db.insert(professionalsTable).values({ name, specialty, email, phone }).returning();
+  const { name, specialty, email, phone, pin } = req.body;
+  const [row] = await db.insert(professionalsTable).values({ name, specialty, email, phone, pin: pin ?? null }).returning();
   res.status(201).json(row);
+});
+
+router.post("/professionals/:id/verify-pin", async (req, res) => {
+  const id = Number(req.params.id);
+  const { pin } = req.body;
+  const [prof] = await db.select({ id: professionalsTable.id, pin: professionalsTable.pin }).from(professionalsTable).where(eq(professionalsTable.id, id));
+  if (!prof) return res.status(404).json({ error: "Profissional não encontrado" });
+  if (!prof.pin) return res.status(400).json({ error: "PIN não configurado para este profissional" });
+  if (prof.pin !== String(pin)) return res.status(401).json({ error: "PIN incorreto" });
+  res.json({ ok: true });
 });
 
 router.get("/professionals/:id", async (req, res) => {
@@ -27,8 +37,10 @@ router.get("/professionals/:id", async (req, res) => {
 
 router.put("/professionals/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { name, specialty, email, phone } = req.body;
-  const [row] = await db.update(professionalsTable).set({ name, specialty, email, phone }).where(eq(professionalsTable.id, id)).returning();
+  const { name, specialty, email, phone, pin } = req.body;
+  const updateData: Record<string, unknown> = { name, specialty, email, phone };
+  if (pin !== undefined) updateData.pin = pin || null;
+  const [row] = await db.update(professionalsTable).set(updateData).where(eq(professionalsTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Professional not found" });
   res.json(row);
 });

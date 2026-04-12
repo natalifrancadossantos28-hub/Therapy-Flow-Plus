@@ -84,7 +84,7 @@ router.get("/appointments", async (req, res) => {
 });
 
 router.post("/appointments", async (req, res) => {
-  const { patientId, professionalId, date, time, notes } = req.body;
+  const { patientId, professionalId, date, time, notes, fromWaitingList } = req.body;
   const [row] = await db.insert(appointmentsTable).values({
     patientId: Number(patientId),
     professionalId: Number(professionalId),
@@ -93,6 +93,16 @@ router.post("/appointments", async (req, res) => {
     status: "agendado",
     notes: notes ?? null,
   }).returning();
+
+  if (fromWaitingList) {
+    await db.update(patientsTable)
+      .set({ status: "Atendimento", professionalId: Number(professionalId) })
+      .where(eq(patientsTable.id, Number(patientId)));
+
+    const { waitingListTable } = await import("@workspace/db");
+    await db.delete(waitingListTable).where(eq(waitingListTable.patientId, Number(patientId)));
+  }
+
   res.status(201).json(row);
 });
 
