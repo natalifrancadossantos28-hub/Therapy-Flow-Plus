@@ -226,62 +226,122 @@ async function atualizar() {
 atualizar();
 
 /* ── Comandos de Voz (Web Speech API) ── */
-const micBtn   = document.getElementById('mic-btn');
-const vStatus  = document.getElementById('voice-status');
-const vResult  = document.getElementById('voice-result');
-let recognition = null;
-let isListening = false;
+const micBtn  = document.getElementById('mic-btn');
+const vStatus = document.getElementById('voice-status');
+const vResult = document.getElementById('voice-result');
+
+let recognition  = null;
+let isListening  = false;
+let autoStopTimer = null;
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 if (!SpeechRecognition) {
   micBtn.disabled = true;
-  micBtn.title = 'Reconhecimento de voz não suportado neste navegador (use Chrome)';
   micBtn.style.opacity = '0.4';
-  vStatus.textContent = 'Use Google Chrome para comandos de voz';
+  vStatus.innerHTML = '⚠️ Use o <b>Google Chrome</b> para comandos de voz — este navegador não suporta microfone';
 } else {
-  recognition = new SpeechRecognition();
-  recognition.lang = 'pt-BR';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
+  function criarReconhecimento() {
+    const r = new SpeechRecognition();
+    r.lang = 'pt-BR';
+    r.continuous = true;
+    r.interimResults = true;
+    r.maxAlternatives = 1;
 
-  recognition.onstart = () => {
-    isListening = true;
-    micBtn.classList.add('listen');
-    micBtn.textContent = '⏹';
-    vStatus.textContent = 'Ouvindo... fale o comando agora';
-    vResult.style.display = 'none';
-  };
+    r.onstart = () => {
+      isListening = true;
+      micBtn.classList.add('listen');
+      micBtn.textContent = '⏹';
+      vStatus.textContent = '🎙️ Fale agora — clique ⏹ para parar';
+      vResult.style.display = 'block';
+      vResult.textContent = '...';
+      clearTimeout(autoStopTimer);
+      autoStopTimer = setTimeout(() => {
+        if (isListening) pararMicrofone();
+      }, 15000);
+    };
 
-  recognition.onresult = (e) => {
-    const texto = e.results[0][0].transcript;
-    vResult.style.display = 'block';
-    vResult.textContent = '🗣️ "' + texto + '"';
-    executarComando(texto);
-  };
+    r.onresult = (e) => {
+      clearTimeout(autoStopTimer);
+      let interim = '';
+      let final = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t;
+        else interim += t;
+      }
+      vResult.style.display = 'block';
+      if (final) {
+        vResult.textContent = '🗣️ "' + final.trim() + '"';
+        pararMicrofone();
+        executarComando(final.trim());
+      } else if (interim) {
+        vResult.textContent = '⌛ ' + interim;
+        autoStopTimer = setTimeout(() => {
+          if (isListening) pararMicrofone();
+        }, 4000);
+      }
+    };
 
-  recognition.onerror = (e) => {
-    vStatus.textContent = 'Erro: ' + (e.error === 'no-speech' ? 'nenhuma fala detectada' : e.error);
-    pararMicrofone();
-  };
+    r.onerror = (e) => {
+      if (e.error === 'no-speech') {
+        vStatus.textContent = '🔇 Nenhuma fala detectada — tente falar mais alto ou mais perto do microfone';
+      } else if (e.error === 'not-allowed' || e.error === 'permission-denied') {
+        vStatus.innerHTML = '🚫 <b>Microfone bloqueado.</b> Clique no 🔒 na barra de endereço do navegador → selecione <b>Permitir microfone</b> → recarregue a página.';
+        micBtn.disabled = true;
+        micBtn.style.opacity = '0.4';
+      } else if (e.error === 'audio-capture') {
+        vStatus.textContent = '❌ Nenhum microfone encontrado. Conecte um microfone e tente novamente.';
+      } else {
+        vStatus.textContent = '❌ Erro: ' + e.error;
+      }
+      pararMicrofone();
+    };
 
-  recognition.onend = () => pararMicrofone();
-}
+    r.onend = () => {
+      if (isListening) pararMicrofone();
+    };
 
-function pararMicrofone() {
-  isListening = false;
-  micBtn.classList.remove('listen');
-  micBtn.textContent = '🎤';
-  if (vStatus.textContent === 'Ouvindo... fale o comando agora') {
-    vStatus.textContent = 'Pressione o microfone para começar';
+    return r;
   }
-}
 
-micBtn.addEventListener('click', () => {
-  if (!recognition) return;
-  if (isListening) { recognition.stop(); return; }
-  try { recognition.start(); } catch(e) { vStatus.textContent = 'Erro ao iniciar microfone'; }
-});
+  function pararMicrofone() {
+    clearTimeout(autoStopTimer);
+    isListening = false;
+    micBtn.classList.remove('listen');
+    micBtn.textContent = '🎤';
+    try { if (recognition) recognition.stop(); } catch(e) {}
+    if (vStatus.textContent === '🎙️ Fale agora — clique ⏹ para parar') {
+      vStatus.textContent = 'Microfone parado. Pressione novamente para falar.';
+    }
+  }
+
+  micBtn.addEventListener('click', async () => {
+    if (isListening) { pararMicrofone(); return; }
+
+    vStatus.textContent = '⏳ Solicitando acesso ao microfone...';
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+    } catch(err) {
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        vStatus.innerHTML = '🚫 <b>Permissão negada.</b> Clique no 🔒 na barra de endereço → <b>Permitir microfone</b> → recarregue a página.';
+      } else if (err.name === 'NotFoundError') {
+        vStatus.textContent = '❌ Nenhum microfone encontrado no dispositivo.';
+      } else {
+        vStatus.textContent = '❌ Não foi possível acessar o microfone: ' + err.message;
+      }
+      return;
+    }
+
+    try {
+      recognition = criarReconhecimento();
+      recognition.start();
+    } catch(e) {
+      vStatus.textContent = '❌ Erro ao iniciar reconhecimento. Tente novamente.';
+    }
+  });
+}
 
 /* ── Processar comando de voz ── */
 async function executarComando(texto) {
