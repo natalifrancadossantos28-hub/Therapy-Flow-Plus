@@ -24,6 +24,16 @@ function lerAtividade() {
 router.get("/status", (req, res) => res.json(lerStatus()));
 router.get("/activity", (req, res) => res.json(lerAtividade()));
 
+router.post("/logout", async (req, res) => {
+  try {
+    const r = await fetch(`${BOT_URL}/logout`, { method: "POST" });
+    const d = await r.json();
+    res.json(d);
+  } catch (err: any) {
+    res.status(500).json({ ok: false, erro: err.message });
+  }
+});
+
 router.post("/voice-chat", async (req, res) => {
   try {
     const r = await fetch(`${BOT_URL}/voice-chat`, {
@@ -354,7 +364,10 @@ body{
     <div class="hero-sub">Recepcionista Virtual · NFs gestão</div>
 
     <!-- Status dinâmico -->
-    <div id="status-pill" class="status-pill off"><span class="pulse-dot"></span> Carregando...</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap">
+      <div id="status-pill" class="status-pill off"><span class="pulse-dot"></span> Carregando...</div>
+      <button id="btn-logout" onclick="fazerLogout()" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35);color:#fca5a5;border-radius:20px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(239,68,68,.3)'" onmouseout="this.style.background='rgba(239,68,68,.15)'">🔌 Desconectar</button>
+    </div>
     <div id="status-body" style="margin-top:14px"></div>
     <p id="status-loader" style="font-size:11px;color:rgba(255,255,255,.2);margin-top:8px">Conectando...</p>
   </div>
@@ -613,22 +626,53 @@ async function pollStatus(){
     var pill=document.getElementById('status-pill');
     var body=document.getElementById('status-body');
     var loader=document.getElementById('status-loader');
+    var btnLogout=document.getElementById('btn-logout');
     if(d.status==='conectado'){
       pill.className='status-pill on';pill.innerHTML='<span class="pulse-dot"></span> WhatsApp Conectado ✅';
       body.innerHTML='<div class="conn-number">+'+( d.numero||'')+'</div><div class="info-grid"><div class="info-box"><div class="label">Sessões ativas</div><div class="value">'+(d.sessoes||0)+'</div></div><div class="info-box"><div class="label">Última sync</div><div class="value" style="font-size:12px">'+(d.horario||'—')+'</div></div></div>';
-      loader.textContent='Bot ativo';setTimeout(pollStatus,30000);
+      loader.textContent='Bot ativo';
+      if(btnLogout)btnLogout.style.display='inline-flex';
+      setTimeout(pollStatus,30000);
     }else if(d.qrCode){
       pill.className='status-pill qr';pill.innerHTML='<span class="pulse-dot"></span> Escanear QR Code';
       body.innerHTML='<div class="qr-container"><div class="qr-frame"><img src="'+d.qrCode+'" alt="QR Code"></div><div class="qr-steps"><b>Como conectar:</b><br>1. Abra o WhatsApp da clínica<br>2. Toque em ⋮ → <b>Dispositivos Vinculados</b><br>3. Toque em <b>Vincular um dispositivo</b><br>4. Aponte a câmera para o QR Code<br><span class="qr-warn">⚠️ Expira em ~60s — atualizando automaticamente</span></div></div>';
-      loader.textContent='Aguardando leitura...';setTimeout(pollStatus,5000);
+      loader.textContent='Aguardando leitura...';
+      if(btnLogout)btnLogout.style.display='none';
+      setTimeout(pollStatus,5000);
     }else{
       pill.className='status-pill off';pill.innerHTML='<span class="pulse-dot"></span> Aguardando bot...';
       body.innerHTML='<p style="color:rgba(255,255,255,.25);font-size:13px;margin-top:8px">O QR Code aparecerá em instantes...</p>';
-      loader.textContent='';setTimeout(pollStatus,4000);
+      loader.textContent='';
+      if(btnLogout)btnLogout.style.display='none';
+      setTimeout(pollStatus,4000);
     }
   }catch(e){document.getElementById('status-loader').textContent='Erro — tentando reconectar...';setTimeout(pollStatus,5000);}
 }
 pollStatus();
+
+/* ── Logout ── */
+async function fazerLogout(){
+  var btn=document.getElementById('btn-logout');
+  if(!confirm('Desconectar o telefone da Carla?\n\nO bot vai parar de responder e um novo QR Code será gerado para reconectar.'))return;
+  if(btn)btn.textContent='⏳ Desconectando...';
+  try{
+    var r=await fetch('/api/whatsapp/logout',{method:'POST'});
+    var d=await r.json();
+    if(d.ok){
+      if(btn){btn.style.display='none';}
+      document.getElementById('status-pill').className='status-pill off';
+      document.getElementById('status-pill').innerHTML='<span class="pulse-dot"></span> Desconectado';
+      document.getElementById('status-body').innerHTML='<p style="color:rgba(255,255,255,.35);font-size:13px;margin-top:8px">Sessão encerrada — novo QR Code aparecerá em instantes...</p>';
+      setTimeout(pollStatus,3000);
+    }else{
+      alert('Erro ao desconectar: '+(d.erro||'tente novamente'));
+      if(btn)btn.textContent='🔌 Desconectar';
+    }
+  }catch(e){
+    alert('Erro de comunicação. Tente novamente.');
+    if(btn)btn.textContent='🔌 Desconectar';
+  }
+}
 
 /* ── Log polling ── */
 async function pollLog(){

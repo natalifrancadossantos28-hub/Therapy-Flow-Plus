@@ -812,6 +812,39 @@ app.get(["/status", "/assistente-nfs/status"], (req, res) => {
   res.json({ status: statusConexao, numeroConectado, sessoesAtivas: sessoes.size, horario: new Date().toLocaleString("pt-BR") });
 });
 
+// Desconectar WhatsApp (logout da sessão)
+app.post(["/logout", "/assistente-nfs/logout"], async (req, res) => {
+  try {
+    console.log("🔌 Solicitação de logout recebida...");
+    statusConexao = "desconectado";
+    numeroConectado = null;
+    salvarStatus({ status: "desconectado", qrCode: null });
+
+    // Encerra a sessão Baileys
+    if (sock) {
+      try { await sock.logout(); } catch (e) { /* ignora erros de logout */ }
+      try { sock.end(); } catch (e) { /* ignora */ }
+      sock = null;
+    }
+
+    // Remove arquivos de autenticação para forçar novo QR
+    const fs = await import("fs");
+    const authDir = "./auth_info_baileys";
+    if (fs.existsSync(authDir)) {
+      fs.rmSync(authDir, { recursive: true, force: true });
+      console.log("🗑️  Sessão apagada — novo QR Code será gerado");
+    }
+
+    // Reconecta (vai gerar novo QR)
+    setTimeout(() => connectToWhatsApp(), 2000);
+
+    res.json({ ok: true, mensagem: "Sessão encerrada. Novo QR Code será gerado em instantes." });
+  } catch (err) {
+    console.error("❌ Erro no logout:", err.message);
+    res.status(500).json({ ok: false, erro: err.message });
+  }
+});
+
 // Redirect para painel
 function redirectToPanel(req, res) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
