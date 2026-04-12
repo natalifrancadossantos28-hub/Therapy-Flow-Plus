@@ -24,7 +24,6 @@ function lerAtividade() {
 router.get("/status", (req, res) => res.json(lerStatus()));
 router.get("/activity", (req, res) => res.json(lerAtividade()));
 
-// Proxy: voice-chat → bot:3001/voice-chat
 router.post("/voice-chat", async (req, res) => {
   try {
     const r = await fetch(`${BOT_URL}/voice-chat`, {
@@ -39,7 +38,6 @@ router.post("/voice-chat", async (req, res) => {
   }
 });
 
-// GET /api/whatsapp/panel — painel de controle com voz + log neon
 router.get("/panel", (req, res) => {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(`<!DOCTYPE html>
@@ -47,481 +45,521 @@ router.get("/panel", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Assistente NFS — Painel de Controle</title>
+<title>Carla — NFs gestão</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#050a0e;
-  --surface:#0d1520;
-  --border:#1a2a3a;
-  --green:#00ff88;
-  --cyan:#00d4ff;
-  --yellow:#ffcc00;
-  --red:#ff4455;
-  --text:#c8e0f0;
-  --dim:#4a6278;
+
+/* ── AURORA BG ── */
+body{
+  font-family:'Segoe UI',system-ui,sans-serif;
+  background:#070a12;
+  color:#e2eaf8;
+  min-height:100vh;
+  overflow-x:hidden;
+  position:relative;
 }
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 12px 40px}
-.wrap{width:100%;max-width:480px;display:flex;flex-direction:column;gap:14px}
-
-/* ── header ── */
-.header{text-align:center;padding:20px 0 6px}
-.header .logo{font-size:44px;filter:drop-shadow(0 0 12px #00d4ff88)}
-.header h1{font-size:20px;font-weight:700;letter-spacing:1px;color:var(--cyan);text-shadow:0 0 12px #00d4ff66}
-.header p{font-size:12px;color:var(--dim);margin-top:3px}
-
-/* ── card ── */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px}
-
-/* ── status badge ── */
-.badge{display:inline-flex;align-items:center;gap:8px;padding:5px 15px;border-radius:999px;font-size:12px;font-weight:600;margin-bottom:14px}
-.badge.on {background:#001a0f;color:var(--green);border:1px solid #00884455;text-shadow:0 0 6px #00ff8877}
-.badge.qr {background:#1a1500;color:var(--yellow);border:1px solid #88660044}
-.badge.off{background:#1a0008;color:var(--red);border:1px solid #88002244}
-.dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1.4s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
-
-/* ── connection info ── */
-.num{font-size:22px;font-weight:700;color:var(--green);letter-spacing:2px;text-shadow:0 0 10px #00ff8866;margin:6px 0 14px}
-.info-row{display:flex;justify-content:space-between;padding:7px 12px;background:var(--bg);border-radius:8px;margin-top:6px;font-size:12px}
-.info-row span:first-child{color:var(--dim)}
-.info-row span:last-child{color:var(--text);font-weight:600}
-
-/* ── qr ── */
-.qr-box{background:#fff;border-radius:10px;padding:8px;display:inline-block;margin:4px 0 12px}
-.qr-box img{display:block;width:200px;height:200px}
-.qr-steps{background:var(--bg);border-radius:10px;padding:12px 14px;text-align:left;font-size:12px;color:var(--dim);line-height:2}
-.qr-steps b{color:var(--text)}
-.qr-warn{color:var(--yellow);margin-top:6px;font-size:11px;display:block}
-
-/* ── voice assistant ── */
-.va-wrap{text-align:center}
-.va-circle{
-  width:80px;height:80px;border-radius:50%;border:none;cursor:pointer;
-  background:linear-gradient(135deg,#003322,#00552e);
-  color:var(--green);font-size:32px;
-  display:flex;align-items:center;justify-content:center;
-  margin:0 auto 12px;
-  transition:all .2s;
-  box-shadow:0 0 0 0 rgba(0,255,136,.4),inset 0 1px 0 rgba(255,255,255,.05);
+.aurora{
+  position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;
 }
-.va-circle:hover{background:linear-gradient(135deg,#004433,#006635);transform:scale(1.04)}
-.va-circle.listen{
-  background:linear-gradient(135deg,#330011,#660022);
-  color:var(--red);
-  animation:ring-red 1.2s ease-in-out infinite;
+.blob{
+  position:absolute;border-radius:50%;filter:blur(80px);opacity:.18;
+  animation:drift 18s ease-in-out infinite alternate;
 }
-.va-circle.thinking{
-  background:linear-gradient(135deg,#001833,#003366);
-  color:var(--cyan);
-  animation:ring-cyan 1.4s ease-in-out infinite;
+.blob1{width:600px;height:600px;background:radial-gradient(circle,#7c3aed,transparent 70%);top:-20%;left:-15%;animation-delay:0s}
+.blob2{width:500px;height:500px;background:radial-gradient(circle,#06b6d4,transparent 70%);top:30%;right:-10%;animation-delay:-6s}
+.blob3{width:400px;height:400px;background:radial-gradient(circle,#10b981,transparent 70%);bottom:-10%;left:20%;animation-delay:-12s}
+.blob4{width:350px;height:350px;background:radial-gradient(circle,#f59e0b,transparent 70%);top:60%;right:30%;animation-delay:-4s;opacity:.09}
+@keyframes drift{
+  0%{transform:translate(0,0) scale(1)}
+  100%{transform:translate(40px,60px) scale(1.12)}
 }
-.va-circle.speaking{
-  background:linear-gradient(135deg,#002233,#004455);
-  color:var(--cyan);
-  animation:ring-cyan .8s ease-in-out infinite;
-}
-@keyframes ring-red{0%{box-shadow:0 0 0 0 rgba(255,68,85,.5)}70%{box-shadow:0 0 0 16px rgba(255,68,85,0)}100%{box-shadow:0 0 0 0 rgba(255,68,85,0)}}
-@keyframes ring-cyan{0%{box-shadow:0 0 0 0 rgba(0,212,255,.5)}70%{box-shadow:0 0 0 16px rgba(0,212,255,0)}100%{box-shadow:0 0 0 0 rgba(0,212,255,0)}}
 
-.va-status{font-size:13px;color:var(--dim);min-height:18px;margin-bottom:10px;transition:color .3s}
-.va-status.active{color:var(--cyan);text-shadow:0 0 8px #00d4ff66}
-
-.va-bubble{
-  background:var(--bg);border:1px solid var(--border);border-radius:12px;
-  padding:14px 16px;font-size:13.5px;color:var(--text);
-  min-height:50px;text-align:left;line-height:1.6;display:none;
-  margin-top:6px;border-left:3px solid var(--cyan);
+/* ── LAYOUT ── */
+.page{
+  position:relative;z-index:1;
+  display:flex;flex-direction:column;align-items:center;
+  padding:28px 14px 60px;gap:18px;
+  max-width:480px;margin:0 auto;
 }
-.va-bubble.user{border-left-color:var(--dim);color:var(--dim);font-size:12px;margin-top:8px}
 
-.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;justify-content:center}
-.chip{
-  background:var(--bg);border:1px solid var(--border);border-radius:999px;
-  padding:5px 13px;font-size:11.5px;color:var(--dim);cursor:pointer;transition:all .15s
-}
-.chip:hover{background:var(--surface);color:var(--cyan);border-color:var(--cyan);text-shadow:0 0 6px #00d4ff44}
-
-/* ── neon log ── */
-.log-terminal{
-  background:#020508;border:1px solid #0a1e2e;border-radius:12px;
-  font-family:'Courier New',monospace;font-size:11.5px;
+/* ── GLASS CARD ── */
+.glass{
+  width:100%;
+  background:rgba(255,255,255,.04);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:24px;
+  box-shadow:
+    0 4px 24px rgba(0,0,0,.4),
+    0 1px 0 rgba(255,255,255,.06) inset,
+    0 -1px 0 rgba(0,0,0,.3) inset;
+  position:relative;
   overflow:hidden;
+  padding:24px;
 }
-.log-header{
-  background:#050d14;padding:8px 14px;display:flex;align-items:center;gap:8px;
-  border-bottom:1px solid #0a1e2e;
+.glass::before{
+  content:'';position:absolute;inset:0;border-radius:24px;
+  background:linear-gradient(135deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,0) 60%);
+  pointer-events:none;
 }
-.log-dot{width:8px;height:8px;border-radius:50%}
-.log-dot.r{background:#ff4455}
-.log-dot.y{background:#ffcc00}
-.log-dot.g{background:#00ff88}
-.log-title{color:#3a5a6e;font-size:11px;margin-left:4px;letter-spacing:.5px}
-.log-live{width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:auto;animation:pulse 1s ease-in-out infinite}
-.log-body{padding:10px 14px;max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
-.log-body::-webkit-scrollbar{width:4px}
-.log-body::-webkit-scrollbar-track{background:transparent}
-.log-body::-webkit-scrollbar-thumb{background:#1a3a4a;border-radius:2px}
-.log-entry{display:flex;gap:8px;opacity:.9}
-.log-time{color:#1a5a6e;min-width:54px;flex-shrink:0}
-.log-msg{color:#00ff88;word-break:break-word}
-.log-msg.erro{color:var(--red)}
-.log-msg.aviso{color:var(--yellow)}
-.log-msg.voz{color:var(--cyan)}
-.log-empty{color:#1a3a4e;font-size:11px;padding:10px 0;text-align:center}
 
-/* ── iframe warn ── */
-.warn-box{text-align:center;padding:6px 0}
-.warn-box a{
-  display:inline-block;background:linear-gradient(135deg,#003322,#00552e);
-  color:var(--green);padding:10px 22px;border-radius:8px;
-  text-decoration:none;font-weight:600;font-size:13px;
-  border:1px solid #00884455;
-  box-shadow:0 0 12px #00ff8822;
+/* ── HERO ── */
+.hero{text-align:center;padding:32px 20px 28px}
+
+/* Avatar orbital ring */
+.avatar-wrap{
+  position:relative;width:120px;height:120px;margin:0 auto 20px;
 }
+.avatar-ring{
+  position:absolute;inset:-8px;border-radius:50%;
+  background:conic-gradient(from 0deg,#7c3aed,#06b6d4,#10b981,#f59e0b,#7c3aed);
+  animation:spin-ring 4s linear infinite;
+  filter:blur(2px);
+}
+@keyframes spin-ring{to{transform:rotate(360deg)}}
+.avatar-ring-inner{
+  position:absolute;inset:3px;border-radius:50%;
+  background:#070a12;
+}
+.avatar-emoji{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:58px;
+  filter:drop-shadow(0 0 16px rgba(124,58,237,.6));
+}
+
+.hero-name{
+  font-size:26px;font-weight:800;letter-spacing:.5px;
+  background:linear-gradient(135deg,#a78bfa,#67e8f9,#6ee7b7);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:4px;
+}
+.hero-sub{font-size:13px;color:rgba(255,255,255,.35);letter-spacing:.3px}
+
+/* Status pill */
+.status-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:7px 18px;border-radius:999px;
+  font-size:12.5px;font-weight:600;margin-top:16px;
+  transition:all .4s;
+}
+.status-pill.on {background:rgba(16,185,129,.12);color:#6ee7b7;border:1px solid rgba(16,185,129,.25);box-shadow:0 0 20px rgba(16,185,129,.15)}
+.status-pill.qr {background:rgba(245,158,11,.1);color:#fcd34d;border:1px solid rgba(245,158,11,.2);box-shadow:0 0 20px rgba(245,158,11,.12)}
+.status-pill.off{background:rgba(239,68,68,.1);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse-anim 1.6s ease-in-out infinite}
+@keyframes pulse-anim{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+
+/* QR section */
+.qr-container{text-align:center;padding:10px 0}
+.qr-frame{
+  display:inline-block;padding:10px;border-radius:16px;
+  background:white;
+  box-shadow:0 0 40px rgba(124,58,237,.3),0 0 80px rgba(6,182,212,.15);
+  margin:8px 0 16px;
+}
+.qr-frame img{display:block;width:190px;height:190px;border-radius:6px}
+.qr-steps{
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  border-radius:14px;padding:14px 16px;text-align:left;
+  font-size:12.5px;color:rgba(255,255,255,.4);line-height:2.1;
+}
+.qr-steps b{color:rgba(255,255,255,.75)}
+.qr-warn{
+  color:#fcd34d;font-size:11.5px;margin-top:8px;display:block;
+  text-shadow:0 0 8px rgba(252,211,77,.4);
+}
+
+/* Connected card body */
+.conn-number{
+  font-size:22px;font-weight:700;letter-spacing:3px;
+  background:linear-gradient(90deg,#6ee7b7,#34d399);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin:6px 0 16px;text-shadow:none;
+}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.info-box{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:12px;padding:10px 14px;
+}
+.info-box .label{font-size:10.5px;color:rgba(255,255,255,.3);margin-bottom:3px}
+.info-box .value{font-size:15px;font-weight:700;color:rgba(255,255,255,.85)}
+
+/* ── CHAT SECTION ── */
+.chat-header{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:16px;
+}
+.chat-title{font-size:15px;font-weight:700;color:rgba(255,255,255,.85)}
+.chat-sub{font-size:11px;color:rgba(255,255,255,.3);margin-top:2px}
+.tts-btn{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:999px;padding:4px 12px;cursor:pointer;
+  font-size:11px;color:rgba(255,255,255,.4);transition:all .2s;
+}
+.tts-btn:hover{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7)}
+
+/* Response bubbles */
+.bubble{
+  border-radius:16px;padding:14px 16px;font-size:13.5px;line-height:1.6;
+  display:none;margin-bottom:12px;
+  animation:fadeSlide .3s ease;
+}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.bubble.user{
+  background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.2);
+  color:rgba(255,255,255,.5);font-size:12px;
+  border-bottom-left-radius:4px;
+}
+.bubble.carla{
+  background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.15);
+  color:rgba(255,255,255,.9);
+  border-bottom-left-radius:4px;
+  box-shadow:0 0 30px rgba(6,182,212,.08);
+}
+.loading-dots{
+  display:none;padding:12px 0;text-align:center;
+  color:rgba(6,182,212,.7);font-size:13px;
+}
+.dot-wave span{
+  display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:currentColor;margin:0 2px;
+  animation:wave .9s ease-in-out infinite;
+}
+.dot-wave span:nth-child(2){animation-delay:.15s}
+.dot-wave span:nth-child(3){animation-delay:.3s}
+@keyframes wave{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-8px)}}
+
+/* Input row */
+.input-row{
+  display:flex;gap:8px;margin-bottom:14px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:14px;padding:6px 6px 6px 14px;
+  transition:border-color .2s,box-shadow .2s;
+}
+.input-row:focus-within{
+  border-color:rgba(124,58,237,.5);
+  box-shadow:0 0 0 3px rgba(124,58,237,.1),0 0 20px rgba(124,58,237,.1);
+}
+.input-row input{
+  flex:1;background:transparent;border:none;outline:none;
+  color:rgba(255,255,255,.9);font-size:13.5px;padding:6px 0;
+}
+.input-row input::placeholder{color:rgba(255,255,255,.2)}
+.send-btn{
+  width:38px;height:38px;border-radius:10px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,#7c3aed,#6d28d9);
+  color:white;font-size:16px;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;box-shadow:0 4px 12px rgba(124,58,237,.4);
+  flex-shrink:0;
+}
+.send-btn:hover{background:linear-gradient(135deg,#8b5cf6,#7c3aed);transform:translateY(-1px);box-shadow:0 6px 16px rgba(124,58,237,.5)}
+.send-btn:active{transform:translateY(0)}
+.mic-btn{
+  width:38px;height:38px;border-radius:10px;border:1px solid rgba(255,255,255,.1);cursor:pointer;
+  background:rgba(255,255,255,.05);
+  color:rgba(255,255,255,.5);font-size:16px;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;flex-shrink:0;
+}
+.mic-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.8)}
+.mic-btn.listening{
+  background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);
+  color:#fca5a5;animation:mic-pulse 1s ease-in-out infinite;
+}
+@keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 8px rgba(239,68,68,0)}}
+
+/* Chips */
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+.chip{
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:999px;padding:6px 14px;
+  font-size:11.5px;color:rgba(255,255,255,.4);
+  cursor:pointer;transition:all .2s;white-space:nowrap;
+}
+.chip:hover{
+  background:rgba(124,58,237,.15);
+  border-color:rgba(124,58,237,.35);
+  color:rgba(167,139,250,.9);
+  box-shadow:0 0 12px rgba(124,58,237,.15);
+  transform:translateY(-1px);
+}
+.va-status{font-size:11px;color:rgba(255,255,255,.25);text-align:center;min-height:16px;margin-top:4px}
+
+.iframe-warn{
+  background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);
+  border-radius:12px;padding:12px 14px;text-align:center;display:none;margin-bottom:10px;
+}
+.iframe-warn a{
+  color:#fcd34d;font-size:12.5px;font-weight:600;text-decoration:none;
+}
+
+/* ── LOG TERMINAL ── */
+.terminal{
+  width:100%;background:#030507;
+  border:1px solid rgba(0,212,255,.12);border-radius:20px;overflow:hidden;
+  box-shadow:0 0 40px rgba(0,212,255,.05),0 4px 24px rgba(0,0,0,.5);
+}
+.term-bar{
+  background:rgba(255,255,255,.03);
+  padding:10px 16px;display:flex;align-items:center;gap:7px;
+  border-bottom:1px solid rgba(0,212,255,.08);
+}
+.tdot{width:9px;height:9px;border-radius:50%}
+.tdot.r{background:#ff5f57}.tdot.y{background:#febc2e}.tdot.g{background:#28c840}
+.term-title{
+  font-family:'Courier New',monospace;font-size:10.5px;
+  color:rgba(0,212,255,.35);letter-spacing:1px;margin-left:6px;
+}
+.live-dot{
+  width:6px;height:6px;border-radius:50%;background:#28c840;margin-left:auto;
+  box-shadow:0 0 6px #28c840;animation:pulse-anim 1.2s ease-in-out infinite;
+}
+.term-body{
+  font-family:'Courier New',monospace;font-size:11.5px;
+  padding:12px 16px;max-height:200px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:5px;
+}
+.term-body::-webkit-scrollbar{width:3px}
+.term-body::-webkit-scrollbar-thumb{background:rgba(0,212,255,.2);border-radius:2px}
+.log-row{display:flex;gap:10px;animation:fadeSlide .25s ease}
+.log-ts{color:rgba(0,212,255,.3);min-width:56px;flex-shrink:0}
+.log-txt{color:#00ff88;word-break:break-word;text-shadow:0 0 8px rgba(0,255,136,.25)}
+.log-txt.erro{color:#ff6b6b;text-shadow:0 0 8px rgba(255,107,107,.2)}
+.log-txt.aviso{color:#fcd34d;text-shadow:0 0 8px rgba(252,211,77,.2)}
+.log-txt.voz{color:#67e8f9;text-shadow:0 0 8px rgba(103,232,249,.2)}
+.term-empty{color:rgba(0,212,255,.15);font-size:11px;padding:14px 0;text-align:center}
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <div class="header">
-    <div class="logo">👩‍💼</div>
-    <h1>OLÁ, SOU A CARLA!</h1>
-    <p>Recepcionista Virtual — NFs gestão</p>
+<!-- Aurora background -->
+<div class="aurora">
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+  <div class="blob blob3"></div>
+  <div class="blob blob4"></div>
+</div>
+
+<div class="page">
+
+  <!-- ── HERO ── -->
+  <div class="glass hero">
+    <div class="avatar-wrap">
+      <div class="avatar-ring"></div>
+      <div class="avatar-ring-inner"></div>
+      <div class="avatar-emoji">👩‍💼</div>
+    </div>
+    <div class="hero-name">Olá, sou a Carla!</div>
+    <div class="hero-sub">Recepcionista Virtual · NFs gestão</div>
+
+    <!-- Status dinâmico -->
+    <div id="status-pill" class="status-pill off"><span class="pulse-dot"></span> Carregando...</div>
+    <div id="status-body" style="margin-top:14px"></div>
+    <p id="status-loader" style="font-size:11px;color:rgba(255,255,255,.2);margin-top:8px">Conectando...</p>
   </div>
 
-  <!-- STATUS -->
-  <div class="card" id="status-card" style="text-align:center">
-    <div id="status-badge" class="badge off"><span class="dot"></span> Carregando...</div>
-    <div id="status-body"></div>
-    <p id="status-loader" style="font-size:11px;color:var(--dim);margin-top:8px">Conectando...</p>
-  </div>
-
-  <!-- ASSISTENTE DE VOZ -->
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+  <!-- ── CHAT ── -->
+  <div class="glass" style="padding:22px">
+    <div class="chat-header">
       <div>
-        <div style="font-size:14px;font-weight:600;color:var(--cyan)">💬 Fale com a Carla</div>
-        <div style="font-size:11px;color:var(--dim);margin-top:2px">Digite ou fale — ela responde em voz alta</div>
+        <div class="chat-title">💬 Fale com a Carla</div>
+        <div class="chat-sub">Ela conhece toda a agenda e responde ao vivo</div>
       </div>
-      <div style="cursor:pointer" onclick="toggleTTS()">
-        <span style="font-size:11px;color:var(--dim)" id="tts-label">🔊 Voz ON</span>
-      </div>
+      <button class="tts-btn" onclick="toggleTTS()" id="tts-label">🔊 Voz ON</button>
     </div>
 
-    <!-- Balões de resposta SEMPRE VISÍVEIS no topo -->
-    <div id="va-user" class="va-bubble" style="display:none;margin-bottom:8px"></div>
-    <div id="va-response" class="va-bubble" style="display:none;margin-bottom:14px;border-left-color:var(--cyan)"></div>
-    <div id="va-loading" style="display:none;text-align:center;padding:12px 0;color:var(--cyan);font-size:13px">
-      <span id="va-dots">⏳ Consultando a IA</span>
+    <div class="iframe-warn" id="iframe-warn">
+      <a id="open-link" href="#" target="_blank">🔗 Abrir em nova aba para usar o microfone</a>
     </div>
 
-    <!-- Campo de texto + botão enviar -->
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input id="texto-input" type="text" placeholder="Digite sua pergunta aqui..."
-        style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;
-               padding:10px 14px;color:var(--text);font-size:13px;outline:none;
-               transition:border-color .2s"
-        onkeydown="if(event.key==='Enter')enviarTexto()"
-        onfocus="this.style.borderColor='var(--cyan)'"
-        onblur="this.style.borderColor='var(--border)'"
-      />
-      <button onclick="enviarTexto()"
-        style="background:linear-gradient(135deg,#003322,#006635);border:1px solid #00884455;
-               color:var(--green);border-radius:8px;padding:10px 16px;cursor:pointer;
-               font-size:16px;transition:all .2s;white-space:nowrap"
-        title="Enviar pergunta">➤</button>
-      <button id="mic-btn"
-        style="background:var(--bg);border:1px solid var(--border);border-radius:8px;
-               padding:10px 14px;cursor:pointer;font-size:18px;transition:all .2s"
-        title="Falar com a IA" onclick="clicarMic()">🎤</button>
+    <!-- Bolha de resposta Carla (inicial) -->
+    <div class="bubble carla" id="va-response"></div>
+    <div class="bubble user" id="va-user"></div>
+    <div class="loading-dots" id="va-loading">
+      <div class="dot-wave"><span></span><span></span><span></span></div>
     </div>
 
-    <!-- Atalhos rápidos -->
+    <!-- Input -->
+    <div class="input-row">
+      <input id="texto-input" type="text" placeholder="Pergunte algo para a Carla..."
+        onkeydown="if(event.key==='Enter')enviarTexto()" />
+      <button class="send-btn" onclick="enviarTexto()" title="Enviar">➤</button>
+      <button class="mic-btn" id="mic-btn" onclick="clicarMic()" title="Falar">🎤</button>
+    </div>
+
+    <!-- Atalhos -->
     <div class="chips">
       <span class="chip" onclick="perguntarIA('Quem faltou hoje?')">Quem faltou?</span>
       <span class="chip" onclick="perguntarIA('Quantas consultas temos hoje?')">Agenda de hoje</span>
-      <span class="chip" onclick="perguntarIA('Qual é o próximo paciente da van?')">Próximo da van</span>
-      <span class="chip" onclick="perguntarIA('Quantas confirmações recebemos?')">Confirmações</span>
-      <span class="chip" onclick="perguntarIA('Algum paciente ainda não confirmou?')">Pendentes</span>
+      <span class="chip" onclick="perguntarIA('Próximo paciente da van?')">Van</span>
+      <span class="chip" onclick="perguntarIA('Quem ainda não confirmou?')">Pendentes</span>
+      <span class="chip" onclick="perguntarIA('Resumo do dia')">Resumo</span>
     </div>
-
-    <div id="va-status" style="font-size:11px;color:var(--dim);text-align:center;margin-top:10px;min-height:16px"></div>
-    <div id="iframe-warn" class="warn-box" style="display:none;margin-top:12px">
-      <a id="open-link" href="#" target="_blank">🔗 Abrir em nova aba para usar o microfone</a>
-    </div>
+    <div class="va-status" id="va-status"></div>
   </div>
 
-  <!-- LOG NEON -->
-  <div class="log-terminal">
-    <div class="log-header">
-      <div class="log-dot r"></div>
-      <div class="log-dot y"></div>
-      <div class="log-dot g"></div>
-      <span class="log-title">CARLA — LOG DE ATIVIDADES EM TEMPO REAL</span>
-      <div class="log-live" title="Atualizando ao vivo"></div>
+  <!-- ── TERMINAL LOG ── -->
+  <div class="terminal">
+    <div class="term-bar">
+      <div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div>
+      <span class="term-title">CARLA · LOG EM TEMPO REAL</span>
+      <div class="live-dot" title="Ao vivo"></div>
     </div>
-    <div class="log-body" id="log-body">
-      <div class="log-empty">Aguardando atividades...</div>
+    <div class="term-body" id="log-body">
+      <div class="term-empty">Aguardando atividades...</div>
     </div>
   </div>
 
 </div>
 
 <script>
-/* ─── Saudação inicial da Carla ─── */
+/* ── Saudação inicial ── */
 (function(){
-  var hora = new Date().getHours();
-  var saudacao = hora < 12 ? 'Bom dia!' : hora < 18 ? 'Boa tarde!' : 'Boa noite!';
-  var msgs = [
-    saudacao + ' Tô aqui, pode perguntar o que precisar.',
-    saudacao + ' Pode falar, tô te ouvindo.',
-    saudacao + ' Pode mandar — tô de olho na agenda.',
+  var h=new Date().getHours();
+  var s=h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';
+  var msgs=[
+    s+'! Tô aqui, pode perguntar o que precisar. 😊',
+    s+'! Pode falar, tô de olho na agenda.',
+    s+'! Qualquer dúvida é só chamar!',
   ];
-  var msg = msgs[Math.floor(Math.random()*msgs.length)];
-  var el = document.getElementById('va-response');
-  el.textContent = '👩‍💼 ' + msg;
-  el.style.display = 'block';
+  var el=document.getElementById('va-response');
+  el.textContent='👩‍💼 '+msgs[Math.floor(Math.random()*msgs.length)];
+  el.style.display='block';
 })();
 
-/* ─── TTS setup ─── */
-var ttsAtivo = true;
-if(window.speechSynthesis) speechSynthesis.getVoices();
-if(window.speechSynthesis) speechSynthesis.onvoiceschanged = function(){ speechSynthesis.getVoices(); };
-
+/* ── TTS ── */
+var ttsAtivo=true;
+if(window.speechSynthesis){speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();}}
 function toggleTTS(){
-  ttsAtivo = !ttsAtivo;
-  document.getElementById('tts-label').textContent = ttsAtivo ? '🔊 Voz ON' : '🔇 Voz OFF';
-  if(!ttsAtivo && window.speechSynthesis) speechSynthesis.cancel();
+  ttsAtivo=!ttsAtivo;
+  document.getElementById('tts-label').textContent=ttsAtivo?'🔊 Voz ON':'🔇 Voz OFF';
+  if(!ttsAtivo&&window.speechSynthesis)speechSynthesis.cancel();
 }
-
 function falar(texto){
-  if(!ttsAtivo || !window.speechSynthesis) return;
+  if(!ttsAtivo||!window.speechSynthesis)return;
   speechSynthesis.cancel();
-  var utter = new SpeechSynthesisUtterance(texto);
-  utter.lang = 'pt-BR';
-  utter.rate = 1.0;
-  utter.pitch = 1.1;
-  utter.volume = 1;
-  var vozes = speechSynthesis.getVoices();
-  var ptVoz = vozes.find(function(v){ return (v.lang==='pt-BR'||v.lang==='pt_BR') && v.name.toLowerCase().includes('female'); });
-  if(!ptVoz) ptVoz = vozes.find(function(v){ return v.lang==='pt-BR'||v.lang==='pt_BR'; });
-  if(ptVoz) utter.voice = ptVoz;
-  utter.onend = function(){ setStatus(''); };
-  speechSynthesis.speak(utter);
+  var u=new SpeechSynthesisUtterance(texto);
+  u.lang='pt-BR';u.rate=1.0;u.pitch=1.1;u.volume=1;
+  var vs=speechSynthesis.getVoices();
+  var v=vs.find(function(x){return(x.lang==='pt-BR'||x.lang==='pt_BR')&&x.name.toLowerCase().includes('female')});
+  if(!v)v=vs.find(function(x){return x.lang==='pt-BR'||x.lang==='pt_BR'});
+  if(v)u.voice=v;
+  u.onend=function(){setStatus('')};
+  speechSynthesis.speak(u);
 }
 
-/* ─── UI helpers ─── */
-function setStatus(msg){
-  document.getElementById('va-status').textContent = msg;
-}
-
-function mostrarResposta(pergunta, resposta){
-  var u = document.getElementById('va-user');
-  var r = document.getElementById('va-response');
-  u.textContent = '🗣️ "' + pergunta + '"';
-  u.style.display = 'block';
-  r.textContent = '🤖 ' + resposta;
-  r.style.display = 'block';
-  document.getElementById('va-loading').style.display = 'none';
-}
-
-function mostrarCarregando(pergunta){
-  var u = document.getElementById('va-user');
-  u.textContent = '🗣️ "' + pergunta + '"';
-  u.style.display = 'block';
-  document.getElementById('va-response').style.display = 'none';
-  document.getElementById('va-loading').style.display = 'block';
-  setStatus('⏳ Consultando a IA...');
-}
-
-/* ─── Enviar pergunta via texto ─── */
+/* ── UI ── */
+function setStatus(m){document.getElementById('va-status').textContent=m}
 function enviarTexto(){
-  var input = document.getElementById('texto-input');
-  var pergunta = (input.value || '').trim();
-  if(!pergunta) return;
-  input.value = '';
-  perguntarIA(pergunta);
+  var inp=document.getElementById('texto-input');
+  var p=(inp.value||'').trim();if(!p)return;inp.value='';perguntarIA(p);
 }
-
-/* ─── Chamar IA ─── */
-async function perguntarIA(pergunta){
-  mostrarCarregando(pergunta);
+function mostrarCarregando(p){
+  var u=document.getElementById('va-user');
+  u.textContent='🗣️ "'+p+'"';u.style.display='block';
+  document.getElementById('va-response').style.display='none';
+  document.getElementById('va-loading').style.display='block';
+  setStatus('⏳ Carla está respondendo...');
+}
+function mostrarResposta(p,resp){
+  var r=document.getElementById('va-response');
+  r.textContent='👩‍💼 '+resp;r.style.display='block';
+  document.getElementById('va-loading').style.display='none';
+  setStatus('');
+}
+async function perguntarIA(p){
+  mostrarCarregando(p);
   try{
-    var resp = await fetch('/api/whatsapp/voice-chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pergunta: pergunta })
+    var r=await fetch('/api/whatsapp/voice-chat',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pergunta:p})
     });
-    if(!resp.ok) throw new Error('HTTP ' + resp.status);
-    var dados = await resp.json();
-    var texto = dados.resposta || 'Não consegui obter uma resposta.';
-    mostrarResposta(pergunta, texto);
-    setStatus('🔊 Falando resposta...');
-    falar(texto);
-  } catch(err){
-    var errMsg = 'Erro ao consultar a IA. Tente novamente.';
-    mostrarResposta(pergunta, errMsg);
-    setStatus('❌ ' + err.message);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var d=await r.json();
+    var txt=d.resposta||'Não consegui obter resposta agora.';
+    mostrarResposta(p,txt);
+    setStatus('🔊 Falando...');
+    falar(txt);
+  }catch(e){
+    mostrarResposta(p,'Eita, tive um problema técnico agora. Tenta de novo?');
+    setStatus('❌ '+e.message);
   }
 }
 
-/* ─── Microfone (STT) ─── */
-var recognition = null;
-var ouvindo = false;
-var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-/* Detectar iframe — mostrar link de nova aba mas NÃO esconder nada */
+/* ── iframe detect ── */
 (function(){
-  var inIframe = false;
-  try { inIframe = window.self !== window.top; } catch(e){ inIframe = true; }
+  var inIframe=false;try{inIframe=window.self!==window.top}catch(e){inIframe=true}
   if(inIframe){
-    var link = window.location.protocol + '//' + window.location.hostname + '/api/whatsapp/panel';
-    document.getElementById('open-link').href = link;
-    document.getElementById('iframe-warn').style.display = 'block';
+    document.getElementById('iframe-warn').style.display='block';
+    document.getElementById('open-link').href=window.location.protocol+'//'+window.location.hostname+'/api/whatsapp/panel';
   }
 })();
 
-function clicarMic(){
-  if(ouvindo){ pararMic(); return; }
-  if(!SpeechRec){
-    setStatus('⚠️ Use o Google Chrome para voz. Ou digite acima.');
-    return;
-  }
-  iniciarMic();
-}
-
+/* ── Mic STT ── */
+var recognition=null,ouvindo=false;
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+function clicarMic(){if(ouvindo){pararMic();return;}if(!SR){setStatus('Use o Chrome para voz. Ou digite acima.');return;}iniciarMic();}
 async function iniciarMic(){
-  try{
-    var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach(function(t){ t.stop(); });
-  } catch(e){
-    setStatus('🚫 Microfone bloqueado — use o campo de texto acima ou abra em nova aba');
-    document.getElementById('iframe-warn').style.display = 'block';
-    return;
-  }
-
-  recognition = new SpeechRec();
-  recognition.lang = 'pt-BR';
-  recognition.continuous = false;
-  recognition.interimResults = true;
-
-  var finalText = '';
-
-  recognition.onstart = function(){
-    ouvindo = true;
-    document.getElementById('mic-btn').textContent = '⏹';
-    document.getElementById('mic-btn').style.background = '#330011';
-    document.getElementById('mic-btn').style.borderColor = '#ff4455';
-    setStatus('🎙️ Ouvindo... clique ⏹ para parar');
-  };
-
-  recognition.onresult = function(e){
-    finalText = '';
-    var interim = '';
-    for(var i = e.resultIndex; i < e.results.length; i++){
-      if(e.results[i].isFinal) finalText += e.results[i][0].transcript;
-      else interim += e.results[i][0].transcript;
-    }
-    if(interim) setStatus('⌛ ' + interim);
-  };
-
-  recognition.onerror = function(e){
-    if(e.error === 'not-allowed') setStatus('🚫 Microfone bloqueado — abra em nova aba');
-    else if(e.error === 'no-speech') setStatus('🔇 Nenhuma fala detectada');
-    else setStatus('❌ Erro: ' + e.error);
-    pararMic();
-  };
-
-  recognition.onend = function(){
-    pararMic();
-    if(finalText.trim()) perguntarIA(finalText.trim());
-  };
-
+  try{var s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(function(t){t.stop()});}
+  catch(e){setStatus('🚫 Microfone bloqueado — use o campo de texto ou abra em nova aba');document.getElementById('iframe-warn').style.display='block';return;}
+  recognition=new SR();recognition.lang='pt-BR';recognition.continuous=false;recognition.interimResults=true;
+  var ft='';
+  recognition.onstart=function(){ouvindo=true;var b=document.getElementById('mic-btn');b.classList.add('listening');b.textContent='⏹';setStatus('🎙️ Ouvindo...')};
+  recognition.onresult=function(e){ft='';var interim='';for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)ft+=e.results[i][0].transcript;else interim+=e.results[i][0].transcript;}if(interim)setStatus('⌛ '+interim);};
+  recognition.onerror=function(e){setStatus(e.error==='not-allowed'?'🚫 Microfone bloqueado':'❌ '+e.error);pararMic();};
+  recognition.onend=function(){pararMic();if(ft.trim())perguntarIA(ft.trim());};
   recognition.start();
 }
-
 function pararMic(){
-  ouvindo = false;
-  var btn = document.getElementById('mic-btn');
-  btn.textContent = '🎤';
-  btn.style.background = 'var(--bg)';
-  btn.style.borderColor = 'var(--border)';
-  try{ if(recognition) recognition.stop(); } catch(e){}
+  ouvindo=false;var b=document.getElementById('mic-btn');b.classList.remove('listening');b.textContent='🎤';
+  try{if(recognition)recognition.stop()}catch(e){}
 }
 
-/* ─── Status polling ─── */
-async function atualizarStatus(){
+/* ── Status polling ── */
+async function pollStatus(){
   try{
-    var d=await fetch('/api/whatsapp/status').then(r=>r.json());
-    var badge=document.getElementById('status-badge');
+    var d=await fetch('/api/whatsapp/status').then(function(r){return r.json()});
+    var pill=document.getElementById('status-pill');
     var body=document.getElementById('status-body');
     var loader=document.getElementById('status-loader');
-
     if(d.status==='conectado'){
-      badge.className='badge on';
-      badge.innerHTML='<span class="dot"></span> WhatsApp Conectado ✅';
-      body.innerHTML=
-        '<div class="num">+'+( d.numero||'...')+'</div>'+
-        '<div class="info-row"><span>Sessões ativas</span><span>'+(d.sessoes||0)+'</span></div>'+
-        '<div class="info-row"><span>Última sync</span><span>'+(d.horario||'—')+'</span></div>';
-      loader.textContent='Bot ativo — atualizando a cada 30s';
-      setTimeout(atualizarStatus,30000);
-    } else if(d.qrCode){
-      badge.className='badge qr';
-      badge.innerHTML='<span class="dot"></span> Escanear QR Code';
-      body.innerHTML=
-        '<div class="qr-box"><img src="'+d.qrCode+'" alt="QR Code"></div>'+
-        '<div class="qr-steps"><b>Como conectar:</b><br>'+
-        '1. Abra o WhatsApp da clínica<br>'+
-        '2. Toque em ⋮ → <b>Dispositivos Vinculados</b><br>'+
-        '3. Toque em <b>Vincular um dispositivo</b><br>'+
-        '4. Aponte a câmera para o QR Code<br>'+
-        '<span class="qr-warn">⚠️ Expira em ~60 segundos — o painel atualiza automaticamente</span></div>';
-      loader.textContent='Aguardando leitura do QR Code...';
-      setTimeout(atualizarStatus,5000);
-    } else {
-      badge.className='badge off';
-      badge.innerHTML='<span class="dot"></span> Aguardando bot...';
-      body.innerHTML='<div style="color:var(--dim);font-size:13px;padding:10px 0">O bot está iniciando.<br>O QR Code aparecerá em instantes.</div>';
-      loader.textContent='Verificando a cada 4s...';
-      setTimeout(atualizarStatus,4000);
+      pill.className='status-pill on';pill.innerHTML='<span class="pulse-dot"></span> WhatsApp Conectado ✅';
+      body.innerHTML='<div class="conn-number">+'+( d.numero||'')+'</div><div class="info-grid"><div class="info-box"><div class="label">Sessões ativas</div><div class="value">'+(d.sessoes||0)+'</div></div><div class="info-box"><div class="label">Última sync</div><div class="value" style="font-size:12px">'+(d.horario||'—')+'</div></div></div>';
+      loader.textContent='Bot ativo';setTimeout(pollStatus,30000);
+    }else if(d.qrCode){
+      pill.className='status-pill qr';pill.innerHTML='<span class="pulse-dot"></span> Escanear QR Code';
+      body.innerHTML='<div class="qr-container"><div class="qr-frame"><img src="'+d.qrCode+'" alt="QR Code"></div><div class="qr-steps"><b>Como conectar:</b><br>1. Abra o WhatsApp da clínica<br>2. Toque em ⋮ → <b>Dispositivos Vinculados</b><br>3. Toque em <b>Vincular um dispositivo</b><br>4. Aponte a câmera para o QR Code<br><span class="qr-warn">⚠️ Expira em ~60s — atualizando automaticamente</span></div></div>';
+      loader.textContent='Aguardando leitura...';setTimeout(pollStatus,5000);
+    }else{
+      pill.className='status-pill off';pill.innerHTML='<span class="pulse-dot"></span> Aguardando bot...';
+      body.innerHTML='<p style="color:rgba(255,255,255,.25);font-size:13px;margin-top:8px">O QR Code aparecerá em instantes...</p>';
+      loader.textContent='';setTimeout(pollStatus,4000);
     }
-  }catch(e){
-    document.getElementById('status-loader').textContent='Erro ao conectar — tentando novamente...';
-    setTimeout(atualizarStatus,5000);
-  }
+  }catch(e){document.getElementById('status-loader').textContent='Erro — tentando reconectar...';setTimeout(pollStatus,5000);}
 }
-atualizarStatus();
+pollStatus();
 
-/* ─── Log neon polling ─── */
-var logVisto=0;
-async function atualizarLog(){
+/* ── Log polling ── */
+async function pollLog(){
   try{
-    var lista=await fetch('/api/whatsapp/activity').then(r=>r.json());
+    var lista=await fetch('/api/whatsapp/activity').then(function(r){return r.json()});
     var body=document.getElementById('log-body');
-    if(!lista||lista.length===0){
-      body.innerHTML='<div class="log-empty">Aguardando atividades...</div>';
-    } else {
-      var html='';
-      lista.forEach(function(e){
-        var cls='log-msg';
-        if(e.tipo==='erro') cls+=' erro';
-        else if(e.tipo==='aviso') cls+=' aviso';
-        else if(e.tipo==='voz'||e.m&&e.m.includes('🎙️')) cls+=' voz';
-        html+='<div class="log-entry"><span class="log-time">['+e.t+']</span><span class="'+cls+'">'+escHtml(e.m)+'</span></div>';
-      });
-      body.innerHTML=html;
-      body.scrollTop=0;
-    }
+    if(!lista||!lista.length){body.innerHTML='<div class="term-empty">Aguardando atividades...</div>';return;}
+    var html='';
+    lista.forEach(function(e){
+      var cls='log-txt';
+      if(e.tipo==='erro')cls+=' erro';
+      else if(e.tipo==='aviso')cls+=' aviso';
+      else if(e.m&&e.m.includes('🎙️'))cls+=' voz';
+      html+='<div class="log-row"><span class="log-ts">['+esc(e.t)+']</span><span class="'+cls+'">'+esc(e.m)+'</span></div>';
+    });
+    body.innerHTML=html;body.scrollTop=0;
   }catch(e){}
-  setTimeout(atualizarLog,3000);
+  setTimeout(pollLog,3000);
 }
-atualizarLog();
-
-function escHtml(s){
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+pollLog();
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 </script>
 </body>
 </html>`);
