@@ -157,8 +157,20 @@ router.get("/panel", (req, res) => {
     <p id="loader">Conectando ao bot...</p>
   </div>
 
+  <!-- ── Aviso de iframe ── -->
+  <div id="iframe-warn" class="voice-card" style="display:none;text-align:center">
+    <div style="font-size:36px;margin-bottom:10px">🔒</div>
+    <h2 style="margin-bottom:8px">Microfone bloqueado pelo iframe</h2>
+    <p style="margin-bottom:16px">Para usar os comandos de voz, abra este painel diretamente em uma aba do navegador:</p>
+    <a id="open-link" href="#" target="_blank"
+       style="display:inline-block;background:#238636;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+      🔗 Abrir Painel em Nova Aba
+    </a>
+    <p style="margin-top:12px;font-size:11px;color:#8b949e">Os atalhos de texto abaixo funcionam normalmente aqui.</p>
+  </div>
+
   <!-- ── Comandos de Voz ── -->
-  <div class="voice-card">
+  <div class="voice-card" id="voice-card-main">
     <h2>🎙️ Comandos de Voz</h2>
     <p>Clique no microfone e fale um comando para o bot executar.</p>
 
@@ -179,6 +191,18 @@ router.get("/panel", (req, res) => {
 </div>
 
 <script>
+/* ── Detecção de iframe: microfone é bloqueado pelo navegador em iframes ── */
+(function() {
+  var inIframe = false;
+  try { inIframe = window.self !== window.top; } catch(e) { inIframe = true; }
+  if (inIframe) {
+    document.getElementById('iframe-warn').style.display = 'block';
+    document.getElementById('voice-card-main').style.display = 'none';
+    var link = window.location.protocol + '//' + window.location.hostname + '/api/whatsapp/panel';
+    document.getElementById('open-link').href = link;
+  }
+})();
+
 /* ── Polling de status ── */
 async function atualizar() {
   try {
