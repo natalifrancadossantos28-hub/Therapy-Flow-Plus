@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { Link } from "wouter";
 import { Html5QrcodeScanner, Html5QrcodeScanType } from "html5-qrcode";
 import { useGetPontoEmployeeByCpf, useCreatePontoRecord, useGetPontoRecords } from "@workspace/api-client-react";
 import { format } from "date-fns";
@@ -246,9 +247,9 @@ export default function KioskPage() {
 
       {/* Admin Link (subtle) */}
       <div className="absolute bottom-8 right-8 z-40">
-        <a href="/admin/login" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+        <Link href="/admin/login" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">
           Acesso Administrativo
-        </a>
+        </Link>
       </div>
 
       <style>{`
