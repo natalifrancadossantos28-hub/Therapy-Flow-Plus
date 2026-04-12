@@ -650,7 +650,8 @@ cron.schedule("0 7 * * 1-5", async () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // BAILEYS — CONEXÃO WHATSAPP
 // ─────────────────────────────────────────────────────────────────────────────
-let _conectando = false; // guard: evita múltiplas conexões simultâneas
+let _conectando  = false; // guard: evita múltiplas conexões simultâneas
+let _connId      = 0;    // ID de conexão: cada socket ignora eventos de sockets anteriores
 
 async function conectarWhatsApp() {
   if (_conectando) {
@@ -658,12 +659,8 @@ async function conectarWhatsApp() {
     return;
   }
   _conectando = true;
-
-  // Fecha socket anterior para evitar acúmulo de event listeners
-  if (sock) {
-    try { sock.end(); } catch(e) {}
-    sock = null;
-  }
+  const myConnId = ++_connId; // ID único desta tentativa de conexão
+  sock = null;
 
   const { state, saveCreds } = await useMultiFileAuthState("./sessao_whatsapp");
   const { version }          = await fetchLatestBaileysVersion();
@@ -679,6 +676,12 @@ async function conectarWhatsApp() {
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
+    // Ignora eventos de sockets de conexões anteriores (evita race condition)
+    if (myConnId !== _connId) {
+      console.log(`⏭️  Evento de conexão obsoleta (${myConnId} vs ${_connId}) — ignorado`);
+      return;
+    }
+
     if (qr) {
       statusConexao  = "conectando";
       qrCodeBase64   = await QRCode.toDataURL(qr);
