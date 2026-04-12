@@ -9,7 +9,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom";
 import { getStatusColor, cn } from "@/lib/utils";
-import { Check, X, CalendarClock, AlertCircle, UserMinus, ChevronRight } from "lucide-react";
+import { Check, X, CalendarClock, AlertCircle, UserMinus, ChevronRight, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
@@ -256,6 +256,54 @@ export default function Reception() {
     query: { enabled: false },
   });
 
+  const handlePrintPDF = () => {
+    const todayStr = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+    const list = [...(appointments || [])].sort((a, b) => a.time.localeCompare(b.time));
+    const morningSlots = ["08:00","08:50","09:40","10:30","11:20"];
+    const afternoonSlots = ["13:10","14:00","14:50","15:40"];
+
+    const aptMap: Record<string, typeof list[0][]> = {};
+    for (const a of list) {
+      if (!aptMap[a.time]) aptMap[a.time] = [];
+      aptMap[a.time].push(a);
+    }
+
+    const w = window.open("", "_blank");
+    if (!w) return;
+
+    const rowHtml = (time: string, isLunch = false) => {
+      if (isLunch) return `<tr><td colspan="4" style="background:#f8fafc;color:#94a3b8;font-style:italic;padding:8px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;">🍽 12:10 — Intervalo de Almoço</td></tr>`;
+      const apts = aptMap[time] || [];
+      if (apts.length === 0)
+        return `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td colspan="3" style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#cbd5e1;font-style:italic;">Livre</td></tr>`;
+      return apts.map(a => `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;font-weight:600;">${a.patientName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.professionalName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.status}</td></tr>`).join("");
+    };
+
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Agenda do Dia</title>
+    <style>body{font-family:Arial,sans-serif;padding:32px;color:#0f172a;}h1{font-size:20px;margin-bottom:4px;}
+    .sub{color:#64748b;font-size:13px;margin-bottom:24px;text-transform:capitalize;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{text-align:left;padding:10px 14px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+    .section{background:#fefce8;color:#92400e;font-size:11px;font-weight:700;padding:8px 14px;border-bottom:1px solid #e2e8f0;text-transform:uppercase;letter-spacing:.05em;}
+    @media print{button{display:none}}</style></head><body>
+    <button onclick="window.print()" style="margin-bottom:20px;padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;">🖨 Imprimir</button>
+    <h1>Atendimentos Terapêuticos – Hoje</h1>
+    <p class="sub">${todayStr}</p>
+    <table>
+      <thead><tr><th>Horário</th><th>Paciente</th><th>Profissional</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td colspan="4" class="section">Período da Manhã</td></tr>
+        ${morningSlots.map(t => rowHtml(t)).join("")}
+        ${rowHtml("12:10", true)}
+        <tr><td colspan="4" class="section">Período da Tarde</td></tr>
+        ${afternoonSlots.map(t => rowHtml(t)).join("")}
+      </tbody>
+    </table>
+    <p style="margin-top:24px;font-size:11px;color:#94a3b8;">Encerramento: 16:30 | NFS – Gestão Terapêutica</p>
+    </body></html>`);
+    w.document.close();
+  };
+
   const handleStatusChange = async (id: number, status: string): Promise<number> => {
     const apt = appointments?.find((a) => a.id === id);
     let newAbsenceCount = apt?.patientAbsenceCount ?? 0;
@@ -322,7 +370,7 @@ export default function Reception() {
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">
           <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="text-sm font-semibold text-muted-foreground">Filtrar:</span>
             <Select
               className="w-48"
@@ -336,6 +384,9 @@ export default function Reception() {
                 </option>
               ))}
             </Select>
+            <Button variant="outline" className="gap-2" onClick={handlePrintPDF}>
+              <Printer className="w-4 h-4" /> Imprimir PDF
+            </Button>
           </div>
         </div>
 

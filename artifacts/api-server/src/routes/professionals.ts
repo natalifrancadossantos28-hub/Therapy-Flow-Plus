@@ -75,6 +75,7 @@ const SCHEDULE_SLOTS = [
   "13:10", "14:00", "14:50", "15:40",
 ];
 const LUNCH_SLOT = "12:10";
+// Encerra às 16:30 (último atendimento 15:40 + 50 min)
 
 router.get("/professionals/:id/schedule", async (req, res) => {
   const id = Number(req.params.id);

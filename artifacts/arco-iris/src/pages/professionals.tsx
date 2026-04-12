@@ -17,6 +17,10 @@ import {
   ChevronRight,
   AlertTriangle,
   CheckCircle2,
+  Lock,
+  ShieldCheck,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -75,6 +79,72 @@ function ProfessionalCapacityCard({ id }: { id: number }) {
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function PinManager({ prof }: { prof: any }) {
+  const [show, setShow] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [showPin, setShowPin] = useState(false);
+  const { toast } = useToast();
+
+  const handleSave = async () => {
+    if (newPin.length !== 4) return;
+    setSaving(true);
+    try {
+      await fetch(`/api/professionals/${prof.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...prof, pin: newPin }),
+      });
+      toast({ title: "PIN atualizado", description: `PIN de ${prof.name} salvo com sucesso.` });
+      setNewPin(""); setShow(false);
+    } catch { toast({ title: "Erro", variant: "destructive", description: "Falha ao salvar o PIN." }); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="mt-4 pt-4 border-t border-border">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+          <Lock className="w-3 h-3" /> PIN de Agenda
+        </span>
+        <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", prof.pin ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+          {prof.pin ? "Definido" : "Não definido"}
+        </span>
+      </div>
+      {prof.pin && !show && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="font-mono text-sm font-bold tracking-widest text-foreground">
+            {showPin ? prof.pin : "••••"}
+          </span>
+          <button onClick={() => setShowPin(v => !v)} className="text-muted-foreground hover:text-foreground transition-colors">
+            {showPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      )}
+      {!show ? (
+        <button onClick={() => setShow(true)} className="text-xs text-primary font-semibold hover:underline">
+          {prof.pin ? "Alterar PIN" : "Definir PIN"}
+        </button>
+      ) : (
+        <div className="flex gap-2 mt-1">
+          <input
+            type="password" maxLength={4}
+            value={newPin}
+            onChange={e => setNewPin(e.target.value.replace(/\D/, ""))}
+            onKeyDown={e => e.key === "Enter" && handleSave()}
+            placeholder="Novo PIN"
+            className="border border-border rounded-lg px-2 py-1.5 w-24 text-center font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <button onClick={handleSave} disabled={newPin.length !== 4 || saving} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-primary text-primary-foreground rounded-lg disabled:opacity-50 hover:bg-primary/90 transition-colors">
+            <ShieldCheck className="w-3 h-3" /> {saving ? "..." : "Salvar"}
+          </button>
+          <button onClick={() => { setShow(false); setNewPin(""); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1">Cancelar</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -170,6 +240,7 @@ export default function Professionals() {
               </div>
 
               <ProfessionalCapacityCard id={prof.id} />
+              <PinManager prof={prof} />
 
               <div className="mt-5 flex gap-2">
                 <Link href={`/professionals/${prof.id}`} className="flex-1">

@@ -7,9 +7,9 @@ import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 
 const TIME_SLOTS = [
-  "07:30", "08:00", "08:50", "09:40", "10:30", "11:20",
+  "08:00", "08:50", "09:40", "10:30", "11:20",
   "12:10",
-  "13:00", "13:50", "14:40", "15:30",
+  "13:10", "14:00", "14:50", "15:40",
 ];
 
 function getWeekDays(ref: Date): Date[] {
