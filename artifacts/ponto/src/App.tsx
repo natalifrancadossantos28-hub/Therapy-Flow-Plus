@@ -6,11 +6,13 @@ import NotFound from "@/pages/not-found";
 
 import KioskPage from "./pages/kiosk";
 import AdminLogin from "./pages/admin/login";
+import Dashboard from "./pages/admin/dashboard/index";
 import EmployeesList from "./pages/admin/employees/index";
 import EmployeeForm from "./pages/admin/employees/form";
 import EmployeeBadge from "./pages/admin/employees/badge";
 import RecordsList from "./pages/admin/records/index";
 import SummaryList from "./pages/admin/summary/index";
+import Reports from "./pages/admin/reports/index";
 
 import { AdminGuard } from "./components/AdminGuard";
 import { AdminLayout } from "./components/AdminLayout";
@@ -20,29 +22,25 @@ const queryClient = new QueryClient();
 function Router() {
   return (
     <Switch>
-      {/* Public Kiosk Route */}
       <Route path="/" component={KioskPage} />
-      
-      {/* Admin Login Route */}
       <Route path="/admin/login" component={AdminLogin} />
-      
-      {/* Protected Admin Routes */}
       <Route path="/admin/*">
         <AdminGuard>
           <AdminLayout>
             <Switch>
+              <Route path="/admin/dashboard" component={Dashboard} />
               <Route path="/admin/employees" component={EmployeesList} />
               <Route path="/admin/employees/new" component={EmployeeForm} />
-              <Route path="/admin/employees/:id" component={EmployeeForm} />
               <Route path="/admin/employees/:id/badge" component={EmployeeBadge} />
+              <Route path="/admin/employees/:id" component={EmployeeForm} />
               <Route path="/admin/records" component={RecordsList} />
               <Route path="/admin/summary" component={SummaryList} />
+              <Route path="/admin/reports" component={Reports} />
               <Route component={NotFound} />
             </Switch>
           </AdminLayout>
         </AdminGuard>
       </Route>
-
       <Route component={NotFound} />
     </Switch>
   );

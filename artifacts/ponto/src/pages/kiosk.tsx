@@ -132,13 +132,16 @@ export default function KioskPage() {
       if (document.getElementById("reader")) {
         const scanner = new Html5QrcodeScanner(
           "reader",
-          { 
-            fps: 10, 
-            qrbox: { width: 300, height: 300 },
+          {
+            fps: 15,
+            qrbox: { width: 280, height: 280 },
             aspectRatio: 1,
             supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
             videoConstraints: {
-              facingMode: "user" // Default to front camera for kiosk, usually
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              advanced: [{ focusMode: "continuous" } as any],
             }
           },
           false
@@ -259,6 +262,10 @@ export default function KioskPage() {
           90% { opacity: 1; }
           100% { top: 100%; opacity: 0; }
         }
+        #reader video {
+          filter: contrast(1.2) brightness(1.05) saturate(0.9) !important;
+          object-fit: cover !important;
+        }
         #reader__dashboard_section_csr span { color: hsl(var(--foreground)) !important; }
         #reader__dashboard_section_swaplink { color: hsl(var(--primary)) !important; text-decoration: none !important; }
         #reader button { 
@@ -270,6 +277,9 @@ export default function KioskPage() {
           font-weight: 500 !important;
           cursor: pointer !important;
         }
+        #reader { background: transparent !important; border: none !important; }
+        #reader__scan_region { background: transparent !important; }
+        #reader__header_message { display: none !important; }
       `}</style>
     </div>
   );

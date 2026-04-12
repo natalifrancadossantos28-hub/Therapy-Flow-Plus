@@ -15,7 +15,7 @@ export default function AdminLogin() {
     e.preventDefault();
     if (password === "admin123") {
       sessionStorage.setItem("nfs_ponto_admin", "true");
-      setLocation("/admin/employees");
+      setLocation("/admin/dashboard");
     } else {
       toast({
         title: "Senha incorreta",

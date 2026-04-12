@@ -1,0 +1,26 @@
+COMANDO DE ATUALIZAÇÃO: NFs - GESTÃO DE PONTO PROFISSIONAL
+​1. Melhoria Radical na Visão (QR Code):
+​Substitua a biblioteca de leitura atual por Html5-QRCode ou Instascan.
+​Force a câmera a usar a resolução máxima disponível.
+​Adicione um Auto-Foco (Focus Mode) contínuo.
+​Aplique um filtro de Nitidez e Contraste no feed da câmera para que ela consiga ler códigos em papel ou telas de celular com reflexo.
+​Adicione um "Bip" sonoro e um flash verde na tela quando a leitura for bem-sucedida.
+​2. Cadastro de Carga Horária:
+​No cadastro do profissional, adicione um campo: "Carga Horária Semanal (horas)" (Ex: 20h, 30h, 44h).
+​Salve esse dado para cada funcionário.
+​3. Dashboard Inteligente e Alertas:
+​Crie um Dashboard Administrativo que mostre:
+​Resumo de Horas: Uma barra de progresso para cada funcionário mostrando quanto das horas semanais ele já cumpriu.
+​Alerta de Extra: Se o funcionário passar da carga horária cadastrada, a barra fica Vermelha.
+​Status em Tempo Real: Uma lista de quem está "Presente" (bateu entrada e não saiu) e quem está "Ausente".
+​4. Relatórios para Contabilidade (Mensal):
+​Crie uma aba "Relatórios" onde eu possa filtrar por Mês e Funcionário.
+​Adicione o botão "Exportar Espelho de Ponto (PDF)".
+​O PDF deve ser um documento profissional com: Logotipo da NFs, Nome do Funcionário, CPF, Horários de Entrada/Saída detalhados dia a dia, Total de Horas do Mês e um campo para assinatura do funcionário e do empregador.
+​5. Visual Premium:
+​Mantenha o Premium Dark Theme (fundo escuro, fontes modernas e bordas neon). Remova qualquer resto de fundo branco que ainda exista no sistema.
+​Como vai funcionar o seu novo Dashboard:
+​Imagine que você cadastrou uma profissional para 20 horas semanais.
+​Na quarta-feira, o sistema já calculou que ela trabalhou 12 horas. No seu Dashboard, vai aparecer uma barra azul em 60%.
+​Se na sexta ela chegar a 22 horas, o sistema vai te mostrar um alerta: "Atenção: Profissional ultrapassou a carga horária em 2 horas".
+​Isso é o que as empresas chamam de Gestão de Banco de Horas, e é um recurso muito caro em outros sistemas!

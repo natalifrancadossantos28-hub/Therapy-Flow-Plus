@@ -11,12 +11,13 @@ router.get("/ponto/employees", async (req, res) => {
 });
 
 router.post("/ponto/employees", async (req, res) => {
-  const { name, cpf, role, photo, active } = req.body;
+  const { name, cpf, role, photo, weeklyHours, active } = req.body;
   const [row] = await db.insert(pontoEmployeesTable).values({
     name,
     cpf: cpf.replace(/\D/g, ""),
     role,
     photo: photo ?? null,
+    weeklyHours: weeklyHours !== undefined ? Number(weeklyHours) : 44,
     active: active !== undefined ? active : true,
   }).returning();
   res.status(201).json(row);
@@ -38,12 +39,13 @@ router.get("/ponto/employees/:id", async (req, res) => {
 
 router.put("/ponto/employees/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { name, cpf, role, photo, active } = req.body;
+  const { name, cpf, role, photo, weeklyHours, active } = req.body;
   const updateData: Record<string, unknown> = {};
   if (name !== undefined) updateData.name = name;
   if (cpf !== undefined) updateData.cpf = cpf.replace(/\D/g, "");
   if (role !== undefined) updateData.role = role;
   if (photo !== undefined) updateData.photo = photo;
+  if (weeklyHours !== undefined) updateData.weeklyHours = Number(weeklyHours);
   if (active !== undefined) updateData.active = active;
 
   const [row] = await db.update(pontoEmployeesTable).set(updateData).where(eq(pontoEmployeesTable.id, id)).returning();

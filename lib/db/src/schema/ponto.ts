@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, date, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -8,6 +8,7 @@ export const pontoEmployeesTable = pgTable("ponto_employees", {
   cpf: text("cpf").notNull().unique(),
   role: text("role").notNull(),
   photo: text("photo"),
+  weeklyHours: integer("weekly_hours").notNull().default(44),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

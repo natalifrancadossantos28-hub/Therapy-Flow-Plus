@@ -6,18 +6,28 @@ import * as z from "zod";
 import { useCreatePontoEmployee, useGetPontoEmployee, useUpdatePontoEmployee, useDeletePontoEmployee, getGetPontoEmployeesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Camera, Upload, Trash2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+
+const WEEKLY_HOURS_OPTIONS = [
+  { value: "20", label: "20 horas" },
+  { value: "30", label: "30 horas" },
+  { value: "36", label: "36 horas" },
+  { value: "40", label: "40 horas" },
+  { value: "44", label: "44 horas (CLT)" },
+];
 
 const formSchema = z.object({
   name: z.string().min(2, "Nome muito curto"),
   cpf: z.string().min(11, "CPF inválido").max(14, "CPF muito longo"),
   role: z.string().min(2, "Cargo muito curto"),
+  weeklyHours: z.number().int().min(1).max(60).default(44),
   photo: z.string().nullable(),
   active: z.boolean().default(true),
 });
@@ -29,12 +39,12 @@ export default function EmployeeForm() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const isNew = !id || id === "new";
   const employeeId = id ? parseInt(id, 10) : 0;
 
-  const { data: employee, isLoading } = useGetPontoEmployee(employeeId, { 
-    query: { enabled: !isNew } 
+  const { data: employee, isLoading } = useGetPontoEmployee(employeeId, {
+    query: { enabled: !isNew }
   });
 
   const createMutation = useCreatePontoEmployee();
@@ -51,6 +61,7 @@ export default function EmployeeForm() {
       name: "",
       cpf: "",
       role: "",
+      weeklyHours: 44,
       photo: null,
       active: true,
     }
@@ -62,7 +73,8 @@ export default function EmployeeForm() {
         name: employee.name,
         cpf: employee.cpf,
         role: employee.role,
-        photo: employee.photo,
+        weeklyHours: employee.weeklyHours ?? 44,
+        photo: employee.photo ?? null,
         active: employee.active,
       });
     }
@@ -157,7 +169,9 @@ export default function EmployeeForm() {
     }
   };
 
-  if (isLoading && !isNew) return <div>Carregando...</div>;
+  if (isLoading && !isNew) return (
+    <div className="flex items-center justify-center h-64 text-muted-foreground">Carregando...</div>
+  );
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -186,10 +200,10 @@ export default function EmployeeForm() {
         <CardContent className="p-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              
-              {/* Photo Section */}
+
+              {/* Photo */}
               <div className="flex flex-col items-center space-y-4">
-                <div className="w-48 h-48 rounded-full overflow-hidden bg-secondary border-4 border-border relative group">
+                <div className="w-48 h-48 rounded-full overflow-hidden bg-secondary border-4 border-border relative">
                   {useWebcam ? (
                     <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
                   ) : form.watch("photo") ? (
@@ -201,7 +215,6 @@ export default function EmployeeForm() {
                     </div>
                   )}
                 </div>
-
                 <div className="flex gap-2">
                   {useWebcam ? (
                     <>
@@ -217,12 +230,7 @@ export default function EmployeeForm() {
                         <Button type="button" variant="outline" className="border-white/10">
                           <Upload className="w-4 h-4 mr-2" /> Enviar Arquivo
                         </Button>
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                          onChange={handleFileUpload} 
-                        />
+                        <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleFileUpload} />
                       </div>
                       {form.watch("photo") && (
                         <Button type="button" variant="ghost" onClick={() => form.setValue("photo", null)}>
@@ -235,65 +243,75 @@ export default function EmployeeForm() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome Completo</FormLabel>
+                <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome Completo</FormLabel>
+                    <FormControl><Input {...field} className="bg-background/50 border-white/10" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="cpf" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF</FormLabel>
+                    <FormControl><Input {...field} placeholder="000.000.000-00" className="bg-background/50 border-white/10" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="role" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cargo</FormLabel>
+                    <FormControl><Input {...field} placeholder="Ex: Fisioterapeuta" className="bg-background/50 border-white/10" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="weeklyHours" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Carga Horária Semanal</FormLabel>
+                    <Select
+                      value={String(field.value)}
+                      onValueChange={v => field.onChange(Number(v))}
+                    >
                       <FormControl>
-                        <Input {...field} className="bg-background/50" />
+                        <SelectTrigger className="bg-background/50 border-white/10">
+                          <SelectValue placeholder="Selecione a carga horária" />
+                        </SelectTrigger>
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="cpf"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CPF</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="000.000.000-00" className="bg-background/50" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cargo</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Ex: Fisioterapeuta" className="bg-background/50" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="active"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 p-4 bg-background/30">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Ativo</FormLabel>
-                        <CardDescription>
-                          Funcionário pode registrar ponto
-                        </CardDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                      <SelectContent>
+                        {WEEKLY_HOURS_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                        <SelectItem value="custom">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {!WEEKLY_HOURS_OPTIONS.find(o => o.value === String(field.value)) && (
+                      <Input
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={field.value}
+                        onChange={e => field.onChange(Number(e.target.value))}
+                        className="mt-2 bg-background/50 border-white/10"
+                        placeholder="Horas por semana"
+                      />
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="active" render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 p-4 bg-background/30 md:col-span-2">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Ativo</FormLabel>
+                      <CardDescription>Funcionário pode registrar ponto</CardDescription>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )} />
               </div>
 
               <div className="flex justify-end gap-4 pt-4 border-t border-white/10">
