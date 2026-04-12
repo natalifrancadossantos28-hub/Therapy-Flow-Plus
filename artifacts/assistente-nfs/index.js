@@ -56,7 +56,7 @@ async function buscarPacientePorTelefone(telefone) {
     `SELECT p.*, prof.name AS professional_name, prof.specialty, prof.phone AS professional_phone
        FROM patients p
        LEFT JOIN professionals prof ON p.professional_id = prof.id
-      WHERE company_id = $1
+      WHERE p.company_id = $1
         AND REGEXP_REPLACE(COALESCE(p.guardian_phone,''), '[^0-9]', '', 'g') LIKE '%' || $2
       LIMIT 1`,
     [COMPANY_ID, sufixo]
@@ -583,13 +583,13 @@ async function conectarWhatsApp() {
   });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== "notify") return;
+    console.log(`🔔 [upsert] type=${type} count=${messages.length}`);
     for (const msg of messages) {
-      if (msg.key.fromMe) continue;
-      if (!msg.message) continue;
+      if (msg.key.fromMe) { console.log("  ⏭️  fromMe, ignorando"); continue; }
+      if (!msg.message)   { console.log("  ⏭️  sem .message, ignorando"); continue; }
 
       const jid = msg.key.remoteJid;
-      if (!jid || jid.includes("status@")) continue;
+      if (!jid || jid.includes("status@")) { console.log(`  ⏭️  jid inválido: ${jid}`); continue; }
 
       const texto = (
         msg.message.conversation ||
@@ -605,15 +605,16 @@ async function conectarWhatsApp() {
         msg.message.audioMessage
       );
 
-      if (!texto && !temAnexo) continue;
+      console.log(`  📩 [${jid}] texto="${texto}" temAnexo=${temAnexo}`);
 
-      console.log(`📩 [${jid}] ${texto || "(anexo)"}`);
+      if (!texto && !temAnexo) { console.log("  ⏭️  sem texto nem anexo, ignorando"); continue; }
 
       try {
         const resposta = await processarMensagem(jid, texto || "(arquivo enviado)", temAnexo);
+        console.log(`  ✉️  resposta=${resposta?.substring(0, 60)}`);
         if (resposta) await enviar(jid, resposta);
       } catch (err) {
-        console.error(`❌ Erro ao processar mensagem de ${jid}:`, err.message);
+        console.error(`  ❌ Erro processarMensagem: ${err.message}`, err.stack?.split("\n")[1]);
       }
     }
   });
@@ -671,6 +672,22 @@ app.post("/webhook/campanha", async (req, res) => {
     res.json({ ok: true, enviados });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Teste: simular mensagem recebida
+app.post(["/test-msg", "/assistente-nfs/test-msg"], async (req, res) => {
+  try {
+    const { numero, mensagem } = req.body;
+    if (!numero || !mensagem) return res.status(400).json({ error: "numero e mensagem obrigatorios" });
+    const jid = numeroParaJid(numero);
+    console.log(`🧪 [TESTE] Simulando mensagem de ${jid}: "${mensagem}"`);
+    const resposta = await processarMensagem(jid, mensagem, false);
+    console.log(`🧪 [TESTE] Resposta: ${resposta?.substring(0, 100)}`);
+    res.json({ ok: true, resposta });
+  } catch (err) {
+    console.error("🧪 [TESTE] Erro:", err.message, err.stack);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
