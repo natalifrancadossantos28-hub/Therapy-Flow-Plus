@@ -287,7 +287,10 @@ export default function Reception() {
     th{text-align:left;padding:10px 14px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
     .section{background:#fefce8;color:#92400e;font-size:11px;font-weight:700;padding:8px 14px;border-bottom:1px solid #e2e8f0;text-transform:uppercase;letter-spacing:.05em;}
     @media print{button{display:none}}</style></head><body>
-    <button onclick="window.print()" style="margin-bottom:20px;padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;">🖨 Imprimir</button>
+    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
+      <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
+      <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
+    </div>
     <h1>Atendimentos Terapêuticos – Hoje</h1>
     <p class="sub">${todayStr}</p>
     <table>

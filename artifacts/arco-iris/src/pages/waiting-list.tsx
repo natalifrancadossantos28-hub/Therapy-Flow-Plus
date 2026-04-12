@@ -110,9 +110,9 @@ export default function WaitingList() {
                       <td className="px-6 py-4 font-display font-bold text-lg text-primary">#{idx + 1}</td>
                       <td className="px-6 py-4 font-semibold text-foreground">
                         {entry.patientName}
-                        {e.patientProntuario && (
-                          <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">{e.patientProntuario}</div>
-                        )}
+                        <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">
+                          {e.patientProntuario || `#${String(entry.patientId).padStart(4, "0")}`}
+                        </div>
                         {entry.patientPhone && (
                           <div className="text-xs text-muted-foreground font-normal mt-0.5">{entry.patientPhone}</div>
                         )}

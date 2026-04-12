@@ -98,16 +98,21 @@ export default function AgendaProfissionais() {
         .sub{color:#6b7280;font-size:14px;margin-bottom:24px;}
         table{width:100%;border-collapse:collapse;font-size:14px;}
         th{text-align:left;padding:10px 12px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:12px;text-transform:uppercase;letter-spacing:.05em;}
-        @media print{button{display:none}}
+        .section-row td{background:#fefce8;color:#92400e;font-size:11px;font-weight:700;padding:8px 12px;border-bottom:1px solid #e5e7eb;text-transform:uppercase;letter-spacing:.05em;}
+        .lunch-row td{background:#f1f5f9;color:#64748b;font-style:italic;padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;}
+        @media print{.no-print{display:none}}
       </style>
     </head><body>
-      <button onclick="window.print()" style="margin-bottom:20px;padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
+      <div class="no-print" style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
+        <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
+        <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
+      </div>
       <h1>${doc.title}</h1>
       <p class="sub">${doc.date} • ${selectedProf?.specialty}</p>
       <table>
         <thead><tr><th>Horário</th><th>Paciente</th><th>Status</th></tr></thead>
         <tbody>
-          <tr><td colspan="3" style="padding:8px 12px;background:#fef9c3;color:#854d0e;font-style:italic;border-bottom:1px solid #e5e7eb;">07:30 – 12:10 — Período da Manhã</td></tr>
+          <tr class="section-row"><td colspan="3">Período da Manhã — 08:00 às 11:20</td></tr>
           ${TIME_SLOTS.filter(t => t < "12:10").map(time => {
             const apt = todayApts.find(a => a.time === time);
             return `<tr>
@@ -116,8 +121,8 @@ export default function AgendaProfissionais() {
               <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? apt.status : ""}</td>
             </tr>`;
           }).join("")}
-          <tr><td colspan="3" style="padding:8px 12px;background:#f1f5f9;color:#64748b;font-style:italic;border-bottom:1px solid #e5e7eb;">12:10 — Almoço</td></tr>
-          <tr><td colspan="3" style="padding:8px 12px;background:#fef9c3;color:#854d0e;font-style:italic;border-bottom:1px solid #e5e7eb;">13:00 – 15:30 — Período da Tarde</td></tr>
+          <tr class="lunch-row"><td colspan="3">🍽 12:10 — Intervalo de Almoço</td></tr>
+          <tr class="section-row"><td colspan="3">Período da Tarde — 13:10 às 15:40</td></tr>
           ${TIME_SLOTS.filter(t => t > "12:10").map(time => {
             const apt = todayApts.find(a => a.time === time);
             return `<tr>
@@ -128,6 +133,7 @@ export default function AgendaProfissionais() {
           }).join("")}
         </tbody>
       </table>
+      <p style="margin-top:24px;font-size:11px;color:#94a3b8;">Encerramento: 16:30 | NFS – Gestão Terapêutica</p>
     </body></html>`);
     printWindow.document.close();
   };
