@@ -430,22 +430,40 @@ body{
 
 /* ── TTS ── */
 var ttsAtivo=true;
-if(window.speechSynthesis){speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();}}
+var vozCache=null;
+function carregarVoz(){
+  if(!window.speechSynthesis)return;
+  var vs=speechSynthesis.getVoices();
+  if(!vs.length)return;
+  /* Prioridade: vozes femininas BR conhecidas → qualquer pt-BR → qualquer pt */
+  var prioridade=[
+    function(x){return(x.lang==='pt-BR'||x.lang==='pt_BR')&&/luciana|vitoria|francisca|edith/i.test(x.name)},
+    function(x){return(x.lang==='pt-BR'||x.lang==='pt_BR')&&/female|feminino|woman|f\b/i.test(x.name)},
+    function(x){return(x.lang==='pt-BR'||x.lang==='pt_BR')&&!/male|masculino|man|m\b/i.test(x.name)},
+    function(x){return x.lang==='pt-BR'||x.lang==='pt_BR'},
+    function(x){return x.lang.startsWith('pt')}
+  ];
+  for(var i=0;i<prioridade.length;i++){var v=vs.find(prioridade[i]);if(v){vozCache=v;break;}}
+}
+if(window.speechSynthesis){
+  speechSynthesis.onvoiceschanged=carregarVoz;
+  carregarVoz();
+  setTimeout(carregarVoz,500);
+}
 function toggleTTS(){
   ttsAtivo=!ttsAtivo;
   document.getElementById('tts-label').textContent=ttsAtivo?'🔊 Voz ON':'🔇 Voz OFF';
   if(!ttsAtivo&&window.speechSynthesis)speechSynthesis.cancel();
 }
-function falar(texto){
-  if(!ttsAtivo||!window.speechSynthesis)return;
+function falar(texto,callback){
+  if(!ttsAtivo||!window.speechSynthesis){if(callback)callback();return;}
   speechSynthesis.cancel();
   var u=new SpeechSynthesisUtterance(texto);
-  u.lang='pt-BR';u.rate=1.0;u.pitch=1.1;u.volume=1;
-  var vs=speechSynthesis.getVoices();
-  var v=vs.find(function(x){return(x.lang==='pt-BR'||x.lang==='pt_BR')&&x.name.toLowerCase().includes('female')});
-  if(!v)v=vs.find(function(x){return x.lang==='pt-BR'||x.lang==='pt_BR'});
-  if(v)u.voice=v;
-  u.onend=function(){setStatus('')};
+  u.lang='pt-BR';u.rate=1.15;u.pitch=1.2;u.volume=1;
+  carregarVoz();
+  if(vozCache)u.voice=vozCache;
+  u.onend=function(){setStatus('');if(callback)callback();};
+  u.onerror=function(){if(callback)callback();};
   speechSynthesis.speak(u);
 }
 
@@ -470,6 +488,7 @@ function mostrarResposta(p,resp){
 }
 async function perguntarIA(p){
   mostrarCarregando(p);
+  var reiniciarDepois=modoConversa;
   try{
     var r=await fetch('/api/whatsapp/voice-chat',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -480,10 +499,16 @@ async function perguntarIA(p){
     var txt=d.resposta||'Não consegui obter resposta agora.';
     mostrarResposta(p,txt);
     setStatus('🔊 Falando...');
-    falar(txt);
+    falar(txt,function(){
+      if(reiniciarDepois&&modoConversa){
+        setStatus('🎙️ Ouvindo novamente...');
+        setTimeout(iniciarMic,400);
+      }
+    });
   }catch(e){
     mostrarResposta(p,'Eita, tive um problema técnico agora. Tenta de novo?');
     setStatus('❌ '+e.message);
+    if(reiniciarDepois&&modoConversa)setTimeout(iniciarMic,1000);
   }
 }
 
@@ -497,23 +522,52 @@ async function perguntarIA(p){
 })();
 
 /* ── Mic STT ── */
-var recognition=null,ouvindo=false;
+var recognition=null,ouvindo=false,modoConversa=false,micPermitido=false;
 var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-function clicarMic(){if(ouvindo){pararMic();return;}if(!SR){setStatus('Use o Chrome para voz. Ou digite acima.');return;}iniciarMic();}
+function clicarMic(){
+  if(!SR){setStatus('Use o Chrome ou Edge para voz. Ou digite acima.');return;}
+  if(ouvindo){modoConversa=false;pararMic();return;}
+  modoConversa=true;
+  iniciarMic();
+}
 async function iniciarMic(){
-  try{var s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(function(t){t.stop()});}
-  catch(e){setStatus('🚫 Microfone bloqueado — use o campo de texto ou abra em nova aba');document.getElementById('iframe-warn').style.display='block';return;}
-  recognition=new SR();recognition.lang='pt-BR';recognition.continuous=false;recognition.interimResults=true;
+  if(!micPermitido){
+    try{var s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(function(t){t.stop()});micPermitido=true;}
+    catch(e){setStatus('🚫 Microfone bloqueado — abra em nova aba ou permita nas configurações do Chrome');document.getElementById('iframe-warn').style.display='block';modoConversa=false;return;}
+  }
+  if(recognition){try{recognition.abort();}catch(e){}}
+  recognition=new SR();
+  recognition.lang='pt-BR';
+  recognition.continuous=false;
+  recognition.interimResults=true;
   var ft='';
-  recognition.onstart=function(){ouvindo=true;var b=document.getElementById('mic-btn');b.classList.add('listening');b.textContent='⏹';setStatus('🎙️ Ouvindo...')};
-  recognition.onresult=function(e){ft='';var interim='';for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)ft+=e.results[i][0].transcript;else interim+=e.results[i][0].transcript;}if(interim)setStatus('⌛ '+interim);};
-  recognition.onerror=function(e){setStatus(e.error==='not-allowed'?'🚫 Microfone bloqueado':'❌ '+e.error);pararMic();};
-  recognition.onend=function(){pararMic();if(ft.trim())perguntarIA(ft.trim());};
-  recognition.start();
+  recognition.onstart=function(){ouvindo=true;var b=document.getElementById('mic-btn');b.classList.add('listening');b.textContent='⏹';setStatus('🎙️ Ouvindo — clique para parar');};
+  recognition.onresult=function(e){
+    ft='';var interim='';
+    for(var i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal)ft+=e.results[i][0].transcript;
+      else interim+=e.results[i][0].transcript;
+    }
+    if(interim)setStatus('⌛ "'+interim+'"');
+  };
+  recognition.onerror=function(e){
+    if(e.error==='no-speech'){if(modoConversa){setTimeout(iniciarMic,300);}return;}
+    setStatus(e.error==='not-allowed'?'🚫 Microfone bloqueado':'❌ Erro mic: '+e.error);
+    modoConversa=false;pararMic();
+  };
+  recognition.onend=function(){
+    ouvindo=false;
+    var b=document.getElementById('mic-btn');b.classList.remove('listening');b.textContent='🎤';
+    if(ft.trim()){perguntarIA(ft.trim());}
+    else if(modoConversa){setTimeout(iniciarMic,200);}
+  };
+  try{recognition.start();}catch(e){setTimeout(iniciarMic,500);}
 }
 function pararMic(){
-  ouvindo=false;var b=document.getElementById('mic-btn');b.classList.remove('listening');b.textContent='🎤';
-  try{if(recognition)recognition.stop()}catch(e){}
+  ouvindo=false;modoConversa=false;
+  var b=document.getElementById('mic-btn');b.classList.remove('listening');b.textContent='🎤';
+  try{if(recognition)recognition.abort();}catch(e){}
+  setStatus('');
 }
 
 /* ── Status polling ── */
