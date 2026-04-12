@@ -20,7 +20,7 @@ const {
 // ─────────────────────────────────────────────────────────────────────────────
 const app        = express();
 const PORT       = process.env.PORT || 3001;
-const COMPANY_ID = parseInt(process.env.COMPANY_ID || "2");  // arco-iris-ibiuna
+const COMPANY_ID = parseInt(process.env.COMPANY_ID || "1");  // usa company_id=1 onde os dados estão
 
 const CLINICA_NOME     = "NFs gestão";
 const CLINICA_ENDERECO = "R. Antônieta Corrêa dos Santos, 46 - Parque Bela Vista, Votorantim";
@@ -187,6 +187,18 @@ async function buscarEstatisticas() {
   );
   const wl = await query(`SELECT COUNT(*) AS total FROM waiting_list WHERE company_id=$1`, [COMPANY_ID]);
   return { ...rows[0], fila_espera: wl[0]?.total || 0 };
+}
+
+async function buscarTodosPacientes() {
+  return query(
+    `SELECT p.name, p.guardian_name, p.guardian_phone, p.status, p.absence_count,
+            prof.name AS profissional, prof.specialty
+     FROM patients p
+     LEFT JOIN professionals prof ON prof.id = p.professional_id AND prof.company_id = $1
+     WHERE p.company_id = $1
+     ORDER BY p.name`,
+    [COMPANY_ID]
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -821,12 +833,13 @@ app.post(["/voice-chat", "/assistente-nfs/voice-chat"], async (req, res) => {
     const dataFormatada = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
     // Busca em paralelo todos os dados do Arco-Íris
-    const [consultasHoje, profissionais, filaEspera, pacientesComFaltas, stats] = await Promise.all([
+    const [consultasHoje, profissionais, filaEspera, pacientesComFaltas, stats, todosPacientes] = await Promise.all([
       buscarConsultasData(hoje),
       buscarProfissionais(),
       buscarFilaEspera(),
       buscarPacientesComFaltas(),
       buscarEstatisticas(),
+      buscarTodosPacientes(),
     ]);
 
     // ── Agenda de hoje ──
@@ -853,6 +866,13 @@ app.post(["/voice-chat", "/assistente-nfs/voice-chat"], async (req, res) => {
       ? "Nenhum paciente com faltas registradas."
       : pacientesComFaltas.map(p =>
           `  ${p.name}: ${p.absence_count} falta(s) | ${p.profissional || "sem profissional"} | Responsável: ${p.guardian_name || "–"}`
+        ).join("\n");
+
+    // ── Todos os pacientes cadastrados ──
+    const resumoTodosPacientes = todosPacientes.length === 0
+      ? "Nenhum paciente cadastrado."
+      : todosPacientes.map(p =>
+          `  ${p.name} | Status: ${p.status} | Profissional: ${p.profissional || "–"} (${p.specialty || "–"}) | Responsável: ${p.guardian_name || "–"} | Tel: ${p.guardian_phone || "–"} | Faltas: ${p.absence_count || 0}`
         ).join("\n");
 
     const prompt = `Você é a Carla, recepcionista da Clínica NFs gestão em Votorantim.
@@ -885,6 +905,9 @@ ${resumoFila}
 
 ⚠️ PACIENTES COM FALTAS:
 ${resumoFaltas}
+
+👥 TODOS OS PACIENTES CADASTRADOS (${todosPacientes.length} total):
+${resumoTodosPacientes}
 
 ═══════════════════════════════════════
 
