@@ -5,11 +5,12 @@ import { eq, and, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "alta" | "media" | "baixa" {
-  const vulnScore = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0);
-  if (triagemScore >= 65 || vulnScore >= 2) return "alta";
-  if (triagemScore >= 35 || vulnScore >= 1) return "media";
-  return "baixa";
+function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "elevado" | "moderado" | "leve" | "baixo" {
+  const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
+  const baseIdx = triagemScore >= 270 ? 3 : triagemScore >= 180 ? 2 : triagemScore >= 90 ? 1 : 0;
+  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0);
+  const idx = Math.min(3, baseIdx + vuln);
+  return levels[idx];
 }
 
 router.get("/patients", async (req, res) => {
@@ -33,6 +34,11 @@ router.get("/patients", async (req, res) => {
     entryDate: patientsTable.entryDate,
     absenceCount: patientsTable.absenceCount,
     triagemScore: patientsTable.triagemScore,
+    scorePsicologia: patientsTable.scorePsicologia,
+    scorePsicomotricidade: patientsTable.scorePsicomotricidade,
+    scoreFisioterapia: patientsTable.scoreFisioterapia,
+    scorePsicopedagogia: patientsTable.scorePsicopedagogia,
+    scoreEdFisica: patientsTable.scoreEdFisica,
     escolaPublica: patientsTable.escolaPublica,
     trabalhoNaRoca: patientsTable.trabalhoNaRoca,
     createdAt: patientsTable.createdAt,
@@ -78,6 +84,11 @@ router.post("/patients", async (req, res) => {
     entryDate,
     absenceCount: 0,
     triagemScore: body.triagemScore !== undefined ? Number(body.triagemScore) : null,
+    scorePsicologia: body.scorePsicologia !== undefined ? Number(body.scorePsicologia) : null,
+    scorePsicomotricidade: body.scorePsicomotricidade !== undefined ? Number(body.scorePsicomotricidade) : null,
+    scoreFisioterapia: body.scoreFisioterapia !== undefined ? Number(body.scoreFisioterapia) : null,
+    scorePsicopedagogia: body.scorePsicopedagogia !== undefined ? Number(body.scorePsicopedagogia) : null,
+    scoreEdFisica: body.scoreEdFisica !== undefined ? Number(body.scoreEdFisica) : null,
     escolaPublica: body.escolaPublica !== undefined ? Boolean(body.escolaPublica) : null,
     trabalhoNaRoca: body.trabalhoNaRoca !== undefined ? Boolean(body.trabalhoNaRoca) : null,
   }).returning();
@@ -113,6 +124,11 @@ router.put("/patients/:id", async (req, res) => {
   if (body.status !== undefined) updateData.status = body.status;
   if (body.entryDate !== undefined) updateData.entryDate = body.entryDate;
   if (body.triagemScore !== undefined) updateData.triagemScore = body.triagemScore !== null ? Number(body.triagemScore) : null;
+  if (body.scorePsicologia !== undefined) updateData.scorePsicologia = body.scorePsicologia !== null ? Number(body.scorePsicologia) : null;
+  if (body.scorePsicomotricidade !== undefined) updateData.scorePsicomotricidade = body.scorePsicomotricidade !== null ? Number(body.scorePsicomotricidade) : null;
+  if (body.scoreFisioterapia !== undefined) updateData.scoreFisioterapia = body.scoreFisioterapia !== null ? Number(body.scoreFisioterapia) : null;
+  if (body.scorePsicopedagogia !== undefined) updateData.scorePsicopedagogia = body.scorePsicopedagogia !== null ? Number(body.scorePsicopedagogia) : null;
+  if (body.scoreEdFisica !== undefined) updateData.scoreEdFisica = body.scoreEdFisica !== null ? Number(body.scoreEdFisica) : null;
   if (body.escolaPublica !== undefined) updateData.escolaPublica = body.escolaPublica !== null ? Boolean(body.escolaPublica) : null;
   if (body.trabalhoNaRoca !== undefined) updateData.trabalhoNaRoca = body.trabalhoNaRoca !== null ? Boolean(body.trabalhoNaRoca) : null;
 

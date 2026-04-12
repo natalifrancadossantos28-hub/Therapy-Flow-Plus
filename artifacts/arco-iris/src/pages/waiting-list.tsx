@@ -19,7 +19,15 @@ async function apiAddToFila(patientId: number, professionalId: number | null) {
   return json;
 }
 
-const PRIORITY_LABEL: Record<string, string> = { alta: "ALTA", media: "MÉDIA", baixa: "BAIXA" };
+const PRIORITY_LABEL: Record<string, string> = {
+  elevado: "VERMELHO – Elevado",
+  moderado: "LARANJA – Moderado",
+  leve: "AZUL – Leve",
+  baixo: "VERDE – Baixo",
+  alta: "VERMELHO – Elevado",
+  media: "LARANJA – Moderado",
+  baixa: "VERDE – Baixo",
+};
 
 export default function WaitingList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -93,14 +101,15 @@ export default function WaitingList() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary/40 border border-border rounded-xl px-4 py-2.5">
-        <span className="font-semibold">Ordenação automática por prioridade:</span>
-        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold border border-rose-200">ALTA</span>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground bg-secondary/40 border border-border rounded-xl px-4 py-2.5">
+        <span className="font-semibold">Ordenação por prioridade:</span>
+        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold border border-rose-200">VERMELHO – Elevado</span>
         <span className="text-muted-foreground">→</span>
-        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold border border-amber-200">MÉDIA</span>
+        <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold border border-orange-200">LARANJA – Moderado</span>
         <span className="text-muted-foreground">→</span>
-        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">BAIXA</span>
-        <span className="ml-2 text-muted-foreground">• Prioridade calculada automaticamente na triagem</span>
+        <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-bold border border-sky-200">AZUL – Leve</span>
+        <span className="text-muted-foreground">→</span>
+        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">VERDE – Baixo</span>
       </div>
 
       <Card className="p-0 overflow-hidden">
@@ -187,7 +196,7 @@ export default function WaitingList() {
                     const score = (p as any).triagemScore;
                     return (
                       <option key={p.id} value={p.id}>
-                        {p.name} — Score: {score}/100
+                        {p.name} — Score: {score}/360
                       </option>
                     );
                   })}

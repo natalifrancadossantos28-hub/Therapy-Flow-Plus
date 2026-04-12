@@ -17,19 +17,25 @@ import { cn, getStatusColor, formatDate } from "@/lib/utils";
 import { AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 
-function calcPriority(score: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "alta" | "media" | "baixa" {
+function calcPriority(score: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "elevado" | "moderado" | "leve" | "baixo" {
+  const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
+  const baseIdx = score >= 270 ? 3 : score >= 180 ? 2 : score >= 90 ? 1 : 0;
   const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0);
-  if (score >= 65 || vuln >= 2) return "alta";
-  if (score >= 35 || vuln >= 1) return "media";
-  return "baixa";
+  return levels[Math.min(3, baseIdx + vuln)];
 }
 
 const PRIORITY_STYLE: Record<string, string> = {
-  alta: "bg-rose-100 text-rose-800 border-rose-300",
-  media: "bg-amber-100 text-amber-800 border-amber-300",
-  baixa: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  elevado: "bg-rose-100 text-rose-800 border-rose-300",
+  moderado: "bg-orange-100 text-orange-800 border-orange-300",
+  leve: "bg-sky-100 text-sky-800 border-sky-300",
+  baixo: "bg-emerald-100 text-emerald-800 border-emerald-300",
 };
-const PRIORITY_LABEL: Record<string, string> = { alta: "ALTA", media: "MÉDIA", baixa: "BAIXA" };
+const PRIORITY_LABEL: Record<string, string> = {
+  elevado: "VERMELHO – Elevado",
+  moderado: "LARANJA – Moderado",
+  leve: "AZUL – Leve",
+  baixo: "VERDE – Baixo",
+};
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
 
@@ -70,7 +76,11 @@ export default function PatientDetail() {
   const { refetch: checkVacancy } = useGetProfessionalVacancyAlert(patient?.professionalId || 0, { query: { enabled: false } });
 
   const [triagemEdit, setTriagemEdit] = useState(false);
-  const [triagemScore, setTriagemScore] = useState("");
+  const [sPsicologia, setSPsicologia] = useState("");
+  const [sPsicomotricidade, setSPsicomotricidade] = useState("");
+  const [sFisioterapia, setSFisioterapia] = useState("");
+  const [sPsicopedagogia, setSPsicopedagogia] = useState("");
+  const [sEdFisica, setSEdFisica] = useState("");
   const [escolaPublica, setEscolaPublica] = useState<boolean | null>(null);
   const [trabalhoNaRoca, setTrabalhoNaRoca] = useState<boolean | null>(null);
   const [savingTriagem, setSavingTriagem] = useState(false);
@@ -105,30 +115,44 @@ export default function PatientDetail() {
     }
   };
 
+  const p = patient as any;
+  const totalScore = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica]
+    .reduce((acc, v) => acc + (parseInt(v) || 0), 0);
+
   const openTriagemEdit = () => {
-    setTriagemScore(patient?.triagemScore != null ? String(patient.triagemScore) : "");
-    setEscolaPublica(patient?.escolaPublica ?? null);
-    setTrabalhoNaRoca(patient?.trabalhoNaRoca ?? null);
+    setSPsicologia(p?.scorePsicologia != null ? String(p.scorePsicologia) : "");
+    setSPsicomotricidade(p?.scorePsicomotricidade != null ? String(p.scorePsicomotricidade) : "");
+    setSFisioterapia(p?.scoreFisioterapia != null ? String(p.scoreFisioterapia) : "");
+    setSPsicopedagogia(p?.scorePsicopedagogia != null ? String(p.scorePsicopedagogia) : "");
+    setSEdFisica(p?.scoreEdFisica != null ? String(p.scoreEdFisica) : "");
+    setEscolaPublica(p?.escolaPublica ?? null);
+    setTrabalhoNaRoca(p?.trabalhoNaRoca ?? null);
     setTriagemEdit(true);
   };
 
   const saveTriagem = async () => {
-    const score = parseInt(triagemScore);
-    if (isNaN(score) || score < 0 || score > 100) {
-      toast({ title: "Score inválido", description: "Informe um valor entre 0 e 100.", variant: "destructive" });
+    const scores = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica].map(v => parseInt(v) || 0);
+    if (scores.some(s => s < 0 || s > 72)) {
+      toast({ title: "Score inválido", description: "Cada área deve ter um valor entre 0 e 72.", variant: "destructive" });
       return;
     }
+    const total = scores.reduce((a, b) => a + b, 0);
     setSavingTriagem(true);
     try {
       await apiPatch(`/api/patients/${patientId}`, {
-        triagemScore: score,
+        triagemScore: total,
+        scorePsicologia: scores[0],
+        scorePsicomotricidade: scores[1],
+        scoreFisioterapia: scores[2],
+        scorePsicopedagogia: scores[3],
+        scoreEdFisica: scores[4],
         escolaPublica: escolaPublica ?? false,
         trabalhoNaRoca: trabalhoNaRoca ?? false,
       });
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       setTriagemEdit(false);
-      toast({ title: "Triagem registrada!", description: "Agora é possível adicionar o paciente à fila." });
+      toast({ title: "Triagem registrada!", description: `Score total: ${total}/360. Paciente apto para a fila.` });
     } catch {
       toast({ title: "Erro", description: "Falha ao salvar triagem.", variant: "destructive" });
     } finally {
@@ -294,34 +318,48 @@ export default function PatientDetail() {
             </div>
 
             {triagemFeita ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                <div className="p-3 bg-secondary/30 rounded-xl">
-                  <p className="text-muted-foreground font-semibold mb-1">Score Clínico</p>
-                  <p className="text-2xl font-bold text-foreground">{(patient as any).triagemScore}<span className="text-sm text-muted-foreground">/100</span></p>
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                  {[
+                    { label: "Psicologia", val: p.scorePsicologia },
+                    { label: "Psicomotr.", val: p.scorePsicomotricidade },
+                    { label: "Fisioterapia", val: p.scoreFisioterapia },
+                    { label: "Psicoped.", val: p.scorePsicopedagogia },
+                    { label: "Ed. Física", val: p.scoreEdFisica },
+                  ].map(area => (
+                    <div key={area.label} className="p-2 bg-secondary/30 rounded-xl text-center">
+                      <p className="text-muted-foreground font-semibold text-xs mb-1">{area.label}</p>
+                      <p className="text-lg font-bold text-foreground">{area.val ?? "—"}<span className="text-xs text-muted-foreground">/72</span></p>
+                    </div>
+                  ))}
                 </div>
-                <div className="p-3 bg-secondary/30 rounded-xl">
-                  <p className="text-muted-foreground font-semibold mb-1">Escola Pública</p>
-                  <p className="font-bold">{ep ? "✅ Sim" : "❌ Não"}</p>
-                </div>
-                <div className="p-3 bg-secondary/30 rounded-xl">
-                  <p className="text-muted-foreground font-semibold mb-1">Trabalho na Roça</p>
-                  <p className="font-bold">{tnr ? "✅ Sim" : "❌ Não"}</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
+                    <p className="text-muted-foreground font-semibold mb-1">Score Total</p>
+                    <p className="text-2xl font-bold text-primary">{p.triagemScore}<span className="text-sm text-muted-foreground font-normal">/360</span></p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round((p.triagemScore / 360) * 100)}% do máximo</p>
+                  </div>
+                  <div className="p-3 bg-secondary/30 rounded-xl">
+                    <p className="text-muted-foreground font-semibold mb-1">Escola Pública</p>
+                    <p className="font-bold">{ep ? "✅ Sim" : "❌ Não"}</p>
+                  </div>
+                  <div className="p-3 bg-secondary/30 rounded-xl">
+                    <p className="text-muted-foreground font-semibold mb-1">Trabalho na Roça</p>
+                    <p className="font-bold">{tnr ? "✅ Sim" : "❌ Não"}</p>
+                  </div>
                 </div>
                 {previewPriority && (
-                  <div className="col-span-2 md:col-span-3 p-3 rounded-xl border" style={{ background: "transparent" }}>
-                    <p className="text-muted-foreground font-semibold text-xs uppercase tracking-wider mb-1">Prioridade calculada para a fila</p>
+                  <div className="p-3 rounded-xl border" style={{ background: "transparent" }}>
+                    <p className="text-muted-foreground font-semibold text-xs uppercase tracking-wider mb-1">Prioridade para a fila</p>
                     <span className={cn("text-sm font-bold px-3 py-1 rounded-full border", PRIORITY_STYLE[previewPriority])}>
                       {PRIORITY_LABEL[previewPriority]}
-                      {previewPriority === "alta" && " — Encaminhar com urgência"}
-                      {previewPriority === "media" && " — Encaminhar em breve"}
-                      {previewPriority === "baixa" && " — Aguardar disponibilidade"}
                     </span>
                   </div>
                 )}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground italic">
-                Registre a triagem com o score clínico e os critérios de vulnerabilidade para liberar o botão <strong>"Adicionar à Fila"</strong>.
+                Registre a triagem com as notas por área (0–72 cada) para liberar o botão <strong>"Adicionar à Fila"</strong>.
               </p>
             )}
           </Card>
@@ -364,26 +402,41 @@ export default function PatientDetail() {
 
       {/* Modal: Registrar/Editar Triagem */}
       {triagemEdit && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <MotionCard className="w-full max-w-md p-6" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <MotionCard className="w-full max-w-lg p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <h2 className="text-2xl font-bold font-display mb-1">{triagemFeita ? "Editar Triagem" : "Registrar Triagem"}</h2>
-            <p className="text-sm text-muted-foreground mb-6">Score clínico (0–100) e critérios de vulnerabilidade.</p>
+            <p className="text-sm text-muted-foreground mb-5">Preencha a nota de cada área (0–72). O score total é a soma (máx. 360).</p>
             <div className="space-y-5">
               <div>
-                <Label>Score Clínico <span className="text-muted-foreground">(0 = sem indicativo, 100 = máximo indicativo)</span></Label>
-                <Input
-                  type="number" min={0} max={100}
-                  value={triagemScore}
-                  onChange={e => setTriagemScore(e.target.value)}
-                  placeholder="Ex.: 72"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  ≥ 65 → prioridade alta · 35–64 → média · &lt; 35 → baixa (pode subir por vulnerabilidade)
-                </p>
+                <Label className="text-base font-bold mb-3 block">Perfil Multidisciplinar</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {([
+                    { label: "Psicologia", val: sPsicologia, set: setSPsicologia },
+                    { label: "Psicomotricidade", val: sPsicomotricidade, set: setSPsicomotricidade },
+                    { label: "Fisioterapia", val: sFisioterapia, set: setSFisioterapia },
+                    { label: "Psicopedagogia", val: sPsicopedagogia, set: setSPsicopedagogia },
+                    { label: "Ed. Física", val: sEdFisica, set: setSEdFisica },
+                  ] as const).map(area => (
+                    <div key={area.label} className="space-y-1">
+                      <Label className="text-sm">{area.label} <span className="text-muted-foreground font-normal">(0–72)</span></Label>
+                      <Input
+                        type="number" min={0} max={72}
+                        value={area.val}
+                        onChange={e => area.set(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                  ))}
+                  <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 flex flex-col justify-center">
+                    <p className="text-xs text-muted-foreground font-semibold mb-0.5">Score Total</p>
+                    <p className="text-2xl font-bold text-primary">{totalScore}<span className="text-sm text-muted-foreground font-normal">/360</span></p>
+                    <p className="text-xs text-muted-foreground">{Math.round((totalScore / 360) * 100)}% do máximo</p>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-3">
-                <Label>Critérios de Vulnerabilidade</Label>
+                <Label className="text-base font-bold">Critérios de Vulnerabilidade</Label>
                 <label className="flex items-center gap-3 p-3 rounded-xl border border-border cursor-pointer hover:bg-secondary/30 transition-colors">
                   <input type="checkbox" checked={escolaPublica ?? false} onChange={e => setEscolaPublica(e.target.checked)} className="w-5 h-5 rounded" />
                   <div>
@@ -400,12 +453,22 @@ export default function PatientDetail() {
                 </label>
               </div>
 
-              {triagemScore && !isNaN(parseInt(triagemScore)) && (
+              {totalScore > 0 && (
                 <div className="p-3 bg-secondary/30 rounded-xl text-sm">
-                  <p className="text-muted-foreground font-semibold mb-1">Prioridade que será calculada:</p>
-                  <span className={cn("font-bold px-3 py-1 rounded-full border text-sm", PRIORITY_STYLE[calcPriority(parseInt(triagemScore), escolaPublica ?? false, trabalhoNaRoca ?? false)])}>
-                    {PRIORITY_LABEL[calcPriority(parseInt(triagemScore), escolaPublica ?? false, trabalhoNaRoca ?? false)]}
-                  </span>
+                  <p className="text-muted-foreground font-semibold mb-2">Classificação que será atribuída:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(["baixo", "leve", "moderado", "elevado"] as const).map(lvl => {
+                      const active = calcPriority(totalScore, escolaPublica ?? false, trabalhoNaRoca ?? false) === lvl;
+                      return (
+                        <span key={lvl} className={cn("px-3 py-1 rounded-full border text-xs font-bold transition-all", active ? PRIORITY_STYLE[lvl] + " ring-2 ring-offset-1 ring-current" : "bg-secondary text-muted-foreground border-border opacity-50")}>
+                          {PRIORITY_LABEL[lvl]}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Verde 0–89 · Azul 90–179 · Laranja 180–269 · Vermelho 270–360 (Vulnerabilidade sobe um nível)
+                  </p>
                 </div>
               )}
             </div>
@@ -432,7 +495,7 @@ export default function PatientDetail() {
                 </span>
               </div>
               <div className="text-right text-sm text-muted-foreground">
-                <p>Score: <strong>{(patient as any).triagemScore}/100</strong></p>
+                <p>Score: <strong>{p.triagemScore}/360</strong></p>
                 <p>Escola Pública: <strong>{ep ? "Sim" : "Não"}</strong></p>
                 <p>Trabalho na Roça: <strong>{tnr ? "Sim" : "Não"}</strong></p>
               </div>

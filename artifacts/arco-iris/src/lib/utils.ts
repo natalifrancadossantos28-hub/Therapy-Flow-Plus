@@ -34,8 +34,9 @@ export const getStatusColor = (status: string) => {
 
 export const getPriorityColor = (priority: string) => {
   const p = priority.toLowerCase();
-  if (p === "alta") return "bg-rose-100 text-rose-800 border-rose-200";
-  if (p === "media" || p === "média") return "bg-amber-100 text-amber-800 border-amber-200";
-  if (p === "baixa") return "bg-emerald-100 text-emerald-800 border-emerald-200";
+  if (p === "elevado" || p === "alta") return "bg-rose-100 text-rose-800 border-rose-200";
+  if (p === "moderado" || p === "media" || p === "média") return "bg-orange-100 text-orange-800 border-orange-200";
+  if (p === "leve") return "bg-sky-100 text-sky-800 border-sky-200";
+  if (p === "baixo" || p === "baixa") return "bg-emerald-100 text-emerald-800 border-emerald-200";
   return "bg-slate-100 text-slate-800 border-slate-200";
 };

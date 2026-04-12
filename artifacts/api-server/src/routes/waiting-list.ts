@@ -5,7 +5,7 @@ import { eq, and, asc, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-const priorityOrder = sql`CASE priority WHEN 'alta' THEN 1 WHEN 'media' THEN 2 WHEN 'baixa' THEN 3 ELSE 4 END`;
+const priorityOrder = sql`CASE priority WHEN 'elevado' THEN 1 WHEN 'alta' THEN 1 WHEN 'moderado' THEN 2 WHEN 'media' THEN 2 WHEN 'leve' THEN 3 WHEN 'baixo' THEN 4 WHEN 'baixa' THEN 4 ELSE 5 END`;
 
 router.get("/waiting-list", async (req, res) => {
   const conditions = [];

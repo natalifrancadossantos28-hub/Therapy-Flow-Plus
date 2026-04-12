@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useGetPatients, useGetProfessionals, useGetTodayAppointments, useGetWaitingList } from "@workspace/api-client-react";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor } from "@/lib/utils";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from "recharts";
 
 type Stats = { semanal: number; mensal: number; trimestral: number; semestral: number; anual: number };
 
@@ -32,6 +33,15 @@ export default function Dashboard() {
   const waitingCount = waitingList?.length || 0;
 
   const absentPatients = patients?.filter(p => p.absenceCount >= 3) || [];
+
+  const triadPatients = (patients || []).filter(p => (p as any).triagemScore != null);
+  const radarData = [
+    { area: "Psicologia", score: triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any).scorePsicologia || 0), 0) / triadPatients.length) : 0, max: 72 },
+    { area: "Psicomotr.", score: triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any).scorePsicomotricidade || 0), 0) / triadPatients.length) : 0, max: 72 },
+    { area: "Fisioterapia", score: triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any).scoreFisioterapia || 0), 0) / triadPatients.length) : 0, max: 72 },
+    { area: "Psicoped.", score: triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any).scorePsicopedagogia || 0), 0) / triadPatients.length) : 0, max: 72 },
+    { area: "Ed. Física", score: triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any).scoreEdFisica || 0), 0) / triadPatients.length) : 0, max: 72 },
+  ].map(d => ({ ...d, pct: Math.round((d.score / 72) * 100) }));
 
   // Historical count by year — prefer entryDate, fallback to createdAt
   const byYear: Record<number, number> = {};
@@ -96,6 +106,53 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+      </Card>
+
+      {/* Perfil Multidisciplinar – Teia de Aranha */}
+      <Card className="p-6">
+        <div className="flex items-center gap-2 mb-2">
+          <Activity className="w-5 h-5 text-primary" />
+          <h2 className="text-xl font-bold font-display">Perfil Multidisciplinar</h2>
+          <span className="ml-auto text-xs text-muted-foreground font-semibold">Média dos {triadPatients.length} pacientes triados</span>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">Média do score por área terapêutica (% do máximo 72 pts por área)</p>
+        {triadPatients.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 text-center">
+            <Activity className="w-10 h-10 text-muted-foreground/40 mb-2" />
+            <p className="text-sm text-muted-foreground">Nenhum paciente com triagem registrada ainda.</p>
+            <p className="text-xs text-muted-foreground mt-1">Registre a triagem de um paciente para ver o gráfico.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
+                  <PolarGrid stroke="hsl(var(--border))" />
+                  <PolarAngleAxis dataKey="area" tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontWeight: 600 }} />
+                  <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickCount={4} unit="%" />
+                  <Radar name="Média" dataKey="pct" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.25} strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--primary))" }} />
+                  <Tooltip formatter={(v: any) => [`${v}%`, "Média"]} contentStyle={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--border))", borderRadius: 12 }} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="space-y-2">
+              {radarData.map(d => (
+                <div key={d.area} className="flex items-center gap-3">
+                  <span className="w-24 text-xs font-semibold text-muted-foreground shrink-0">{d.area}</span>
+                  <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${d.pct}%` }} />
+                  </div>
+                  <span className="w-12 text-right text-xs font-bold text-foreground">{d.score}/72</span>
+                  <span className="w-10 text-right text-xs text-muted-foreground">{d.pct}%</span>
+                </div>
+              ))}
+              <div className="mt-3 pt-3 border-t border-border flex justify-between text-sm">
+                <span className="font-semibold text-muted-foreground">Score Médio Total</span>
+                <span className="font-bold text-primary">{Math.round(radarData.reduce((s, d) => s + d.score, 0))}/360</span>
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Histórico de Crescimento + Pacientes de Hoje */}
