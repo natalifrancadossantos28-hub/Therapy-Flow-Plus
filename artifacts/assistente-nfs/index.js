@@ -689,10 +689,10 @@ async function conectarWhatsApp() {
         // Sessão invalidada — limpa arquivos e gera novo QR
         console.log("🗑️  Sessão 401 — limpando auth e gerando novo QR...");
         try { fs.rmSync("./sessao_whatsapp", { recursive: true, force: true }); } catch(e) {}
-        setTimeout(conectarWhatsApp, 3000);
+        setTimeout(iniciarWhatsApp, 3000);
       } else {
         // Reconexão normal
-        setTimeout(conectarWhatsApp, 5000);
+        setTimeout(iniciarWhatsApp, 5000);
       }
     }
   });
@@ -950,7 +950,7 @@ app.post(["/logout", "/assistente-nfs/logout"], async (req, res) => {
     try { fs.rmSync(authDir, { recursive: true, force: true }); console.log("🗑️  Sessão apagada — novo QR Code será gerado"); } catch(e) {}
 
     // Reconecta (vai gerar novo QR)
-    setTimeout(() => conectarWhatsApp(), 2000);
+    setTimeout(() => iniciarWhatsApp(), 2000);
 
     res.json({ ok: true, mensagem: "Sessão encerrada. Novo QR Code será gerado em instantes." });
   } catch (err) {
@@ -974,12 +974,35 @@ app.get("/", redirectToPanel);
 app.get("/assistente-nfs", redirectToPanel);
 app.get("/assistente-nfs/", redirectToPanel);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TRATAMENTO GLOBAL DE ERROS — evita que o processo morra
+// ─────────────────────────────────────────────────────────────────────────────
+process.on("uncaughtException", (err) => {
+  console.error("⚠️  Exceção não capturada (processo mantido):", err?.message || err);
+  logAtividade(`⚠️ Erro interno: ${err?.message || String(err)}`, "erro");
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("⚠️  Promise rejeitada não tratada (processo mantido):", reason?.message || reason);
+  logAtividade(`⚠️ Promise rejeitada: ${reason?.message || String(reason)}`, "erro");
+});
+
+// Wrapper seguro de reconexão com retry automático
+async function iniciarWhatsApp() {
+  try {
+    await conectarWhatsApp();
+  } catch (err) {
+    console.error("❌ Erro ao iniciar WhatsApp:", err?.message || err);
+    logAtividade(`❌ Falha ao iniciar conexão — tentando novamente em 10s`, "erro");
+    setTimeout(iniciarWhatsApp, 10000);
+  }
+}
+
 app.listen(PORT, () => {
   console.log(`\n💬 Assistente NFs — ${CLINICA_NOME}`);
   console.log(`✅ Servidor na porta ${PORT}`);
   console.log(`🤖 IA: ${AI_BASE ? "Anthropic Claude ativo" : "⚠️  IA não configurada"}`);
   console.log(`🗄️  DB: ${process.env.DATABASE_URL ? "PostgreSQL conectado" : "⚠️  DATABASE_URL ausente"}`);
   console.log(`📱 Acesse /api/whatsapp/panel para o QR Code\n`);
+  iniciarWhatsApp();
 });
-
-conectarWhatsApp().catch(err => console.error("❌ Erro ao conectar WhatsApp:", err));
