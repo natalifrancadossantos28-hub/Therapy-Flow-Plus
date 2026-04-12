@@ -25,7 +25,10 @@ type Appointment = {
   professionalId: number; date: string; time: string; status: string;
 };
 
+const isAdminSession = () => sessionStorage.getItem("nfs_admin_auth") === "true";
+
 export default function Agenda() {
+  const isAdmin = isAdminSession();
   const [selectedProfId, setSelectedProfId] = useState<string>("");
   const [pinInput, setPinInput] = useState("");
   const [pinVerified, setPinVerified] = useState(false);
@@ -37,6 +40,9 @@ export default function Agenda() {
   const { data: professionals } = useGetProfessionals();
   const { toast } = useToast();
 
+  // Admin bypasses PIN — access is granted by the admin session itself
+  const canView = isAdmin || pinVerified;
+
   const weekDays = getWeekDays(weekRef);
   const weekDates = weekDays.map(d => format(d, "yyyy-MM-dd"));
 
@@ -47,14 +53,16 @@ export default function Agenda() {
   };
 
   useEffect(() => {
-    if (pinVerified) fetchAppointments();
-  }, [selectedProfId, pinVerified]);
+    if (canView && selectedProfId) fetchAppointments();
+  }, [selectedProfId, canView]);
 
   const handleProfChange = (id: string) => {
     setSelectedProfId(id);
-    setPinVerified(false);
-    setPinInput("");
-    setPinError("");
+    if (!isAdmin) {
+      setPinVerified(false);
+      setPinInput("");
+      setPinError("");
+    }
   };
 
   const verifyPin = async () => {
@@ -105,7 +113,7 @@ export default function Agenda() {
             {professionals?.map(p => <option key={p.id} value={p.id}>{p.name} – {p.specialty}</option>)}
           </Select>
         </div>
-        {selectedProfId && !pinVerified && (
+        {selectedProfId && !canView && (
           <div className="flex-1">
             <Label className="mb-2 block flex items-center gap-1"><Lock className="w-3 h-3" /> PIN de acesso (4 dígitos)</Label>
             <div className="flex gap-2">
@@ -125,9 +133,10 @@ export default function Agenda() {
             {pinError && <p className="text-destructive text-sm mt-1">{pinError}</p>}
           </div>
         )}
-        {pinVerified && (
-          <div className="flex items-center gap-2 text-green-600 font-semibold text-sm bg-green-50 px-4 py-2 rounded-xl border border-green-200">
-            <ShieldCheck className="w-4 h-4" /> Acesso liberado
+        {canView && selectedProfId && (
+          <div className={`flex items-center gap-2 font-semibold text-sm px-4 py-2 rounded-xl border ${isAdmin ? "text-blue-700 bg-blue-50 border-blue-200" : "text-green-600 bg-green-50 border-green-200"}`}>
+            <ShieldCheck className="w-4 h-4" />
+            {isAdmin ? "Administrador – Acesso Total" : "Acesso liberado"}
           </div>
         )}
       </Card>
@@ -136,9 +145,11 @@ export default function Agenda() {
         <Card className="p-16 text-center">
           <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-lg font-bold">Selecione um profissional</p>
-          <p className="text-muted-foreground">Escolha o profissional e informe o PIN para visualizar a grade.</p>
+          <p className="text-muted-foreground">
+            {isAdmin ? "Escolha o profissional para visualizar a grade." : "Escolha o profissional e informe o PIN para visualizar a grade."}
+          </p>
         </Card>
-      ) : !pinVerified ? (
+      ) : !canView ? (
         <Card className="p-16 text-center">
           <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-lg font-bold">Informe o PIN</p>
