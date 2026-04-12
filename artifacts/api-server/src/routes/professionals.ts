@@ -5,7 +5,7 @@ import { eq, and, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-const MAX_CAPACITY = 30;
+const getMaxCapacity = (cargaHoraria: string) => cargaHoraria === "20h" ? 20 : 30;
 
 router.get("/professionals", async (_req, res) => {
   const rows = await db.select().from(professionalsTable);
@@ -13,8 +13,12 @@ router.get("/professionals", async (_req, res) => {
 });
 
 router.post("/professionals", async (req, res) => {
-  const { name, specialty, email, phone, pin } = req.body;
-  const [row] = await db.insert(professionalsTable).values({ name, specialty, email, phone, pin: pin ?? null }).returning();
+  const { name, specialty, email, phone, pin, cargaHoraria } = req.body;
+  const [row] = await db.insert(professionalsTable).values({
+    name, specialty, email, phone,
+    pin: pin ?? null,
+    cargaHoraria: cargaHoraria ?? "30h",
+  }).returning();
   res.status(201).json(row);
 });
 
@@ -37,9 +41,10 @@ router.get("/professionals/:id", async (req, res) => {
 
 router.put("/professionals/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { name, specialty, email, phone, pin } = req.body;
+  const { name, specialty, email, phone, pin, cargaHoraria } = req.body;
   const updateData: Record<string, unknown> = { name, specialty, email, phone };
   if (pin !== undefined) updateData.pin = pin || null;
+  if (cargaHoraria !== undefined) updateData.cargaHoraria = cargaHoraria;
   const [row] = await db.update(professionalsTable).set(updateData).where(eq(professionalsTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Professional not found" });
   res.json(row);
@@ -60,13 +65,15 @@ router.get("/professionals/:id/capacity", async (req, res) => {
     .from(patientsTable)
     .where(and(eq(patientsTable.professionalId, id), eq(patientsTable.status, "ativo")));
   const count = activePatients[0]?.count ?? 0;
+  const maxCapacity = getMaxCapacity(prof.cargaHoraria ?? "30h");
 
   res.json({
     professionalId: id,
     professionalName: prof.name,
+    cargaHoraria: prof.cargaHoraria ?? "30h",
     activePatients: count,
-    maxCapacity: MAX_CAPACITY,
-    availableSlots: Math.max(0, MAX_CAPACITY - count),
+    maxCapacity,
+    availableSlots: Math.max(0, maxCapacity - count),
   });
 });
 
@@ -122,11 +129,15 @@ router.get("/professionals/:id/schedule", async (req, res) => {
 router.get("/professionals/:id/vacancy-alert", async (req, res) => {
   const id = Number(req.params.id);
 
+  const [profForVacancy] = await db.select({ cargaHoraria: professionalsTable.cargaHoraria })
+    .from(professionalsTable).where(eq(professionalsTable.id, id));
+  const maxCapacityVacancy = getMaxCapacity(profForVacancy?.cargaHoraria ?? "30h");
+
   const activePatients = await db.select({ count: sql<number>`count(*)::int` })
     .from(patientsTable)
     .where(and(eq(patientsTable.professionalId, id), eq(patientsTable.status, "ativo")));
   const count = activePatients[0]?.count ?? 0;
-  const available = Math.max(0, MAX_CAPACITY - count);
+  const available = Math.max(0, maxCapacityVacancy - count);
 
   let nextWaitingPatient = undefined;
   if (available > 0) {

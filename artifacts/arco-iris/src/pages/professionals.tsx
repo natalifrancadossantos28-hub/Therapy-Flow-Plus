@@ -6,7 +6,7 @@ import {
   useCreateProfessional,
   useDeleteProfessional,
 } from "@workspace/api-client-react";
-import { Card, MotionCard, Button, Input, Label } from "@/components/ui-custom";
+import { Card, MotionCard, Button, Input, Label, Select, Badge } from "@/components/ui-custom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   UserRound,
@@ -15,12 +15,12 @@ import {
   Calendar,
   Stethoscope,
   ChevronRight,
-  AlertTriangle,
-  CheckCircle2,
+  Clock,
   Lock,
   ShieldCheck,
   Eye,
   EyeOff,
+  Users,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -32,50 +32,59 @@ function ProfessionalCapacityCard({ id }: { id: number }) {
     return <div className="h-2 w-full bg-secondary rounded-full animate-pulse mt-4" />;
   }
 
-  const percentage = Math.min(100, (capacity.activePatients / capacity.maxCapacity) * 100);
-  const isFull = capacity.availableSlots === 0;
-  const isLow = capacity.activePatients < 20;
-  const barColor = isFull ? "bg-emerald-500" : isLow ? "bg-amber-400" : "bg-primary";
+  const { activePatients, maxCapacity, availableSlots } = capacity;
+  const percentage = Math.min(100, (activePatients / maxCapacity) * 100);
+  const isFull = availableSlots === 0;
+  const isAlmostFull = !isFull && availableSlots <= 3;
 
   return (
     <div className="mt-4 pt-4 border-t border-border space-y-3">
-      {/* Alert banner when below capacity */}
-      {!isFull && (
-        <div
-          className={cn(
-            "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold",
-            isLow
-              ? "bg-amber-50 border border-amber-200 text-amber-800"
-              : "bg-primary/5 border border-primary/20 text-primary"
-          )}
-        >
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+      {isFull ? (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold badge-neon-green">
+          <Users className="w-3.5 h-3.5 shrink-0" />
+          <span>Agenda completa — {maxCapacity} pacientes ativos</span>
+        </div>
+      ) : isAlmostFull ? (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold badge-neon-orange">
+          <Users className="w-3.5 h-3.5 shrink-0" />
           <span>
-            {capacity.availableSlots === 1
-              ? "1 vaga disponível — agenda não está cheia"
-              : `${capacity.availableSlots} vagas disponíveis — agenda não está cheia`}
+            {availableSlots === 1 ? "Apenas 1 vaga disponível!" : `Apenas ${availableSlots} vagas restantes!`}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-primary/8 border border-primary/20 text-primary">
+          <Users className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            {availableSlots === 1
+              ? "1 vaga disponível"
+              : `${availableSlots} vagas disponíveis`}
           </span>
         </div>
       )}
-      {isFull && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-800">
-          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-          <span>Agenda completa — 30 pacientes ativos</span>
-        </div>
-      )}
 
-      {/* Capacity bar */}
       <div>
         <div className="flex justify-between text-xs font-semibold mb-1.5">
           <span className="text-muted-foreground">Pacientes Ativos</span>
-          <span className="text-foreground">
-            {capacity.activePatients} / {capacity.maxCapacity}
+          <span className="text-foreground font-bold">
+            {activePatients} / {maxCapacity}
           </span>
         </div>
         <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
           <div
-            className={cn("h-full rounded-full transition-all duration-500", barColor)}
-            style={{ width: `${percentage}%` }}
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${percentage}%`,
+              background: isFull
+                ? "linear-gradient(90deg, #00c866, #00ff88)"
+                : isAlmostFull
+                ? "linear-gradient(90deg, #ff7000, #ff9f20)"
+                : "linear-gradient(90deg, #00b4d8, #00f0ff)",
+              boxShadow: isFull
+                ? "0 0 8px rgba(0,255,136,0.5)"
+                : isAlmostFull
+                ? "0 0 8px rgba(255,140,0,0.5)"
+                : "0 0 8px rgba(0,240,255,0.4)",
+            }}
           />
         </div>
       </div>
@@ -111,7 +120,10 @@ function PinManager({ prof }: { prof: any }) {
         <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
           <Lock className="w-3 h-3" /> PIN de Agenda
         </span>
-        <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", prof.pin ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+        <span className={cn(
+          "text-xs font-bold px-2 py-0.5 rounded-full border",
+          prof.pin ? "badge-neon-green" : "badge-neon-orange"
+        )}>
           {prof.pin ? "Definido" : "Não definido"}
         </span>
       </div>
@@ -137,9 +149,9 @@ function PinManager({ prof }: { prof: any }) {
             onChange={e => setNewPin(e.target.value.replace(/\D/, ""))}
             onKeyDown={e => e.key === "Enter" && handleSave()}
             placeholder="Novo PIN"
-            className="border border-border rounded-lg px-2 py-1.5 w-24 text-center font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="border border-border rounded-lg px-2 py-1.5 w-24 text-center font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground transition-all"
           />
-          <button onClick={handleSave} disabled={newPin.length !== 4 || saving} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-primary text-primary-foreground rounded-lg disabled:opacity-50 hover:bg-primary/90 transition-colors">
+          <button onClick={handleSave} disabled={newPin.length !== 4 || saving} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-primary text-primary-foreground rounded-lg disabled:opacity-50 hover:bg-primary/90 transition-all hover:shadow-[0_0_12px_rgba(0,240,255,0.3)]">
             <ShieldCheck className="w-3 h-3" /> {saving ? "..." : "Salvar"}
           </button>
           <button onClick={() => { setShow(false); setNewPin(""); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1">Cancelar</button>
@@ -163,6 +175,7 @@ export default function Professionals() {
     email: "",
     phone: "",
     pin: "",
+    cargaHoraria: "30h",
   });
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -172,7 +185,7 @@ export default function Professionals() {
       queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
       toast({ title: "Sucesso", description: "Profissional cadastrado." });
       setIsDialogOpen(false);
-      setFormData({ name: "", specialty: "", email: "", phone: "", pin: "" });
+      setFormData({ name: "", specialty: "", email: "", phone: "", pin: "", cargaHoraria: "30h" });
     } catch {
       toast({
         title: "Erro",
@@ -199,7 +212,7 @@ export default function Professionals() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Profissionais</h1>
           <p className="text-muted-foreground mt-1">
-            Cada profissional atende até 30 pacientes ativos.
+            Profissionais com 30h atendem até 30 pacientes · 20h atendem até 20 pacientes.
           </p>
         </div>
         <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
@@ -215,7 +228,7 @@ export default function Professionals() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {professionals?.map((prof, i) => (
+          {professionals?.map((prof: any, i: number) => (
             <MotionCard
               key={prof.id}
               className="p-6 relative overflow-visible group"
@@ -225,7 +238,7 @@ export default function Professionals() {
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex gap-4 items-center">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary" style={{ boxShadow: "0 0 12px rgba(0,240,255,0.15)" }}>
                     <UserRound className="w-6 h-6" />
                   </div>
                   <div>
@@ -237,6 +250,16 @@ export default function Professionals() {
                     </div>
                   </div>
                 </div>
+                <Badge className={cn(
+                  "text-xs font-bold px-2.5 py-1 flex items-center gap-1 shrink-0",
+                  prof.cargaHoraria === "20h" ? "badge-neon-orange" : "badge-neon-blue"
+                )}>
+                  <Clock className="w-3 h-3" />
+                  {prof.cargaHoraria ?? "30h"}
+                  <span className="text-[10px] font-semibold opacity-80">
+                    · {prof.cargaHoraria === "20h" ? "20" : "30"} pac.
+                  </span>
+                </Badge>
               </div>
 
               <ProfessionalCapacityCard id={prof.id} />
@@ -291,6 +314,19 @@ export default function Professionals() {
                   onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
                   placeholder="Psicologia"
                 />
+              </div>
+              <div>
+                <Label>Carga Horária</Label>
+                <Select
+                  value={formData.cargaHoraria}
+                  onChange={(e) => setFormData({ ...formData, cargaHoraria: e.target.value })}
+                >
+                  <option value="30h">30 horas — até 30 pacientes</option>
+                  <option value="20h">20 horas — até 20 pacientes</option>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define o limite de pacientes ativos para este profissional.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
