@@ -31,11 +31,12 @@ name = "artifacts/assistente-nfs: WhatsApp Bot"
 author = "agent"
 
 [workflows.workflow.metadata]
-outputType = "console"
+outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd artifacts/assistente-nfs && PORT=3001 node index.js"
+waitForPort = 3001
 
 [agent]
 stack = "PNPM_WORKSPACE"

@@ -1,0 +1,12 @@
+kind = "web"
+previewPath = "/assistente-nfs"
+title = "Assistente NFS – WhatsApp"
+version = "1.0.0"
+
+[[services]]
+localPort = 3001
+name = "web"
+paths = ["/assistente-nfs"]
+
+[services.development]
+run = "cd artifacts/assistente-nfs && PORT=3001 node index.js"
