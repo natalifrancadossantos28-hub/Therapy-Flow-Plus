@@ -32,6 +32,7 @@ export const pontoEmployeesTable = pgTable("ponto_employees", {
   entryTime: text("entry_time"),
   exitTime: text("exit_time"),
   breakMinutes: integer("break_minutes").notNull().default(60),
+  schedule: text("schedule"), // JSON: {mon:{in,out,dayOff},tue,...,sat:{...}}
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

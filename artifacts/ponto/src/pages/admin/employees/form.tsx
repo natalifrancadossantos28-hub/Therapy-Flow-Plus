@@ -11,11 +11,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, Upload, Trash2, ArrowLeft } from "lucide-react";
+import { Camera, Upload, Trash2, ArrowLeft, CalendarDays, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 
-// Resize + compress to JPEG before sending — keeps payload well under 100 KB
 const compressImage = (dataUrl: string, maxPx = 500, quality = 0.72): Promise<string> =>
   new Promise((resolve) => {
     const img = new Image();
@@ -24,8 +23,7 @@ const compressImage = (dataUrl: string, maxPx = 500, quality = 0.72): Promise<st
       const w = Math.round(img.width * ratio);
       const h = Math.round(img.height * ratio);
       const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
+      canvas.width = w; canvas.height = h;
       canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
       resolve(canvas.toDataURL("image/jpeg", quality));
     };
@@ -40,6 +38,97 @@ const WEEKLY_HOURS_OPTIONS = [
   { value: "44", label: "44 horas (CLT)" },
 ];
 
+type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+type DaySchedule = { in: string; out: string; dayOff: boolean };
+type Schedule = Record<DayKey, DaySchedule>;
+
+const DAY_LABELS: { key: DayKey; label: string; short: string }[] = [
+  { key: "mon", label: "Segunda-feira", short: "Seg" },
+  { key: "tue", label: "Terça-feira",   short: "Ter" },
+  { key: "wed", label: "Quarta-feira",  short: "Qua" },
+  { key: "thu", label: "Quinta-feira",  short: "Qui" },
+  { key: "fri", label: "Sexta-feira",   short: "Sex" },
+  { key: "sat", label: "Sábado",        short: "Sáb" },
+];
+
+const DEFAULT_SCHEDULE: Schedule = {
+  mon: { in: "08:00", out: "17:00", dayOff: false },
+  tue: { in: "08:00", out: "17:00", dayOff: false },
+  wed: { in: "08:00", out: "17:00", dayOff: false },
+  thu: { in: "08:00", out: "17:00", dayOff: false },
+  fri: { in: "08:00", out: "17:00", dayOff: false },
+  sat: { in: "",      out: "",      dayOff: true  },
+};
+
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function calcScheduleHours(schedule: Schedule): number {
+  let total = 0;
+  for (const day of Object.values(schedule)) {
+    if (!day.dayOff && day.in && day.out) {
+      const diff = timeToMinutes(day.out) - timeToMinutes(day.in);
+      if (diff > 0) total += diff;
+    }
+  }
+  return Math.round(total / 60 * 10) / 10;
+}
+
+function ScheduleEditor({ schedule, onChange }: { schedule: Schedule; onChange: (s: Schedule) => void }) {
+  const totalHours = calcScheduleHours(schedule);
+  return (
+    <div className="space-y-3">
+      <div className="space-y-2">
+        {DAY_LABELS.map(({ key, label, short }) => {
+          const day = schedule[key];
+          return (
+            <div key={key} className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${day.dayOff ? "border-white/5 bg-white/2 opacity-60" : "border-white/10 bg-background/40"}`}>
+              <span className="w-10 text-xs font-bold text-muted-foreground uppercase tracking-wider shrink-0">{short}</span>
+              <span className="hidden sm:block text-sm text-foreground w-28 shrink-0">{label}</span>
+              <div className="flex items-center gap-2 flex-1">
+                <Input
+                  type="time"
+                  value={day.in}
+                  disabled={day.dayOff}
+                  onChange={e => onChange({ ...schedule, [key]: { ...day, in: e.target.value } })}
+                  className="bg-background/50 border-white/10 text-sm h-8 w-28"
+                />
+                <span className="text-muted-foreground text-xs shrink-0">até</span>
+                <Input
+                  type="time"
+                  value={day.out}
+                  disabled={day.dayOff}
+                  onChange={e => onChange({ ...schedule, [key]: { ...day, out: e.target.value } })}
+                  className="bg-background/50 border-white/10 text-sm h-8 w-28"
+                />
+                {day.in && day.out && !day.dayOff && timeToMinutes(day.out) > timeToMinutes(day.in) && (
+                  <span className="text-xs text-primary font-mono shrink-0">
+                    {Math.floor((timeToMinutes(day.out) - timeToMinutes(day.in)) / 60)}h{(timeToMinutes(day.out) - timeToMinutes(day.in)) % 60 > 0 ? `${(timeToMinutes(day.out) - timeToMinutes(day.in)) % 60}m` : ""}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Switch
+                  checked={day.dayOff}
+                  onCheckedChange={v => onChange({ ...schedule, [key]: { ...day, dayOff: v, in: v ? "" : day.in || "08:00", out: v ? "" : day.out || "17:00" } })}
+                  className="scale-75"
+                />
+                <span className="text-xs text-muted-foreground">Folga</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/5 border border-primary/20">
+        <span className="text-xs text-muted-foreground">Total calculado da escala:</span>
+        <span className="font-mono font-bold text-primary">{totalHours}h / semana</span>
+      </div>
+    </div>
+  );
+}
+
 const formSchema = z.object({
   name: z.string().min(2, "Nome muito curto"),
   cpf: z.string().min(11, "CPF inválido").max(14, "CPF muito longo"),
@@ -47,9 +136,7 @@ const formSchema = z.object({
   weeklyHours: z.number().int().min(1).max(60).default(44),
   photo: z.string().nullable(),
   active: z.boolean().default(true),
-  entryTime: z.string().nullable().optional(),
-  exitTime: z.string().nullable().optional(),
-  breakMinutes: z.number().int().default(60),
+  schedule: z.string().nullable().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -74,24 +161,20 @@ export default function EmployeeForm() {
   const [useWebcam, setUseWebcam] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [schedule, setSchedule] = useState<Schedule>(DEFAULT_SCHEDULE);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      cpf: "",
-      role: "",
-      weeklyHours: 44,
-      photo: null,
-      active: true,
-      entryTime: null,
-      exitTime: null,
-      breakMinutes: 60,
-    }
+    defaultValues: { name: "", cpf: "", role: "", weeklyHours: 44, photo: null, active: true, schedule: null },
   });
 
   useEffect(() => {
     if (employee && !isNew) {
+      let emp_schedule = DEFAULT_SCHEDULE;
+      try {
+        if ((employee as any).schedule) emp_schedule = JSON.parse((employee as any).schedule);
+      } catch { /* keep default */ }
+      setSchedule(emp_schedule);
       form.reset({
         name: employee.name,
         cpf: employee.cpf,
@@ -99,53 +182,31 @@ export default function EmployeeForm() {
         weeklyHours: employee.weeklyHours ?? 44,
         photo: employee.photo ?? null,
         active: employee.active,
-        entryTime: (employee as any).entryTime ?? null,
-        exitTime: (employee as any).exitTime ?? null,
-        breakMinutes: (employee as any).breakMinutes ?? 60,
+        schedule: (employee as any).schedule ?? null,
       });
     }
   }, [employee, isNew, form]);
 
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
+  useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
 
   const startWebcam = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      if (videoRef.current) videoRef.current.srcObject = stream;
       streamRef.current = stream;
       setUseWebcam(true);
-    } catch (err) {
-      toast({ title: "Erro na câmera", description: "Não foi possível acessar a câmera", variant: "destructive" });
-    }
+    } catch { toast({ title: "Câmera indisponível", variant: "destructive" }); }
   };
 
-  const stopWebcam = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    setUseWebcam(false);
-  };
+  const stopWebcam = () => { streamRef.current?.getTracks().forEach(t => t.stop()); streamRef.current = null; setUseWebcam(false); };
 
   const capturePhoto = async () => {
     if (!videoRef.current) return;
     const canvas = document.createElement("canvas");
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(videoRef.current, 0, 0);
-    const raw = canvas.toDataURL("image/jpeg", 1);
-    const compressed = await compressImage(raw);
-    form.setValue("photo", compressed);
+    canvas.getContext("2d")!.drawImage(videoRef.current, 0, 0);
+    form.setValue("photo", await compressImage(canvas.toDataURL("image/jpeg", 1)));
     stopWebcam();
   };
 
@@ -153,46 +214,36 @@ export default function EmployeeForm() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = async () => {
-      const compressed = await compressImage(reader.result as string);
-      form.setValue("photo", compressed);
-    };
+    reader.onloadend = async () => form.setValue("photo", await compressImage(reader.result as string));
     reader.readAsDataURL(file);
   };
 
   const onSubmit = (data: FormValues) => {
+    const payload = { ...data, schedule: JSON.stringify(schedule) };
     if (isNew) {
-      createMutation.mutate({ data }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetPontoEmployeesQueryKey() });
-          toast({ title: "Sucesso", description: "Funcionário cadastrado" });
-          setLocation("/admin/employees");
-        },
-        onError: () => toast({ title: "Erro", description: "Falha ao cadastrar", variant: "destructive" })
+      createMutation.mutate({ data: payload as any }, {
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetPontoEmployeesQueryKey() }); toast({ title: "Funcionário cadastrado!" }); setLocation("/admin/employees"); },
+        onError: () => toast({ title: "Erro ao cadastrar", variant: "destructive" }),
       });
     } else {
-      updateMutation.mutate({ id: employeeId, data }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetPontoEmployeesQueryKey() });
-          toast({ title: "Sucesso", description: "Funcionário atualizado" });
-          setLocation("/admin/employees");
-        },
-        onError: () => toast({ title: "Erro", description: "Falha ao atualizar", variant: "destructive" })
+      updateMutation.mutate({ id: employeeId, data: payload as any }, {
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetPontoEmployeesQueryKey() }); toast({ title: "Dados atualizados!" }); setLocation("/admin/employees"); },
+        onError: () => toast({ title: "Erro ao atualizar", variant: "destructive" }),
       });
     }
   };
 
   const handleDelete = () => {
-    if (confirm("Tem certeza que deseja excluir este funcionário?")) {
+    if (confirm("Excluir este funcionário e todos os seus registros?")) {
       deleteMutation.mutate({ id: employeeId }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetPontoEmployeesQueryKey() });
-          toast({ title: "Sucesso", description: "Funcionário excluído" });
-          setLocation("/admin/employees");
-        }
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetPontoEmployeesQueryKey() }); toast({ title: "Funcionário excluído" }); setLocation("/admin/employees"); },
       });
     }
   };
+
+  const schedHours = calcScheduleHours(schedule);
+  const weeklyHours = form.watch("weeklyHours");
+  const hoursMatch = Math.abs(schedHours - weeklyHours) < 0.5;
 
   if (isLoading && !isNew) return (
     <div className="flex items-center justify-center h-64 text-muted-foreground">Carregando...</div>
@@ -203,15 +254,11 @@ export default function EmployeeForm() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link href="/admin/employees">
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full"><ArrowLeft className="w-5 h-5" /></Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">
-              {isNew ? "Novo Funcionário" : "Editar Funcionário"}
-            </h1>
-            <p className="text-muted-foreground">Preencha os dados do colaborador.</p>
+            <h1 className="text-3xl font-display font-bold text-foreground">{isNew ? "Novo Funcionário" : "Editar Funcionário"}</h1>
+            <p className="text-muted-foreground">Preencha os dados e a escala semanal do colaborador.</p>
           </div>
         </div>
         {!isNew && (
@@ -242,201 +289,74 @@ export default function EmployeeForm() {
                 </div>
                 <div className="flex gap-2">
                   {useWebcam ? (
-                    <>
-                      <Button type="button" onClick={capturePhoto}>Capturar</Button>
-                      <Button type="button" variant="outline" onClick={stopWebcam}>Cancelar</Button>
-                    </>
+                    <><Button type="button" onClick={capturePhoto}>Capturar</Button><Button type="button" variant="outline" onClick={stopWebcam}>Cancelar</Button></>
                   ) : (
                     <>
-                      <Button type="button" variant="outline" onClick={startWebcam} className="border-white/10">
-                        <Camera className="w-4 h-4 mr-2" /> Usar Câmera
-                      </Button>
+                      <Button type="button" variant="outline" onClick={startWebcam} className="border-white/10"><Camera className="w-4 h-4 mr-2" /> Usar Câmera</Button>
                       <div className="relative">
-                        <Button type="button" variant="outline" className="border-white/10">
-                          <Upload className="w-4 h-4 mr-2" /> Enviar Arquivo
-                        </Button>
+                        <Button type="button" variant="outline" className="border-white/10"><Upload className="w-4 h-4 mr-2" /> Enviar Arquivo</Button>
                         <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleFileUpload} />
                       </div>
-                      {form.watch("photo") && (
-                        <Button type="button" variant="ghost" onClick={() => form.setValue("photo", null)}>
-                          Remover
-                        </Button>
-                      )}
+                      {form.watch("photo") && <Button type="button" variant="ghost" onClick={() => form.setValue("photo", null)}>Remover</Button>}
                     </>
                   )}
                 </div>
               </div>
 
+              {/* Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome Completo</FormLabel>
-                    <FormControl><Input {...field} className="bg-background/50 border-white/10" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <FormItem><FormLabel>Nome Completo</FormLabel><FormControl><Input {...field} className="bg-background/50 border-white/10" /></FormControl><FormMessage /></FormItem>
                 )} />
-
                 <FormField control={form.control} name="cpf" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>CPF</FormLabel>
-                    <FormControl><Input {...field} placeholder="000.000.000-00" className="bg-background/50 border-white/10" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <FormItem><FormLabel>CPF</FormLabel><FormControl><Input {...field} placeholder="000.000.000-00" className="bg-background/50 border-white/10" /></FormControl><FormMessage /></FormItem>
                 )} />
-
                 <FormField control={form.control} name="role" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cargo</FormLabel>
-                    <FormControl><Input {...field} placeholder="Ex: Fisioterapeuta" className="bg-background/50 border-white/10" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <FormItem><FormLabel>Cargo</FormLabel><FormControl><Input {...field} placeholder="Ex: Fisioterapeuta" className="bg-background/50 border-white/10" /></FormControl><FormMessage /></FormItem>
                 )} />
-
                 <FormField control={form.control} name="weeklyHours" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Carga Horária Semanal</FormLabel>
-                    <Select
-                      value={String(field.value)}
-                      onValueChange={v => field.onChange(Number(v))}
-                    >
+                    <FormLabel>Carga Horária Semanal (contrato)</FormLabel>
+                    <Select value={String(field.value)} onValueChange={v => field.onChange(Number(v))}>
                       <FormControl>
-                        <SelectTrigger className="bg-background/50 border-white/10">
-                          <SelectValue placeholder="Selecione a carga horária" />
-                        </SelectTrigger>
+                        <SelectTrigger className="bg-background/50 border-white/10"><SelectValue /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {WEEKLY_HOURS_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                        <SelectItem value="custom">Outro</SelectItem>
+                        {WEEKLY_HOURS_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    {!WEEKLY_HOURS_OPTIONS.find(o => o.value === String(field.value)) && (
-                      <Input
-                        type="number"
-                        min={1}
-                        max={60}
-                        value={field.value}
-                        onChange={e => field.onChange(Number(e.target.value))}
-                        className="mt-2 bg-background/50 border-white/10"
-                        placeholder="Horas por semana"
-                      />
-                    )}
                     <FormMessage />
                   </FormItem>
                 )} />
-
                 <FormField control={form.control} name="active" render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 p-4 bg-background/30 md:col-span-2">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Ativo</FormLabel>
-                      <CardDescription>Funcionário pode registrar ponto</CardDescription>
-                    </div>
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
+                    <div><FormLabel className="text-base">Ativo</FormLabel><CardDescription>Funcionário pode registrar ponto</CardDescription></div>
+                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                   </FormItem>
                 )} />
               </div>
 
-              {/* ── Schedule Section ─────────────────────────────────────────── */}
+              {/* Weekly Schedule */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2 pb-1 border-b border-white/10">
-                  <span className="text-sm font-semibold text-foreground">Horário de Trabalho</span>
-                  <span className="text-xs text-muted-foreground">(opcional — usado para controle de horas extras)</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField control={form.control} name="entryTime" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Horário de Entrada</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="time"
-                          value={field.value ?? ""}
-                          onChange={e => field.onChange(e.target.value || null)}
-                          className="bg-background/50 border-white/10"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-
-                  <FormField control={form.control} name="exitTime" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Horário de Saída</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="time"
-                          value={field.value ?? ""}
-                          onChange={e => field.onChange(e.target.value || null)}
-                          className="bg-background/50 border-white/10"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-
-                  <FormField control={form.control} name="breakMinutes" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tempo de Intervalo</FormLabel>
-                      <Select
-                        value={String(field.value)}
-                        onValueChange={v => field.onChange(Number(v))}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="bg-background/50 border-white/10">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="15">15 minutos</SelectItem>
-                          <SelectItem value="60">1 hora</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-
-                {/* Preview do cálculo de saída efetiva */}
-                {form.watch("entryTime") && form.watch("exitTime") && (() => {
-                  const entry = form.watch("entryTime")!;
-                  const exit = form.watch("exitTime")!;
-                  const brk = form.watch("breakMinutes") ?? 60;
-                  const effMins = (() => {
-                    const [eh, em] = exit.split(":").map(Number);
-                    return (eh * 60 + em) - (60 - brk);
-                  })();
-                  const effTime = `${String(Math.floor(effMins / 60)).padStart(2, "0")}:${String(effMins % 60).padStart(2, "0")}`;
-                  const sameAsExit = brk === 60;
-                  return (
-                    <div className="flex items-start gap-2 text-xs rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-muted-foreground">
-                      <span className="text-primary font-semibold shrink-0">Resumo:</span>
-                      <span>
-                        Entrada liberada a partir das <strong className="text-foreground">{entry.slice(0, 5).replace(/^(\d{2}):(\d{2})$/, (_, h, m) => {
-                          const t = Number(h)*60+Number(m)-10;
-                          return `${String(Math.floor(t/60)).padStart(2,"0")}:${String(t%60).padStart(2,"0")}`;
-                        })}</strong>.
-                        {" "}Saída bloqueada após{" "}
-                        <strong className="text-foreground">{(() => {
-                          const [h, m] = effTime.split(":").map(Number);
-                          const t = h*60+m+10;
-                          return `${String(Math.floor(t/60)).padStart(2,"0")}:${String(t%60).padStart(2,"0")}`;
-                        })()}</strong>
-                        {!sameAsExit && <span className="text-amber-400"> (saída real: {effTime} por intervalo de {brk} min)</span>}.
-                      </span>
+                <div className="flex items-center justify-between pb-1 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-semibold text-foreground">Escala Semanal de Trabalho</span>
+                  </div>
+                  {schedHours > 0 && (
+                    <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${hoursMatch ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`}>
+                      {hoursMatch ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                      {hoursMatch ? `Escala confere com ${weeklyHours}h semanais` : `Escala soma ${schedHours}h — contrato: ${weeklyHours}h`}
                     </div>
-                  );
-                })()}
+                  )}
+                </div>
+                <ScheduleEditor schedule={schedule} onChange={setSchedule} />
               </div>
 
               <div className="flex justify-end gap-4 pt-4 border-t border-white/10">
-                <Link href="/admin/employees">
-                  <Button type="button" variant="ghost">Cancelar</Button>
-                </Link>
+                <Link href="/admin/employees"><Button type="button" variant="ghost">Cancelar</Button></Link>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {isNew ? "Cadastrar" : "Salvar Alterações"}
+                  {isNew ? "Cadastrar Funcionário" : "Salvar Alterações"}
                 </Button>
               </div>
             </form>

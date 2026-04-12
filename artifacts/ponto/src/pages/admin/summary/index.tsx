@@ -74,19 +74,22 @@ export default function SummaryList() {
                     <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wider font-semibold">Marcações</p>
                     <div className="flex flex-wrap gap-2">
                       {summary.records.length > 0 ? (
-                        summary.records.sort((a, b) => new Date(a.punchedAt).getTime() - new Date(b.punchedAt).getTime()).map((rec, i) => (
-                          <Badge 
-                            key={i} 
-                            variant="outline" 
-                            className={`font-mono text-xs ${
-                              rec.type === 'entrada' 
-                                ? 'border-green-500/30 text-green-400 bg-green-500/5' 
-                                : 'border-orange-500/30 text-orange-400 bg-orange-500/5'
-                            }`}
-                          >
-                            {rec.type === 'entrada' ? 'E' : 'S'}: {format(new Date(rec.punchedAt), "HH:mm")}
-                          </Badge>
-                        ))
+                        summary.records.sort((a, b) => new Date(a.punchedAt).getTime() - new Date(b.punchedAt).getTime()).map((rec, i) => {
+                          const typeMap: Record<string, { label: string; cls: string }> = {
+                            ENTRADA_DIARIA:  { label: "Entrada",    cls: "border-green-500/30 text-green-400 bg-green-500/5" },
+                            SAIDA_ALMOCO:    { label: "S.Almoço",   cls: "border-amber-500/30 text-amber-400 bg-amber-500/5" },
+                            RETORNO_ALMOCO:  { label: "Retorno",    cls: "border-blue-500/30 text-blue-400 bg-blue-500/5" },
+                            SAIDA_FINAL:     { label: "Saída",      cls: "border-rose-500/30 text-rose-400 bg-rose-500/5" },
+                            entrada:         { label: "E",          cls: "border-green-500/30 text-green-400 bg-green-500/5" },
+                            saida:           { label: "S",          cls: "border-orange-500/30 text-orange-400 bg-orange-500/5" },
+                          };
+                          const t = typeMap[rec.type] ?? { label: rec.type, cls: "border-white/20 text-muted-foreground" };
+                          return (
+                            <Badge key={i} variant="outline" className={`font-mono text-xs ${t.cls}`}>
+                              {t.label}: {format(new Date(rec.punchedAt), "HH:mm")}
+                            </Badge>
+                          );
+                        })
                       ) : (
                         <span className="text-sm text-muted-foreground">Sem marcações</span>
                       )}

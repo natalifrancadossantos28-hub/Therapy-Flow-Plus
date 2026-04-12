@@ -162,6 +162,30 @@ All three systems (Triagem, Arco-Íris, Ponto) now share a unified multi-tenant 
 
 **Per-company settings:** `toleranceMinutes`, `overtimeBlockEnabled`, `defaultBreakMinutes` stored in `ponto_companies`.
 
+### 4-Punch Clock System (IMPLEMENTED)
+
+**Punch sequence per day (auto-determined by server):**
+1. `ENTRADA_DIARIA` — Start of work (green)
+2. `SAIDA_ALMOCO` — Going to lunch (amber)
+3. `RETORNO_ALMOCO` — Return from lunch (blue)
+4. `SAIDA_FINAL` — End of work (rose)
+
+**Rules enforced by server:**
+- Server auto-determines next punch type from count of today's records (no client-side type logic)
+- 1-minute duplicate lock: returns error with remaining seconds if last punch was < 60s ago
+- 4th punch complete: returns 422 "Você já completou todas as 4 batidas de hoje"
+- Legacy `entrada`/`saida` records still supported in reports/summary (backward compat)
+
+**Kiosk success screen:** Shows punch type label, time, employee photo, and progress dots (1/4, 2/4...)
+
+**Weekly Schedule per employee (`schedule` column, JSON):**
+```json
+{ "mon": {"in": "08:00", "out": "17:00", "dayOff": false}, ..., "sat": {"in": "", "out": "", "dayOff": true} }
+```
+Employee form shows per-day schedule grid with Folga (day-off) toggles and auto-calculated total hours vs contract hours comparison badge.
+
+**Espelho de Ponto (reports):** 4 columns (Entrada / Saída Almoço / Retorno / Saída Final) + Saldo daily balance. PDF exported in landscape A4. Balance calculated from `weeklyHours / workDays` vs actual time worked.
+
 **Auth flow:**
 1. Company admin: POST `/api/ponto/auth/company` `{slug, password}` → stores company session
 2. Master admin: POST `/api/ponto/auth/master` `{password}` → stores master session

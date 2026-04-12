@@ -340,12 +340,21 @@ router.get("/ponto/records/summary", async (req, res) => {
     grouped[eid].records.push(r);
   }
   for (const s of Object.values(grouped)) {
-    const entradas = s.records.filter((r: any) => r.type === "entrada").map((r: any) => new Date(r.punchedAt!).getTime());
-    const saidas = s.records.filter((r: any) => r.type === "saida").map((r: any) => new Date(r.punchedAt!).getTime());
     let totalMs = 0;
-    const pairs = Math.min(entradas.length, saidas.length);
-    for (let i = 0; i < pairs; i++) totalMs += saidas[i] - entradas[i];
-    if (pairs > 0) {
+    const recs = s.records.sort((a: any, b: any) => new Date(a.punchedAt).getTime() - new Date(b.punchedAt).getTime());
+    const get = (type: string) => recs.find((r: any) => r.type === type);
+    // New 4-punch model
+    const ed = get("ENTRADA_DIARIA"), sa = get("SAIDA_ALMOCO"), ra = get("RETORNO_ALMOCO"), sf = get("SAIDA_FINAL");
+    if (ed && sa) totalMs += new Date(sa.punchedAt).getTime() - new Date(ed.punchedAt).getTime();
+    if (ra && sf) totalMs += new Date(sf.punchedAt).getTime() - new Date(ra.punchedAt).getTime();
+    // Legacy 2-punch model
+    if (totalMs === 0) {
+      const entradas = recs.filter((r: any) => r.type === "entrada").map((r: any) => new Date(r.punchedAt!).getTime());
+      const saidas = recs.filter((r: any) => r.type === "saida").map((r: any) => new Date(r.punchedAt!).getTime());
+      const pairs = Math.min(entradas.length, saidas.length);
+      for (let i = 0; i < pairs; i++) totalMs += saidas[i] - entradas[i];
+    }
+    if (totalMs > 0) {
       const h = Math.floor(totalMs / 3600000);
       const m = Math.floor((totalMs % 3600000) / 60000);
       s.totalHours = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -382,8 +391,18 @@ router.get("/ponto/records", async (req, res) => {
   res.json(rows.map(r => ({ ...r, employeeName: r.employeeName ?? "", employeePhoto: r.employeePhoto ?? null })));
 });
 
+const PUNCH_SEQUENCE = ["ENTRADA_DIARIA", "SAIDA_ALMOCO", "RETORNO_ALMOCO", "SAIDA_FINAL"] as const;
+type PunchType = typeof PUNCH_SEQUENCE[number];
+
+const PUNCH_LABELS: Record<PunchType, string> = {
+  ENTRADA_DIARIA: "entrada diária",
+  SAIDA_ALMOCO: "saída para almoço",
+  RETORNO_ALMOCO: "retorno do almoço",
+  SAIDA_FINAL: "saída final",
+};
+
 router.post("/ponto/records", async (req, res) => {
-  const { employeeId, type } = req.body;
+  const { employeeId } = req.body;
   const now = new Date();
   const date = now.toISOString().split("T")[0];
   const companyId = getCompanyId(req);
@@ -394,46 +413,33 @@ router.post("/ponto/records", async (req, res) => {
   const [employee] = await db.select().from(pontoEmployeesTable).where(condition);
   if (!employee) return res.status(404).json({ error: "Funcionário não encontrado" });
 
-  // Get company settings for validation
-  let tolerance = 10;
-  let overtimeBlockEnabled = true;
-  if (employee.companyId) {
-    const [company] = await db.select({
-      toleranceMinutes: pontoCompaniesTable.toleranceMinutes,
-      overtimeBlockEnabled: pontoCompaniesTable.overtimeBlockEnabled,
-    }).from(pontoCompaniesTable).where(eq(pontoCompaniesTable.id, employee.companyId));
-    if (company) {
-      tolerance = company.toleranceMinutes;
-      overtimeBlockEnabled = company.overtimeBlockEnabled;
+  // Get today's records for this employee (ordered by time)
+  const todayRecs = await db.select()
+    .from(pontoRecordsTable)
+    .where(and(eq(pontoRecordsTable.employeeId, Number(employeeId)), eq(pontoRecordsTable.date, date)))
+    .orderBy(pontoRecordsTable.punchedAt);
+
+  // All 4 punches already registered today
+  if (todayRecs.length >= 4) {
+    return res.status(422).json({ error: "Você já completou todas as 4 batidas de hoje. Até amanhã! 👋" });
+  }
+
+  // 1-minute duplicate lock
+  if (todayRecs.length > 0) {
+    const lastPunch = todayRecs[todayRecs.length - 1];
+    const diffMs = now.getTime() - new Date(lastPunch.punchedAt).getTime();
+    if (diffMs < 60_000) {
+      const remainSec = Math.ceil((60_000 - diffMs) / 1000);
+      return res.status(422).json({ error: `Aguarde ${remainSec} segundo(s) antes de registrar novamente.` });
     }
   }
 
-  // Schedule validation using company-level tolerance settings
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-  if (type === "entrada" && employee.entryTime) {
-    const earliest = timeToMinutes(employee.entryTime) - tolerance;
-    if (nowMinutes < earliest) {
-      return res.status(422).json({
-        error: `Muito cedo para registrar. A entrada é liberada a partir das ${minutesToTime(earliest)}.`,
-      });
-    }
-  }
-
-  if (type === "saida" && employee.exitTime && overtimeBlockEnabled) {
-    const effExit = effectiveExitMinutes(employee.exitTime, employee.breakMinutes ?? 60);
-    const deadline = effExit + tolerance;
-    if (nowMinutes > deadline) {
-      return res.status(422).json({
-        error: `Horário limite de saída excedido. Procure a administração para autorizar hora extra.`,
-        detail: `Saída prevista: ${minutesToTime(effExit)} · Limite: ${minutesToTime(deadline)}`,
-      });
-    }
-  }
+  // Auto-determine next punch type from sequence
+  const nextType: PunchType = PUNCH_SEQUENCE[todayRecs.length];
 
   const [row] = await db.insert(pontoRecordsTable).values({
     employeeId: Number(employeeId),
-    type: type ?? "entrada",
+    type: nextType,
     punchedAt: now,
     date,
   }).returning();
@@ -442,6 +448,8 @@ router.post("/ponto/records", async (req, res) => {
     ...row,
     employeeName: employee.name,
     employeePhoto: employee.photo ?? null,
+    punchTypeLabel: PUNCH_LABELS[nextType],
+    punchIndex: todayRecs.length + 1,
   });
 });
 

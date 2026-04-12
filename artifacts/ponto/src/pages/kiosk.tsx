@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { Html5QrcodeScanner, Html5QrcodeScanType } from "html5-qrcode";
-import { useGetPontoEmployeeByCpf, useCreatePontoRecord, useGetPontoRecords } from "@workspace/api-client-react";
+import { useGetPontoEmployeeByCpf, useCreatePontoRecord } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { CheckCircle2, ScanLine, XCircle, Zap, Building2 } from "lucide-react";
-
-const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { CheckCircle2, XCircle, Zap, Building2, LogIn, Coffee, Utensils, LogOut } from "lucide-react";
 
 // Play beep instantly — called at moment of QR detection, not after DB save
 const playBeep = () => {
@@ -27,11 +25,29 @@ const playBeep = () => {
 };
 
 type ScanState = "idle" | "detected" | "success" | "error";
-const RESET_DELAY_MS = 2000;
+const RESET_DELAY_MS = 3500;
 
-// ── Company context ──────────────────────────────────────────────────────────
-// On load, if URL has ?c=SLUG, look up the company and set kiosk session
-// so all API calls are scoped to that company via x-company-id header.
+type PunchResult = {
+  label: string;
+  time: string;
+  index: number;
+  type: string;
+};
+
+const PUNCH_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  ENTRADA_DIARIA: LogIn,
+  SAIDA_ALMOCO: Utensils,
+  RETORNO_ALMOCO: Coffee,
+  SAIDA_FINAL: LogOut,
+};
+
+const PUNCH_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  ENTRADA_DIARIA: { bg: "bg-green-500/10", text: "text-green-400", border: "border-green-500/30" },
+  SAIDA_ALMOCO:   { bg: "bg-amber-500/10", text: "text-amber-400",  border: "border-amber-500/30" },
+  RETORNO_ALMOCO: { bg: "bg-blue-500/10",  text: "text-blue-400",   border: "border-blue-500/30" },
+  SAIDA_FINAL:    { bg: "bg-rose-500/10",  text: "text-rose-400",   border: "border-rose-500/30" },
+};
+
 async function initCompanyContext(slug: string): Promise<{ id: number; name: string } | null> {
   try {
     const res = await fetch(`/api/ponto/companies/slug/${slug}`);
@@ -43,9 +59,7 @@ async function initCompanyContext(slug: string): Promise<{ id: number; name: str
       companyName: company.name,
     }));
     return company;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 export default function KioskPage() {
@@ -59,26 +73,20 @@ export default function KioskPage() {
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [companyLoading, setCompanyLoading] = useState(false);
   const [companyError, setCompanyError] = useState<string | null>(null);
+  const [punchResult, setPunchResult] = useState<PunchResult | null>(null);
 
-  // ── Init company from URL param ?c=slug ──────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const slug = params.get("c");
     if (!slug) {
-      // No company param — clear any old kiosk session, use global
       const existing = JSON.parse(sessionStorage.getItem("nfs_ponto_session") || "{}");
-      if (existing.type === "kiosk") {
-        setCompanyName(existing.companyName ?? null);
-      }
+      if (existing.type === "kiosk") setCompanyName(existing.companyName ?? null);
       return;
     }
     setCompanyLoading(true);
     initCompanyContext(slug).then(company => {
-      if (company) {
-        setCompanyName(company.name);
-      } else {
-        setCompanyError(`Empresa "${slug}" não encontrada ou inativa.`);
-      }
+      if (company) setCompanyName(company.name);
+      else setCompanyError(`Empresa "${slug}" não encontrada ou inativa.`);
       setCompanyLoading(false);
     });
   }, []);
@@ -88,21 +96,10 @@ export default function KioskPage() {
     { query: { enabled: !!scannedCpf, retry: false } }
   );
 
-  const { data: todayRecords } = useGetPontoRecords(
-    { employeeId: employee?.id, date: format(new Date(), "yyyy-MM-dd") },
-    { query: { enabled: !!employee?.id } }
-  );
-
   const createRecord = useCreatePontoRecord();
 
-  // ─── helpers ──────────────────────────────────────────────────────────────
-  const pauseScanner = useCallback(() => {
-    try { scannerRef.current?.pause(true); } catch (_) {}
-  }, []);
-
-  const resumeScanner = useCallback(() => {
-    try { scannerRef.current?.resume(); } catch (_) {}
-  }, []);
+  const pauseScanner = useCallback(() => { try { scannerRef.current?.pause(true); } catch (_) {} }, []);
+  const resumeScanner = useCallback(() => { try { scannerRef.current?.resume(); } catch (_) {} }, []);
 
   const scheduleReset = useCallback((delay = RESET_DELAY_MS) => {
     if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
@@ -110,6 +107,7 @@ export default function KioskPage() {
       setScanState("idle");
       setScannedCpf(null);
       setErrorMessage(null);
+      setPunchResult(null);
       processingRef.current = false;
       resumeScanner();
     }, delay);
@@ -118,10 +116,9 @@ export default function KioskPage() {
   const showError = useCallback((msg: string) => {
     setScanState("error");
     setErrorMessage(msg);
-    scheduleReset(3500);
+    scheduleReset(4000);
   }, [scheduleReset]);
 
-  // ─── QR detected (immediate) ────────────────────────────────────────────
   const handleScan = useCallback((decodedText: string) => {
     if (processingRef.current) return;
     processingRef.current = true;
@@ -131,74 +128,45 @@ export default function KioskPage() {
     setScannedCpf(decodedText.trim());
   }, [pauseScanner]);
 
-  // ─── DB lookup complete ──────────────────────────────────────────────────
+  // DB lookup complete → register punch
   useEffect(() => {
     if (!scannedCpf || scanState !== "detected") return;
     if (isLoadingEmployee) return;
-
-    if (!employee) {
-      showError("Funcionário não encontrado. O QR Code pode ser inválido.");
-      return;
-    }
-    if (todayRecords === undefined) return;
-
-    const sortedRecords = [...todayRecords].sort(
-      (a, b) => new Date(b.punchedAt).getTime() - new Date(a.punchedAt).getTime()
-    );
-    const nextType =
-      sortedRecords.length === 0 || sortedRecords[0].type === "saida"
-        ? "entrada"
-        : "saida";
+    if (!employee) { showError("Funcionário não encontrado. Verifique seu crachá."); return; }
 
     createRecord.mutate(
-      { data: { employeeId: employee.id, type: nextType } },
+      { data: { employeeId: employee.id, type: "ENTRADA_DIARIA" } }, // type overridden by server
       {
-        onSuccess: () => {
+        onSuccess: (data: any) => {
+          setPunchResult({
+            label: data.punchTypeLabel ?? "ponto",
+            time: format(new Date(data.punchedAt), "HH:mm"),
+            index: data.punchIndex ?? 1,
+            type: data.type ?? "ENTRADA_DIARIA",
+          });
           setScanState("success");
           scheduleReset();
         },
         onError: (err: any) => {
-          // ApiError: err.data.error (custom-fetch) or fallback to err.message
-          const msg =
-            (err?.data as any)?.error ??
-            err?.message ??
-            "Erro ao registrar ponto. Tente novamente.";
+          const msg = (err?.data as any)?.error ?? err?.message ?? "Erro ao registrar ponto. Tente novamente.";
           showError(msg);
         },
       }
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scannedCpf, scanState, isLoadingEmployee, employee, todayRecords]);
+  }, [scannedCpf, scanState, isLoadingEmployee, employee]);
 
-  // ─── Scanner init ────────────────────────────────────────────────────────
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!document.getElementById("reader")) return;
-
       const scanner = new Html5QrcodeScanner(
         "reader",
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1,
-          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-          videoConstraints: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-          },
-        },
+        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1, supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA], videoConstraints: { facingMode: { ideal: "environment" }, width: { ideal: 640 }, height: { ideal: 480 } } },
         false
       );
-
-      scanner.render(
-        text => handleScan(text),
-        () => {}
-      );
-
+      scanner.render(text => handleScan(text), () => {});
       scannerRef.current = scanner;
     }, 100);
-
     return () => {
       clearTimeout(timer);
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
@@ -211,16 +179,16 @@ export default function KioskPage() {
   const isSuccess = scanState === "success";
   const isError   = scanState === "error";
 
-  // ─── Company error screen ────────────────────────────────────────────────
-  if (companyError) {
-    return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center p-8 bg-background text-center">
-        <Building2 className="w-16 h-16 text-destructive mb-4" />
-        <h1 className="text-2xl font-bold text-foreground mb-2">Empresa não encontrada</h1>
-        <p className="text-muted-foreground">{companyError}</p>
-      </div>
-    );
-  }
+  if (companyError) return (
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center p-8 bg-background text-center">
+      <Building2 className="w-16 h-16 text-destructive mb-4" />
+      <h1 className="text-2xl font-bold text-foreground mb-2">Empresa não encontrada</h1>
+      <p className="text-muted-foreground">{companyError}</p>
+    </div>
+  );
+
+  const punchColors = punchResult ? (PUNCH_COLORS[punchResult.type] ?? PUNCH_COLORS.ENTRADA_DIARIA) : PUNCH_COLORS.ENTRADA_DIARIA;
+  const PunchIcon = punchResult ? (PUNCH_ICONS[punchResult.type] ?? CheckCircle2) : CheckCircle2;
 
   return (
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 bg-background relative overflow-hidden">
@@ -236,12 +204,8 @@ export default function KioskPage() {
 
       <div className="w-full max-w-4xl mx-auto flex flex-col items-center mt-24">
 
-        {/* ── Scanner ── */}
-        <div
-          className={`w-full max-w-lg aspect-square relative rounded-3xl overflow-hidden glass-card transition-all duration-300 ${
-            isIdle ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none absolute"
-          }`}
-        >
+        {/* Scanner */}
+        <div className={`w-full max-w-lg aspect-square relative rounded-3xl overflow-hidden glass-card transition-all duration-300 ${isIdle ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none absolute"}`}>
           <div id="reader" className="w-full h-full [&>div]:border-none [&>div]:bg-transparent" />
           <div className="absolute inset-0 pointer-events-none border-[12px] border-background/50 rounded-3xl z-10" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[260px] h-[260px] pointer-events-none z-20">
@@ -255,12 +219,8 @@ export default function KioskPage() {
           </div>
         </div>
 
-        {/* ── Detected ── */}
-        <div
-          className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-200 z-20 bg-background/95 backdrop-blur-xl ${
-            isDetect ? "opacity-100 scale-100" : "opacity-0 scale-105 pointer-events-none"
-          }`}
-        >
+        {/* Detected */}
+        <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-200 z-20 bg-background/95 backdrop-blur-xl ${isDetect ? "opacity-100 scale-100" : "opacity-0 scale-105 pointer-events-none"}`}>
           <div className="w-28 h-28 rounded-full bg-primary/20 flex items-center justify-center mb-6 animate-pulse">
             <Zap className="w-14 h-14 text-primary" />
           </div>
@@ -268,50 +228,57 @@ export default function KioskPage() {
           <p className="text-muted-foreground text-lg animate-pulse">Registrando ponto…</p>
         </div>
 
-        {/* ── Success ── */}
+        {/* Success */}
         {employee && (
-          <div
-            className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-300 z-30 bg-background/95 backdrop-blur-xl ${
-              isSuccess ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
-            }`}
-          >
-            <div className="max-w-2xl w-full flex flex-col items-center">
-              <div className="relative mb-8">
-                <div className="w-64 h-64 md:w-80 md:h-80 rounded-full border-4 border-primary overflow-hidden shadow-[0_0_50px_rgba(59,130,246,0.3)] bg-muted">
+          <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-300 z-30 bg-background/95 backdrop-blur-xl ${isSuccess ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}>
+            <div className="max-w-2xl w-full flex flex-col items-center px-4">
+              {/* Photo */}
+              <div className="relative mb-6">
+                <div className="w-56 h-56 md:w-72 md:h-72 rounded-full border-4 border-primary overflow-hidden shadow-[0_0_50px_rgba(59,130,246,0.3)] bg-muted">
                   {employee.photo ? (
                     <img src={employee.photo} alt={employee.name} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-6xl text-muted-foreground bg-secondary">
-                      {employee.name.charAt(0)}
-                    </div>
+                    <div className="w-full h-full flex items-center justify-center text-6xl text-muted-foreground bg-secondary">{employee.name.charAt(0)}</div>
                   )}
                 </div>
-                <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-green-500 rounded-full flex items-center justify-center border-4 border-background shadow-lg">
-                  <CheckCircle2 className="w-10 h-10 text-white" />
+                <div className={`absolute -bottom-4 -right-4 w-20 h-20 rounded-full flex items-center justify-center border-4 border-background shadow-lg ${punchColors.bg} ${punchColors.border} border-2`}>
+                  <PunchIcon className={`w-10 h-10 ${punchColors.text}`} />
                 </div>
               </div>
-              <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground text-center mb-2">
-                {employee.name}
-              </h2>
-              <p className="text-xl text-primary font-medium mb-8">{employee.role}</p>
-              <div className="bg-green-500/10 border border-green-500/20 text-green-500 px-8 py-4 rounded-2xl text-2xl font-semibold flex items-center gap-4">
-                <CheckCircle2 className="w-7 h-7" />
-                Ponto Registrado com Sucesso!
-              </div>
+
+              {/* Name + Role */}
+              <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground text-center mb-1">{employee.name}</h2>
+              <p className="text-xl text-primary font-medium mb-6">{employee.role}</p>
+
+              {/* Punch result */}
+              {punchResult && (
+                <div className={`${punchColors.bg} border ${punchColors.border} px-8 py-4 rounded-2xl flex flex-col items-center gap-2 mb-4 w-full max-w-sm text-center`}>
+                  <div className={`text-2xl font-bold capitalize ${punchColors.text}`}>
+                    {punchResult.label.charAt(0).toUpperCase() + punchResult.label.slice(1)} ✓
+                  </div>
+                  <div className="font-mono text-4xl font-bold text-foreground">{punchResult.time}</div>
+                  <div className="text-sm text-muted-foreground">Batida {punchResult.index} de 4 do dia</div>
+                </div>
+              )}
+
+              {/* Progress dots */}
+              {punchResult && (
+                <div className="flex gap-3 mt-2">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className={`w-3 h-3 rounded-full border-2 transition-all ${i <= punchResult.index ? `${punchColors.bg} ${punchColors.border}` : "border-white/20 bg-white/5"}`} />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* ── Error ── */}
-        <div
-          className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-300 z-30 bg-background/95 backdrop-blur-xl ${
-            isError ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
-          }`}
-        >
+        {/* Error */}
+        <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-300 z-30 bg-background/95 backdrop-blur-xl ${isError ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}>
           <div className="w-32 h-32 rounded-full bg-destructive/20 flex items-center justify-center mb-8">
             <XCircle className="w-16 h-16 text-destructive" />
           </div>
-          <h2 className="text-3xl font-display font-bold text-foreground mb-4">Ops, ocorreu um erro</h2>
+          <h2 className="text-3xl font-display font-bold text-foreground mb-4">Atenção</h2>
           <p className="text-xl text-muted-foreground text-center max-w-md">{errorMessage}</p>
         </div>
       </div>
@@ -330,10 +297,7 @@ export default function KioskPage() {
           90%  { opacity: 1; }
           100% { top: 100%; opacity: 0; }
         }
-        #reader video {
-          filter: contrast(1.15) brightness(1.05) !important;
-          object-fit: cover !important;
-        }
+        #reader video { filter: contrast(1.15) brightness(1.05) !important; object-fit: cover !important; }
         #reader { background: transparent !important; border: none !important; }
         #reader__scan_region { background: transparent !important; }
         #reader__header_message { display: none !important; }
