@@ -34,7 +34,7 @@ const RESET_DELAY_MS = 2000;
 // so all API calls are scoped to that company via x-company-id header.
 async function initCompanyContext(slug: string): Promise<{ id: number; name: string } | null> {
   try {
-    const res = await fetch(`${BASE_URL}/api/ponto/companies/slug/${slug}`);
+    const res = await fetch(`/api/ponto/companies/slug/${slug}`);
     if (!res.ok) return null;
     const company = await res.json();
     sessionStorage.setItem("nfs_ponto_session", JSON.stringify({

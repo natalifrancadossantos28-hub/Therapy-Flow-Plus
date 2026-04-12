@@ -26,7 +26,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!companyId) return;
-    fetch(`${BASE_URL}/api/ponto/companies/${companyId}/settings`, {
+    fetch(`/api/ponto/companies/${companyId}/settings`, {
       headers: {
         "x-company-id": String(companyId),
         "x-company-auth": session?.type === "company" ? session.adminToken : "",
@@ -49,7 +49,7 @@ export default function SettingsPage() {
         logoUrl: settings.logoUrl,
       };
       if (newPassword.trim()) payload.adminPassword = newPassword;
-      const res = await fetch(`${BASE_URL}/api/ponto/companies/${companyId}/settings`, {
+      const res = await fetch(`/api/ponto/companies/${companyId}/settings`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

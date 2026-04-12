@@ -32,7 +32,7 @@ function authHeaders() {
 }
 
 async function fetchCompanies(): Promise<Company[]> {
-  const res = await fetch(`${BASE_URL}/api/ponto/companies`, { headers: authHeaders() });
+  const res = await fetch(`/api/ponto/companies`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Falha ao carregar empresas.");
   return res.json();
 }
@@ -52,7 +52,7 @@ export default function CompaniesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await fetch(`${BASE_URL}/api/ponto/companies`, {
+      const res = await fetch(`/api/ponto/companies`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(data),
@@ -71,7 +71,7 @@ export default function CompaniesPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<FormData> }) => {
-      const res = await fetch(`${BASE_URL}/api/ponto/companies/${id}`, {
+      const res = await fetch(`/api/ponto/companies/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(data),
@@ -89,7 +89,7 @@ export default function CompaniesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`${BASE_URL}/api/ponto/companies/${id}`, {
+      const res = await fetch(`/api/ponto/companies/${id}`, {
         method: "DELETE", headers: authHeaders(),
       });
       if (!res.ok && res.status !== 204) throw new Error("Falha ao excluir.");

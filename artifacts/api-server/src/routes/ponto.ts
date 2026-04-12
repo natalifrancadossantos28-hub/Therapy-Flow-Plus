@@ -87,9 +87,10 @@ router.get("/ponto/companies", async (req, res) => {
 
 router.post("/ponto/companies", async (req, res) => {
   if (!isMaster(req)) return res.status(403).json({ error: "Acesso negado." });
-  const { name, slug, adminPassword, toleranceMinutes, overtimeBlockEnabled, defaultBreakMinutes, logoUrl } = req.body;
+  const { name, slug, adminPassword, toleranceMinutes, overtimeBlockEnabled, defaultBreakMinutes, logoUrl, modulePonto, moduleTriagem, moduleArcoIris } = req.body;
+  if (!name || !slug) return res.status(400).json({ error: "Nome e slug são obrigatórios." });
   const exists = await db.select({ id: pontoCompaniesTable.id })
-    .from(pontoCompaniesTable).where(eq(pontoCompaniesTable.slug, slug));
+    .from(pontoCompaniesTable).where(eq(pontoCompaniesTable.slug, slug.toLowerCase()));
   if (exists.length > 0) return res.status(409).json({ error: "Slug já em uso." });
   const [row] = await db.insert(pontoCompaniesTable).values({
     name,
@@ -99,6 +100,9 @@ router.post("/ponto/companies", async (req, res) => {
     overtimeBlockEnabled: overtimeBlockEnabled !== undefined ? Boolean(overtimeBlockEnabled) : true,
     defaultBreakMinutes: defaultBreakMinutes !== undefined ? Number(defaultBreakMinutes) : 60,
     logoUrl: logoUrl ?? null,
+    modulePonto: modulePonto !== undefined ? Boolean(modulePonto) : true,
+    moduleTriagem: moduleTriagem !== undefined ? Boolean(moduleTriagem) : false,
+    moduleArcoIris: moduleArcoIris !== undefined ? Boolean(moduleArcoIris) : false,
   }).returning();
   const { adminPassword: _, ...safe } = row;
   res.status(201).json(safe);
