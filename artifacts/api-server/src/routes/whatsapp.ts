@@ -185,9 +185,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 <div class="wrap">
 
   <div class="header">
-    <div class="logo">🤖</div>
-    <h1>ASSISTENTE NFS</h1>
-    <p>Painel de Controle — Recepção Virtual</p>
+    <div class="logo">👩‍💼</div>
+    <h1>OLÁ, SOU A CARLA!</h1>
+    <p>Recepcionista Virtual — NFs gestão</p>
   </div>
 
   <!-- STATUS -->
@@ -201,8 +201,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div>
-        <div style="font-size:14px;font-weight:600;color:var(--cyan)">🤖 Assistente de Voz</div>
-        <div style="font-size:11px;color:var(--dim);margin-top:2px">Digite ou fale — a IA responde em voz alta</div>
+        <div style="font-size:14px;font-weight:600;color:var(--cyan)">💬 Fale com a Carla</div>
+        <div style="font-size:11px;color:var(--dim);margin-top:2px">Digite ou fale — ela responde em voz alta</div>
       </div>
       <div style="cursor:pointer" onclick="toggleTTS()">
         <span style="font-size:11px;color:var(--dim)" id="tts-label">🔊 Voz ON</span>
@@ -258,7 +258,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
       <div class="log-dot r"></div>
       <div class="log-dot y"></div>
       <div class="log-dot g"></div>
-      <span class="log-title">ASSISTENTE NFS — LOG DE ATIVIDADES</span>
+      <span class="log-title">CARLA — LOG DE ATIVIDADES EM TEMPO REAL</span>
       <div class="log-live" title="Atualizando ao vivo"></div>
     </div>
     <div class="log-body" id="log-body">
@@ -269,6 +269,21 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 </div>
 
 <script>
+/* ─── Saudação inicial da Carla ─── */
+(function(){
+  var hora = new Date().getHours();
+  var saudacao = hora < 12 ? 'Bom dia!' : hora < 18 ? 'Boa tarde!' : 'Boa noite!';
+  var msgs = [
+    saudacao + ' Tô aqui, pode perguntar o que precisar.',
+    saudacao + ' Pode falar, tô te ouvindo.',
+    saudacao + ' Pode mandar — tô de olho na agenda.',
+  ];
+  var msg = msgs[Math.floor(Math.random()*msgs.length)];
+  var el = document.getElementById('va-response');
+  el.textContent = '👩‍💼 ' + msg;
+  el.style.display = 'block';
+})();
+
 /* ─── TTS setup ─── */
 var ttsAtivo = true;
 if(window.speechSynthesis) speechSynthesis.getVoices();
