@@ -658,6 +658,13 @@ async function conectarWhatsApp() {
     return;
   }
   _conectando = true;
+
+  // Fecha socket anterior para evitar acúmulo de event listeners
+  if (sock) {
+    try { sock.end(); } catch(e) {}
+    sock = null;
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState("./sessao_whatsapp");
   const { version }          = await fetchLatestBaileysVersion();
 
@@ -1011,6 +1018,7 @@ async function iniciarWhatsApp() {
   } catch (err) {
     console.error("❌ Erro ao iniciar WhatsApp:", err?.message || err);
     logAtividade(`❌ Falha ao iniciar conexão — tentando novamente em 10s`, "erro");
+    _conectando = false; // libera o guard mesmo se conectarWhatsApp() jogou exceção
     setTimeout(iniciarWhatsApp, 10000);
   }
 }
