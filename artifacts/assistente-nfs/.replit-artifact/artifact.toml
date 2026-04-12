@@ -1,12 +1,24 @@
 kind = "web"
-previewPath = "/assistente-nfs"
-title = "Assistente NFS – WhatsApp"
-version = "1.0.0"
+  previewPath = "/assistente-nfs"
+  title = "Assistente NFS – WhatsApp"
+  version = "1.0.0"
 
-[[services]]
-localPort = 3001
-name = "web"
-paths = ["/assistente-nfs"]
+  [[services]]
+  localPort = 3001
+  name = "web"
+  paths = ["/assistente-nfs"]
 
-[services.development]
-run = "cd artifacts/assistente-nfs && PORT=3001 node index.js"
+  [services.development]
+  run = "cd artifacts/assistente-nfs && PORT=3001 node index.js"
+
+  [services.production]
+
+  [services.production.run]
+  args = ["node", "artifacts/assistente-nfs/index.js"]
+
+  [services.production.run.env]
+  PORT = "3001"
+
+  [services.production.health.startup]
+  path = "/assistente-nfs/status"
+  
