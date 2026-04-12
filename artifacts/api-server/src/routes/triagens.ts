@@ -18,11 +18,20 @@ router.post("/triagens", async (req, res) => {
   try {
     const {
       nome, dataNascimento, idade, responsavel, telefone, endereco,
-      diagnostico, cid, profissional, especialidade, data, resultado,
+      naturalidade, rg, sus, nomeMae, profissaoMae, nomePai, profissaoPai,
+      numIrmaos, tipoImovel, bolsaFamilia, bpc,
+      diagnostico, cid, medico, dataUltimaCons,
+      profissional, especialidade, data, resultado,
     } = req.body;
     const [row] = await db
       .insert(triagens)
-      .values({ nome, dataNascimento, idade, responsavel, telefone, endereco, diagnostico, cid, profissional, especialidade, data, resultado })
+      .values({
+        nome, dataNascimento, idade, responsavel, telefone, endereco,
+        naturalidade, rg, sus, nomeMae, profissaoMae, nomePai, profissaoPai,
+        numIrmaos, tipoImovel, bolsaFamilia: !!bolsaFamilia, bpc: !!bpc,
+        diagnostico, cid, medico, dataUltimaCons,
+        profissional, especialidade, data, resultado,
+      })
       .returning();
     res.status(201).json(row);
   } catch (err) {

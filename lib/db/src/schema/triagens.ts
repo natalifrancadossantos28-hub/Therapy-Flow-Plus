@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, boolean } from "drizzle-orm/pg-core";
 
 export const triagens = pgTable("triagens", {
   id: serial("id").primaryKey(),
@@ -8,8 +8,21 @@ export const triagens = pgTable("triagens", {
   responsavel: text("responsavel"),
   telefone: text("telefone"),
   endereco: text("endereco"),
+  naturalidade: text("naturalidade"),
+  rg: text("rg"),
+  sus: text("sus"),
+  nomeMae: text("nome_mae"),
+  profissaoMae: text("profissao_mae"),
+  nomePai: text("nome_pai"),
+  profissaoPai: text("profissao_pai"),
+  numIrmaos: text("num_irmaos"),
+  tipoImovel: text("tipo_imovel"),
+  bolsaFamilia: boolean("bolsa_familia").default(false),
+  bpc: boolean("bpc").default(false),
   diagnostico: text("diagnostico"),
   cid: text("cid"),
+  medico: text("medico"),
+  dataUltimaCons: text("data_ultima_cons"),
   profissional: text("profissional"),
   especialidade: text("especialidade"),
   data: text("data"),

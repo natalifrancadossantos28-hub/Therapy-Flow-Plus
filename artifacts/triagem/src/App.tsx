@@ -157,14 +157,27 @@ type FormData = {
   respostas: number[];
   nomePaciente: string;
   dataNascimento: string;
+  idade: string;
   nomeResponsavel: string;
   telefone: string;
   endereco: string;
+  naturalidade: string;
+  rg: string;
+  sus: string;
+  nomeMae: string;
+  profissaoMae: string;
+  nomePai: string;
+  profissaoPai: string;
+  numIrmaos: string;
+  tipoImovel: string;
+  bolsaFamilia: boolean;
+  bpc: boolean;
   diagnostico: string;
   cid: string;
+  medico: string;
+  dataUltimaCons: string;
   profissional: string;
   especialidade: string;
-  idade: string;
 };
 
 type TriagemSalva = {
@@ -175,8 +188,21 @@ type TriagemSalva = {
   responsavel: string | null;
   telefone: string | null;
   endereco: string | null;
+  naturalidade: string | null;
+  rg: string | null;
+  sus: string | null;
+  nomeMae: string | null;
+  profissaoMae: string | null;
+  nomePai: string | null;
+  profissaoPai: string | null;
+  numIrmaos: string | null;
+  tipoImovel: string | null;
+  bolsaFamilia: boolean | null;
+  bpc: boolean | null;
   diagnostico: string | null;
   cid: string | null;
+  medico: string | null;
+  dataUltimaCons: string | null;
   profissional: string | null;
   especialidade: string | null;
   data: string | null;
@@ -209,14 +235,27 @@ function Formulario({ onSubmit }: { onSubmit: (f: FormData) => void }) {
   const [respostas, setRespostas] = useState<number[]>(Array(PERGUNTAS.length).fill(0));
   const [nomePaciente, setNomePaciente] = useState("");
   const [dataNascimento, setDataNascimento] = useState("");
+  const [idade, setIdade] = useState("");
   const [nomeResponsavel, setNomeResponsavel] = useState("");
   const [telefone, setTelefone] = useState("");
   const [endereco, setEndereco] = useState("");
+  const [naturalidade, setNaturalidade] = useState("");
+  const [rg, setRg] = useState("");
+  const [sus, setSus] = useState("");
+  const [nomeMae, setNomeMae] = useState("");
+  const [profissaoMae, setProfissaoMae] = useState("");
+  const [nomePai, setNomePai] = useState("");
+  const [profissaoPai, setProfissaoPai] = useState("");
+  const [numIrmaos, setNumIrmaos] = useState("");
+  const [tipoImovel, setTipoImovel] = useState("");
+  const [bolsaFamilia, setBolsaFamilia] = useState(false);
+  const [bpc, setBpc] = useState(false);
   const [diagnostico, setDiagnostico] = useState("");
   const [cid, setCid] = useState("");
+  const [medico, setMedico] = useState("");
+  const [dataUltimaCons, setDataUltimaCons] = useState("");
   const [profissional, setProfissional] = useState("");
   const [especialidade, setEspecialidade] = useState("");
-  const [idade, setIdade] = useState("");
   const [areaAtiva, setAreaAtiva] = useState(AREAS[0]);
 
   const perguntasDaArea = PERGUNTAS.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === areaAtiva);
@@ -224,7 +263,14 @@ function Formulario({ onSubmit }: { onSubmit: (f: FormData) => void }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ respostas, nomePaciente, dataNascimento, nomeResponsavel, telefone, endereco, diagnostico, cid, profissional, especialidade, idade });
+    onSubmit({
+      respostas, nomePaciente, dataNascimento, idade, nomeResponsavel,
+      telefone, endereco, naturalidade, rg, sus,
+      nomeMae, profissaoMae, nomePai, profissaoPai,
+      numIrmaos, tipoImovel, bolsaFamilia, bpc,
+      diagnostico, cid, medico, dataUltimaCons,
+      profissional, especialidade,
+    });
   };
 
   return (
@@ -284,10 +330,87 @@ function Formulario({ onSubmit }: { onSubmit: (f: FormData) => void }) {
                   placeholder="(00) 00000-0000" />
               </div>
               <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Naturalidade</label>
+                <input value={naturalidade} onChange={(e) => setNaturalidade(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Cidade / Estado" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">RG</label>
+                <input value={rg} onChange={(e) => setRg(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Nº do RG" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Cartão SUS (CNS)</label>
+                <input value={sus} onChange={(e) => setSus(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Nº do cartão SUS" />
+              </div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-muted-foreground mb-1">Endereço</label>
                 <input value={endereco} onChange={(e) => setEndereco(e.target.value)}
                   className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                   placeholder="Rua, número, bairro" />
+              </div>
+            </div>
+          </div>
+
+          {/* Dados Familiares */}
+          <div className="pt-4 border-t border-border">
+            <h2 className="text-base font-bold text-foreground mb-3">Dados Familiares e Socioeconômicos</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome da Mãe</label>
+                <input value={nomeMae} onChange={(e) => setNomeMae(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Nome completo" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Profissão da Mãe</label>
+                <input value={profissaoMae} onChange={(e) => setProfissaoMae(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Profissão" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome do Pai</label>
+                <input value={nomePai} onChange={(e) => setNomePai(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Nome completo" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Profissão do Pai</label>
+                <input value={profissaoPai} onChange={(e) => setProfissaoPai(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Profissão" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Nº de Irmãos</label>
+                <input type="number" min="0" value={numIrmaos} onChange={(e) => setNumIrmaos(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Tipo de Imóvel</label>
+                <select value={tipoImovel} onChange={(e) => setTipoImovel(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white">
+                  <option value="">Selecione...</option>
+                  <option value="Próprio">Próprio</option>
+                  <option value="Alugado">Alugado</option>
+                  <option value="Cedido">Cedido</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-6 md:col-span-2 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={bolsaFamilia} onChange={(e) => setBolsaFamilia(e.target.checked)}
+                    className="w-4 h-4 rounded accent-primary" />
+                  <span className="text-sm font-semibold text-muted-foreground">Bolsa Família</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={bpc} onChange={(e) => setBpc(e.target.checked)}
+                    className="w-4 h-4 rounded accent-primary" />
+                  <span className="text-sm font-semibold text-muted-foreground">BPC</span>
+                </label>
               </div>
             </div>
           </div>
@@ -303,10 +426,21 @@ function Formulario({ onSubmit }: { onSubmit: (f: FormData) => void }) {
                   placeholder="Ex.: TEA, TDAH, sem diagnóstico" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-muted-foreground mb-1">CID (se houver)</label>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">CID-10</label>
                 <input value={cid} onChange={(e) => setCid(e.target.value)}
                   className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                   placeholder="Ex.: F84.0, F90.0" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Médico Responsável</label>
+                <input value={medico} onChange={(e) => setMedico(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Nome do médico" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Data da Última Consulta</label>
+                <input type="date" value={dataUltimaCons} onChange={(e) => setDataUltimaCons(e.target.value)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
               </div>
             </div>
           </div>
@@ -422,7 +556,14 @@ function Formulario({ onSubmit }: { onSubmit: (f: FormData) => void }) {
 }
 
 function Relatorio({ formData, onNova }: { formData: FormData; onNova: () => void }) {
-  const { respostas, nomePaciente, dataNascimento, nomeResponsavel, telefone, endereco, diagnostico, cid, profissional, especialidade, idade } = formData;
+  const {
+    respostas, nomePaciente, dataNascimento, idade, nomeResponsavel,
+    telefone, endereco, naturalidade, rg, sus,
+    nomeMae, profissaoMae, nomePai, profissaoPai,
+    numIrmaos, tipoImovel, bolsaFamilia, bpc,
+    diagnostico, cid, medico, dataUltimaCons,
+    profissional, especialidade,
+  } = formData;
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
   const [, navigate] = useLocation();
@@ -454,17 +595,14 @@ function Relatorio({ formData, onNova }: { formData: FormData; onNova: () => voi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nome: nomePaciente,
-          dataNascimento,
-          idade,
+          dataNascimento, idade,
           responsavel: nomeResponsavel,
-          telefone,
-          endereco,
-          diagnostico,
-          cid,
-          profissional,
-          especialidade,
-          data,
-          resultado: resultadoTexto,
+          telefone, endereco, naturalidade, rg, sus,
+          nomeMae, profissaoMae, nomePai, profissaoPai,
+          numIrmaos, tipoImovel, bolsaFamilia, bpc,
+          diagnostico, cid, medico, dataUltimaCons,
+          profissional, especialidade,
+          data, resultado: resultadoTexto,
         }),
       });
       setSalvo(true);
@@ -479,19 +617,41 @@ function Relatorio({ formData, onNova }: { formData: FormData; onNova: () => voi
       <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
         <div className="bg-white rounded-2xl border border-border p-6 shadow-sm space-y-4">
           <h2 className="font-bold text-base text-muted-foreground uppercase tracking-wider">Dados do Paciente</h2>
+          {/* Identificação */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Nome</p><p className="font-bold text-foreground">{nomePaciente || "—"}</p></div>
             <div><p className="text-muted-foreground font-semibold">Data da Triagem</p><p className="font-bold text-foreground">{data}</p></div>
             {dataNascimento && <div><p className="text-muted-foreground font-semibold">Data de Nascimento</p><p className="font-bold text-foreground">{new Date(dataNascimento + "T12:00:00").toLocaleDateString("pt-BR")}</p></div>}
             {idade && <div><p className="text-muted-foreground font-semibold">Idade</p><p className="font-bold text-foreground">{idade}</p></div>}
+            {naturalidade && <div><p className="text-muted-foreground font-semibold">Naturalidade</p><p className="font-bold text-foreground">{naturalidade}</p></div>}
+            {rg && <div><p className="text-muted-foreground font-semibold">RG</p><p className="font-bold text-foreground">{rg}</p></div>}
+            {sus && <div><p className="text-muted-foreground font-semibold">Cartão SUS</p><p className="font-bold text-foreground">{sus}</p></div>}
             {nomeResponsavel && <div><p className="text-muted-foreground font-semibold">Responsável</p><p className="font-bold text-foreground">{nomeResponsavel}</p></div>}
             {telefone && <div><p className="text-muted-foreground font-semibold">Telefone</p><p className="font-bold text-foreground">{telefone}</p></div>}
             {endereco && <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Endereço</p><p className="font-bold text-foreground">{endereco}</p></div>}
           </div>
-          {(diagnostico || cid) && (
-            <div className="pt-4 border-t border-border text-sm grid grid-cols-2 gap-4">
-              {diagnostico && <div><p className="text-muted-foreground font-semibold">Diagnóstico informado</p><p className="font-bold text-foreground">{diagnostico}</p></div>}
-              {cid && <div><p className="text-muted-foreground font-semibold">CID</p><p className="font-bold text-foreground">{cid}</p></div>}
+          {/* Família */}
+          {(nomeMae || nomePai || numIrmaos || tipoImovel || bolsaFamilia || bpc) && (
+            <div className="pt-4 border-t border-border text-sm grid grid-cols-2 md:grid-cols-3 gap-4">
+              {nomeMae && <div><p className="text-muted-foreground font-semibold">Nome da Mãe</p><p className="font-bold text-foreground">{nomeMae}{profissaoMae ? ` (${profissaoMae})` : ""}</p></div>}
+              {nomePai && <div><p className="text-muted-foreground font-semibold">Nome do Pai</p><p className="font-bold text-foreground">{nomePai}{profissaoPai ? ` (${profissaoPai})` : ""}</p></div>}
+              {numIrmaos && <div><p className="text-muted-foreground font-semibold">Nº de Irmãos</p><p className="font-bold text-foreground">{numIrmaos}</p></div>}
+              {tipoImovel && <div><p className="text-muted-foreground font-semibold">Imóvel</p><p className="font-bold text-foreground">{tipoImovel}</p></div>}
+              {(bolsaFamilia || bpc) && (
+                <div className="md:col-span-2">
+                  <p className="text-muted-foreground font-semibold">Benefícios</p>
+                  <p className="font-bold text-foreground">{[bolsaFamilia && "Bolsa Família", bpc && "BPC"].filter(Boolean).join(", ")}</p>
+                </div>
+              )}
+            </div>
+          )}
+          {/* Clínico */}
+          {(diagnostico || cid || medico || dataUltimaCons) && (
+            <div className="pt-4 border-t border-border text-sm grid grid-cols-2 md:grid-cols-3 gap-4">
+              {diagnostico && <div><p className="text-muted-foreground font-semibold">Diagnóstico</p><p className="font-bold text-foreground">{diagnostico}</p></div>}
+              {cid && <div><p className="text-muted-foreground font-semibold">CID-10</p><p className="font-bold text-foreground">{cid}</p></div>}
+              {medico && <div><p className="text-muted-foreground font-semibold">Médico</p><p className="font-bold text-foreground">{medico}</p></div>}
+              {dataUltimaCons && <div><p className="text-muted-foreground font-semibold">Última Consulta</p><p className="font-bold text-foreground">{new Date(dataUltimaCons + "T12:00:00").toLocaleDateString("pt-BR")}</p></div>}
             </div>
           )}
           {profissional && (

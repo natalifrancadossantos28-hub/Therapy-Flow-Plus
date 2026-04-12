@@ -1,0 +1,26 @@
+Solicitação de Atualização: Sistema NFS - Gestão Terapêutica
+​Por favor, atualize o sistema com as seguintes especificações para transformar a ferramenta em uma plataforma de gestão clínica (SaaS) completa:
+​1. Identidade e Segurança:
+​Alterar o nome do sistema para NFS - Gestão Terapêutica.
+​Implementar um campo clinicaId (valor inicial: "arco-iris") em todos os registros do Firebase para garantir a separação de dados.
+​Criar um Portal do Profissional com acesso restrito por PIN de 4 dígitos (cadastrado no perfil de cada profissional). O profissional logado deve ver apenas a sua própria agenda.
+​2. Agenda Semanal (Grade de Slots):
+​Substituir a visão diária por uma Grade Semanal Fixa (Segunda a Sexta), estilo tabela horizontal.
+​Horários (Slots): 07:30, 08:00, 08:50, 09:40, 10:30, 11:20, 12:10 (Almoço), 13:00, 13:50, 14:40, 15:30 (Finalização).
+​Os profissionais podem clicar no slot para adicionar um paciente da lista ou remover (dar alta).
+​3. Cadastro de Pacientes e Vínculo Automático:
+​Novos Campos: Nome da Mãe, Prontuário, CPF, CNS (SUS), Idade, Telefone, CID e Status (Atendimento, Alta, Óbito, Desistência).
+​Automação de Vínculo: Quando um profissional adicionar um paciente à sua grade, o sistema deve atualizar automaticamente o cadastro do paciente mudando o campo profissional_atual para o nome do profissional e o status para "Atendimento".
+​4. Fila de Espera Dinâmica:
+​Substituir a coluna "Profissional" por "Especialidade" (Fono, TO, Equipe Multi, etc.).
+​Exibir o Número do Prontuário logo abaixo do nome do paciente.
+​Lógica de Fila: Assim que um paciente for escalado para a agenda de um profissional, ele deve ser removido automaticamente da Fila de Espera (mudança de status), fazendo com que os pacientes abaixo subam de posição.
+​5. Dashboard NFS (Visão Geral):
+​Substituir "Consultas" por "Atendimentos Terapêuticos".
+​Métricas de Atendimento: Criar cards para contagem Semanal, Mensal, Trimestral, Semestral e Anual.
+​Histórico de Crescimento: Criar um painel que mostre o total de pacientes cadastrados por ano, baseado na data de entrada:
+​Total 2023, Total 2024, Total 2025, Total 2026.
+​Métrica Principal: Exibir a SOMA TOTAL de todos os pacientes cadastrados desde 2023.
+​Adicionar um card para "Pré-Cadastros" (pacientes que ainda não entraram na fila).
+​6. Interface da Recepção:
+​A recepção deve visualizar apenas a lista de pacientes agendados para o dia atual para marcar "Presença" ou "Falta". A falta deve ser contabilizada automaticamente no cadastro do paciente.
