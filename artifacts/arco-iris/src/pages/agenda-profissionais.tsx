@@ -142,6 +142,17 @@ export default function AgendaProfissionais() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+      {/* Admin shortcut bar */}
+      <div className="bg-slate-800 text-white px-4 py-2 flex items-center">
+        <a
+          href={import.meta.env.BASE_URL || "/"}
+          className="flex items-center gap-2 text-sm font-semibold text-slate-200 hover:text-white transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          Ir para o Painel Administrativo
+        </a>
+      </div>
+
       {/* Header */}
       <div className="bg-white border-b border-emerald-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
