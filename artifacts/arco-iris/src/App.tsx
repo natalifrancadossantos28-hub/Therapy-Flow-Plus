@@ -30,8 +30,8 @@ function Router() {
             <Route path="/professionals/:id">{(params) => <AdminGuard><ProfessionalDetail /></AdminGuard>}</Route>
             <Route path="/patients">{() => <AdminGuard><Patients /></AdminGuard>}</Route>
             <Route path="/patients/:id">{(params) => <AdminGuard><PatientDetail /></AdminGuard>}</Route>
-            <Route path="/reception" component={Reception} />
-            <Route path="/waiting-list" component={WaitingList} />
+            <Route path="/reception">{() => <AdminGuard><Reception /></AdminGuard>}</Route>
+            <Route path="/waiting-list">{() => <AdminGuard><WaitingList /></AdminGuard>}</Route>
             <Route path="/agenda" component={Agenda} />
             <Route component={NotFound} />
           </Switch>

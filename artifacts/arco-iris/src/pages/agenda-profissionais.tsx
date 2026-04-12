@@ -165,9 +165,9 @@ export default function AgendaProfissionais() {
                 </button>
                 <button
                   onClick={() => { setPinVerified(false); setSelectedProfId(""); setPinInput(""); }}
-                  className="flex items-center gap-1 text-gray-500 text-sm hover:text-gray-800 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-xl hover:bg-rose-50 hover:text-rose-700 border border-gray-200 hover:border-rose-200 transition-colors"
                 >
-                  <LogOut className="w-4 h-4" /> Sair
+                  <LogOut className="w-4 h-4" /> Sair da Agenda
                 </button>
               </>
             )}
