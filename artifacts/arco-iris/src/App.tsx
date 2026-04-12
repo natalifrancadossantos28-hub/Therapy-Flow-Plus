@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 
 import { Layout } from "@/components/Layout";
+import AdminGuard from "@/components/AdminGuard";
 import Dashboard from "@/pages/dashboard";
 import Professionals from "@/pages/professionals";
 import ProfessionalDetail from "@/pages/professional-detail";
@@ -24,11 +25,11 @@ function Router() {
       <Route>
         <Layout>
           <Switch>
-            <Route path="/" component={Dashboard} />
-            <Route path="/professionals" component={Professionals} />
-            <Route path="/professionals/:id" component={ProfessionalDetail} />
-            <Route path="/patients" component={Patients} />
-            <Route path="/patients/:id" component={PatientDetail} />
+            <Route path="/">{() => <AdminGuard><Dashboard /></AdminGuard>}</Route>
+            <Route path="/professionals">{() => <AdminGuard><Professionals /></AdminGuard>}</Route>
+            <Route path="/professionals/:id">{(params) => <AdminGuard><ProfessionalDetail /></AdminGuard>}</Route>
+            <Route path="/patients">{() => <AdminGuard><Patients /></AdminGuard>}</Route>
+            <Route path="/patients/:id">{(params) => <AdminGuard><PatientDetail /></AdminGuard>}</Route>
             <Route path="/reception" component={Reception} />
             <Route path="/waiting-list" component={WaitingList} />
             <Route path="/agenda" component={Agenda} />
