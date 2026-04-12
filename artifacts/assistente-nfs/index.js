@@ -999,16 +999,24 @@ app.get("/assistente-nfs", servirPainel);
 app.get("/assistente-nfs/", servirPainel);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TRATAMENTO GLOBAL DE ERROS — evita que o processo morra
+// TRATAMENTO GLOBAL DE ERROS — evita que o processo morra por erros não fatais
+// Erros FATAIS (porta em uso, permissão, etc.) devem encerrar o processo
+// para que o Replit possa reiniciá-lo limpo
 // ─────────────────────────────────────────────────────────────────────────────
+const ERROS_FATAIS = new Set(["EADDRINUSE", "EACCES", "ENOENT"]);
+
 process.on("uncaughtException", (err) => {
+  if (ERROS_FATAIS.has(err.code)) {
+    console.error(`❌ Erro fatal (${err.code}): ${err.message} — encerrando para restart limpo`);
+    process.exit(1);
+  }
   console.error("⚠️  Exceção não capturada (processo mantido):", err?.message || err);
-  logAtividade(`⚠️ Erro interno: ${err?.message || String(err)}`, "erro");
+  try { logAtividade(`⚠️ Erro interno: ${err?.message || String(err)}`, "erro"); } catch(e) {}
 });
 
 process.on("unhandledRejection", (reason) => {
   console.error("⚠️  Promise rejeitada não tratada (processo mantido):", reason?.message || reason);
-  logAtividade(`⚠️ Promise rejeitada: ${reason?.message || String(reason)}`, "erro");
+  try { logAtividade(`⚠️ Promise rejeitada: ${reason?.message || String(reason)}`, "erro"); } catch(e) {}
 });
 
 // Wrapper seguro de reconexão com retry automático
@@ -1023,11 +1031,20 @@ async function iniciarWhatsApp() {
   }
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n💬 Assistente NFs — ${CLINICA_NOME}`);
   console.log(`✅ Servidor na porta ${PORT}`);
   console.log(`🤖 IA: ${AI_BASE ? "Anthropic Claude ativo" : "⚠️  IA não configurada"}`);
   console.log(`🗄️  DB: ${process.env.DATABASE_URL ? "PostgreSQL conectado" : "⚠️  DATABASE_URL ausente"}`);
   console.log(`📱 Acesse /api/whatsapp/panel para o QR Code\n`);
   iniciarWhatsApp();
+});
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`❌ Porta ${PORT} já está em uso. Encerrando para restart limpo...`);
+    process.exit(1);
+  }
+  console.error("❌ Erro no servidor Express:", err.message);
+  process.exit(1);
 });
