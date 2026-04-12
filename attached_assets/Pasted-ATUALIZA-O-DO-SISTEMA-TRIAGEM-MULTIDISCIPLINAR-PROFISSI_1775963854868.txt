@@ -1,0 +1,20 @@
+ATUALIZAÇÃO DO SISTEMA: TRIAGEM MULTIDISCIPLINAR PROFISSIONAL (0-18 ANOS)
+​Objetivo: Transformar este sistema em uma ferramenta de avaliação completa para todos os tipos de PCD, eliminando o uso de fichas de papel.
+​1. Cadastro Social Completo (Migração do Papel para o Digital):
+​Implemente um formulário de entrada com: Dados Pessoais (RG, CPF, Cartão SUS), Núcleo Familiar (Escolaridade e Profissão dos Pais), Dados Sociais (BPC, Bolsa Família, Situação de Moradia) e Dados de Saúde (CID-10, Médico Responsável e Checklist de Laudo).
+​2. O Protocolo de 15 Perguntas (Universal PCD):
+​Aumente para 15 perguntas por especialidade (Psicologia, Fono, TO, Fisioterapia, etc.).
+​Público: Deve cobrir todo o espectro PCD (TEA, Deficiência Física, Intelectual, Auditiva e Visual) de 0 a 18 anos.
+​Formato Dual: Exiba o [Termo Técnico em Negrito] e logo abaixo a (Explicação Simples em Itálico) para o responsável entender o que está sendo perguntado.
+​3. Visualização e Gráficos:
+​No final da avaliação, gere um Gráfico de Radar (Teia de Aranha) usando Chart.js. O gráfico deve mostrar as 8 áreas avaliadas e usar as cores da escala (Verde, Azul, Laranja, Vermelho) conforme a gravidade.
+​Deixe o visual dinâmico e profissional para apresentação aos pais.
+​4. Destravamento e Fluxo:
+​Botão Editar/Visualizar: Na tela de "Pacientes Triados", permita clicar no paciente para reabrir a triagem, editar respostas ou apenas visualizar. O sistema NÃO deve bloquear o registro após finalizar.
+​Impressão em PDF: Crie um layout de relatório oficial para o botão "Imprimir", contendo os dados sociais, as respostas e o gráfico de radar.
+​5. Preparação para Venda (White Label):
+​Organize o código para que o nome e o logo da clínica compradora possam ser alterados facilmente.
+​O que muda agora no seu Sistema de Triagem:
+​Independência: Ele agora é uma ferramenta poderosa de diagnóstico.
+​Fim do Papel: Aquela ficha da prefeitura/secretaria agora está toda dentro dele.
+​Autoridade: Quando você mostrar o gráfico de radar com os termos técnicos para uma mãe ou para o dono de uma clínica, o valor do seu trabalho sobe na hora.
