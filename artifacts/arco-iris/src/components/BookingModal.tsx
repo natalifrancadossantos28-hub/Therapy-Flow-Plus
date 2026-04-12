@@ -18,9 +18,9 @@ type Props = {
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  alta: "bg-rose-100 text-rose-700 border-rose-200",
-  media: "bg-amber-100 text-amber-700 border-amber-200",
-  baixa: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  alta: "badge-neon-red",
+  media: "badge-neon-orange",
+  baixa: "badge-neon-green",
 };
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -129,7 +129,7 @@ export default function BookingModal({ date, time, professionalId, professionalN
                       "w-full text-left p-3 rounded-xl border-2 transition-all",
                       selectedEntryId === String(e.id)
                         ? "border-primary bg-primary/5"
-                        : "border-border bg-white hover:border-primary/40 hover:bg-secondary/20"
+                        : "border-border bg-secondary/30 hover:border-primary/40 hover:bg-secondary/50"
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">

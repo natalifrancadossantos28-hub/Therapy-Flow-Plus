@@ -18,25 +18,25 @@ export function formatDate(dateStr: string | null | undefined, dateFormat = "dd/
 
 export const getStatusColor = (status: string) => {
   const s = status.toLowerCase();
-  if (s === "ativo" || s === "presente") return "bg-emerald-100 text-emerald-800 border-emerald-200";
-  if (s === "inativo" || s === "ausente") return "bg-rose-100 text-rose-800 border-rose-200";
-  if (s === "alta") return "bg-purple-100 text-purple-800 border-purple-200";
-  if (s === "agendado") return "bg-blue-100 text-blue-800 border-blue-200";
-  if (s === "remarcado") return "bg-amber-100 text-amber-800 border-amber-200";
-  if (s === "aguardando triagem") return "bg-sky-100 text-sky-800 border-sky-200";
-  if (s === "fila de espera") return "bg-orange-100 text-orange-800 border-orange-200";
-  if (s === "atendimento") return "bg-teal-100 text-teal-800 border-teal-200";
-  if (s === "pré-cadastro") return "bg-slate-100 text-slate-700 border-slate-200";
-  if (s === "desistência") return "bg-zinc-100 text-zinc-700 border-zinc-200";
-  if (s === "óbito") return "bg-neutral-200 text-neutral-700 border-neutral-300";
-  return "bg-slate-100 text-slate-800 border-slate-200";
+  if (s === "ativo" || s === "presente") return "badge-neon-green";
+  if (s === "inativo" || s === "ausente") return "badge-neon-red";
+  if (s === "alta") return "badge-neon-blue";
+  if (s === "agendado") return "badge-neon-blue";
+  if (s === "remarcado") return "badge-neon-orange";
+  if (s === "aguardando triagem") return "badge-neon-blue";
+  if (s === "fila de espera") return "badge-neon-orange";
+  if (s === "atendimento") return "badge-neon-green";
+  if (s === "pré-cadastro") return "bg-secondary text-muted-foreground border-border";
+  if (s === "desistência") return "bg-secondary text-muted-foreground border-border";
+  if (s === "óbito") return "bg-secondary text-muted-foreground border-border";
+  return "bg-secondary text-muted-foreground border-border";
 };
 
 export const getPriorityColor = (priority: string) => {
   const p = priority.toLowerCase();
-  if (p === "elevado" || p === "alta") return "bg-rose-100 text-rose-800 border-rose-200";
-  if (p === "moderado" || p === "media" || p === "média") return "bg-orange-100 text-orange-800 border-orange-200";
-  if (p === "leve") return "bg-sky-100 text-sky-800 border-sky-200";
-  if (p === "baixo" || p === "baixa") return "bg-emerald-100 text-emerald-800 border-emerald-200";
-  return "bg-slate-100 text-slate-800 border-slate-200";
+  if (p === "elevado" || p === "alta") return "badge-neon-red";
+  if (p === "moderado" || p === "media" || p === "média") return "badge-neon-orange";
+  if (p === "leve") return "badge-neon-blue";
+  if (p === "baixo" || p === "baixa") return "badge-neon-green";
+  return "bg-secondary text-muted-foreground border-border";
 };

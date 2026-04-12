@@ -40,9 +40,9 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   return (
     <div className="flex items-center justify-center min-h-[60vh] px-4">
       <div className={`w-full max-w-sm ${shaking ? "animate-[shake_0.4s_ease]" : ""}`}>
-        <div className="bg-white rounded-3xl shadow-xl border border-border overflow-hidden">
-          <div className="bg-gradient-to-br from-primary to-emerald-600 p-8 text-center text-white">
-            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <div className="bg-card rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.6)] border border-primary/20 overflow-hidden" style={{ boxShadow: "0 0 60px rgba(0,0,0,0.6), 0 0 30px rgba(0,240,255,0.06)" }}>
+          <div className="bg-gradient-to-br from-primary/80 to-primary/40 p-8 text-center text-primary-foreground" style={{ borderBottom: "1px solid rgba(0,240,255,0.2)" }}>
+            <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ boxShadow: "0 0 20px rgba(0,240,255,0.3)" }}>
               <Lock className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold">Área Restrita</h2>
@@ -57,12 +57,12 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
                 onChange={e => { setPassword(e.target.value); setError(""); }}
                 placeholder="Senha administrativa"
                 autoFocus
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-12 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 bg-gray-50 font-medium"
+                className="w-full border border-border rounded-xl px-4 py-3 pr-12 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground font-medium placeholder:text-muted-foreground transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -77,7 +77,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
             <button
               type="submit"
               disabled={!password}
-              className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2"
+              className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-bold py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(0,240,255,0.4)]"
             >
               <ShieldCheck className="w-4 h-4" /> Entrar
             </button>

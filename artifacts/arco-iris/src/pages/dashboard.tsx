@@ -57,10 +57,10 @@ export default function Dashboard() {
   const anos = [2023, 2024, 2025, 2026];
 
   const topCards = [
-    { title: "Total de Pacientes", value: totalPatients, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { title: "Pré-Cadastros", value: preCadastros, icon: ClipboardList, color: "text-violet-500", bg: "bg-violet-500/10" },
-    { title: "Profissionais", value: totalProfessionals, icon: UserRound, color: "text-purple-500", bg: "bg-purple-500/10" },
-    { title: "Fila de Espera", value: waitingCount, icon: ListTodo, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { title: "Total de Pacientes", value: totalPatients, icon: Users, color: "text-[#00d4ff]", bg: "bg-[#00d4ff]/10" },
+    { title: "Pré-Cadastros", value: preCadastros, icon: ClipboardList, color: "text-[#00ff88]", bg: "bg-[#00ff88]/10" },
+    { title: "Profissionais", value: totalProfessionals, icon: UserRound, color: "text-primary", bg: "bg-primary/10" },
+    { title: "Fila de Espera", value: waitingCount, icon: ListTodo, color: "text-[#ff9f20]", bg: "bg-[#ff9f20]/10" },
   ];
 
   const periodCards = [
@@ -131,11 +131,11 @@ export default function Dashboard() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis dataKey="area" tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontWeight: 600 }} />
-                  <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickCount={4} unit="%" />
-                  <Radar name="Média" dataKey="pct" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.25} strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--primary))" }} />
-                  <Tooltip formatter={(v: any) => [`${v}%`, "Média"]} contentStyle={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--border))", borderRadius: 12 }} />
+                  <PolarGrid stroke="rgba(0,240,255,0.15)" />
+                  <PolarAngleAxis dataKey="area" tick={{ fontSize: 11, fill: "rgba(210,230,255,0.85)", fontWeight: 600 }} />
+                  <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 9, fill: "rgba(150,180,220,0.6)" }} tickCount={4} unit="%" />
+                  <Radar name="Média" dataKey="pct" stroke="#00f0ff" fill="#00f0ff" fillOpacity={0.15} strokeWidth={2.5} dot={{ r: 4, fill: "#00f0ff", filter: "drop-shadow(0 0 6px #00f0ff)" }} />
+                  <Tooltip formatter={(v: any) => [`${v}%`, "Média"]} contentStyle={{ background: "hsl(222 50% 8%)", border: "1px solid rgba(0,240,255,0.25)", borderRadius: 12, color: "#e0f0ff", boxShadow: "0 0 20px rgba(0,240,255,0.1)" }} />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
@@ -144,7 +144,7 @@ export default function Dashboard() {
                 <div key={d.area} className="flex items-center gap-3">
                   <span className="w-24 text-xs font-semibold text-muted-foreground shrink-0">{d.area}</span>
                   <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${d.pct}%` }} />
+                    <div className="h-full rounded-full transition-all" style={{ width: `${d.pct}%`, background: "linear-gradient(90deg, #00b4d8, #00f0ff)", boxShadow: "0 0 8px rgba(0,240,255,0.5)" }} />
                   </div>
                   <span className="w-12 text-right text-xs font-bold text-foreground">{d.score}/72</span>
                   <span className="w-10 text-right text-xs text-muted-foreground">{d.pct}%</span>
@@ -224,20 +224,20 @@ export default function Dashboard() {
 
       {/* Alertas de Faltas */}
       {absentPatients.length > 0 && (
-        <Card className="p-6 border-rose-200 shadow-[0_0_20px_-5px_rgba(244,63,94,0.1)]">
-          <h2 className="text-xl font-bold font-display flex items-center gap-2 text-rose-600 mb-6">
+        <Card className="p-6 border-[rgba(255,30,90,0.3)] shadow-[0_0_24px_rgba(255,30,90,0.08)]">
+          <h2 className="text-xl font-bold font-display flex items-center gap-2 text-[#ff2060] mb-6" style={{ textShadow: "0 0 12px rgba(255,30,90,0.5)" }}>
             <AlertCircle className="w-5 h-5" />
             Atenção: Pacientes com Faltas
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {absentPatients.map(p => (
-              <div key={p.id} className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex flex-col gap-2">
+              <div key={p.id} className="p-4 rounded-xl bg-[rgba(255,30,90,0.06)] border border-[rgba(255,30,90,0.2)] flex flex-col gap-2">
                 <div className="flex justify-between items-start">
-                  <p className="font-semibold text-rose-900">{p.name}</p>
-                  <Badge className="bg-rose-200 text-rose-800 border-rose-300">{p.absenceCount} Faltas</Badge>
+                  <p className="font-semibold text-foreground">{p.name}</p>
+                  <Badge className="badge-neon-red">{p.absenceCount} Faltas</Badge>
                 </div>
                 <Link href={`/patients/${p.id}`}>
-                  <Button variant="outline" className="w-full text-xs h-8 mt-2 border-rose-200 text-rose-700 hover:bg-rose-100">
+                  <Button variant="outline" className="w-full text-xs h-8 mt-2 border-[rgba(255,30,90,0.4)] text-[#ff2060] hover:bg-[rgba(255,30,90,0.08)] hover:shadow-[0_0_14px_rgba(255,30,90,0.35)]">
                     Ver Ficha
                   </Button>
                 </Link>

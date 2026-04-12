@@ -26,8 +26,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             className={cn(
               "flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group",
               isActive 
-                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
-                : "text-foreground/70 hover:bg-secondary hover:text-foreground"
+                ? "nav-active-neon font-semibold" 
+                : "text-foreground/60 hover:bg-secondary/80 hover:text-foreground"
             )}
           >
             <item.icon className={cn("w-5 h-5 transition-transform duration-200", isActive ? "scale-110" : "group-hover:scale-110")} />
@@ -68,7 +68,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col bg-card border-r border-border min-h-screen p-4 sticky top-0 z-10 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)]">
+      <aside className="hidden md:flex w-64 flex-col bg-card border-r border-border min-h-screen p-4 sticky top-0 z-10 shadow-[4px_0_32px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-3 px-2 mb-8 mt-2">
           <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-10 h-10 rounded-xl shadow-sm" />
           <div className="flex flex-col">

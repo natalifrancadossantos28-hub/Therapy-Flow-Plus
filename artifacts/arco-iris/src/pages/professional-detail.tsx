@@ -58,7 +58,7 @@ export default function ProfessionalDetail() {
               type="date" 
               value={date} 
               onChange={(e) => setDate(e.target.value)}
-              className="bg-white/50 backdrop-blur-sm border-primary/30 text-lg py-6"
+              className="bg-secondary/40 backdrop-blur-sm border-primary/30 text-lg py-6"
             />
           </Card>
           

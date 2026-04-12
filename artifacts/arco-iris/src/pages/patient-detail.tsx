@@ -25,10 +25,10 @@ function calcPriority(score: number, escolaPublica: boolean, trabalhoNaRoca: boo
 }
 
 const PRIORITY_STYLE: Record<string, string> = {
-  elevado: "bg-rose-100 text-rose-800 border-rose-300",
-  moderado: "bg-orange-100 text-orange-800 border-orange-300",
-  leve: "bg-sky-100 text-sky-800 border-sky-300",
-  baixo: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  elevado: "badge-neon-red",
+  moderado: "badge-neon-orange",
+  leve: "badge-neon-blue",
+  baixo: "badge-neon-green",
 };
 const PRIORITY_LABEL: Record<string, string> = {
   elevado: "VERMELHO – Elevado",

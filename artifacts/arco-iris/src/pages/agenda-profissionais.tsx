@@ -154,15 +154,15 @@ export default function AgendaProfissionais() {
       </div>
 
       {/* Header */}
-      <div className="bg-white border-b border-emerald-100 shadow-sm">
+      <div className="bg-card border-b border-border shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center">
-              <CalendarIcon className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center" style={{ boxShadow: "0 0 12px rgba(0,240,255,0.3)" }}>
+              <CalendarIcon className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="font-bold text-gray-900 leading-tight">NFS – Portal do Profissional</p>
-              <p className="text-xs text-gray-500">Agenda Semanal</p>
+              <p className="font-bold text-foreground leading-tight">NFS – Portal do Profissional</p>
+              <p className="text-xs text-muted-foreground">Agenda Semanal</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -170,13 +170,13 @@ export default function AgendaProfissionais() {
               <>
                 <button
                   onClick={handlePrint}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-[0_0_16px_rgba(0,240,255,0.4)]"
                 >
                   <Printer className="w-4 h-4" /> Imprimir Agenda do Dia
                 </button>
                 <button
                   onClick={() => { setPinVerified(false); setSelectedProfId(""); setPinInput(""); }}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-xl hover:bg-rose-50 hover:text-rose-700 border border-gray-200 hover:border-rose-200 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground text-sm font-semibold rounded-xl hover:bg-[rgba(255,30,90,0.1)] hover:text-[#ff2060] border border-border hover:border-[rgba(255,30,90,0.3)] transition-all"
                 >
                   <LogOut className="w-4 h-4" /> Sair da Agenda
                 </button>
@@ -191,9 +191,9 @@ export default function AgendaProfissionais() {
         {/* Login Card */}
         {!pinVerified ? (
           <div className="max-w-md mx-auto mt-16">
-            <div className="bg-white rounded-3xl shadow-xl border border-emerald-100 overflow-hidden">
-              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-8 text-center text-white">
-                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="bg-card rounded-3xl border border-primary/20 overflow-hidden" style={{ boxShadow: "0 0 60px rgba(0,0,0,0.5), 0 0 30px rgba(0,240,255,0.05)" }}>
+              <div className="bg-gradient-to-r from-primary/70 to-primary/30 p-8 text-center text-primary-foreground" style={{ borderBottom: "1px solid rgba(0,240,255,0.2)" }}>
+                <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ boxShadow: "0 0 20px rgba(0,240,255,0.3)" }}>
                   <Lock className="w-8 h-8" />
                 </div>
                 <h2 className="text-2xl font-bold">Acesso do Profissional</h2>
@@ -201,11 +201,11 @@ export default function AgendaProfissionais() {
               </div>
               <div className="p-8 space-y-5">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Profissional</label>
+                  <label className="block text-sm font-semibold text-foreground mb-2">Profissional</label>
                   <select
                     value={selectedProfId}
                     onChange={e => handleProfChange(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-gray-50 font-medium"
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground font-medium transition-all"
                   >
                     <option value="">Selecione seu nome...</option>
                     {professionals.map(p => <option key={p.id} value={p.id}>{p.name} – {p.specialty}</option>)}
@@ -214,23 +214,23 @@ export default function AgendaProfissionais() {
 
                 {selectedProfId && (
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">PIN (4 dígitos)</label>
+                    <label className="block text-sm font-semibold text-foreground mb-2">PIN (4 dígitos)</label>
                     <input
                       type="password" maxLength={4}
                       value={pinInput}
                       onChange={e => setPinInput(e.target.value.replace(/\D/, ""))}
                       onKeyDown={e => e.key === "Enter" && verifyPin()}
                       placeholder="••••"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-4 text-center font-mono text-2xl tracking-[1em] focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-gray-50"
+                      className="w-full border border-border rounded-xl px-4 py-4 text-center font-mono text-2xl tracking-[1em] focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground transition-all"
                     />
-                    {pinError && <p className="text-red-500 text-sm mt-2 font-semibold">{pinError}</p>}
+                    {pinError && <p className="text-destructive text-sm mt-2 font-semibold">{pinError}</p>}
                   </div>
                 )}
 
                 <button
                   onClick={verifyPin}
                   disabled={!selectedProfId || pinInput.length !== 4 || pinLoading}
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors shadow-sm"
+                  className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-bold py-3 rounded-xl transition-all hover:shadow-[0_0_20px_rgba(0,240,255,0.4)]"
                 >
                   {pinLoading ? "Verificando..." : "Acessar Agenda"}
                 </button>
@@ -240,33 +240,33 @@ export default function AgendaProfissionais() {
         ) : (
           <>
             {/* Pro info bar */}
-            <div className="bg-white rounded-2xl border border-emerald-100 shadow-sm px-6 py-4 flex items-center justify-between">
+            <div className="bg-card rounded-2xl border border-primary/20 px-6 py-4 flex items-center justify-between" style={{ boxShadow: "0 0 20px rgba(0,240,255,0.04)" }}>
               <div className="flex items-center gap-3">
-                <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                <ShieldCheck className="w-5 h-5 text-primary" style={{ filter: "drop-shadow(0 0 6px rgba(0,240,255,0.5))" }} />
                 <div>
-                  <p className="font-bold text-gray-900">{selectedProf?.name}</p>
-                  <p className="text-sm text-gray-500">{selectedProf?.specialty}</p>
+                  <p className="font-bold text-foreground">{selectedProf?.name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedProf?.specialty}</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-semibold text-gray-700">Semana atual</p>
-                <p className="text-xs text-gray-500">{format(weekDays[0], "dd/MM")} a {format(weekDays[4], "dd/MM/yyyy")}</p>
+                <p className="text-sm font-semibold text-foreground">Semana atual</p>
+                <p className="text-xs text-muted-foreground">{format(weekDays[0], "dd/MM")} a {format(weekDays[4], "dd/MM/yyyy")}</p>
               </div>
             </div>
 
             {/* Weekly grid */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[700px]">
-                  <thead className="bg-emerald-50 border-b border-emerald-100">
+                  <thead className="bg-muted/60 border-b border-border">
                     <tr>
-                      <th className="px-5 py-4 w-24 sticky left-0 bg-emerald-50 backdrop-blur z-10 border-r border-emerald-100 text-left text-xs text-emerald-700 uppercase font-bold">Horário</th>
+                      <th className="px-5 py-4 w-24 sticky left-0 bg-muted/80 backdrop-blur z-10 border-r border-border text-left text-xs text-primary uppercase font-bold">Horário</th>
                       {weekDays.map((d, i) => {
                         const isToday = format(d, "yyyy-MM-dd") === today;
                         return (
-                          <th key={i} className={cn("px-4 py-4 text-center min-w-[140px] text-xs uppercase font-bold", isToday ? "text-emerald-700 bg-emerald-100/50" : "text-gray-500")}>
+                          <th key={i} className={cn("px-4 py-4 text-center min-w-[140px] text-xs uppercase font-bold", isToday ? "text-primary bg-primary/8" : "text-muted-foreground")}>
                             <span className="capitalize">{format(d, "EEEE", { locale: ptBR })}</span>
-                            <div className={cn("font-normal mt-0.5 text-[11px]", isToday && "text-emerald-600 font-bold")}>{format(d, "dd/MM")}</div>
+                            <div className={cn("font-normal mt-0.5 text-[11px]", isToday && "text-primary font-bold")}>{format(d, "dd/MM")}</div>
                           </th>
                         );
                       })}
@@ -276,12 +276,12 @@ export default function AgendaProfissionais() {
                     {TIME_SLOTS.map(time => {
                       const isLunch = time === "12:10";
                       return (
-                        <tr key={time} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                          <td className={cn("px-5 py-3 font-bold sticky left-0 bg-white z-10 border-r border-gray-100", isLunch ? "text-gray-400" : "text-emerald-600")}>
+                        <tr key={time} className="border-b border-border/60 hover:bg-secondary/30 transition-colors">
+                          <td className={cn("px-5 py-3 font-bold sticky left-0 bg-card z-10 border-r border-border", isLunch ? "text-muted-foreground" : "text-primary")}>
                             {time}
                           </td>
                           {isLunch ? (
-                            <td colSpan={5} className="px-4 py-3 bg-slate-50 text-center text-gray-400 italic font-medium text-xs">
+                            <td colSpan={5} className="px-4 py-3 bg-muted/30 text-center text-muted-foreground italic font-medium text-xs">
                               🍽 Almoço — Pausa
                             </td>
                           ) : (
@@ -289,10 +289,10 @@ export default function AgendaProfissionais() {
                               const apt = getApt(date, time);
                               const isToday = date === today;
                               return (
-                                <td key={i} className={cn("px-4 py-2.5", isToday && "bg-emerald-50/30")}>
+                                <td key={i} className={cn("px-4 py-2.5", isToday && "bg-primary/5")}>
                                   {apt ? (
-                                    <div className="p-2.5 rounded-xl border border-gray-200 bg-white shadow-sm">
-                                      <p className="font-semibold text-gray-900 text-xs truncate">
+                                    <div className="p-2.5 rounded-xl border border-border bg-secondary/50">
+                                      <p className="font-semibold text-foreground text-xs truncate">
                                         {apt.patientName || `Paciente #${apt.patientId}`}
                                       </p>
                                       <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max mt-1 block", getStatusColor(apt.status))}>
@@ -302,7 +302,7 @@ export default function AgendaProfissionais() {
                                   ) : (
                                     <button
                                       onClick={() => setBookingSlot({ date, time })}
-                                      className="w-full min-h-[50px] flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl text-gray-300 hover:border-emerald-300 hover:text-emerald-400 hover:bg-emerald-50/30 transition-colors text-[10px] font-semibold cursor-pointer"
+                                      className="w-full min-h-[50px] flex items-center justify-center border-2 border-dashed border-border/50 rounded-xl text-muted-foreground/40 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all text-[10px] font-semibold cursor-pointer"
                                     >
                                       + Agendar
                                     </button>
@@ -320,17 +320,17 @@ export default function AgendaProfissionais() {
             </div>
 
             {/* Today's summary */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-emerald-500" /> Resumo de Hoje — {format(new Date(), "dd/MM/yyyy")}
+            <div className="bg-card rounded-2xl border border-border p-6 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
+              <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary" style={{ filter: "drop-shadow(0 0 6px rgba(0,240,255,0.5))" }} /> Resumo de Hoje — {format(new Date(), "dd/MM/yyyy")}
               </h3>
               <div className="space-y-2">
                 {TIME_SLOTS.filter(t => t !== "12:10").map(time => {
                   const apt = getApt(today, time);
                   return (
-                    <div key={time} className={cn("flex items-center gap-4 px-4 py-3 rounded-xl text-sm", apt ? "bg-emerald-50 border border-emerald-100" : "bg-gray-50 border border-gray-100")}>
-                      <span className="font-bold text-emerald-600 w-14 shrink-0">{time}</span>
-                      <span className={apt ? "font-semibold text-gray-900" : "text-gray-400 italic"}>
+                    <div key={time} className={cn("flex items-center gap-4 px-4 py-3 rounded-xl text-sm", apt ? "bg-primary/8 border border-primary/20" : "bg-secondary/50 border border-border/50")}>
+                      <span className="font-bold text-primary w-14 shrink-0">{time}</span>
+                      <span className={apt ? "font-semibold text-foreground" : "text-muted-foreground italic"}>
                         {apt ? (apt.patientName || `Paciente #${apt.patientId}`) : "Livre"}
                       </span>
                       {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apt.status))}>{apt.status}</span>}

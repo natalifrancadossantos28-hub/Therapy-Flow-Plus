@@ -49,48 +49,51 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* LIGHT MODE - Calming Teal/Green Healthcare Palette */
+/* ═══════════════════════════════════════════
+   PREMIUM DARK NEON THEME
+   ═══════════════════════════════════════════ */
 :root {
-  --background: 180 20% 98%;
-  --foreground: 200 30% 15%;
-  
-  --border: 180 15% 90%;
-  --input: 180 15% 90%;
-  --ring: 175 70% 35%;
-  
-  --card: 0 0% 100%;
-  --card-foreground: 200 30% 15%;
-  --card-border: 180 15% 92%;
-  
-  --popover: 0 0% 100%;
-  --popover-foreground: 200 30% 15%;
-  --popover-border: 180 15% 90%;
-  
-  --primary: 175 70% 35%; /* Teal */
-  --primary-foreground: 0 0% 100%;
-  
-  --secondary: 160 40% 90%; /* Soft Mint */
-  --secondary-foreground: 175 70% 25%;
-  
-  --muted: 180 10% 95%;
-  --muted-foreground: 200 15% 45%;
-  
-  --accent: 190 60% 85%;
-  --accent-foreground: 190 80% 25%;
-  
-  --destructive: 0 70% 55%;
-  --destructive-foreground: 0 0% 100%;
-  
-  --sidebar: 0 0% 100%;
-  --sidebar-foreground: 200 30% 15%;
-  --sidebar-border: 180 15% 90%;
-  --sidebar-primary: 175 70% 35%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 180 20% 96%;
-  --sidebar-accent-foreground: 175 70% 35%;
-  --sidebar-ring: 175 70% 35%;
+  /* Deep Navy Base */
+  --background: 222 55% 4%;
+  --foreground: 210 30% 92%;
 
-  --radius: 0.75rem; /* 12px */
+  --border: 222 35% 16%;
+  --input: 222 40% 11%;
+  --ring: 183 100% 52%;
+
+  --card: 222 50% 7%;
+  --card-foreground: 210 30% 92%;
+  --card-border: 222 35% 15%;
+
+  --popover: 222 50% 8%;
+  --popover-foreground: 210 30% 92%;
+  --popover-border: 222 35% 15%;
+
+  --primary: 183 100% 52%;
+  --primary-foreground: 222 55% 4%;
+
+  --secondary: 222 40% 11%;
+  --secondary-foreground: 210 25% 72%;
+
+  --muted: 222 38% 9%;
+  --muted-foreground: 220 18% 48%;
+
+  --accent: 200 70% 22%;
+  --accent-foreground: 183 100% 68%;
+
+  --destructive: 340 100% 55%;
+  --destructive-foreground: 0 0% 100%;
+
+  --sidebar: 222 55% 4%;
+  --sidebar-foreground: 210 30% 88%;
+  --sidebar-border: 222 35% 14%;
+  --sidebar-primary: 183 100% 52%;
+  --sidebar-primary-foreground: 222 55% 4%;
+  --sidebar-accent: 222 40% 10%;
+  --sidebar-accent-foreground: 183 100% 62%;
+  --sidebar-ring: 183 100% 52%;
+
+  --radius: 0.75rem;
 }
 
 @layer base {
@@ -99,11 +102,96 @@
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    background-image: radial-gradient(circle at 100% 0%, hsla(160, 40%, 90%, 0.4) 0%, transparent 40%),
-                      radial-gradient(circle at 0% 100%, hsla(190, 60%, 85%, 0.4) 0%, transparent 40%);
+    background-image:
+      radial-gradient(ellipse 60% 40% at 80% 0%, rgba(0, 240, 255, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 0% 100%, rgba(0, 255, 136, 0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 80% 60% at 50% 50%, rgba(10, 15, 50, 0.8) 0%, transparent 100%);
     background-attachment: fixed;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-display tracking-tight text-foreground;
   }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(222 50% 7%);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(222 35% 20%);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(183 100% 30%);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   NEON PRIORITY BADGES
+   ═══════════════════════════════════════════ */
+.badge-neon-green {
+  background: rgba(0, 255, 136, 0.10);
+  color: #00ff88;
+  border: 1px solid rgba(0, 255, 136, 0.35);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.25), 0 0 25px rgba(0, 255, 136, 0.08);
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+}
+
+.badge-neon-blue {
+  background: rgba(0, 210, 255, 0.10);
+  color: #00d4ff;
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.25), 0 0 25px rgba(0, 210, 255, 0.08);
+  text-shadow: 0 0 8px rgba(0, 210, 255, 0.6);
+}
+
+.badge-neon-orange {
+  background: rgba(255, 140, 0, 0.10);
+  color: #ff9f20;
+  border: 1px solid rgba(255, 140, 0, 0.35);
+  box-shadow: 0 0 10px rgba(255, 140, 0, 0.25), 0 0 25px rgba(255, 140, 0, 0.08);
+  text-shadow: 0 0 8px rgba(255, 140, 0, 0.6);
+}
+
+.badge-neon-red {
+  background: rgba(255, 30, 90, 0.10);
+  color: #ff2060;
+  border: 1px solid rgba(255, 30, 90, 0.35);
+  box-shadow: 0 0 10px rgba(255, 30, 90, 0.25), 0 0 25px rgba(255, 30, 90, 0.08);
+  text-shadow: 0 0 8px rgba(255, 30, 90, 0.6);
+}
+
+/* ═══════════════════════════════════════════
+   NEON BUTTON GLOW
+   ═══════════════════════════════════════════ */
+.btn-neon {
+  position: relative;
+  transition: all 0.25s ease;
+}
+.btn-neon:hover:not(:disabled) {
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.45), 0 0 32px rgba(0, 240, 255, 0.15);
+  border-color: rgba(0, 240, 255, 0.9) !important;
+}
+.btn-neon-primary:hover:not(:disabled) {
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.5), 0 0 40px rgba(0, 240, 255, 0.2);
+}
+
+/* ═══════════════════════════════════════════
+   NEON CARD HOVER GLOW
+   ═══════════════════════════════════════════ */
+.card-neon:hover {
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.07), 0 4px 24px rgba(0, 0, 0, 0.4);
+  border-color: rgba(0, 240, 255, 0.2);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* ═══════════════════════════════════════════
+   SIDEBAR ACTIVE NEON GLOW
+   ═══════════════════════════════════════════ */
+.nav-active-neon {
+  background: rgba(0, 240, 255, 0.12);
+  color: #00f0ff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.2), inset 0 0 12px rgba(0, 240, 255, 0.05);
+  border: 1px solid rgba(0, 240, 255, 0.25);
 }
