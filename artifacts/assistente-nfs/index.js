@@ -34,7 +34,7 @@ app.use(bodyParser.json());
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURAÇÕES DA CLÍNICA
 // ─────────────────────────────────────────────────────────────────────────────
-const CLINICA_NOME     = "Clínica Arco-Íris";
+const CLINICA_NOME     = "NFs";
 const CLINICA_ENDERECO = "R. Antônieta Corrêa dos Santos, 46 - Parque Bela Vista, Ibiúna - SP";
 const CLINICA_TELEFONE = "(15) 99999-0000";
 const CLINICA_MAPS     = "https://maps.google.com/?q=R.+Antônieta+Corrêa+dos+Santos,+46+Ibiúna+SP";
@@ -560,69 +560,35 @@ cron.schedule("30 9 * * 1-6", async () => {
 // INTERFACE WEB — PAINEL DE CONEXÃO
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  const conectado = statusConexao === "conectado";
-  const refreshSeg = conectado ? 30 : 5;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Assistente NFS — ${CLINICA_NOME}</title>
-  <script>setTimeout(() => location.reload(), ${refreshSeg * 1000});</script>
+  <title>Assistente NFs</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .card { background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 40px; max-width: 480px; width: 90%; text-align: center; }
-    .logo { font-size: 48px; margin-bottom: 8px; }
-    h1 { font-size: 22px; color: #e6edf3; margin-bottom: 4px; }
-    .subtitle { color: #8b949e; font-size: 14px; margin-bottom: 32px; }
-    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 20px; border-radius: 999px; font-size: 14px; font-weight: 600; margin-bottom: 28px; }
-    .badge.online  { background: #1a3a2a; color: #3fb950; border: 1px solid #238636; }
-    .badge.offline { background: #3a1a1a; color: #f85149; border: 1px solid #da3633; }
-    .badge.waiting { background: #2a2a1a; color: #e3b341; border: 1px solid #9e6a03; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-    .qr-box { background: #fff; border-radius: 12px; padding: 12px; display: inline-block; margin: 16px 0; }
-    .qr-box img { display: block; width: 220px; height: 220px; }
-    .instructions { background: #1f2937; border-radius: 10px; padding: 16px; margin-top: 20px; text-align: left; font-size: 13px; color: #8b949e; line-height: 1.8; }
-    .instructions strong { color: #e6edf3; }
-    .info-row { display: flex; justify-content: space-between; align-items: center; background: #0d1117; border-radius: 8px; padding: 10px 14px; margin-top: 12px; font-size: 13px; }
-    .info-row span:first-child { color: #8b949e; }
-    .info-row span:last-child  { color: #e6edf3; font-weight: 600; }
-    .connected-icon { font-size: 80px; margin: 8px 0; }
-    .number { font-size: 20px; font-weight: 700; color: #3fb950; margin: 4px 0 20px; letter-spacing: 1px; }
+    body { font-family: 'Segoe UI', sans-serif; background: #fff; color: #111; min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+    p { color: #555; font-size: 15px; }
+    a { color: #1a73e8; font-size: 15px; }
+    .spin { width: 36px; height: 36px; border: 4px solid #eee; border-top-color: #25D366; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
+  <script>
+    window.addEventListener('load', function() {
+      var base = window.location.protocol + '//' + window.location.hostname;
+      window.location.replace(base + '/api/whatsapp/panel');
+    });
+  </script>
 </head>
 <body>
-<div class="card">
-  <div class="logo">🌈</div>
-  <h1>Assistente NFS</h1>
-  <p class="subtitle">${CLINICA_NOME}</p>
-
-  ${conectado ? `
-    <div class="badge online"><span class="dot"></span> WhatsApp Conectado</div>
-    <div class="connected-icon">✅</div>
-    <div class="number">+${numeroConectado}</div>
-    <p style="color:#8b949e;font-size:14px">O bot está ativo e respondendo mensagens.<br>Esta página atualiza automaticamente.</p>
-    <div class="info-row"><span>Sessões ativas</span><span>${sessoes.size}</span></div>
-    <div class="info-row"><span>Horário</span><span>${new Date().toLocaleString("pt-BR")}</span></div>
-  ` : qrCodeBase64 ? `
-    <div class="badge waiting"><span class="dot"></span> Aguardando Scan do QR Code</div>
-    <div class="qr-box"><img src="${qrCodeBase64}" alt="QR Code WhatsApp"></div>
-    <div class="instructions">
-      <strong>Como conectar:</strong><br>
-      1. Abra o WhatsApp da clínica no celular<br>
-      2. Toque em ⋮ → <strong>Dispositivos Vinculados</strong><br>
-      3. Toque em <strong>Vincular um dispositivo</strong><br>
-      4. Aponte a câmera para o QR Code acima<br><br>
-      <span style="color:#e3b341">⚠️ O QR Code expira em 60 segundos. A página atualiza automaticamente.</span>
-    </div>
-  ` : `
-    <div class="badge offline"><span class="dot"></span> Desconectado</div>
-    <div style="font-size:64px;margin:20px 0">📵</div>
-    <p style="color:#8b949e;font-size:14px">Aguardando inicialização do WhatsApp...<br>Esta página atualiza automaticamente.</p>
-  `}
-</div>
+  <div class="spin"></div>
+  <p>Abrindo painel do Assistente NFs...</p>
+  <a id="link" href="#">Clique aqui se não redirecionar automaticamente</a>
+  <script>
+    var base = window.location.protocol + '//' + window.location.hostname;
+    document.getElementById('link').href = base + '/api/whatsapp/panel';
+  </script>
 </body>
 </html>`);
 });

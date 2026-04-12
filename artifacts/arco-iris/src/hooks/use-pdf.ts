@@ -11,7 +11,7 @@ export const generatePatientPdf = (data: PatientPdfData) => {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.setTextColor(24, 118, 107); // Teal primary color
-  doc.text("Arco-Íris Gestão Terapêutica", 14, 20);
+  doc.text("NFs gestão Terapêutica", 14, 20);
   
   doc.setFontSize(16);
   doc.setTextColor(40, 40, 40);
@@ -49,7 +49,7 @@ export const generatePatientPdf = (data: PatientPdfData) => {
   // Footer
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
-  doc.text(`Gerado em ${formatDate(new Date().toISOString(), "dd/MM/yyyy HH:mm")} por Arco-Íris Gestão`, 14, doc.internal.pageSize.height - 10);
+  doc.text(`Gerado em ${formatDate(new Date().toISOString(), "dd/MM/yyyy HH:mm")} por NFs gestão`, 14, doc.internal.pageSize.height - 10);
 
   doc.save(`paciente-${patient.name.replace(/\s+/g, "-").toLowerCase()}.pdf`);
 };
