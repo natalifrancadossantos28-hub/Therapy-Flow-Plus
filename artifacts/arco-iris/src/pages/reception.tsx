@@ -321,7 +321,7 @@ export default function Reception() {
 
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">
-          <h2 className="text-xl font-bold">Consultas de Hoje</h2>
+          <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-muted-foreground">Filtrar:</span>
             <Select

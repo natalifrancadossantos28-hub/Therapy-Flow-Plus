@@ -45,6 +45,32 @@ router.get("/appointments/today", async (req, res) => {
   })));
 });
 
+router.get("/appointments/stats", async (_req, res) => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() + 1); weekStart.setHours(0,0,0,0);
+  const monthStart = new Date(y, m, 1);
+  const trimStart = new Date(y, m - 2, 1);
+  const semStart = new Date(y, m - 5, 1);
+  const yearStart = new Date(y, 0, 1);
+
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+  const rows = await db.select({ date: appointmentsTable.date }).from(appointmentsTable);
+
+  const count = (from: Date) => rows.filter(r => r.date >= fmt(from)).length;
+
+  res.json({
+    semanal: count(weekStart),
+    mensal: count(monthStart),
+    trimestral: count(trimStart),
+    semestral: count(semStart),
+    anual: count(yearStart),
+  });
+});
+
 router.get("/appointments", async (req, res) => {
   const conditions: ReturnType<typeof eq>[] = [];
   if (req.query.date) conditions.push(eq(appointmentsTable.date, String(req.query.date)));

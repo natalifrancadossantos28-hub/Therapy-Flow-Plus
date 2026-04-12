@@ -44,7 +44,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="md:hidden flex items-center justify-between p-4 bg-card border-b border-border z-20">
         <div className="flex items-center gap-2">
           <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-8 h-8 rounded-lg" />
-          <span className="font-display font-bold text-lg text-primary">Arco-Íris</span>
+          <span className="font-display font-bold text-lg text-primary">NFS</span>
         </div>
         <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-foreground/70 hover:bg-secondary rounded-lg">
           {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -72,7 +72,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-3 px-2 mb-8 mt-2">
           <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-10 h-10 rounded-xl shadow-sm" />
           <div className="flex flex-col">
-            <span className="font-display font-bold text-xl leading-tight text-primary">Arco-Íris</span>
+            <span className="font-display font-bold text-xl leading-tight text-primary">NFS</span>
             <span className="text-xs text-muted-foreground font-medium">Gestão Terapêutica</span>
           </div>
         </div>
@@ -80,7 +80,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLinks />
         </nav>
         <div className="mt-auto p-4 bg-secondary/50 rounded-2xl">
-          <p className="text-xs text-center text-muted-foreground">© 2025 Arco-Íris</p>
+          <p className="text-xs text-center text-muted-foreground">© 2026 NFS – Gestão Terapêutica</p>
         </div>
       </aside>
 

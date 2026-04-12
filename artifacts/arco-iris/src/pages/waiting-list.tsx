@@ -17,23 +17,23 @@ export default function WaitingList() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [formData, setFormData] = useState({ 
-    patientId: "", 
-    professionalId: "", 
-    priority: "media", 
-    entryDate: format(new Date(), "yyyy-MM-dd") 
+  const [formData, setFormData] = useState({
+    patientId: "",
+    professionalId: "",
+    priority: "media",
+    entryDate: format(new Date(), "yyyy-MM-dd"),
   });
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.patientId) return;
     try {
-      await createMutation.mutateAsync({ 
-        data: { 
-          ...formData, 
+      await createMutation.mutateAsync({
+        data: {
+          ...formData,
           patientId: parseInt(formData.patientId),
-          professionalId: formData.professionalId ? parseInt(formData.professionalId) : undefined
-        } 
+          professionalId: formData.professionalId ? parseInt(formData.professionalId) : undefined,
+        },
       });
       queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
       toast({ title: "Adicionado", description: "Paciente incluído na fila." });
@@ -73,7 +73,7 @@ export default function WaitingList() {
               <tr>
                 <th className="px-6 py-4">Posição</th>
                 <th className="px-6 py-4">Paciente</th>
-                <th className="px-6 py-4">Profissional (Pref)</th>
+                <th className="px-6 py-4">Especialidade</th>
                 <th className="px-6 py-4">Prioridade</th>
                 <th className="px-6 py-4">Entrada</th>
                 <th className="px-6 py-4 text-right">Ações</th>
@@ -93,25 +93,39 @@ export default function WaitingList() {
                   </td>
                 </tr>
               ) : (
-                waitingList?.map((entry, idx) => (
-                  <tr key={entry.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
-                    <td className="px-6 py-4 font-display font-bold text-lg text-primary">#{idx + 1}</td>
-                    <td className="px-6 py-4 font-semibold text-foreground">
-                      {entry.patientName}
-                      {entry.patientPhone && <div className="text-xs text-muted-foreground font-normal mt-0.5">{entry.patientPhone}</div>}
-                    </td>
-                    <td className="px-6 py-4 text-muted-foreground">{entry.professionalName || "Qualquer um"}</td>
-                    <td className="px-6 py-4">
-                      <Badge className={getPriorityColor(entry.priority)}>{entry.priority.toUpperCase()}</Badge>
-                    </td>
-                    <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
-                    <td className="px-6 py-4 text-right">
-                      <Button variant="ghost" className="text-destructive hover:bg-destructive/10 h-8 w-8 p-0" onClick={() => handleRemove(entry.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))
+                waitingList?.map((entry, idx) => {
+                  const e = entry as any;
+                  return (
+                    <tr key={entry.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
+                      <td className="px-6 py-4 font-display font-bold text-lg text-primary">#{idx + 1}</td>
+                      <td className="px-6 py-4 font-semibold text-foreground">
+                        {entry.patientName}
+                        {e.patientProntuario && (
+                          <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">{e.patientProntuario}</div>
+                        )}
+                        {entry.patientPhone && (
+                          <div className="text-xs text-muted-foreground font-normal mt-0.5">{entry.patientPhone}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {e.professionalSpecialty || e.professionalName || "Qualquer especialidade"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Badge className={getPriorityColor(entry.priority)}>{entry.priority.toUpperCase()}</Badge>
+                      </td>
+                      <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                          onClick={() => handleRemove(entry.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -125,25 +139,25 @@ export default function WaitingList() {
             <form onSubmit={handleAdd} className="space-y-4">
               <div>
                 <Label>Paciente</Label>
-                <Select required value={formData.patientId} onChange={e => setFormData({...formData, patientId: e.target.value})}>
+                <Select required value={formData.patientId} onChange={e => setFormData({ ...formData, patientId: e.target.value })}>
                   <option value="">Selecione um paciente...</option>
-                  {patients?.filter(p => p.status !== 'alta').map(p => (
+                  {patients?.filter(p => p.status !== "Alta").map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">Apenas pacientes sem alta aparecem aqui.</p>
+                <p className="text-xs text-muted-foreground mt-1">Pacientes com alta não aparecem aqui.</p>
               </div>
               <div>
-                <Label>Profissional Preferencial (Opcional)</Label>
-                <Select value={formData.professionalId} onChange={e => setFormData({...formData, professionalId: e.target.value})}>
-                  <option value="">Qualquer Profissional</option>
-                  {professionals?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <Label>Especialidade Preferencial (Opcional)</Label>
+                <Select value={formData.professionalId} onChange={e => setFormData({ ...formData, professionalId: e.target.value })}>
+                  <option value="">Qualquer Especialidade</option>
+                  {professionals?.map(p => <option key={p.id} value={p.id}>{p.specialty} – {p.name}</option>)}
                 </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Prioridade</Label>
-                  <Select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
+                  <Select value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })}>
                     <option value="alta">Alta</option>
                     <option value="media">Média</option>
                     <option value="baixa">Baixa</option>
@@ -151,12 +165,14 @@ export default function WaitingList() {
                 </div>
                 <div>
                   <Label>Data de Entrada</Label>
-                  <Input type="date" required value={formData.entryDate} onChange={e => setFormData({...formData, entryDate: e.target.value})} />
+                  <Input type="date" required value={formData.entryDate} onChange={e => setFormData({ ...formData, entryDate: e.target.value })} />
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-8">
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Adicionando..." : "Adicionar"}</Button>
+                <Button type="submit" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? "Adicionando..." : "Adicionar"}
+                </Button>
               </div>
             </form>
           </MotionCard>

@@ -18,8 +18,10 @@ router.get("/waiting-list", async (req, res) => {
     patientId: waitingListTable.patientId,
     patientName: patientsTable.name,
     patientPhone: patientsTable.phone,
+    patientProntuario: patientsTable.prontuario,
     professionalId: waitingListTable.professionalId,
     professionalName: professionalsTable.name,
+    professionalSpecialty: professionalsTable.specialty,
     priority: waitingListTable.priority,
     notes: waitingListTable.notes,
     entryDate: waitingListTable.entryDate,
@@ -36,7 +38,9 @@ router.get("/waiting-list", async (req, res) => {
     ...r,
     patientName: r.patientName ?? "",
     patientPhone: r.patientPhone ?? null,
+    patientProntuario: r.patientProntuario ?? null,
     professionalName: r.professionalName ?? null,
+    professionalSpecialty: r.professionalSpecialty ?? null,
   })));
 });
 
