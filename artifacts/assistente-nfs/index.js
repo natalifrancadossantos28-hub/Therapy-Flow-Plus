@@ -589,7 +589,10 @@ async function conectarWhatsApp() {
       if (!msg.message)   { console.log("  ⏭️  sem .message, ignorando"); continue; }
 
       const jid = msg.key.remoteJid;
-      if (!jid || jid.includes("status@")) { console.log(`  ⏭️  jid inválido: ${jid}`); continue; }
+      console.log(`  🔍 jid=${jid} type=${type}`);
+      if (!jid || jid.includes("status@")) { console.log(`  ⏭️  jid status, ignorando`); continue; }
+      // Aceitar qualquer type (notify, append, etc)
+
 
       const texto = (
         msg.message.conversation ||
