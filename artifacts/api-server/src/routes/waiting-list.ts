@@ -46,6 +46,19 @@ router.get("/waiting-list", async (req, res) => {
 
 router.post("/waiting-list", async (req, res) => {
   const { patientId, professionalId, priority, notes, entryDate } = req.body;
+
+  const [patient] = await db.select({ triagemScore: patientsTable.triagemScore })
+    .from(patientsTable)
+    .where(eq(patientsTable.id, Number(patientId)));
+
+  if (!patient) return res.status(404).json({ error: "Paciente não encontrado" });
+  if (patient.triagemScore === null || patient.triagemScore === undefined) {
+    return res.status(422).json({
+      error: "Triagem não realizada",
+      message: "O paciente precisa ter a triagem registrada antes de entrar na fila. Acesse o prontuário para registrar a triagem.",
+    });
+  }
+
   const [row] = await db.insert(waitingListTable).values({
     patientId: Number(patientId),
     professionalId: professionalId ? Number(professionalId) : null,
@@ -54,7 +67,7 @@ router.post("/waiting-list", async (req, res) => {
     entryDate,
   }).returning();
 
-  const patient = await db.select({ name: patientsTable.name, phone: patientsTable.phone })
+  const patientInfo = await db.select({ name: patientsTable.name, phone: patientsTable.phone })
     .from(patientsTable).where(eq(patientsTable.id, row.patientId));
   const prof = row.professionalId
     ? await db.select({ name: professionalsTable.name }).from(professionalsTable).where(eq(professionalsTable.id, row.professionalId))
@@ -62,8 +75,8 @@ router.post("/waiting-list", async (req, res) => {
 
   res.status(201).json({
     ...row,
-    patientName: patient[0]?.name ?? "",
-    patientPhone: patient[0]?.phone ?? null,
+    patientName: patientInfo[0]?.name ?? "",
+    patientPhone: patientInfo[0]?.phone ?? null,
     professionalName: prof[0]?.name ?? null,
   });
 });

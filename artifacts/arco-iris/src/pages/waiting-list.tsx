@@ -1,45 +1,71 @@
 import { useState } from "react";
-import { useGetWaitingList, useCreateWaitingListEntry, useDeleteWaitingListEntry, useGetPatients, useGetProfessionals } from "@workspace/api-client-react";
+import { useGetWaitingList, useDeleteWaitingListEntry, useGetPatients, useGetProfessionals } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, MotionCard, Button, Badge, Input, Label, Select } from "@/components/ui-custom";
-import { format } from "date-fns";
-import { Plus, Trash2, ListTodo } from "lucide-react";
+import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-custom";
+import { Trash2, ListTodo, ListPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate } from "@/lib/utils";
 
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+
+async function apiAddToFila(patientId: number, professionalId: number | null) {
+  const res = await fetch(`${BASE_URL}/api/patients/${patientId}/add-to-fila`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ professionalId }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message ?? json.error ?? "Erro ao adicionar à fila");
+  return json;
+}
+
+const PRIORITY_LABEL: Record<string, string> = { alta: "ALTA", media: "MÉDIA", baixa: "BAIXA" };
+
 export default function WaitingList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [formPatientId, setFormPatientId] = useState("");
+  const [formProfId, setFormProfId] = useState("");
+
   const { data: waitingList, isLoading } = useGetWaitingList({} as any, { refetchInterval: 20_000 } as any);
   const { data: patients } = useGetPatients();
   const { data: professionals } = useGetProfessionals();
-  const createMutation = useCreateWaitingListEntry();
   const deleteMutation = useDeleteWaitingListEntry();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [formData, setFormData] = useState({
-    patientId: "",
-    professionalId: "",
-    priority: "media",
-    entryDate: format(new Date(), "yyyy-MM-dd"),
+  const waitingListIds = new Set((waitingList ?? []).map((e) => e.patientId));
+
+  const eligiblePatients = (patients ?? []).filter((p) => {
+    const score = (p as any).triagemScore;
+    const alreadyInQueue = waitingListIds.has(p.id);
+    const inactiveStatus = ["Alta", "Óbito", "Desistência", "Atendimento", "Fila de Espera"].includes(p.status ?? "");
+    return score != null && !alreadyInQueue && !inactiveStatus;
   });
+
+  const resetForm = () => { setFormPatientId(""); setFormProfId(""); };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.patientId) return;
+    if (!formPatientId) return;
+    setAdding(true);
     try {
-      await createMutation.mutateAsync({
-        data: {
-          ...formData,
-          patientId: parseInt(formData.patientId),
-          professionalId: formData.professionalId ? parseInt(formData.professionalId) : undefined,
-        },
-      });
+      const result = await apiAddToFila(
+        parseInt(formPatientId),
+        formProfId ? parseInt(formProfId) : null,
+      );
       queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
-      toast({ title: "Adicionado", description: "Paciente incluído na fila." });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      toast({
+        title: "Adicionado à fila!",
+        description: `Prioridade calculada automaticamente: ${PRIORITY_LABEL[result.priority] ?? result.priority}`,
+      });
       setIsDialogOpen(false);
-    } catch {
-      toast({ title: "Erro", description: "Falha ao adicionar na fila.", variant: "destructive" });
+      resetForm();
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -48,6 +74,7 @@ export default function WaitingList() {
     try {
       await deleteMutation.mutateAsync({ id });
       queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       toast({ title: "Removido", description: "Entrada removida com sucesso." });
     } catch {
       toast({ title: "Erro", description: "Falha ao remover.", variant: "destructive" });
@@ -59,10 +86,10 @@ export default function WaitingList() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">Fila de Espera</h1>
-          <p className="text-muted-foreground mt-1">Organização de triagem por prioridade e data.</p>
+          <p className="text-muted-foreground mt-1">Organização por prioridade calculada na triagem.</p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" /> Adicionar à Fila
+        <Button onClick={() => setIsDialogOpen(true)} className="gap-2" disabled={eligiblePatients.length === 0}>
+          <ListPlus className="w-4 h-4" /> Adicionar Triado à Fila
         </Button>
       </div>
 
@@ -73,7 +100,7 @@ export default function WaitingList() {
         <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold border border-amber-200">MÉDIA</span>
         <span className="text-muted-foreground">→</span>
         <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">BAIXA</span>
-        <span className="ml-2 text-muted-foreground">• Desempate por data de entrada</span>
+        <span className="ml-2 text-muted-foreground">• Prioridade calculada automaticamente na triagem</span>
       </div>
 
       <Card className="p-0 overflow-hidden">
@@ -122,7 +149,7 @@ export default function WaitingList() {
                       </td>
                       <td className="px-6 py-4">
                         <Badge className={getPriorityColor(entry.priority)}>
-                          {entry.priority === "alta" ? "ALTA" : entry.priority === "media" ? "MÉDIA" : "BAIXA"}
+                          {PRIORITY_LABEL[entry.priority] ?? entry.priority}
                         </Badge>
                       </td>
                       <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
@@ -147,43 +174,44 @@ export default function WaitingList() {
       {isDialogOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <MotionCard className="w-full max-w-md p-6 overflow-visible" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-            <h2 className="text-2xl font-bold font-display mb-6">Adicionar Paciente à Fila</h2>
+            <h2 className="text-2xl font-bold font-display mb-1">Adicionar à Fila de Espera</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Apenas pacientes com triagem registrada aparecem aqui. A prioridade é calculada automaticamente.
+            </p>
             <form onSubmit={handleAdd} className="space-y-4">
               <div>
-                <Label>Paciente</Label>
-                <Select required value={formData.patientId} onChange={e => setFormData({ ...formData, patientId: e.target.value })}>
-                  <option value="">Selecione um paciente...</option>
-                  {patients?.filter(p => p.status !== "Alta").map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
+                <Label>Paciente (com triagem realizada)</Label>
+                <Select required value={formPatientId} onChange={e => setFormPatientId(e.target.value)}>
+                  <option value="">Selecione um paciente triado...</option>
+                  {eligiblePatients.map(p => {
+                    const score = (p as any).triagemScore;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {p.name} — Score: {score}/100
+                      </option>
+                    );
+                  })}
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">Pacientes com alta não aparecem aqui.</p>
+                {eligiblePatients.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1 font-semibold">
+                    Nenhum paciente com triagem disponível. Realize a triagem no prontuário primeiro.
+                  </p>
+                )}
               </div>
               <div>
                 <Label>Especialidade Preferencial (Opcional)</Label>
-                <Select value={formData.professionalId} onChange={e => setFormData({ ...formData, professionalId: e.target.value })}>
+                <Select value={formProfId} onChange={e => setFormProfId(e.target.value)}>
                   <option value="">Qualquer Especialidade</option>
                   {professionals?.map(p => <option key={p.id} value={p.id}>{p.specialty} – {p.name}</option>)}
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Prioridade</Label>
-                  <Select value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })}>
-                    <option value="alta">Alta</option>
-                    <option value="media">Média</option>
-                    <option value="baixa">Baixa</option>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Data de Entrada</Label>
-                  <Input type="date" required value={formData.entryDate} onChange={e => setFormData({ ...formData, entryDate: e.target.value })} />
-                </div>
+              <div className="p-3 bg-secondary/40 rounded-xl text-xs text-muted-foreground">
+                A prioridade (Alta / Média / Baixa) será calculada automaticamente com base no score clínico e critérios de vulnerabilidade registrados na triagem.
               </div>
-              <div className="flex justify-end gap-3 mt-8">
-                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "Adicionando..." : "Adicionar"}
+              <div className="flex justify-end gap-3 mt-6">
+                <Button type="button" variant="ghost" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>
+                <Button type="submit" disabled={adding || !formPatientId}>
+                  {adding ? "Adicionando..." : "Confirmar e Adicionar"}
                 </Button>
               </div>
             </form>
