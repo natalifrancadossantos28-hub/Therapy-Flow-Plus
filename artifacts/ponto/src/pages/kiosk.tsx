@@ -3,7 +3,9 @@ import { Link } from "wouter";
 import { Html5QrcodeScanner, Html5QrcodeScanType } from "html5-qrcode";
 import { useGetPontoEmployeeByCpf, useCreatePontoRecord, useGetPontoRecords } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { CheckCircle2, ScanLine, XCircle, Zap } from "lucide-react";
+import { CheckCircle2, ScanLine, XCircle, Zap, Building2 } from "lucide-react";
+
+const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 // Play beep instantly — called at moment of QR detection, not after DB save
 const playBeep = () => {
@@ -14,35 +16,72 @@ const playBeep = () => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "sine";
-    osc.frequency.setValueAtTime(1046, ctx.currentTime);  // C6 — sharp, recognizable
+    osc.frequency.setValueAtTime(1046, ctx.currentTime);
     gain.gain.setValueAtTime(0.15, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.18);
-  } catch (e) {
-    // ignore
-  }
+  } catch (_) {}
 };
 
-// State machine:
-//  idle      → waiting for QR
-//  detected  → QR captured; beep played; scanner paused; DB lookup pending
-//  success   → record saved; showing employee card
-//  error     → something went wrong
 type ScanState = "idle" | "detected" | "success" | "error";
+const RESET_DELAY_MS = 2000;
 
-const RESET_DELAY_MS = 2000; // 2 s — ready for the next person
+// ── Company context ──────────────────────────────────────────────────────────
+// On load, if URL has ?c=SLUG, look up the company and set kiosk session
+// so all API calls are scoped to that company via x-company-id header.
+async function initCompanyContext(slug: string): Promise<{ id: number; name: string } | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/ponto/companies/slug/${slug}`);
+    if (!res.ok) return null;
+    const company = await res.json();
+    sessionStorage.setItem("nfs_ponto_session", JSON.stringify({
+      type: "kiosk",
+      companyId: company.id,
+      companyName: company.name,
+    }));
+    return company;
+  } catch {
+    return null;
+  }
+}
 
 export default function KioskPage() {
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-  const processingRef = useRef(false);            // guard against double-fires
+  const processingRef = useRef(false);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [scanState, setScanState] = useState<ScanState>("idle");
   const [scannedCpf, setScannedCpf] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState<string | null>(null);
+  const [companyLoading, setCompanyLoading] = useState(false);
+  const [companyError, setCompanyError] = useState<string | null>(null);
+
+  // ── Init company from URL param ?c=slug ──────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get("c");
+    if (!slug) {
+      // No company param — clear any old kiosk session, use global
+      const existing = JSON.parse(sessionStorage.getItem("nfs_ponto_session") || "{}");
+      if (existing.type === "kiosk") {
+        setCompanyName(existing.companyName ?? null);
+      }
+      return;
+    }
+    setCompanyLoading(true);
+    initCompanyContext(slug).then(company => {
+      if (company) {
+        setCompanyName(company.name);
+      } else {
+        setCompanyError(`Empresa "${slug}" não encontrada ou inativa.`);
+      }
+      setCompanyLoading(false);
+    });
+  }, []);
 
   const { data: employee, isFetching: isLoadingEmployee } = useGetPontoEmployeeByCpf(
     scannedCpf || "",
@@ -56,8 +95,7 @@ export default function KioskPage() {
 
   const createRecord = useCreatePontoRecord();
 
-  // ─── helpers ─────────────────────────────────────────────────────────────
-
+  // ─── helpers ──────────────────────────────────────────────────────────────
   const pauseScanner = useCallback(() => {
     try { scannerRef.current?.pause(true); } catch (_) {}
   }, []);
@@ -80,24 +118,20 @@ export default function KioskPage() {
   const showError = useCallback((msg: string) => {
     setScanState("error");
     setErrorMessage(msg);
-    scheduleReset(3000); // slightly longer for error messages
+    scheduleReset(3500);
   }, [scheduleReset]);
 
-  // ─── QR detected (immediate) ─────────────────────────────────────────────
-
+  // ─── QR detected (immediate) ────────────────────────────────────────────
   const handleScan = useCallback((decodedText: string) => {
-    if (processingRef.current) return;       // already handling one
+    if (processingRef.current) return;
     processingRef.current = true;
-
-    pauseScanner();      // stop loop immediately — no more frames processed
-    playBeep();          // instant audio feedback
-
+    pauseScanner();
+    playBeep();
     setScanState("detected");
     setScannedCpf(decodedText.trim());
   }, [pauseScanner]);
 
-  // ─── DB lookup complete ───────────────────────────────────────────────────
-
+  // ─── DB lookup complete ──────────────────────────────────────────────────
   useEffect(() => {
     if (!scannedCpf || scanState !== "detected") return;
     if (isLoadingEmployee) return;
@@ -106,8 +140,7 @@ export default function KioskPage() {
       showError("Funcionário não encontrado. O QR Code pode ser inválido.");
       return;
     }
-
-    if (todayRecords === undefined) return;   // still loading records
+    if (todayRecords === undefined) return;
 
     const sortedRecords = [...todayRecords].sort(
       (a, b) => new Date(b.punchedAt).getTime() - new Date(a.punchedAt).getTime()
@@ -125,8 +158,9 @@ export default function KioskPage() {
           scheduleReset();
         },
         onError: (err: any) => {
+          // ApiError: err.data.error (custom-fetch) or fallback to err.message
           const msg =
-            err?.response?.data?.error ??
+            (err?.data as any)?.error ??
             err?.message ??
             "Erro ao registrar ponto. Tente novamente.";
           showError(msg);
@@ -136,8 +170,7 @@ export default function KioskPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scannedCpf, scanState, isLoadingEmployee, employee, todayRecords]);
 
-  // ─── scanner initialisation ───────────────────────────────────────────────
-
+  // ─── Scanner init ────────────────────────────────────────────────────────
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!document.getElementById("reader")) return;
@@ -145,22 +178,22 @@ export default function KioskPage() {
       const scanner = new Html5QrcodeScanner(
         "reader",
         {
-          fps: 10,                           // ← was 15, reduced to lower CPU load
+          fps: 10,
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1,
           supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
           videoConstraints: {
             facingMode: { ideal: "environment" },
-            width:  { ideal: 640 },          // ← was 1920, now 640
-            height: { ideal: 480 },          // ← was 1080, now 480
+            width: { ideal: 640 },
+            height: { ideal: 480 },
           },
         },
         false
       );
 
       scanner.render(
-        (text) => handleScan(text),
-        () => {}                             // scan-frame error — ignore
+        text => handleScan(text),
+        () => {}
       );
 
       scannerRef.current = scanner;
@@ -173,19 +206,28 @@ export default function KioskPage() {
     };
   }, [handleScan]);
 
-  // ─── UI ──────────────────────────────────────────────────────────────────
-
   const isIdle    = scanState === "idle";
   const isDetect  = scanState === "detected";
   const isSuccess = scanState === "success";
   const isError   = scanState === "error";
+
+  // ─── Company error screen ────────────────────────────────────────────────
+  if (companyError) {
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center p-8 bg-background text-center">
+        <Building2 className="w-16 h-16 text-destructive mb-4" />
+        <h1 className="text-2xl font-bold text-foreground mb-2">Empresa não encontrada</h1>
+        <p className="text-muted-foreground">{companyError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 bg-background relative overflow-hidden">
       {/* Header */}
       <div className="absolute top-8 left-0 right-0 text-center z-10">
         <h1 className="font-display text-4xl md:text-5xl font-bold text-primary tracking-tight">
-          NFs – Bater Ponto
+          {companyLoading ? "Carregando..." : companyName ?? "NFs – Bater Ponto"}
         </h1>
         <p className="text-muted-foreground mt-2 text-lg">
           Aproxime seu crachá da câmera para registrar o ponto
@@ -213,7 +255,7 @@ export default function KioskPage() {
           </div>
         </div>
 
-        {/* ── Detected (instant feedback — shows before DB finishes) ── */}
+        {/* ── Detected ── */}
         <div
           className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-200 z-20 bg-background/95 backdrop-blur-xl ${
             isDetect ? "opacity-100 scale-100" : "opacity-0 scale-105 pointer-events-none"
@@ -248,12 +290,10 @@ export default function KioskPage() {
                   <CheckCircle2 className="w-10 h-10 text-white" />
                 </div>
               </div>
-
               <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground text-center mb-2">
                 {employee.name}
               </h2>
               <p className="text-xl text-primary font-medium mb-8">{employee.role}</p>
-
               <div className="bg-green-500/10 border border-green-500/20 text-green-500 px-8 py-4 rounded-2xl text-2xl font-semibold flex items-center gap-4">
                 <CheckCircle2 className="w-7 h-7" />
                 Ponto Registrado com Sucesso!

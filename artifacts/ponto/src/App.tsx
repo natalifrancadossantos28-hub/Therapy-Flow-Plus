@@ -13,8 +13,10 @@ import EmployeeBadge from "./pages/admin/employees/badge";
 import RecordsList from "./pages/admin/records/index";
 import SummaryList from "./pages/admin/summary/index";
 import Reports from "./pages/admin/reports/index";
+import SettingsPage from "./pages/admin/settings";
+import CompaniesPage from "./pages/admin/companies/index";
 
-import { AdminGuard } from "./components/AdminGuard";
+import { AdminGuard, MasterGuard } from "./components/AdminGuard";
 import { AdminLayout } from "./components/AdminLayout";
 
 const queryClient = new QueryClient();
@@ -24,6 +26,17 @@ function Router() {
     <Switch>
       <Route path="/" component={KioskPage} />
       <Route path="/admin/login" component={AdminLogin} />
+
+      {/* Master-only: companies management */}
+      <Route path="/admin/companies">
+        <MasterGuard>
+          <AdminLayout>
+            <CompaniesPage />
+          </AdminLayout>
+        </MasterGuard>
+      </Route>
+
+      {/* Company admin routes */}
       <Route path="/admin/*">
         <AdminGuard>
           <AdminLayout>
@@ -36,11 +49,13 @@ function Router() {
               <Route path="/admin/records" component={RecordsList} />
               <Route path="/admin/summary" component={SummaryList} />
               <Route path="/admin/reports" component={Reports} />
+              <Route path="/admin/settings" component={SettingsPage} />
               <Route component={NotFound} />
             </Switch>
           </AdminLayout>
         </AdminGuard>
       </Route>
+
       <Route component={NotFound} />
     </Switch>
   );

@@ -126,6 +126,48 @@ To commercialize this system for multiple clinics (SaaS), the following changes 
 4. Filter ALL API queries by `clinicId` from the authenticated session
 5. The code is already modular (monorepo) — duplication of the entire workspace per new client is the simplest short-term approach, full multi-tenant DB isolation is the long-term approach
 
+---
+
+## NFs – Bater Ponto (Multi-tenant Architecture)
+
+**System 3:** `artifacts/ponto` — Time-clock kiosk with QR code scanning, multi-company SaaS.
+
+### Multi-tenancy Design (IMPLEMENTED)
+
+**DB Tables:**
+- `ponto_companies` — company registry with per-company settings
+- `ponto_employees.company_id` — scopes every employee to a company
+- `ponto_records` — linked via employee, inherits company scope
+
+**Session Storage (`nfs_ponto_session`):**
+```json
+// Company admin:
+{ "type": "company", "companyId": 1, "companyName": "...", "companySlug": "...", "adminToken": "..." }
+// Master admin:
+{ "type": "master", "masterToken": "nfs_master_2024" }
+// Kiosk (public, set on URL param ?c=slug):
+{ "type": "kiosk", "companyId": 1, "companyName": "..." }
+```
+
+**Header injection:** `lib/api-client-react/src/custom-fetch.ts` automatically injects `x-company-id`, `x-company-auth`, and `x-master-auth` headers on every API call from sessionStorage.
+
+**Master password:** env var `MASTER_PASSWORD` (default: `nfs_master_2024`). Grants access to company CRUD panel.
+
+**Kiosk URL:** `/?c=SLUG` — looks up company by slug, sets kiosk session. Scopes all QR lookups to that company.
+
+**Per-company settings:** `toleranceMinutes`, `overtimeBlockEnabled`, `defaultBreakMinutes` stored in `ponto_companies`.
+
+**Auth flow:**
+1. Company admin: POST `/api/ponto/auth/company` `{slug, password}` → stores company session
+2. Master admin: POST `/api/ponto/auth/master` `{password}` → stores master session
+3. Kiosk: GET `/api/ponto/companies/slug/:slug` → stores kiosk session (no password)
+
+**DB rebuild after schema changes:**
+```bash
+pnpm --filter @workspace/db run push      # push schema
+cd lib/db && npx tsc -b --force           # rebuild declaration files
+```
+
 ### DB Schema push
 ```bash
 cd lib/db && pnpm run push          # safe push
