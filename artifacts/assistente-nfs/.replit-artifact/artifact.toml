@@ -5,7 +5,7 @@ kind = "web"
 
   [[services]]
   localPort = 3001
-  name = "web"
+  name = "WhatsApp Bot"
   paths = ["/assistente-nfs"]
 
   [services.development]
