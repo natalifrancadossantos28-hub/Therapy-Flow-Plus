@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -18,9 +18,12 @@ export const patientsTable = pgTable("patients", {
   diagnosis: text("diagnosis"),
   notes: text("notes"),
   professionalId: integer("professional_id"),
-  status: text("status").notNull().default("pré-cadastro"),
+  status: text("status").notNull().default("Aguardando Triagem"),
   entryDate: text("entry_date"),
   absenceCount: integer("absence_count").notNull().default(0),
+  triagemScore: integer("triagem_score"),
+  escolaPublica: boolean("escola_publica"),
+  trabalhoNaRoca: boolean("trabalho_na_roca"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

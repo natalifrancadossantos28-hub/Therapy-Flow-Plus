@@ -5,6 +5,13 @@ import { eq, and, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "alta" | "media" | "baixa" {
+  const vulnScore = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0);
+  if (triagemScore >= 65 || vulnScore >= 2) return "alta";
+  if (triagemScore >= 35 || vulnScore >= 1) return "media";
+  return "baixa";
+}
+
 router.get("/patients", async (req, res) => {
   let query = db.select({
     id: patientsTable.id,
@@ -25,6 +32,9 @@ router.get("/patients", async (req, res) => {
     status: patientsTable.status,
     entryDate: patientsTable.entryDate,
     absenceCount: patientsTable.absenceCount,
+    triagemScore: patientsTable.triagemScore,
+    escolaPublica: patientsTable.escolaPublica,
+    trabalhoNaRoca: patientsTable.trabalhoNaRoca,
     createdAt: patientsTable.createdAt,
     updatedAt: patientsTable.updatedAt,
   }).from(patientsTable);
@@ -47,7 +57,7 @@ router.post("/patients", async (req, res) => {
   const body = req.body;
   const today = new Date().toISOString().split("T")[0];
   const entryDate = body.entryDate ?? today;
-  const status = body.status ?? "pré-cadastro";
+  const status = body.status ?? "Aguardando Triagem";
 
   const [row] = await db.insert(patientsTable).values({
     prontuario: body.prontuario ?? null,
@@ -67,17 +77,10 @@ router.post("/patients", async (req, res) => {
     status,
     entryDate,
     absenceCount: 0,
+    triagemScore: body.triagemScore !== undefined ? Number(body.triagemScore) : null,
+    escolaPublica: body.escolaPublica !== undefined ? Boolean(body.escolaPublica) : null,
+    trabalhoNaRoca: body.trabalhoNaRoca !== undefined ? Boolean(body.trabalhoNaRoca) : null,
   }).returning();
-
-  if (status === "Fila de Espera") {
-    await db.insert(waitingListTable).values({
-      patientId: row.id,
-      professionalId: body.professionalId ? Number(body.professionalId) : null,
-      priority: body.priority ?? "media",
-      notes: body.notes ?? null,
-      entryDate,
-    });
-  }
 
   res.status(201).json(row);
 });
@@ -109,6 +112,9 @@ router.put("/patients/:id", async (req, res) => {
   if (body.professionalId !== undefined) updateData.professionalId = body.professionalId;
   if (body.status !== undefined) updateData.status = body.status;
   if (body.entryDate !== undefined) updateData.entryDate = body.entryDate;
+  if (body.triagemScore !== undefined) updateData.triagemScore = body.triagemScore !== null ? Number(body.triagemScore) : null;
+  if (body.escolaPublica !== undefined) updateData.escolaPublica = body.escolaPublica !== null ? Boolean(body.escolaPublica) : null;
+  if (body.trabalhoNaRoca !== undefined) updateData.trabalhoNaRoca = body.trabalhoNaRoca !== null ? Boolean(body.trabalhoNaRoca) : null;
 
   const [row] = await db.update(patientsTable).set(updateData).where(eq(patientsTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Patient not found" });
@@ -119,6 +125,61 @@ router.delete("/patients/:id", async (req, res) => {
   const id = Number(req.params.id);
   await db.delete(patientsTable).where(eq(patientsTable.id, id));
   res.status(204).send();
+});
+
+router.post("/patients/:id/add-to-fila", async (req, res) => {
+  const id = Number(req.params.id);
+  const [patient] = await db.select().from(patientsTable).where(eq(patientsTable.id, id));
+  if (!patient) return res.status(404).json({ error: "Patient not found" });
+
+  if (patient.triagemScore === null || patient.triagemScore === undefined) {
+    return res.status(422).json({
+      error: "Triagem não realizada",
+      message: "O paciente precisa ter a triagem registrada antes de entrar na fila.",
+    });
+  }
+
+  const existing = await db.select({ id: waitingListTable.id })
+    .from(waitingListTable)
+    .where(eq(waitingListTable.patientId, id));
+  if (existing.length > 0) {
+    return res.status(409).json({
+      error: "Já na fila",
+      message: "Este paciente já está na fila de espera.",
+    });
+  }
+
+  const priority = calcPriority(
+    patient.triagemScore,
+    patient.escolaPublica ?? false,
+    patient.trabalhoNaRoca ?? false,
+  );
+
+  const today = new Date().toISOString().split("T")[0];
+  const professionalId = req.body.professionalId ? Number(req.body.professionalId) : null;
+
+  const [entry] = await db.insert(waitingListTable).values({
+    patientId: id,
+    professionalId,
+    priority,
+    notes: req.body.notes ?? null,
+    entryDate: today,
+  }).returning();
+
+  await db.update(patientsTable)
+    .set({ status: "Fila de Espera" })
+    .where(eq(patientsTable.id, id));
+
+  res.status(201).json({
+    ...entry,
+    priority,
+    patientName: patient.name,
+    calculatedFrom: {
+      triagemScore: patient.triagemScore,
+      escolaPublica: patient.escolaPublica,
+      trabalhoNaRoca: patient.trabalhoNaRoca,
+    },
+  });
 });
 
 router.get("/patients/:id/absences", async (req, res) => {

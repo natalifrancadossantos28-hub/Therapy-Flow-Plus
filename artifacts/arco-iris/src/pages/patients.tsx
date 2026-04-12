@@ -5,14 +5,15 @@ import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/compone
 import { Users, Plus, Search, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getStatusColor } from "@/lib/utils";
+import { Link } from "wouter";
 
 const STATUS_OPTIONS = [
-  { value: "Fila de Espera", label: "Fila de Espera" },
-  { value: "pré-cadastro", label: "Pré-cadastro" },
-  { value: "Atendimento", label: "Atendimento" },
-  { value: "Alta", label: "Alta" },
-  { value: "Óbito", label: "Óbito" },
-  { value: "Desistência", label: "Desistência" },
+  { value: "Aguardando Triagem", label: "Aguardando Triagem" },
+  { value: "Fila de Espera",     label: "Fila de Espera" },
+  { value: "Atendimento",        label: "Atendimento" },
+  { value: "Alta",               label: "Alta" },
+  { value: "Óbito",              label: "Óbito" },
+  { value: "Desistência",        label: "Desistência" },
 ];
 
 const today = () => new Date().toISOString().split("T")[0];
@@ -38,7 +39,6 @@ export default function Patients() {
     guardianName: "",
     guardianPhone: "",
     diagnosis: "",
-    status: "Fila de Espera",
     entryDate: today(),
   });
 
@@ -52,17 +52,20 @@ export default function Patients() {
   const resetForm = () => setFormData({
     name: "", prontuario: "", cpf: "", cns: "", phone: "", dateOfBirth: "",
     motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
-    status: "Fila de Espera", entryDate: today(),
+    entryDate: today(),
   });
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createMutation.mutateAsync({ data: { ...formData } });
+      await createMutation.mutateAsync({
+        data: {
+          ...formData,
+          status: "Aguardando Triagem",
+        },
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
-      toast({ title: "Paciente cadastrado com sucesso!" });
+      toast({ title: "Paciente cadastrado!", description: "Status: Aguardando Triagem. Realize a triagem para adicionar à fila." });
       setIsDialogOpen(false);
       resetForm();
     } catch {
@@ -82,6 +85,19 @@ export default function Patients() {
         </Button>
       </div>
 
+      {/* Legenda do fluxo */}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground bg-secondary/40 border border-border rounded-xl px-4 py-2.5">
+        <span className="font-semibold text-foreground">Fluxo:</span>
+        <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 border border-sky-200 font-semibold">Aguardando Triagem</span>
+        <span>→</span>
+        <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200 font-semibold">Fila de Espera</span>
+        <span>→</span>
+        <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 border border-teal-200 font-semibold">Atendimento</span>
+        <span>→</span>
+        <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 font-semibold">Alta</span>
+        <span className="ml-2 text-muted-foreground">• Clique no paciente para gerenciar</span>
+      </div>
+
       <Card className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="flex items-center gap-3 flex-1 bg-secondary/30 p-2 rounded-xl border border-border/50">
@@ -93,7 +109,7 @@ export default function Patients() {
               className="border-0 bg-transparent shadow-none focus-visible:ring-0 px-0"
             />
           </div>
-          <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-48">
+          <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-52">
             <option value="">Todos os status</option>
             {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </Select>
@@ -121,7 +137,10 @@ export default function Patients() {
                   const prof = professionals?.find(p => p.id === patient.professionalId);
                   const hasWarning = patient.absenceCount >= 3;
                   return (
-                    <tr key={patient.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
+                    <tr key={patient.id}
+                      className="border-b border-border hover:bg-secondary/20 transition-colors cursor-pointer"
+                      onClick={() => window.location.href = `/patients/${patient.id}`}
+                    >
                       <td className="px-4 py-4 text-muted-foreground font-mono text-xs">
                         {(patient as any).prontuario || `#${String(patient.id).padStart(4, "0")}`}
                       </td>
@@ -152,7 +171,10 @@ export default function Patients() {
       {isDialogOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <MotionCard className="w-full max-w-lg p-6 overflow-y-auto max-h-[90vh]" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-            <h2 className="text-2xl font-bold font-display mb-6">Novo Paciente</h2>
+            <h2 className="text-2xl font-bold font-display mb-1">Novo Paciente</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              O paciente será cadastrado com status <strong>Aguardando Triagem</strong>. A triagem é feita no prontuário.
+            </p>
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
@@ -166,12 +188,6 @@ export default function Patients() {
                 <div>
                   <Label>Data de Entrada *</Label>
                   <Input type="date" required value={formData.entryDate} onChange={e => setFormData({ ...formData, entryDate: e.target.value })} />
-                </div>
-                <div>
-                  <Label>Status</Label>
-                  <Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
-                    {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </Select>
                 </div>
                 <div>
                   <Label>Data de Nascimento</Label>
@@ -208,7 +224,7 @@ export default function Patients() {
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <Button type="button" variant="ghost" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>
-                <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Salvando..." : "Salvar"}</Button>
+                <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Salvando..." : "Cadastrar"}</Button>
               </div>
             </form>
           </MotionCard>
