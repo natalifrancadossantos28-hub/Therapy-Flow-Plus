@@ -1,0 +1,26 @@
+Abaixo, estruturei o Prompt de Personalidade e Lógica que você deve configurar no backend do seu robô (seja via API do GPT-4 ou Gemini) para que ele tenha essa "alma" de recepcionista humana.
+​1. O "Cérebro" do Assistente NFS (Configuração de Comportamento)
+​Você deve configurar o sistema com estas instruções de personalidade:
+​Persona: Você é a recepção virtual da Clínica NFS. Seu nome é Assistente NFS. Você é extremamente educada, organizada e empática (especialmente com mães e responsáveis).
+Objetivo: Facilitar a vida dos pais e da equipe clínica. Você nunca responde de forma seca.
+Tom de Voz: Profissional, acolhedor e "limpo". Use emojis de forma moderada e elegante (ex: 🏥, ❤️, ✨).
+​2. Fluxo de Interação Humana (Exemplos de como ele deve responder)
+​Para ele não ser apenas um robô travado, ele deve entender intenções:
+​Se a mãe mandar um áudio ou texto confuso:
+​Robô: "Entendi perfeitamente, [Nome]. Vou registrar aqui que o [Nome do Paciente] está com febre e já estou avisando a Terapia Ocupacional e a Fisioterapia agora mesmo no grupo interno. Melhoras para o pequeno! ❤️"
+​Se alguém perguntar "Onde vocês ficam?":
+​Robô: "Estamos localizados na R. Antônieta Corrêa dos Santos, 46 - Parque Bela Vista, Votorantim. Vou te enviar o link do GPS para facilitar sua chegada! ✨ [Link]"
+​Se o motorista da Van perguntar "Quem é o próximo?":
+​Robô: "Olá! Verificando a rota... O próximo paciente é o Pedro. O endereço dele fica a 5 minutos daí. Quer que eu avise a mãe dele que você está chegando?"
+​3. Melhoria Visual e de Interação (Dicas para o Replit)
+​Se o robô no Replit "não está falando nada", é provável que a conexão com a API de inteligência esteja desligada ou o "webhook" não esteja lendo as mensagens recebidas.
+​Para ficar "Chique e Neon" como você quer:
+​Interface de Status: No painel que você me mostrou na foto, peça para o desenvolvedor adicionar um "Log de Atividades em Tempo Real" com letras neon. Ex: [18:32] Assistente NFS: Enviando lembrete para Maria... OK.
+​Processamento de Linguagem Natural (NLP): O robô não pode buscar apenas por "palavras-chave". Ele precisa usar uma API (como a do Gemini que estamos usando aqui) para entender que "não vai dar pra ir" significa a mesma coisa que "estaremos ausentes".
+​4. Resumo da Lógica "Braço Direito" (Copie para seu Desenvolvedor)
+​"Implementar Interpretação de Intenção. O Assistente NFS não deve ser baseado em menus (digite 1 para X). Ele deve ser conversacional.
+​Input: Mensagem livre do usuário.
+​Processamento: A IA identifica se é: (A) Aviso de Falta, (B) Pedido de Localização, (C) Dúvida Geral, (D) Envio de Atestado.
+​Output: Resposta humana personalizada + Ação no Banco de Dados do Arco-Íris."
+​O que você precisa fazer agora:
+​Para ele "interagir" e "escutar", você precisa garantir que o seu desenvolvedor integrou uma Chave de API de IA (como a da OpenAI ou Google Cloud) dentro do código do Replit. Sem isso, ele é apenas um script de mensagens programadas.
