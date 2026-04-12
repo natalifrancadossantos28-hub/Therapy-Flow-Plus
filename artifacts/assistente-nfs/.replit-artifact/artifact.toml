@@ -5,11 +5,11 @@ kind = "web"
 
   [[services]]
   localPort = 3001
-  name = "WhatsApp Bot"
+  name = "web"
   paths = ["/assistente-nfs"]
 
   [services.development]
-  run = "cd artifacts/assistente-nfs && PORT=3001 node index.js"
+  run = "PORT=3001 node /home/runner/workspace/artifacts/assistente-nfs/index.js"
 
   [services.production]
 
