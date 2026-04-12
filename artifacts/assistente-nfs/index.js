@@ -650,7 +650,14 @@ cron.schedule("0 7 * * 1-5", async () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // BAILEYS — CONEXÃO WHATSAPP
 // ─────────────────────────────────────────────────────────────────────────────
+let _conectando = false; // guard: evita múltiplas conexões simultâneas
+
 async function conectarWhatsApp() {
+  if (_conectando) {
+    console.log("⏳ Conexão já em andamento — ignorando chamada duplicada");
+    return;
+  }
+  _conectando = true;
   const { state, saveCreds } = await useMultiFileAuthState("./sessao_whatsapp");
   const { version }          = await fetchLatestBaileysVersion();
 
@@ -682,6 +689,7 @@ async function conectarWhatsApp() {
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode;
       statusConexao = "desconectado";
+      _conectando = false; // libera o guard para permitir próxima reconexão
       salvarStatus({ status: "desconectado", qrCode: null });
       console.log(`🔴 Desconectado. Código: ${code}`);
       logAtividade(`🔴 Desconectado (código ${code})`, "erro");
@@ -959,20 +967,29 @@ app.post(["/logout", "/assistente-nfs/logout"], async (req, res) => {
   }
 });
 
-// Redirect para painel
-function redirectToPanel(req, res) {
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Assistente NFs</title>
-  <style>body{font-family:sans-serif;background:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;min-height:100vh;gap:16px}.spin{width:36px;height:36px;border:4px solid #eee;border-top-color:#25D366;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}p{color:#555}a{color:#1a73e8}</style>
-  <script>window.addEventListener('load',function(){var b=window.location.protocol+'//'+window.location.hostname;window.location.replace(b+'/api/whatsapp/panel');});</script>
-  </head><body><div class="spin"></div><p>Abrindo painel da Carla...</p><a id="l" href="#">Clique aqui se não redirecionar</a>
-  <script>document.getElementById('l').href=window.location.protocol+'//'+window.location.hostname+'/api/whatsapp/panel';</script>
-  </body></html>`);
+// Serve o painel da Carla diretamente (proxy do api-server)
+// Evita o problema do canvas iframe não seguir redirecionamentos cross-service
+async function servirPainel(req, res) {
+  try {
+    const r = await fetch("http://localhost:8080/api/whatsapp/panel");
+    if (!r.ok) throw new Error(`API retornou ${r.status}`);
+    const html = await r.text();
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.send(html);
+  } catch(e) {
+    // API server ainda não está pronto — mostra tela de carregamento
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Assistente NFs</title>
+<meta http-equiv="refresh" content="3">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;background:#0d1117;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh}.card{text-align:center;gap:16px;display:flex;flex-direction:column;align-items:center}.spin{width:44px;height:44px;border:4px solid rgba(37,211,102,.2);border-top-color:#25D366;border-radius:50%;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}p{color:rgba(255,255,255,.5);font-size:14px}</style>
+</head><body><div class="card"><div class="spin"></div><p>Iniciando painel da Carla...</p></div></body></html>`);
+  }
 }
 
-app.get("/", redirectToPanel);
-app.get("/assistente-nfs", redirectToPanel);
-app.get("/assistente-nfs/", redirectToPanel);
+app.get("/", servirPainel);
+app.get("/assistente-nfs", servirPainel);
+app.get("/assistente-nfs/", servirPainel);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TRATAMENTO GLOBAL DE ERROS — evita que o processo morra
