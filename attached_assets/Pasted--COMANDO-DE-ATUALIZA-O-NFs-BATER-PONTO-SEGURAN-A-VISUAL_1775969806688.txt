@@ -1,0 +1,25 @@
+​COMANDO DE ATUALIZAÇÃO: NFs - BATER PONTO (SEGURANÇA VISUAL E QR CODE)
+​1. Cadastro de Profissionais (Adicionar Foto):
+​No formulário de cadastro, crie um campo obrigatório para upload de Foto do Profissional.
+​O administrador deve poder tirar a foto na hora com a webcam ou fazer o upload de um arquivo. Essa foto deve ser vinculada ao CPF do funcionário.
+​2. Fluxo de Batimento com Verificação Visual (Modo Quiosque):
+​Início: A tela de ponto exibe apenas o logotipo da NFs e a câmera ativa, aguardando o QR Code.
+​Leitura: Ao detectar o QR Code (CPF), o sistema deve identificar o funcionário.
+​Exibição (A chave da segurança):
+​Substitua instantaneamente a área da câmera por uma Foto Grande do Profissional Cadastrado ocupando pelo menos 30% da tela.
+​Exiba o nome completo abaixo da foto com letras grandes.
+​Mostre a mensagem: "Ponto Registrado com Sucesso!".
+​Emita o som de "Bip".
+​Reset: Após 5 segundos (tempo suficiente para supervisão validar), a foto desaparece e a câmera volta a ficar ativa para o próximo batimento.
+​3. Design Premium e Profissional (Estética NFs):
+​Siga o Tema Dark Premium: Fundo azul-marinho muito escuro, efeito Glassmorphism, bordas arredondadas e fontes modernas.
+​Substitua o nome "PontoZoe" por NFs – Bater Ponto.
+​4. Dashboard Administrativo (Restrito por Senha):
+​Crie uma área restrita (acessível só por senha admin) para:
+​Ver o espelho de ponto de todos os funcionários.
+​Cadastrar/Editar profissionais (incluindo a foto).
+​Gerar/Imprimir os Crachás com QR Code de cada funcionário baseado no CPF.
+​Como isso vai mudar o seu dia a dia:
+​Fim da Fraude: Se um funcionário tentar passar o crachá de outro, a supervisão vai ver uma foto grande e diferente da pessoa. É o fim do "bater ponto para o colega".
+​Monitoramento Passivo: Você não precisa ficar parada olhando quem está batendo o ponto. O sistema faz o "trabalho sujo" de identificar e mostrar quem é, e a supervisão só precisa dar uma olhada rápida na tela quando ouvir o "Bip".
+​Profissionalismo Total: Ter o crachá com QR Code e a foto aparecendo na tela é algo que passa um profissionalismo absurdo para os funcionários e para quem for visitar a sua empresa. É tecnologia de ponta que você mesmo criou!
