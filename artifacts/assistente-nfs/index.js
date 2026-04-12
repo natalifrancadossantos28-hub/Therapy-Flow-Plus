@@ -715,6 +715,69 @@ app.post("/webhook/campanha", async (req, res) => {
   }
 });
 
+// ── Endpoint de voz para o painel da recepção ──
+app.post(["/voice-chat", "/assistente-nfs/voice-chat"], async (req, res) => {
+  try {
+    const { pergunta } = req.body;
+    if (!pergunta) return res.status(400).json({ error: "pergunta obrigatória" });
+
+    const hoje = dataHoje();
+    const consultasHoje = await buscarConsultasData(hoje);
+
+    const resumo = consultasHoje.length === 0
+      ? "Nenhuma consulta agendada para hoje."
+      : consultasHoje.map(c =>
+          `- ${c.time}: ${c.patient_name} com ${c.professional_name} (${c.specialty}) — Status: ${c.status}`
+        ).join("\n");
+
+    const prompt = `Você é o Assistente NFS respondendo à EQUIPE INTERNA da Clínica NFs gestão.
+Você é a "recepcionista virtual de luxo" — responsa de forma clara, rápida e elegante.
+Use o nome "Assistente NFS" quando se apresentar.
+A resposta deve ser CURTA e DIRETA (máximo 3 frases) pois será lida em voz alta.
+
+DADOS DE HOJE (${new Date().toLocaleDateString("pt-BR")}):
+${resumo}
+
+PERGUNTA DA EQUIPE: "${pergunta}"
+
+Responda em português brasileiro natural, como se estivesse falando ao vivo.
+Não use markdown, asteriscos ou emojis — apenas texto limpo para voz.`;
+
+    const response = await fetch(`${AI_BASE}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": AI_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5",
+        max_tokens: 300,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    const data = await response.json();
+    const resposta = data.content?.[0]?.text?.trim() || "Desculpe, não consegui processar sua pergunta agora.";
+    logAtividade(`🎙️ Voz: "${pergunta.substring(0, 40)}..." → IA respondeu`, "info");
+    res.json({ resposta });
+  } catch (err) {
+    console.error("❌ voice-chat:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint de atividade (leitura)
+app.get(["/activity", "/assistente-nfs/activity"], (req, res) => {
+  try {
+    let lista = [];
+    try { lista = JSON.parse(fs.readFileSync(ACTIVITY_FILE, "utf8")); } catch {}
+    res.json(lista);
+  } catch (err) {
+    res.json([]);
+  }
+});
+
 // Teste: simular mensagem recebida
 app.post(["/test-msg", "/assistente-nfs/test-msg"], async (req, res) => {
   try {
