@@ -1,619 +1,701 @@
 require("dotenv").config();
-const express        = require("express");
-const bodyParser     = require("body-parser");
-const cron           = require("node-cron");
-const QRCode         = require("qrcode");
-const pino           = require("pino");
-const fs             = require("fs");
+const express     = require("express");
+const bodyParser  = require("body-parser");
+const cron        = require("node-cron");
+const QRCode      = require("qrcode");
+const pino        = require("pino");
+const fs          = require("fs");
+const { Pool }    = require("pg");
 const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
+  downloadMediaMessage,
 } = require("@whiskeysockets/baileys");
 
-const app  = express();
-const PORT = process.env.PORT || 3001;
-
-// Arquivo de status compartilhado com o servidor API
-const STATUS_FILE = "/tmp/whatsapp_bot_status.json";
-
-function salvarStatus(dados) {
-  try {
-    fs.writeFileSync(STATUS_FILE, JSON.stringify({
-      ...dados,
-      horario: new Date().toLocaleString("pt-BR"),
-    }));
-  } catch (e) { /* silencioso */ }
-}
-
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
-
 // ─────────────────────────────────────────────────────────────────────────────
-// CONFIGURAÇÕES DA CLÍNICA
+// CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
-const CLINICA_NOME     = "NFs";
-const CLINICA_ENDERECO = "R. Antônieta Corrêa dos Santos, 46 - Parque Bela Vista, Ibiúna - SP";
-const CLINICA_TELEFONE = "(15) 99999-0000";
-const CLINICA_MAPS     = "https://maps.google.com/?q=R.+Antônieta+Corrêa+dos+Santos,+46+Ibiúna+SP";
+const app        = express();
+const PORT       = process.env.PORT || 3001;
+const COMPANY_ID = parseInt(process.env.COMPANY_ID || "2");  // arco-iris-ibiuna
+
+const CLINICA_NOME     = "NFs gestão";
+const CLINICA_ENDERECO = "R. Antônieta Corrêa dos Santos, 46 - Parque Bela Vista, Votorantim";
+const CLINICA_MAPS     = "https://maps.app.goo.gl/exemplo";   // substitua pelo link real
+const ASSINATURA       = "\n\n_Assistente NFS - Recepção_";
 
 const NUMEROS_RECEPCAO   = (process.env.NUMEROS_RECEPCAO   || "").split(",").map(n => n.trim()).filter(Boolean);
 const NUMEROS_MOTORISTAS = (process.env.NUMEROS_MOTORISTAS || "").split(",").map(n => n.trim()).filter(Boolean);
+const GRUPO_PROFISSIONAIS = process.env.GRUPO_PROFISSIONAIS || ""; // JID do grupo de WhatsApp dos profissionais
+
+const AI_BASE = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+const AI_KEY  = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BANCO DE DADOS
+// ─────────────────────────────────────────────────────────────────────────────
+const db = new Pool({ connectionString: process.env.DATABASE_URL });
+
+async function query(sql, params = []) {
+  const client = await db.connect();
+  try {
+    const result = await client.query(sql, params);
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+async function buscarPacientePorTelefone(telefone) {
+  const num = limparNumero(telefone);
+  const sufixo = num.slice(-8);
+  const rows = await query(
+    `SELECT p.*, prof.name AS professional_name, prof.specialty, prof.phone AS professional_phone
+       FROM patients p
+       LEFT JOIN professionals prof ON p.professional_id = prof.id
+      WHERE company_id = $1
+        AND REGEXP_REPLACE(COALESCE(p.guardian_phone,''), '[^0-9]', '', 'g') LIKE '%' || $2
+      LIMIT 1`,
+    [COMPANY_ID, sufixo]
+  );
+  return rows[0] || null;
+}
+
+async function buscarConsultasData(data) {
+  return query(
+    `SELECT a.*, p.name AS patient_name, p.guardian_name, p.guardian_phone,
+            p.address AS patient_address, p.prontuario,
+            prof.name AS professional_name, prof.specialty, prof.phone AS professional_phone
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN professionals prof ON a.professional_id = prof.id
+      WHERE a.company_id = $1 AND a.date = $2
+      ORDER BY a.time`,
+    [COMPANY_ID, data]
+  );
+}
+
+async function buscarConsultasPacienteHoje(patientId) {
+  const hoje = dataHoje();
+  const rows = await query(
+    `SELECT a.*, prof.name AS professional_name, prof.specialty
+       FROM appointments a
+       JOIN professionals prof ON a.professional_id = prof.id
+      WHERE a.patient_id = $1 AND a.date = $2
+      ORDER BY a.time`,
+    [patientId, hoje]
+  );
+  return rows;
+}
+
+async function atualizarStatusConsulta(appointmentId, status) {
+  await query(`UPDATE appointments SET status=$1, updated_at=NOW() WHERE id=$2`, [status, appointmentId]);
+}
+
+async function incrementarFaltas(patientId) {
+  const rows = await query(`SELECT absence_count FROM patients WHERE id=$1`, [patientId]);
+  const atual = rows[0]?.absence_count || 0;
+  await query(`UPDATE patients SET absence_count=$1, updated_at=NOW() WHERE id=$2`, [atual + 1, patientId]);
+  return atual + 1;
+}
+
+async function zerarFaltas(patientId) {
+  await query(`UPDATE patients SET absence_count=0, updated_at=NOW() WHERE id=$1`, [patientId]);
+}
+
+async function moverParaFilaEspera(patientId, professionalId) {
+  const hoje = dataHoje();
+  await query(
+    `INSERT INTO waiting_list (company_id, patient_id, professional_id, priority, entry_date)
+     VALUES ($1, $2, $3, 'alta', $4)
+     ON CONFLICT DO NOTHING`,
+    [COMPANY_ID, patientId, professionalId, hoje]
+  );
+  await query(`UPDATE patients SET status='Fila de Espera', updated_at=NOW() WHERE id=$1`, [patientId]);
+  await query(`UPDATE appointments SET status='cancelado', updated_at=NOW() WHERE patient_id=$1 AND date >= $2 AND company_id=$3`,
+    [patientId, hoje, COMPANY_ID]);
+}
+
+async function buscarPacientesAmanha() {
+  const amanha = dataAmanha();
+  return buscarConsultasData(amanha);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ESTADO DO BOT
 // ─────────────────────────────────────────────────────────────────────────────
-let sock            = null;
-let qrCodeBase64    = null;   // imagem base64 do QR atual
-let statusConexao   = "aguardando";  // "aguardando" | "conectando" | "conectado" | "desconectado"
+const STATUS_FILE = "/tmp/whatsapp_bot_status.json";
+let sock           = null;
+let qrCodeBase64   = null;
+let statusConexao  = "aguardando";
 let numeroConectado = null;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BANCO DE DADOS EM MEMÓRIA
-// Substitua por banco real quando estiver em produção.
-// ─────────────────────────────────────────────────────────────────────────────
-const pacientes = [
-  { id: 1, nome: "Lucas Oliveira",  responsavel: "Ana Oliveira",    telefoneResponsavel: "5511991110001" },
-  { id: 2, nome: "Maria Santos",    responsavel: "Carlos Santos",   telefoneResponsavel: "5511991110002" },
-  { id: 3, nome: "Pedro Costa",     responsavel: "Fernanda Costa",  telefoneResponsavel: "5511991110003" },
-  { id: 4, nome: "Beatriz Almeida", responsavel: "Roberto Almeida", telefoneResponsavel: "5511991110004" },
-];
-
-const consultasHoje = () => {
-  const hoje = new Date().toLocaleDateString("pt-BR");
-  return [
-    { id: 1, pacienteId: 1, horario: "08:00", terapeuta: "Dra. Márcia", terapia: "Fonoaudiologia", data: hoje, confirmada: null },
-    { id: 2, pacienteId: 2, horario: "09:00", terapeuta: "Dr. Paulo",   terapia: "Fisioterapia",   data: hoje, confirmada: null },
-    { id: 3, pacienteId: 3, horario: "10:00", terapeuta: "Dra. Luana",  terapia: "Psicologia",     data: hoje, confirmada: null },
-    { id: 4, pacienteId: 4, horario: "11:00", terapeuta: "Dra. Márcia", terapia: "Fonoaudiologia", data: hoje, confirmada: null },
-  ];
-};
-
-const rotasVan = [
-  { id: 1, pacienteId: 1, enderecoEmbarque: "Rua das Flores, 10 - Ibiúna", horarioEmbarque: "07:30", confirmadoMotorista: false },
-  { id: 2, pacienteId: 2, enderecoEmbarque: "Av. Brasil, 250 - Ibiúna",    horarioEmbarque: "07:45", confirmadoMotorista: false },
-  { id: 3, pacienteId: 3, enderecoEmbarque: "R. XV de Novembro, 80",        horarioEmbarque: "08:00", confirmadoMotorista: false },
-];
-
-const confirmacoes = new Map();
 const sessoes      = new Map();
+
+function salvarStatus(dados) {
+  try {
+    fs.writeFileSync(STATUS_FILE, JSON.stringify({ ...dados, horario: new Date().toLocaleString("pt-BR"), sessoes: sessoes.size }));
+  } catch {}
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-function limparNumero(jid) {
-  // Converte "5511999@s.whatsapp.net" → "5511999"
-  return (jid || "").replace(/@.+$/, "").replace(/\D/g, "");
-}
-
+function limparNumero(jid) { return (jid || "").replace(/@.+$/, "").replace(/\D/g, ""); }
 function jidParaNumero(jid) { return limparNumero(jid); }
-function numeroParaJid(num)  { return `${limparNumero(num)}@s.whatsapp.net`; }
+function numeroParaJid(num) { return `${limparNumero(num)}@s.whatsapp.net`; }
+function ehRecepcao(jid)    { return NUMEROS_RECEPCAO.includes(jidParaNumero(jid)); }
+function ehMotorista(jid)   { return NUMEROS_MOTORISTAS.includes(jidParaNumero(jid)); }
 
-function ehRecepcao(jid)  { return NUMEROS_RECEPCAO.includes(jidParaNumero(jid)); }
-function ehMotorista(jid) { return NUMEROS_MOTORISTAS.includes(jidParaNumero(jid)); }
-
+function dataHoje() { return new Date().toISOString().split("T")[0]; }
+function dataAmanha() {
+  const d = new Date(); d.setDate(d.getDate() + 1);
+  return d.toISOString().split("T")[0];
+}
+function formatarData(iso) {
+  if (!iso) return "–";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 function getSessao(jid) {
-  if (!sessoes.has(jid)) sessoes.set(jid, { estado: "menu_principal", dados: {} });
+  if (!sessoes.has(jid)) sessoes.set(jid, { historico: [], paciente: null, consultasHoje: [] });
   return sessoes.get(jid);
-}
-function setSessao(jid, estado, dados = {}) {
-  sessoes.set(jid, { estado, dados });
-}
-
-function buscarPacientePorTelefone(jid) {
-  const clean = jidParaNumero(jid);
-  return pacientes.find(p => limparNumero(p.telefoneResponsavel) === clean);
-}
-function buscarConsultaPorPaciente(pacienteId) {
-  return consultasHoje().find(c => c.pacienteId === pacienteId);
 }
 
 async function enviar(jid, texto) {
   if (!sock || statusConexao !== "conectado") {
-    console.warn(`⚠️  [OFFLINE] Não enviado para ${jid}: ${texto.substring(0, 50)}...`);
+    console.warn(`⚠️  [OFFLINE] Para ${jid}: ${texto.substring(0, 60)}...`);
     return;
   }
+  try { await sock.sendMessage(jid, { text: texto }); }
+  catch (err) { console.error(`❌ Erro envio para ${jid}:`, err.message); }
+}
+
+async function enviarGrupoProfissionais(texto) {
+  if (!GRUPO_PROFISSIONAIS) return;
+  await enviar(GRUPO_PROFISSIONAIS, texto);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INTELIGÊNCIA ARTIFICIAL — INTERPRETAÇÃO DE MENSAGENS
+// ─────────────────────────────────────────────────────────────────────────────
+async function interpretarMensagem(mensagem, contexto) {
+  if (!AI_BASE || !AI_KEY) {
+    return { intencao: "outro", resposta: "Olá! Como posso ajudar?" + ASSINATURA, acoes: [] };
+  }
+
+  const prompt = `Você é o "Assistente NFS (Recepção)", a recepção digital da clínica ${CLINICA_NOME}.
+Seu papel é interpretar mensagens de WhatsApp e decidir como agir.
+
+IDENTIDADE:
+- Identifique-se sempre como "Assistente NFS (Recepção)"
+- Trate o interlocutor como "Responsável"
+- Refira-se ao paciente como "Paciente"
+- Seja sempre acolhedor, claro e profissional
+- SEMPRE assine: "Assistente NFS - Recepção"
+
+CONTEXTO DO REMETENTE:
+${JSON.stringify(contexto, null, 2)}
+
+MENSAGEM RECEBIDA: "${mensagem}"
+
+INTENÇÕES POSSÍVEIS:
+- saudacao: cumprimento simples
+- confirmacao: confirmar consulta
+- ausencia: aviso de que não vai comparecer
+- ausencia_justificada: ausência com motivo (doença, emergência)
+- atestado: envio de atestado médico
+- cancelamento: cancelar a consulta
+- duvida: pergunta sobre horários, endereço, profissional
+- chegada: paciente chegou à clínica
+- motorista_rota: motorista pedindo rota do dia
+- motorista_embarque: motorista confirmando embarque de paciente
+- recepcao: mensagem da equipe interna
+- outro: qualquer outra coisa
+
+REGRAS DE TOM:
+- ausência por doença → acolhedor, deseje melhoras
+- falta recorrente (>1 falta) → mais firme, mencione a regra das 3 faltas
+- nova família → mais explicativo e receptivo
+
+RETORNE APENAS JSON válido neste formato:
+{
+  "intencao": "...",
+  "resposta": "texto completo para enviar ao usuário (inclua assinatura)",
+  "acoes": [],
+  "tom": "acolhedor|firme|explicativo|informativo"
+}
+
+AÇÕES DISPONÍVEIS:
+- {"tipo": "registrar_ausencia", "consultaId": N}
+- {"tipo": "registrar_ausencia_justificada", "consultaId": N}
+- {"tipo": "registrar_atestado", "consultaId": N}
+- {"tipo": "registrar_confirmacao", "consultaId": N}
+- {"tipo": "registrar_cancelamento", "consultaId": N}
+- {"tipo": "notificar_profissionais", "mensagem": "..."}
+- {"tipo": "notificar_recepcao", "mensagem": "..."}`;
+
   try {
-    await sock.sendMessage(jid, { text: texto });
+    const response = await fetch(`${AI_BASE}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": AI_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    const data = await response.json();
+    if (!data.content || !data.content[0]) throw new Error("Resposta vazia da IA");
+
+    const texto = data.content[0].text.trim();
+    // Extrair JSON da resposta
+    const match = texto.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("JSON não encontrado na resposta");
+
+    return JSON.parse(match[0]);
   } catch (err) {
-    console.error(`❌ Erro ao enviar para ${jid}:`, err.message);
+    console.error("❌ Erro IA:", err.message);
+    // Fallback com palavras-chave
+    return interpretarFallback(mensagem);
   }
 }
 
-function formatarConsulta(consulta, paciente) {
-  return `📋 *Consulta de ${paciente.nome}*\n` +
-    `📅 Data: ${consulta.data}\n` +
-    `⏰ Horário: ${consulta.horario}\n` +
-    `👩‍⚕️ Terapeuta: ${consulta.terapeuta}\n` +
-    `🩺 Terapia: ${consulta.terapia}`;
-}
-
-async function notificarRecepcao(mensagem) {
-  for (const num of NUMEROS_RECEPCAO) {
-    await enviar(numeroParaJid(num), `🔔 *AVISO — Assistente NFS*\n\n${mensagem}`);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MENUS
-// ─────────────────────────────────────────────────────────────────────────────
-const MENU_PRINCIPAL = `🌈 *Assistente ${CLINICA_NOME}*
-
-Olá! Como posso ajudar você hoje?
-
-1️⃣ - Sou Responsável por um Paciente
-2️⃣ - Sou Motorista da Van
-3️⃣ - Equipe Interna / Recepção
-
-_Digite o número da sua opção._`;
-
-const MENU_RESPONSAVEL = `👨‍👩‍👧 *Menu do Responsável*
-
-1️⃣ - Confirmar consulta de hoje
-2️⃣ - Cancelar consulta de hoje
-3️⃣ - Ver próxima consulta
-4️⃣ - Endereço e localização da clínica
-5️⃣ - Falar com a recepção
-0️⃣ - Voltar ao menu principal`;
-
-const MENU_MOTORISTA = `🚐 *Menu do Motorista*
-
-1️⃣ - Ver rota completa de hoje
-2️⃣ - Confirmar embarque de paciente
-3️⃣ - Reportar problema na rota
-0️⃣ - Voltar ao menu principal`;
-
-const MENU_RECEPCAO = `🏥 *Painel da Recepção — ${CLINICA_NOME}*
-
-1️⃣ - Confirmações de hoje
-2️⃣ - Pacientes do dia (agenda)
-3️⃣ - Ausências / não confirmados
-4️⃣ - Enviar mensagem a um responsável
-5️⃣ - Status da van
-0️⃣ - Sair`;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PROCESSADORES DE ESTADO
-// ─────────────────────────────────────────────────────────────────────────────
-async function processarMenuPrincipal(jid, msg) {
-  switch (msg.trim()) {
-    case "1": setSessao(jid, "menu_responsavel"); return MENU_RESPONSAVEL;
-    case "2": setSessao(jid, "menu_motorista");   return MENU_MOTORISTA;
-    case "3":
-      if (!ehRecepcao(jid)) return "🔒 Acesso restrito à equipe interna.\n\nSe você é da equipe, peça ao administrador para cadastrar seu número.\n\n0️⃣ - Voltar";
-      setSessao(jid, "menu_recepcao");
-      return MENU_RECEPCAO;
-    default: return `❓ Opção inválida. Por favor, escolha:\n\n${MENU_PRINCIPAL}`;
-  }
-}
-
-async function processarMenuResponsavel(jid, msg) {
-  const paciente = buscarPacientePorTelefone(jid);
-  switch (msg.trim()) {
-    case "1": {
-      if (!paciente) return `⚠️ Não encontrei seu cadastro.\nEntre em contato: 📞 ${CLINICA_TELEFONE}`;
-      const consulta = buscarConsultaPorPaciente(paciente.id);
-      if (!consulta) return `ℹ️ *${paciente.responsavel}*, não há consulta hoje para *${paciente.nome}*.\n\n0️⃣ - Voltar`;
-      setSessao(jid, "confirmar_consulta", { consultaId: consulta.id, paciente, consulta });
-      return formatarConsulta(consulta, paciente) + "\n\n✅ Confirmar presença?\n\n*SIM* - Confirmar\n*NÃO* - Cancelar\n0️⃣ - Voltar";
+function interpretarFallback(mensagem) {
+  const m = mensagem.toLowerCase();
+  if (/não (vou|poderei|consigo|irei)|falta|não (vamos|vou ir)/.test(m)) {
+    if (/doente|febre|gripado|mal|hospital|médico|emergência/.test(m)) {
+      return { intencao: "ausencia_justificada", resposta: "Entendemos, esperamos que o Paciente se recupere logo. Recebemos sua mensagem e registramos a justificativa." + ASSINATURA, acoes: [] };
     }
-    case "2": {
-      if (!paciente) return `⚠️ Não encontrei seu cadastro.\n📞 ${CLINICA_TELEFONE}`;
-      const consulta = buscarConsultaPorPaciente(paciente.id);
-      if (!consulta) return "ℹ️ Nenhuma consulta para hoje.\n\n0️⃣ - Voltar";
-      setSessao(jid, "cancelar_consulta", { consultaId: consulta.id, paciente, consulta });
-      return formatarConsulta(consulta, paciente) + "\n\n⚠️ Deseja realmente *cancelar* esta consulta?\n\n*SIM* - Cancelar\n*NÃO* - Manter\n0️⃣ - Voltar";
-    }
-    case "3": {
-      if (!paciente) return `⚠️ Não encontrei seu cadastro.\n📞 ${CLINICA_TELEFONE}`;
-      const consulta = buscarConsultaPorPaciente(paciente.id);
-      if (!consulta) return "ℹ️ Nenhuma consulta agendada hoje.\n\n0️⃣ - Voltar";
-      const status = !confirmacoes.has(consulta.id) ? "⏳ Aguardando confirmação"
-        : confirmacoes.get(consulta.id) ? "✅ Confirmada" : "❌ Cancelada";
-      return formatarConsulta(consulta, paciente) + `\n\n📌 Status: ${status}\n\n0️⃣ - Voltar`;
-    }
-    case "4":
-      return `📍 *${CLINICA_NOME}*\n\n${CLINICA_ENDERECO}\n\n📞 Tel: ${CLINICA_TELEFONE}\n\n🗺️ ${CLINICA_MAPS}\n\n0️⃣ - Voltar`;
-    case "5":
-      return `📞 *Recepção ${CLINICA_NOME}*\n\nTelefone: ${CLINICA_TELEFONE}\n\nEnvie sua dúvida aqui que repassaremos à equipe.\n\n0️⃣ - Voltar`;
-    case "0":
-      setSessao(jid, "menu_principal");
-      return MENU_PRINCIPAL;
-    default:
-      return `❓ Opção inválida.\n\n${MENU_RESPONSAVEL}`;
+    return { intencao: "ausencia", resposta: "Recebemos seu aviso de ausência. A equipe foi notificada." + ASSINATURA, acoes: [] };
   }
+  if (/atestado|laudo|documento/.test(m)) {
+    return { intencao: "atestado", resposta: "Atestado recebido com sucesso! Registramos e encaminhamos à equipe." + ASSINATURA, acoes: [] };
+  }
+  if (/confirmo|confirmado|estarei|vamos|vou sim|confirmar/.test(m)) {
+    return { intencao: "confirmacao", resposta: "Consulta confirmada! Esperamos pelo Paciente." + ASSINATURA, acoes: [] };
+  }
+  if (/olá|oi|bom dia|boa tarde|boa noite/.test(m)) {
+    return { intencao: "saudacao", resposta: "Olá! Como posso ajudar?" + ASSINATURA, acoes: [] };
+  }
+  return { intencao: "outro", resposta: "Recebemos sua mensagem. Em breve a recepção entrará em contato." + ASSINATURA, acoes: [] };
 }
 
-async function processarConfirmarConsulta(jid, msg) {
-  const { consultaId, paciente, consulta } = getSessao(jid).dados;
-  const resp = msg.trim().toUpperCase();
-  if (resp === "SIM" || resp === "S") {
-    confirmacoes.set(consultaId, true);
-    setSessao(jid, "menu_responsavel");
-    notificarRecepcao(`✅ CONFIRMAÇÃO\n👤 ${paciente.responsavel} confirmou a consulta de *${paciente.nome}*\n⏰ ${consulta.horario} — ${consulta.terapia}`);
-    return `✅ *Presença confirmada!*\n\nAté logo, *${paciente.responsavel}*! 🌈\nEsperamos *${paciente.nome}* às ${consulta.horario}.\n\n📍 ${CLINICA_ENDERECO}\n\n0️⃣ - Menu principal`;
-  } else if (resp === "NÃO" || resp === "NAO" || resp === "N") {
-    setSessao(jid, "cancelar_consulta", { consultaId, paciente, consulta });
-    return "⚠️ Confirma o *cancelamento* da consulta?\n\n*SIM* - Cancelar\n*NÃO* - Manter";
-  } else if (resp === "0") {
-    setSessao(jid, "menu_responsavel");
-    return MENU_RESPONSAVEL;
-  }
-  return "Por favor, responda *SIM* ou *NÃO*.";
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// EXECUTAR AÇÕES DA IA
+// ─────────────────────────────────────────────────────────────────────────────
+async function executarAcoes(acoes, paciente, sessao) {
+  for (const acao of (acoes || [])) {
+    try {
+      switch (acao.tipo) {
+        case "registrar_ausencia": {
+          if (!acao.consultaId) break;
+          await atualizarStatusConsulta(acao.consultaId, "faltou");
+          const totalFaltas = paciente ? await incrementarFaltas(paciente.id) : 0;
 
-async function processarCancelarConsulta(jid, msg) {
-  const { consultaId, paciente, consulta } = getSessao(jid).dados;
-  const resp = msg.trim().toUpperCase();
-  if (resp === "SIM" || resp === "S") {
-    confirmacoes.set(consultaId, false);
-    setSessao(jid, "menu_principal");
-    notificarRecepcao(`❌ CANCELAMENTO\n👤 ${paciente.responsavel} *cancelou* a consulta de *${paciente.nome}*\n⏰ ${consulta.horario} — ${consulta.terapia}`);
-    return `❌ *Consulta cancelada.*\n\nEntendemos, *${paciente.responsavel}*. A equipe foi notificada.\n\nPara reagendar: 📞 ${CLINICA_TELEFONE}\n\n0️⃣ - Menu principal`;
-  } else if (resp === "NÃO" || resp === "NAO" || resp === "N") {
-    setSessao(jid, "menu_responsavel");
-    return "👍 Consulta mantida!\n\n" + MENU_RESPONSAVEL;
-  } else if (resp === "0") {
-    setSessao(jid, "menu_responsavel");
-    return MENU_RESPONSAVEL;
-  }
-  return "Por favor, responda *SIM* ou *NÃO*.";
-}
+          // Regra SUS: 3 faltas → remove da agenda
+          if (paciente && totalFaltas >= 3) {
+            const consultas = await buscarConsultasPacienteHoje(paciente.id);
+            const profId = consultas[0]?.professional_id || paciente.professional_id;
+            await moverParaFilaEspera(paciente.id, profId);
+            await enviar(numeroParaJid(paciente.guardian_phone),
+              `⚠️ *Aviso Importante*\n\nPrezado(a) *${paciente.guardian_name}*,\n\nInformamos que o(a) Paciente *${paciente.name}* acumulou *3 faltas consecutivas* sem justificativa.\n\nConforme a política da clínica (padrão SUS), a vaga foi devolvida à fila de espera da prefeitura.\n\nEm caso de dúvidas, entre em contato com a recepção.${ASSINATURA}`
+            );
+            await enviarGrupoProfissionais(`🔴 *REMOÇÃO AUTOMÁTICA*\n👤 Paciente: *${paciente.name}* (Prontuário: ${paciente.prontuario || "–"})\n📋 3 faltas consecutivas — removido(a) da agenda e retornado(a) à fila de espera.`);
+          } else if (paciente && totalFaltas === 2) {
+            await enviar(numeroParaJid(paciente.guardian_phone),
+              `⚠️ *Atenção — 2ª Falta*\n\nPrezado(a) *${paciente.guardian_name}*,\n\nRegistramos a *2ª falta consecutiva* do(a) Paciente *${paciente.name}*.\n\n⚠️ Informamos que na *3ª falta consecutiva sem justificativa*, a vaga será automaticamente devolvida à fila de espera.\n\nEm caso de impedimento, avise-nos com antecedência.${ASSINATURA}`
+            );
+          } else if (paciente && totalFaltas === 1) {
+            // Primeira falta: mensagem acolhedora
+            await enviar(numeroParaJid(paciente.guardian_phone),
+              `💙 *Olá, ${paciente.guardian_name}!*\n\nNotamos a ausência do(a) Paciente *${paciente.name}* hoje. Esperamos que esteja tudo bem com a família.\n\nSe precisar reagendar ou tiver alguma dúvida, estamos à disposição.${ASSINATURA}`
+            );
+          }
+          break;
+        }
 
-async function processarMenuMotorista(jid, msg) {
-  switch (msg.trim()) {
-    case "1": {
-      if (rotasVan.length === 0) return "🚐 Nenhuma rota cadastrada para hoje.\n\n0️⃣ - Voltar";
-      let texto = `🚐 *Rota da Van — ${new Date().toLocaleDateString("pt-BR")}*\n\n`;
-      for (const rota of rotasVan) {
-        const pac      = pacientes.find(p => p.id === rota.pacienteId);
-        const consulta = consultasHoje().find(c => c.pacienteId === rota.pacienteId);
-        const st       = rota.confirmadoMotorista ? "✅ Embarcado" : "⏳ Aguardando";
-        texto += `📍 ${rota.horarioEmbarque} — *${pac?.nome}*\n   ${rota.enderecoEmbarque}\n   🕐 Consulta: ${consulta?.horario || "–"} (${consulta?.terapia || "–"})\n   ${st}\n\n`;
+        case "registrar_ausencia_justificada":
+        case "registrar_atestado": {
+          if (!acao.consultaId) break;
+          await atualizarStatusConsulta(acao.consultaId, "falta_justificada");
+          // Falta justificada não conta — zerar seria errado, mas não incrementamos
+          if (paciente) {
+            const consultas = await buscarConsultasPacienteHoje(paciente.id);
+            const profName  = consultas[0]?.professional_name || "profissional";
+            await enviarGrupoProfissionais(
+              `🔵 *AUSÊNCIA JUSTIFICADA*\n👤 Paciente: *${paciente.name}* (Prontuário: ${paciente.prontuario || "–"})\n👩‍⚕️ Profissional: @${consultas[0]?.professional_id || ""}\n📝 Justificativa recebida via WhatsApp\n📋 Status: Aguardando Validação de Abono`
+            );
+          }
+          break;
+        }
+
+        case "registrar_confirmacao": {
+          if (!acao.consultaId) break;
+          await atualizarStatusConsulta(acao.consultaId, "confirmado");
+          await zerarFaltas(paciente?.id);
+          break;
+        }
+
+        case "registrar_cancelamento": {
+          if (!acao.consultaId) break;
+          await atualizarStatusConsulta(acao.consultaId, "cancelado");
+          if (paciente) {
+            await enviarGrupoProfissionais(
+              `❌ *CANCELAMENTO*\n👤 Paciente: *${paciente.name}*\n👩‍⚕️ ${sessao.consultasHoje[0]?.professional_name || "–"}\n⏰ ${sessao.consultasHoje[0]?.time || "–"}`
+            );
+          }
+          break;
+        }
+
+        case "notificar_profissionais":
+          if (acao.mensagem) await enviarGrupoProfissionais(acao.mensagem);
+          break;
+
+        case "notificar_recepcao":
+          for (const num of NUMEROS_RECEPCAO) {
+            await enviar(numeroParaJid(num), `🔔 *Assistente NFS*\n\n${acao.mensagem || ""}`);
+          }
+          break;
       }
-      texto += `🏁 Destino: ${CLINICA_ENDERECO}\n\n0️⃣ - Voltar`;
-      return texto;
+    } catch (err) {
+      console.error(`❌ Erro executando ação ${acao.tipo}:`, err.message);
     }
-    case "2": {
-      const pendentes = rotasVan.filter(r => !r.confirmadoMotorista);
-      if (pendentes.length === 0) return "✅ Todos os embarques já confirmados!\n\n0️⃣ - Voltar";
-      setSessao(jid, "confirmar_embarque", {});
-      let texto = "👥 *Confirmar embarque de qual paciente?*\n\n";
-      pendentes.forEach((r, i) => {
-        const pac = pacientes.find(p => p.id === r.pacienteId);
-        texto += `${i + 1}️⃣ - ${pac?.nome} (${r.horarioEmbarque})\n`;
-      });
-      return texto + "\n0️⃣ - Cancelar";
-    }
-    case "3":
-      setSessao(jid, "reportar_problema");
-      return "⚠️ *Descreva o problema* (acidente, atraso, ausência do passageiro, etc.):\n\nDigite a mensagem e envie.";
-    case "0":
-      setSessao(jid, "menu_principal");
-      return MENU_PRINCIPAL;
-    default:
-      return `❓ Opção inválida.\n\n${MENU_MOTORISTA}`;
-  }
-}
-
-async function processarConfirmarEmbarque(jid, msg) {
-  if (msg.trim() === "0") { setSessao(jid, "menu_motorista"); return MENU_MOTORISTA; }
-  const idx      = parseInt(msg.trim()) - 1;
-  const pendentes = rotasVan.filter(r => !r.confirmadoMotorista);
-  if (isNaN(idx) || idx < 0 || idx >= pendentes.length) return "❓ Opção inválida.";
-  const rota = pendentes[idx];
-  rota.confirmadoMotorista = true;
-  const pac = pacientes.find(p => p.id === rota.pacienteId);
-  setSessao(jid, "menu_motorista");
-  notificarRecepcao(`🚐 EMBARQUE CONFIRMADO\n👤 *${pac?.nome}* embarcou na van\n⏰ ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
-  return `✅ *Embarque confirmado!*\n\n👤 ${pac?.nome} registrado.\nRecepção notificada.\n\n0️⃣ - Voltar`;
-}
-
-async function processarReportarProblema(jid, msg) {
-  if (msg.trim() === "0") { setSessao(jid, "menu_motorista"); return MENU_MOTORISTA; }
-  notificarRecepcao(`⚠️ PROBLEMA NA VAN\n📱 Motorista: ${jidParaNumero(jid)}\n📝 "${msg.trim()}"`);
-  setSessao(jid, "menu_motorista");
-  return "✅ *Problema reportado!* A recepção foi notificada.\n\n0️⃣ - Voltar";
-}
-
-async function processarMenuRecepcao(jid, msg) {
-  const consultas = consultasHoje();
-  switch (msg.trim()) {
-    case "1": {
-      let texto = `📊 *Confirmações — ${new Date().toLocaleDateString("pt-BR")}*\n\n`;
-      for (const c of consultas) {
-        const pac = pacientes.find(p => p.id === c.pacienteId);
-        const st  = !confirmacoes.has(c.id) ? "⏳" : confirmacoes.get(c.id) ? "✅" : "❌";
-        texto += `${st} *${pac?.nome}* ${c.horario} (${c.terapia})\n`;
-      }
-      const conf = [...confirmacoes.values()].filter(v => v === true).length;
-      const canc = [...confirmacoes.values()].filter(v => v === false).length;
-      texto += `\n📈 Total: ${consultas.length} | ✅ ${conf} | ❌ ${canc} | ⏳ ${consultas.length - conf - canc}\n\n0️⃣ - Voltar`;
-      return texto;
-    }
-    case "2": {
-      let texto = `📅 *Agenda — ${new Date().toLocaleDateString("pt-BR")}*\n\n`;
-      for (const c of consultas) {
-        const pac = pacientes.find(p => p.id === c.pacienteId);
-        texto += `⏰ ${c.horario} — *${pac?.nome}*\n   👩‍⚕️ ${c.terapeuta} · ${c.terapia}\n\n`;
-      }
-      return texto + "0️⃣ - Voltar";
-    }
-    case "3": {
-      const naoConf = consultas.filter(c => !confirmacoes.has(c.id) || confirmacoes.get(c.id) !== true);
-      if (naoConf.length === 0) return "✅ Todos confirmaram presença!\n\n0️⃣ - Voltar";
-      let texto = `⚠️ *Sem confirmação (${naoConf.length}):*\n\n`;
-      for (const c of naoConf) {
-        const pac = pacientes.find(p => p.id === c.pacienteId);
-        const st  = confirmacoes.get(c.id) === false ? "❌ Cancelou" : "⏳ Não respondeu";
-        texto += `${st} — *${pac?.nome}* ${c.horario}\n📞 ${pac?.responsavel}: ${pac?.telefoneResponsavel}\n\n`;
-      }
-      return texto + "0️⃣ - Voltar";
-    }
-    case "4": {
-      setSessao(jid, "enviar_msg_numero");
-      let texto = "📨 *Enviar mensagem para qual responsável?*\n\n";
-      pacientes.forEach((p, i) => { texto += `${i + 1}️⃣ - ${p.responsavel} (${p.nome})\n`; });
-      return texto + "\n0️⃣ - Cancelar";
-    }
-    case "5": {
-      const conf  = rotasVan.filter(r => r.confirmadoMotorista).length;
-      let texto   = `🚐 *Van — ${new Date().toLocaleDateString("pt-BR")}*\n📊 Embarques: ${conf}/${rotasVan.length}\n\n`;
-      for (const r of rotasVan) {
-        const pac = pacientes.find(p => p.id === r.pacienteId);
-        texto += `${r.confirmadoMotorista ? "✅" : "⏳"} ${r.horarioEmbarque} — *${pac?.nome}*\n   📍 ${r.enderecoEmbarque}\n\n`;
-      }
-      return texto + "0️⃣ - Voltar";
-    }
-    case "0":
-      setSessao(jid, "menu_principal");
-      return MENU_PRINCIPAL;
-    default:
-      return `❓ Opção inválida.\n\n${MENU_RECEPCAO}`;
-  }
-}
-
-async function processarEnviarMsgNumero(jid, msg) {
-  if (msg.trim() === "0") { setSessao(jid, "menu_recepcao"); return MENU_RECEPCAO; }
-  const idx = parseInt(msg.trim()) - 1;
-  if (isNaN(idx) || idx < 0 || idx >= pacientes.length) return "❓ Número inválido.";
-  setSessao(jid, "enviar_msg_texto", { destino: pacientes[idx] });
-  return `📝 *Digite a mensagem* para *${pacientes[idx].responsavel}* (responsável de ${pacientes[idx].nome}):\n\n0️⃣ - Cancelar`;
-}
-
-async function processarEnviarMsgTexto(jid, msg) {
-  if (msg.trim() === "0") { setSessao(jid, "menu_recepcao"); return MENU_RECEPCAO; }
-  const { destino } = getSessao(jid).dados;
-  await enviar(numeroParaJid(destino.telefoneResponsavel), `🌈 *${CLINICA_NOME}*\n\n${msg.trim()}`);
-  setSessao(jid, "menu_recepcao");
-  return `✅ Mensagem enviada para *${destino.responsavel}*!\n\n0️⃣ - Voltar`;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ROTEADOR DE MENSAGENS
-// ─────────────────────────────────────────────────────────────────────────────
-async function processarMensagem(jid, texto) {
-  const msg    = texto.trim();
-  const sessao = getSessao(jid);
-
-  console.log(`📩 [${new Date().toLocaleTimeString("pt-BR")}] ${jidParaNumero(jid)}: "${msg}" [${sessao.estado}]`);
-
-  // Comandos globais
-  if (msg === "0" && sessao.estado !== "menu_principal") {
-    setSessao(jid, "menu_principal");
-    return MENU_PRINCIPAL;
-  }
-  if (/^(menu|oi|olá|ola|início|inicio|start|ajuda|help|👋)$/i.test(msg)) {
-    setSessao(jid, "menu_principal");
-    return MENU_PRINCIPAL;
-  }
-
-  switch (sessao.estado) {
-    case "menu_principal":    return processarMenuPrincipal(jid, msg);
-    case "menu_responsavel":  return processarMenuResponsavel(jid, msg);
-    case "menu_motorista":    return processarMenuMotorista(jid, msg);
-    case "menu_recepcao":     return processarMenuRecepcao(jid, msg);
-    case "confirmar_consulta": return processarConfirmarConsulta(jid, msg);
-    case "cancelar_consulta":  return processarCancelarConsulta(jid, msg);
-    case "confirmar_embarque": return processarConfirmarEmbarque(jid, msg);
-    case "reportar_problema":  return processarReportarProblema(jid, msg);
-    case "enviar_msg_numero":  return processarEnviarMsgNumero(jid, msg);
-    case "enviar_msg_texto":   return processarEnviarMsgTexto(jid, msg);
-    default:
-      setSessao(jid, "menu_principal");
-      return MENU_PRINCIPAL;
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONEXÃO BAILEYS (WhatsApp direto via QR Code)
+// MENSAGEM DE BOAS-VINDAS (chamada pelo sistema quando novo agendamento)
+// ─────────────────────────────────────────────────────────────────────────────
+async function enviarBoasVindas(appointment) {
+  if (!appointment.guardian_phone) return;
+  const jid = numeroParaJid(appointment.guardian_phone);
+  const msg = `🌟 *Bem-vindo(a) à ${CLINICA_NOME}!*\n\n` +
+    `Olá, *${appointment.guardian_name || "Responsável"}*!\n\n` +
+    `Temos o prazer de informar que o(a) Paciente *${appointment.patient_name}* foi agendado(a) com sucesso:\n\n` +
+    `📅 *Data:* ${formatarData(appointment.date)}\n` +
+    `⏰ *Horário:* ${appointment.time}\n` +
+    `👩‍⚕️ *Profissional:* ${appointment.professional_name}\n` +
+    `🩺 *Especialidade:* ${appointment.specialty}\n\n` +
+    `📍 *Endereço:*\n${CLINICA_ENDERECO}\n\n` +
+    `🗺️ *Como chegar:* ${CLINICA_MAPS}\n\n` +
+    `Em caso de dúvidas, estamos à disposição.${ASSINATURA}`;
+  await enviar(jid, msg);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRESENÇA NA CLÍNICA (chamado pela recepção ao registrar chegada)
+// ─────────────────────────────────────────────────────────────────────────────
+async function notificarChegadaPaciente(patientName, time, professionalId) {
+  await enviarGrupoProfissionais(
+    `✅ *PACIENTE CHEGOU*\n👤 *${patientName}*\n⏰ Consulta: ${time}\n📢 @${professionalId} — seu paciente está aguardando!`
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HANDLER PRINCIPAL DE MENSAGENS
+// ─────────────────────────────────────────────────────────────────────────────
+async function processarMensagem(jid, mensagem, temAnexo) {
+  const sessao  = getSessao(jid);
+  const isRecepcao  = ehRecepcao(jid);
+  const isMotorista = ehMotorista(jid);
+
+  // Buscar contexto do remetente
+  if (!sessao.paciente) {
+    sessao.paciente = await buscarPacientePorTelefone(jid);
+  }
+  if (sessao.consultasHoje.length === 0 && sessao.paciente) {
+    sessao.consultasHoje = await buscarConsultasPacienteHoje(sessao.paciente.id);
+  }
+
+  const paciente = sessao.paciente;
+
+  // Contexto para a IA
+  const contexto = {
+    tipo: isRecepcao ? "recepcao" : isMotorista ? "motorista" : "responsavel",
+    paciente: paciente ? {
+      nome: paciente.name,
+      responsavel: paciente.guardian_name,
+      faltas: paciente.absence_count || 0,
+      status: paciente.status,
+      prontuario: paciente.prontuario,
+    } : null,
+    consultasHoje: sessao.consultasHoje.map(c => ({
+      id: c.id,
+      horario: c.time,
+      profissional: c.professional_name,
+      especialidade: c.specialty,
+      status: c.status,
+    })),
+    temAnexo,
+    horarioAtual: new Date().toLocaleString("pt-BR"),
+  };
+
+  // Motoristas: fluxo específico
+  if (isMotorista) {
+    if (/rota|endereço|pacientes/i.test(mensagem)) {
+      return await gerarRotaVan();
+    }
+    if (/estou a caminho/i.test(mensagem)) {
+      return await processarMotoristaACaminho();
+    }
+  }
+
+  // IA interpreta a mensagem
+  const resultado = await interpretarMensagem(mensagem, contexto);
+  console.log(`🤖 [IA] ${jid} → ${resultado.intencao} | tom: ${resultado.tom}`);
+
+  // Executar ações
+  await executarAcoes(resultado.acoes, paciente, sessao);
+
+  // Guardar no histórico (máximo 10 mensagens)
+  sessao.historico.push({ role: "user", content: mensagem });
+  sessao.historico.push({ role: "assistant", content: resultado.resposta });
+  if (sessao.historico.length > 20) sessao.historico = sessao.historico.slice(-20);
+
+  return resultado.resposta;
+}
+
+async function gerarRotaVan() {
+  const consultas = await buscarConsultasData(dataHoje());
+  if (consultas.length === 0) return "🚐 Nenhum paciente na rota de hoje." + ASSINATURA;
+  let texto = `🚐 *Rota do Dia — ${new Date().toLocaleDateString("pt-BR")}*\n\n`;
+  consultas.forEach((c, i) => {
+    texto += `${i + 1}. *${c.patient_name}*\n   📍 ${c.patient_address || "Endereço não cadastrado"}\n   ⏰ Consulta: ${c.time} (${c.specialty})\n\n`;
+  });
+  texto += `🏁 *Destino final:*\n${CLINICA_ENDERECO}${ASSINATURA}`;
+  return texto;
+}
+
+async function processarMotoristaACaminho() {
+  // Notifica todos os responsáveis de quem tem consulta hoje
+  const consultas = await buscarConsultasData(dataHoje());
+  let count = 0;
+  for (const c of consultas) {
+    if (c.guardian_phone) {
+      const jid = numeroParaJid(c.guardian_phone);
+      await enviar(jid,
+        `🚐 *Aviso da NFs — Transporte*\n\nOlá, *${c.guardian_name || "Responsável"}*!\n\nO transporte da clínica está a caminho para buscar o(a) Paciente *${c.patient_name}*.\n\nPor favor, deixe o(a) Paciente pronto(a) para embarcar em breve.${ASSINATURA}`
+      );
+      count++;
+    }
+  }
+  return `✅ *${count} responsável(is) notificado(is)* que o transporte está a caminho.${ASSINATURA}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRON JOBS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 18h: Lembrete para consultas do dia seguinte
+cron.schedule("0 18 * * *", async () => {
+  console.log("⏰ [CRON 18h] Enviando lembretes de amanhã...");
+  try {
+    const consultas = await buscarPacientesAmanha();
+    for (const c of consultas) {
+      if (!c.guardian_phone) continue;
+      const jid = numeroParaJid(c.guardian_phone);
+      const msg = `🔔 *Lembrete de Consulta — ${CLINICA_NOME}*\n\n` +
+        `Olá, *${c.guardian_name || "Responsável"}*!\n\n` +
+        `Lembramos que o(a) Paciente *${c.patient_name}* tem consulta *amanhã*:\n\n` +
+        `📅 *Data:* ${formatarData(c.date)}\n` +
+        `⏰ *Horário:* ${c.time}\n` +
+        `👩‍⚕️ *Profissional:* ${c.professional_name}\n` +
+        `🩺 *Especialidade:* ${c.specialty}\n\n` +
+        `Por favor, confirme a presença respondendo *SIM* ou *NÃO*.${ASSINATURA}`;
+      await enviar(jid, msg);
+      await new Promise(r => setTimeout(r, 1500)); // Evitar rate limit
+    }
+    console.log(`✅ ${consultas.length} lembretes enviados.`);
+  } catch (err) {
+    console.error("❌ Erro no cron 18h:", err.message);
+  }
+}, { timezone: "America/Sao_Paulo" });
+
+// 7h: Bom dia para a recepção com resumo do dia
+cron.schedule("0 7 * * 1-5", async () => {
+  console.log("⏰ [CRON 7h] Enviando resumo matinal...");
+  try {
+    const consultas = await buscarConsultasData(dataHoje());
+    if (consultas.length === 0) return;
+
+    let texto = `☀️ *Bom dia! Agenda de hoje — ${new Date().toLocaleDateString("pt-BR")}*\n\n`;
+    consultas.forEach((c, i) => {
+      texto += `${i + 1}. ${c.time} — *${c.patient_name}*\n   👩‍⚕️ ${c.professional_name} · ${c.specialty}\n`;
+    });
+    texto += `\n📊 Total: *${consultas.length} atendimentos*${ASSINATURA}`;
+
+    for (const num of NUMEROS_RECEPCAO) {
+      await enviar(numeroParaJid(num), texto);
+    }
+    await enviarGrupoProfissionais(texto);
+  } catch (err) {
+    console.error("❌ Erro no cron 7h:", err.message);
+  }
+}, { timezone: "America/Sao_Paulo" });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BAILEYS — CONEXÃO WHATSAPP
 // ─────────────────────────────────────────────────────────────────────────────
 async function conectarWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState("./sessao_whatsapp");
   const { version }          = await fetchLatestBaileysVersion();
-  const logger               = pino({ level: "silent" });
 
   sock = makeWASocket({
     version,
-    auth: {
-      creds: state.creds,
-      keys:  makeCacheableSignalKeyStore(state.keys, logger),
-    },
-    logger,
-    browser: ["Assistente NFS", "Chrome", "1.0.0"],
+    logger: pino({ level: "silent" }),
+    auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })) },
+    browser: ["Assistente NFS", "Chrome", "1.0"],
+    generateHighQualityLinkPreview: false,
   });
 
-  // QR Code gerado
-  sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
-    if (qr) {
-      statusConexao = "conectando";
-      qrCodeBase64  = await QRCode.toDataURL(qr);
-      salvarStatus({ status: "conectando", qrCode: qrCodeBase64, numero: null, sessoes: sessoes.size });
-      console.log("📱 Novo QR Code gerado — acesse: /api/whatsapp/panel");
-    }
-
-    if (connection === "open") {
-      statusConexao   = "conectado";
-      qrCodeBase64    = null;
-      numeroConectado = sock.user?.id?.split(":")[0] || sock.user?.id;
-      salvarStatus({ status: "conectado", qrCode: null, numero: numeroConectado, sessoes: sessoes.size });
-      console.log(`✅ WhatsApp conectado! Número: +${numeroConectado}`);
-    }
-
-    if (connection === "close") {
-      const codigo    = lastDisconnect?.error?.output?.statusCode;
-      const deslogado = codigo === DisconnectReason.loggedOut;
-      statusConexao   = deslogado ? "desconectado" : "aguardando";
-      salvarStatus({ status: deslogado ? "desconectado" : "aguardando", qrCode: null, numero: null, sessoes: 0 });
-      console.log(`🔴 Desconectado. Código: ${codigo}. Reconectando: ${!deslogado}`);
-      if (!deslogado) setTimeout(conectarWhatsApp, 3000);
-    }
-  });
-
-  // Salvar credenciais quando atualizar
   sock.ev.on("creds.update", saveCreds);
 
-  // Receber mensagens
+  sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
+    if (qr) {
+      statusConexao  = "conectando";
+      qrCodeBase64   = await QRCode.toDataURL(qr);
+      salvarStatus({ status: "conectando", qrCode: qrCodeBase64 });
+      console.log("📱 Novo QR Code gerado — acesse: /api/whatsapp/panel");
+    }
+    if (connection === "open") {
+      statusConexao  = "conectado";
+      qrCodeBase64   = null;
+      numeroConectado = sock.user?.id?.split(":")[0] || "";
+      salvarStatus({ status: "conectado", numero: numeroConectado });
+      console.log(`✅ WhatsApp conectado! Número: +${numeroConectado}`);
+    }
+    if (connection === "close") {
+      const code = lastDisconnect?.error?.output?.statusCode;
+      const reconectar = code !== DisconnectReason.loggedOut;
+      statusConexao = "desconectado";
+      salvarStatus({ status: "desconectado", qrCode: null });
+      console.log(`🔴 Desconectado. Código: ${code}. Reconectando: ${reconectar}`);
+      if (reconectar) setTimeout(conectarWhatsApp, 5000);
+    }
+  });
+
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
     for (const msg of messages) {
-      if (msg.key.fromMe) continue;                   // ignorar mensagens enviadas por nós
-      if (msg.key.remoteJid?.endsWith("@g.us")) continue; // ignorar grupos
+      if (msg.key.fromMe) continue;
+      if (!msg.message) continue;
 
-      const jid   = msg.key.remoteJid;
-      const texto = msg.message?.conversation
-        || msg.message?.extendedTextMessage?.text
-        || msg.message?.imageMessage?.caption
-        || "";
+      const jid = msg.key.remoteJid;
+      if (!jid || jid.includes("status@")) continue;
 
-      if (!texto.trim()) continue;
+      const texto = (
+        msg.message.conversation ||
+        msg.message.extendedTextMessage?.text ||
+        msg.message.imageMessage?.caption ||
+        msg.message.documentMessage?.caption ||
+        ""
+      ).trim();
+
+      const temAnexo = !!(
+        msg.message.imageMessage ||
+        msg.message.documentMessage ||
+        msg.message.audioMessage
+      );
+
+      if (!texto && !temAnexo) continue;
+
+      console.log(`📩 [${jid}] ${texto || "(anexo)"}`);
 
       try {
-        const resposta = await processarMensagem(jid, texto);
+        const resposta = await processarMensagem(jid, texto || "(arquivo enviado)", temAnexo);
         if (resposta) await enviar(jid, resposta);
       } catch (err) {
-        console.error("❌ Erro ao processar mensagem:", err);
-        await enviar(jid, "⚠️ Ocorreu um erro. Por favor, tente novamente ou digite *menu*.");
+        console.error(`❌ Erro ao processar mensagem de ${jid}:`, err.message);
       }
     }
   });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AGENDAMENTOS AUTOMÁTICOS
+// API ENDPOINTS (para integração com NFs gestão)
 // ─────────────────────────────────────────────────────────────────────────────
+app.use(bodyParser.json());
 
-// 18h (seg–sab): lembrete D-1 para responsáveis
-cron.schedule("0 18 * * 1-6", async () => {
-  if (statusConexao !== "conectado") return;
-  console.log("⏰ [CRON] Enviando lembretes para responsáveis...");
-  for (const consulta of consultasHoje()) {
-    const pac = pacientes.find(p => p.id === consulta.pacienteId);
-    if (!pac) continue;
-    const mensagem =
-      `🌈 *${CLINICA_NOME}*\n\n` +
-      `Olá, *${pac.responsavel}*! 😊\n\n` +
-      `Lembramos que *${pac.nome}* tem consulta *amanhã*:\n\n` +
-      `⏰ Horário: ${consulta.horario}\n` +
-      `🩺 Terapia: ${consulta.terapia}\n` +
-      `👩‍⚕️ Terapeuta: ${consulta.terapeuta}\n\n` +
-      `📍 ${CLINICA_ENDERECO}\n\n` +
-      `Por favor, *confirme a presença* respondendo:\n` +
-      `✅ *SIM* — Confirmar\n❌ *NÃO* — Cancelar\n\n` +
-      `Ou acesse o menu digitando: *oi*`;
-    setSessao(numeroParaJid(pac.telefoneResponsavel), "confirmar_consulta", { consultaId: consulta.id, paciente: pac, consulta });
-    await enviar(numeroParaJid(pac.telefoneResponsavel), mensagem);
-    console.log(`  → Lembrete enviado para ${pac.responsavel}`);
+// Endpoint: NFs gestão chama isso quando cria novo agendamento
+app.post("/webhook/novo-agendamento", async (req, res) => {
+  try {
+    const { appointment } = req.body;
+    if (!appointment) return res.status(400).json({ error: "appointment obrigatório" });
+    await enviarBoasVindas(appointment);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-// 07h: rota do dia para motoristas
-cron.schedule("0 7 * * 1-6", async () => {
-  if (statusConexao !== "conectado" || rotasVan.length === 0) return;
-  let texto = `🚐 *Rota do Dia — ${new Date().toLocaleDateString("pt-BR")}*\n\n🏥 Destino: ${CLINICA_NOME}\n📍 ${CLINICA_ENDERECO}\n\n`;
-  for (const rota of rotasVan) {
-    const pac      = pacientes.find(p => p.id === rota.pacienteId);
-    const consulta = consultasHoje().find(c => c.pacienteId === rota.pacienteId);
-    texto += `⏰ ${rota.horarioEmbarque}\n👤 *${pac?.nome}*\n📍 ${rota.enderecoEmbarque}\n🕐 Consulta: ${consulta?.horario}\n\n`;
+// Endpoint: Recepção registra chegada do paciente
+app.post("/webhook/chegada-paciente", async (req, res) => {
+  try {
+    const { patientName, time, professionalId } = req.body;
+    await notificarChegadaPaciente(patientName, time, professionalId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  texto += `Para confirmar embarques: Menu → *Sou Motorista*`;
-  for (const tel of NUMEROS_MOTORISTAS) await enviar(numeroParaJid(tel), texto);
 });
 
-// 09h30: alerta de não confirmados para recepção
-cron.schedule("30 9 * * 1-6", async () => {
-  if (statusConexao !== "conectado" || NUMEROS_RECEPCAO.length === 0) return;
-  const consultas = consultasHoje();
-  const naoConf   = consultas.filter(c => !confirmacoes.has(c.id));
-  if (naoConf.length === 0) return;
-  let texto = `⚠️ *Alerta — ${naoConf.length} paciente(s) sem confirmação:*\n\n`;
-  for (const c of naoConf) {
-    const pac = pacientes.find(p => p.id === c.pacienteId);
-    texto += `❓ *${pac?.nome}* — ${c.horario}\n📞 ${pac?.responsavel}: ${pac?.telefoneResponsavel}\n\n`;
+// Endpoint: Enviar campanha/mensagem em massa
+app.post("/webhook/campanha", async (req, res) => {
+  try {
+    const { mensagem, companyId } = req.body;
+    if (!mensagem) return res.status(400).json({ error: "mensagem obrigatória" });
+
+    const pacientes = await query(
+      `SELECT guardian_name, guardian_phone, name FROM patients WHERE company_id=$1 AND guardian_phone IS NOT NULL AND status='Atendimento'`,
+      [companyId || COMPANY_ID]
+    );
+
+    let enviados = 0;
+    for (const p of pacientes) {
+      const texto = mensagem
+        .replace("{{responsavel}}", p.guardian_name || "Responsável")
+        .replace("{{paciente}}", p.name || "Paciente")
+        + ASSINATURA;
+      await enviar(numeroParaJid(p.guardian_phone), texto);
+      enviados++;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    res.json({ ok: true, enviados });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  for (const tel of NUMEROS_RECEPCAO) await enviar(numeroParaJid(tel), texto);
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// INTERFACE WEB — PAINEL DE CONEXÃO
-// ─────────────────────────────────────────────────────────────────────────────
+// Status do bot
+app.get(["/status", "/assistente-nfs/status"], (req, res) => {
+  res.json({ status: statusConexao, numeroConectado, sessoesAtivas: sessoes.size, horario: new Date().toLocaleString("pt-BR") });
+});
+
+// Redirect para painel
 app.get("/", (req, res) => {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.send(`<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Assistente NFs</title>
-  <style>
-    body { font-family: 'Segoe UI', sans-serif; background: #fff; color: #111; min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
-    p { color: #555; font-size: 15px; }
-    a { color: #1a73e8; font-size: 15px; }
-    .spin { width: 36px; height: 36px; border: 4px solid #eee; border-top-color: #25D366; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-  <script>
-    window.addEventListener('load', function() {
-      var base = window.location.protocol + '//' + window.location.hostname;
-      window.location.replace(base + '/api/whatsapp/panel');
-    });
-  </script>
-</head>
-<body>
-  <div class="spin"></div>
-  <p>Abrindo painel do Assistente NFs...</p>
-  <a id="link" href="#">Clique aqui se não redirecionar automaticamente</a>
-  <script>
-    var base = window.location.protocol + '//' + window.location.hostname;
-    document.getElementById('link').href = base + '/api/whatsapp/panel';
-  </script>
-</body>
-</html>`);
+  res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Assistente NFs</title>
+  <style>body{font-family:sans-serif;background:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;min-height:100vh;gap:16px}.spin{width:36px;height:36px;border:4px solid #eee;border-top-color:#25D366;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}p{color:#555}a{color:#1a73e8}</style>
+  <script>window.addEventListener('load',function(){var b=window.location.protocol+'//'+window.location.hostname;window.location.replace(b+'/api/whatsapp/panel');});</script>
+  </head><body><div class="spin"></div><p>Abrindo painel...</p><a id="l" href="#">Clique aqui se não redirecionar</a>
+  <script>document.getElementById('l').href=window.location.protocol+'//'+window.location.hostname+'/api/whatsapp/panel';</script>
+  </body></html>`);
 });
 
-// Alias com prefixo (para roteamento do proxy Replit)
-app.get("/assistente-nfs", (req, res) => res.redirect("/assistente-nfs/"));
-app.get("/assistente-nfs/", (req, res, next) => { req.url = "/"; next(); });
-
-// API de status (para monitoramento)
-app.get(["/status", "/assistente-nfs/status"], (req, res) => {
-  res.json({
-    status:         statusConexao,
-    numeroConectado,
-    sessoesAtivas:  sessoes.size,
-    horario:        new Date().toLocaleString("pt-BR"),
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// START
-// ─────────────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n🌈 Assistente NFS — ${CLINICA_NOME}`);
-  console.log(`✅ Painel web na porta ${PORT}`);
-  console.log(`📱 Acesse o painel para escanear o QR Code\n`);
+  console.log(`\n💬 Assistente NFs — ${CLINICA_NOME}`);
+  console.log(`✅ Servidor na porta ${PORT}`);
+  console.log(`🤖 IA: ${AI_BASE ? "Anthropic Claude ativo" : "⚠️  IA não configurada"}`);
+  console.log(`🗄️  DB: ${process.env.DATABASE_URL ? "PostgreSQL conectado" : "⚠️  DATABASE_URL ausente"}`);
+  console.log(`📱 Acesse /api/whatsapp/panel para o QR Code\n`);
 });
 
 conectarWhatsApp().catch(err => console.error("❌ Erro ao conectar WhatsApp:", err));
