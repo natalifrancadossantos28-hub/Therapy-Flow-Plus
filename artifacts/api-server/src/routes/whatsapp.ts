@@ -486,7 +486,7 @@ function trocarVoz(){
   /* Testa a nova voz imediatamente */
   speechSynthesis.cancel();
   var u=new SpeechSynthesisUtterance('Olá, sou a Carla!');
-  u.lang='pt-BR';u.rate=1.15;u.pitch=1.1;u.volume=1;u.voice=vozCache;
+  u.lang='pt-BR';u.rate=1.45;u.pitch=1.4;u.volume=1;u.voice=vozCache;
   speechSynthesis.speak(u);
 }
 /* Tenta carregar imediatamente e nas mudanças de lista */
@@ -507,8 +507,8 @@ function falar(texto,callback){
   var voz=vozCache||selecionarVoz();
   var u=new SpeechSynthesisUtterance(texto);
   u.lang='pt-BR';
-  u.rate=1.15;
-  u.pitch=voz&&VOZES_FEM.test(voz.name)?1.1:1.25; /* pitch mais alto se não tiver voz feminina confirmada */
+  u.rate=1.45;
+  u.pitch=1.4;
   u.volume=1;
   if(voz)u.voice=voz;
   u.onend=function(){setStatus('');if(callback)callback();};
