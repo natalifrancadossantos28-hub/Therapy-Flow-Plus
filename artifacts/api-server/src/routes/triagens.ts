@@ -1,8 +1,15 @@
 import { Router } from "express";
 import { db, triagens } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, and } from "drizzle-orm";
 
 const router = Router();
+
+function getCompanyId(req: any): number | null {
+  const h = req.headers["x-company-id"];
+  if (!h) return null;
+  const n = Number(h);
+  return isNaN(n) ? null : n;
+}
 
 const extractFields = (body: any) => ({
   nome: body.nome,
@@ -50,9 +57,12 @@ const extractFields = (body: any) => ({
   respostas: body.respostas ? JSON.stringify(body.respostas) : null,
 });
 
-router.get("/triagens", async (_req, res) => {
+router.get("/triagens", async (req, res) => {
   try {
-    const rows = await db.select().from(triagens).orderBy(desc(triagens.createdAt));
+    const companyId = getCompanyId(req);
+    const rows = companyId
+      ? await db.select().from(triagens).where(eq(triagens.companyId, companyId)).orderBy(desc(triagens.createdAt))
+      : await db.select().from(triagens).orderBy(desc(triagens.createdAt));
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -62,7 +72,10 @@ router.get("/triagens", async (_req, res) => {
 
 router.get("/triagens/:id", async (req, res) => {
   try {
-    const [row] = await db.select().from(triagens).where(eq(triagens.id, Number(req.params.id)));
+    const companyId = getCompanyId(req);
+    const conditions = [eq(triagens.id, Number(req.params.id))];
+    if (companyId) conditions.push(eq(triagens.companyId, companyId));
+    const [row] = await db.select().from(triagens).where(and(...conditions));
     if (!row) return res.status(404).json({ error: "Triagem não encontrada" });
     res.json(row);
   } catch (err) {
@@ -73,7 +86,11 @@ router.get("/triagens/:id", async (req, res) => {
 
 router.post("/triagens", async (req, res) => {
   try {
-    const [row] = await db.insert(triagens).values(extractFields(req.body)).returning();
+    const companyId = getCompanyId(req);
+    const [row] = await db.insert(triagens).values({
+      ...extractFields(req.body),
+      ...(companyId ? { companyId } : {}),
+    }).returning();
     res.status(201).json(row);
   } catch (err) {
     console.error(err);
@@ -83,10 +100,13 @@ router.post("/triagens", async (req, res) => {
 
 router.put("/triagens/:id", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
+    const conditions = [eq(triagens.id, Number(req.params.id))];
+    if (companyId) conditions.push(eq(triagens.companyId, companyId));
     const [row] = await db
       .update(triagens)
       .set(extractFields(req.body))
-      .where(eq(triagens.id, Number(req.params.id)))
+      .where(and(...conditions))
       .returning();
     if (!row) return res.status(404).json({ error: "Triagem não encontrada" });
     res.json(row);
@@ -98,7 +118,10 @@ router.put("/triagens/:id", async (req, res) => {
 
 router.delete("/triagens/:id", async (req, res) => {
   try {
-    await db.delete(triagens).where(eq(triagens.id, Number(req.params.id)));
+    const companyId = getCompanyId(req);
+    const conditions = [eq(triagens.id, Number(req.params.id))];
+    if (companyId) conditions.push(eq(triagens.companyId, companyId));
+    await db.delete(triagens).where(and(...conditions));
     res.status(204).end();
   } catch (err) {
     console.error(err);

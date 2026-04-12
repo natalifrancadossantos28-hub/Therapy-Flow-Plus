@@ -1,7 +1,8 @@
-import { pgTable, serial, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 
 export const triagens = pgTable("triagens", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id"),
   nome: text("nome").notNull(),
   dataNascimento: text("data_nascimento"),
   idade: text("idade"),

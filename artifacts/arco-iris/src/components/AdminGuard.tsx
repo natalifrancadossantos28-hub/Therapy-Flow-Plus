@@ -1,41 +1,93 @@
-import { useState, useEffect } from "react";
-import { Lock, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Lock, ShieldCheck, Eye, EyeOff, Building2 } from "lucide-react";
 
-const STORAGE_KEY = "nfs_admin_auth";
-const ADMIN_PASSWORD = "admin123";
+const SESSION_KEY = "nfs_ponto_session";
+const LEGACY_KEY = "nfs_admin_auth";
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-function isAuthenticated(): boolean {
-  return sessionStorage.getItem(STORAGE_KEY) === "true";
+type Session = {
+  type: "company" | "master";
+  companyId?: number;
+  companyName?: string;
+  companySlug?: string;
+  adminToken?: string;
+  masterToken?: string;
+  moduleArcoIris?: boolean;
+};
+
+function getSession(): Session | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+export function isAuthenticated(): boolean {
+  const session = getSession();
+  if (session?.type === "master") return true;
+  if (session?.type === "company" && session.moduleArcoIris) return true;
+  return sessionStorage.getItem(LEGACY_KEY) === "true";
+}
+
+export function getCompanyId(): number | null {
+  const session = getSession();
+  return session?.companyId ?? null;
 }
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState(isAuthenticated);
+  const [slug, setSlug] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [shaking, setShaking] = useState(false);
 
-  useEffect(() => {
-    const check = () => setAuthed(isAuthenticated());
-    window.addEventListener("storage", check);
-    return () => window.removeEventListener("storage", check);
-  }, []);
+  const shake = () => { setShaking(true); setTimeout(() => setShaking(false), 500); };
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${BASE_URL}/api/ponto/auth/company`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Empresa ou senha incorretos.");
+        shake();
+        return;
+      }
+      if (!data.moduleArcoIris) {
+        setError("Esta empresa não tem acesso ao módulo Gestão Terapêutica.");
+        shake();
+        return;
+      }
+      const session: Session = {
+        type: "company",
+        companyId: data.id,
+        companyName: data.name,
+        companySlug: data.slug,
+        adminToken: password,
+        moduleArcoIris: true,
+        moduleTriagem: data.moduleTriagem,
+        modulePonto: data.modulePonto,
+      };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      sessionStorage.setItem(LEGACY_KEY, "true");
+      setAuthed(true);
+    } catch {
+      setError("Erro de conexão. Tente novamente.");
+      shake();
+    } finally {
+      setLoading(false);
+    }
+  }, [slug, password]);
 
   if (authed) return <>{children}</>;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      sessionStorage.setItem(STORAGE_KEY, "true");
-      setAuthed(true);
-      setError("");
-    } else {
-      setError("Senha incorreta. Tente novamente.");
-      setPassword("");
-      setShaking(true);
-      setTimeout(() => setShaking(false), 500);
-    }
-  };
 
   return (
     <div className="flex items-center justify-center min-h-[60vh] px-4">
@@ -46,23 +98,36 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
               <Lock className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold">Área Restrita</h2>
-            <p className="text-sm opacity-80 mt-1">Digite a senha administrativa para continuar</p>
+            <p className="text-sm opacity-80 mt-1">Acesse com as credenciais da sua empresa</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-8 space-y-5">
+          <form onSubmit={handleSubmit} className="p-8 space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block uppercase tracking-wider flex items-center gap-1">
+                <Building2 className="w-3 h-3" /> Identificador da Empresa
+              </label>
+              <input
+                type="text"
+                value={slug}
+                onChange={e => { setSlug(e.target.value); setError(""); }}
+                placeholder="minha-clinica"
+                autoFocus
+                className="w-full border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground font-mono placeholder:text-muted-foreground transition-all"
+              />
+            </div>
             <div className="relative">
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block uppercase tracking-wider">Senha Administrativa</label>
               <input
                 type={showPw ? "text" : "password"}
                 value={password}
                 onChange={e => { setPassword(e.target.value); setError(""); }}
                 placeholder="Senha administrativa"
-                autoFocus
                 className="w-full border border-border rounded-xl px-4 py-3 pr-12 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground font-medium placeholder:text-muted-foreground transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-3 bottom-3 text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -76,10 +141,10 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 
             <button
               type="submit"
-              disabled={!password}
+              disabled={!slug || !password || loading}
               className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-bold py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(0,240,255,0.4)]"
             >
-              <ShieldCheck className="w-4 h-4" /> Entrar
+              <ShieldCheck className="w-4 h-4" /> {loading ? "Verificando..." : "Entrar"}
             </button>
           </form>
         </div>

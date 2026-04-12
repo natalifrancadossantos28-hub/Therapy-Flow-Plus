@@ -5,6 +5,13 @@ import { eq, and, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+function getCompanyId(req: any): number | null {
+  const h = req.headers["x-company-id"];
+  if (!h) return null;
+  const n = Number(h);
+  return isNaN(n) ? null : n;
+}
+
 function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
   const baseIdx = triagemScore >= 432 ? 3 : triagemScore >= 288 ? 2 : triagemScore >= 144 ? 1 : 0;
@@ -14,61 +21,27 @@ function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRo
 }
 
 router.get("/patients", async (req, res) => {
-  let query = db.select({
-    id: patientsTable.id,
-    prontuario: patientsTable.prontuario,
-    name: patientsTable.name,
-    dateOfBirth: patientsTable.dateOfBirth,
-    cpf: patientsTable.cpf,
-    cns: patientsTable.cns,
-    phone: patientsTable.phone,
-    email: patientsTable.email,
-    address: patientsTable.address,
-    motherName: patientsTable.motherName,
-    guardianName: patientsTable.guardianName,
-    guardianPhone: patientsTable.guardianPhone,
-    diagnosis: patientsTable.diagnosis,
-    notes: patientsTable.notes,
-    professionalId: patientsTable.professionalId,
-    status: patientsTable.status,
-    entryDate: patientsTable.entryDate,
-    absenceCount: patientsTable.absenceCount,
-    triagemScore: patientsTable.triagemScore,
-    scorePsicologia: patientsTable.scorePsicologia,
-    scorePsicomotricidade: patientsTable.scorePsicomotricidade,
-    scoreFisioterapia: patientsTable.scoreFisioterapia,
-    scorePsicopedagogia: patientsTable.scorePsicopedagogia,
-    scoreEdFisica: patientsTable.scoreEdFisica,
-    scoreFonoaudiologia: patientsTable.scoreFonoaudiologia,
-    scoreTO: patientsTable.scoreTO,
-    scoreNutricionista: patientsTable.scoreNutricionista,
-    escolaPublica: patientsTable.escolaPublica,
-    trabalhoNaRoca: patientsTable.trabalhoNaRoca,
-    createdAt: patientsTable.createdAt,
-    updatedAt: patientsTable.updatedAt,
-  }).from(patientsTable);
-
+  const companyId = getCompanyId(req);
   const conditions = [];
-  if (req.query.professionalId) {
-    conditions.push(eq(patientsTable.professionalId, Number(req.query.professionalId)));
-  }
-  if (req.query.status) {
-    conditions.push(eq(patientsTable.status, String(req.query.status)));
-  }
+  if (companyId) conditions.push(eq(patientsTable.companyId, companyId));
+  if (req.query.professionalId) conditions.push(eq(patientsTable.professionalId, Number(req.query.professionalId)));
+  if (req.query.status) conditions.push(eq(patientsTable.status, String(req.query.status)));
 
   const rows = conditions.length
-    ? await query.where(and(...conditions))
-    : await query;
+    ? await db.select().from(patientsTable).where(and(...conditions))
+    : await db.select().from(patientsTable);
   res.json(rows);
 });
 
 router.post("/patients", async (req, res) => {
+  const companyId = getCompanyId(req);
   const body = req.body;
   const today = new Date().toISOString().split("T")[0];
   const entryDate = body.entryDate ?? today;
   const status = body.status ?? "Aguardando Triagem";
 
   const [row] = await db.insert(patientsTable).values({
+    ...(companyId ? { companyId } : {}),
     prontuario: body.prontuario ?? null,
     name: body.name,
     dateOfBirth: body.dateOfBirth ?? null,
@@ -154,6 +127,7 @@ router.delete("/patients/:id", async (req, res) => {
 
 router.post("/patients/:id/add-to-fila", async (req, res) => {
   const id = Number(req.params.id);
+  const companyId = getCompanyId(req);
   const [patient] = await db.select().from(patientsTable).where(eq(patientsTable.id, id));
   if (!patient) return res.status(404).json({ error: "Patient not found" });
 
@@ -189,6 +163,7 @@ router.post("/patients/:id/add-to-fila", async (req, res) => {
     priority,
     notes: req.body.notes ?? null,
     entryDate: today,
+    ...(companyId ? { companyId } : {}),
   }).returning();
 
   await db.update(patientsTable)

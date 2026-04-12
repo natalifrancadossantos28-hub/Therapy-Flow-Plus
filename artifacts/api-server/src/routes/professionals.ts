@@ -5,19 +5,31 @@ import { eq, and, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+function getCompanyId(req: any): number | null {
+  const h = req.headers["x-company-id"];
+  if (!h) return null;
+  const n = Number(h);
+  return isNaN(n) ? null : n;
+}
+
 const getMaxCapacity = (cargaHoraria: string) => cargaHoraria === "20h" ? 20 : 30;
 
-router.get("/professionals", async (_req, res) => {
-  const rows = await db.select().from(professionalsTable);
+router.get("/professionals", async (req, res) => {
+  const companyId = getCompanyId(req);
+  const rows = companyId
+    ? await db.select().from(professionalsTable).where(eq(professionalsTable.companyId, companyId))
+    : await db.select().from(professionalsTable);
   res.json(rows);
 });
 
 router.post("/professionals", async (req, res) => {
+  const companyId = getCompanyId(req);
   const { name, specialty, email, phone, pin, cargaHoraria } = req.body;
   const [row] = await db.insert(professionalsTable).values({
     name, specialty, email, phone,
     pin: pin ?? null,
     cargaHoraria: cargaHoraria ?? "30h",
+    ...(companyId ? { companyId } : {}),
   }).returning();
   res.status(201).json(row);
 });
@@ -82,7 +94,6 @@ const SCHEDULE_SLOTS = [
   "13:10", "14:00", "14:50", "15:40",
 ];
 const LUNCH_SLOT = "12:10";
-// Encerra às 16:30 (último atendimento 15:40 + 50 min)
 
 router.get("/professionals/:id/schedule", async (req, res) => {
   const id = Number(req.params.id);

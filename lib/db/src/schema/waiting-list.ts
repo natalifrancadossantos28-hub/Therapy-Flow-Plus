@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const waitingListTable = pgTable("waiting_list", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id"),
   patientId: integer("patient_id").notNull(),
   professionalId: integer("professional_id"),
   priority: text("priority").notNull().default("media"),

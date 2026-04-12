@@ -10,6 +10,10 @@ export const pontoCompaniesTable = pgTable("ponto_companies", {
   toleranceMinutes: integer("tolerance_minutes").notNull().default(10),
   overtimeBlockEnabled: boolean("overtime_block_enabled").notNull().default(true),
   defaultBreakMinutes: integer("default_break_minutes").notNull().default(60),
+  // Module flags — which products the company has access to
+  modulePonto: boolean("module_ponto").notNull().default(true),
+  moduleTriagem: boolean("module_triagem").notNull().default(false),
+  moduleArcoIris: boolean("module_arco_iris").notNull().default(false),
   active: boolean("active").notNull().default(true),
   logoUrl: text("logo_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

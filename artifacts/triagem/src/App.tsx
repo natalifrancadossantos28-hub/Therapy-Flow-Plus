@@ -798,12 +798,28 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
   const salvarTriagem = async () => {
     setSalvando(true);
     try {
-      await fetch(editId ? `${API}/triagens/${editId}` : `${API}/triagens`, {
+      if (!navigator.onLine && !editId) {
+        const { addToOfflineQueue } = await import("./lib/offline-queue");
+        addToOfflineQueue(bodyParaSalvar);
+        setSalvo(true);
+        return;
+      }
+      const res = await fetch(editId ? `${API}/triagens/${editId}` : `${API}/triagens`, {
         method: editId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bodyParaSalvar),
       });
+      if (!res.ok && !editId) {
+        const { addToOfflineQueue } = await import("./lib/offline-queue");
+        addToOfflineQueue(bodyParaSalvar);
+      }
       setSalvo(true);
+    } catch {
+      if (!editId) {
+        const { addToOfflineQueue } = await import("./lib/offline-queue");
+        addToOfflineQueue(bodyParaSalvar);
+        setSalvo(true);
+      }
     } finally { setSalvando(false); }
   };
 

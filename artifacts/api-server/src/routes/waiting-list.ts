@@ -5,10 +5,19 @@ import { eq, and, asc, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+function getCompanyId(req: any): number | null {
+  const h = req.headers["x-company-id"];
+  if (!h) return null;
+  const n = Number(h);
+  return isNaN(n) ? null : n;
+}
+
 const priorityOrder = sql`CASE priority WHEN 'elevado' THEN 1 WHEN 'alta' THEN 1 WHEN 'moderado' THEN 2 WHEN 'media' THEN 2 WHEN 'leve' THEN 3 WHEN 'baixo' THEN 4 WHEN 'baixa' THEN 4 ELSE 5 END`;
 
 router.get("/waiting-list", async (req, res) => {
+  const companyId = getCompanyId(req);
   const conditions = [];
+  if (companyId) conditions.push(eq(waitingListTable.companyId, companyId));
   if (req.query.professionalId) {
     conditions.push(eq(waitingListTable.professionalId, Number(req.query.professionalId)));
   }
@@ -45,6 +54,7 @@ router.get("/waiting-list", async (req, res) => {
 });
 
 router.post("/waiting-list", async (req, res) => {
+  const companyId = getCompanyId(req);
   const { patientId, professionalId, priority, notes, entryDate } = req.body;
 
   const [patient] = await db.select({ triagemScore: patientsTable.triagemScore })
@@ -65,6 +75,7 @@ router.post("/waiting-list", async (req, res) => {
     priority: priority ?? "media",
     notes: notes ?? null,
     entryDate,
+    ...(companyId ? { companyId } : {}),
   }).returning();
 
   const patientInfo = await db.select({ name: patientsTable.name, phone: patientsTable.phone })

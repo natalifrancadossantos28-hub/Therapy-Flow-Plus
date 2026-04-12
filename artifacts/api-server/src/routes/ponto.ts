@@ -75,6 +75,9 @@ router.get("/ponto/companies", async (req, res) => {
     toleranceMinutes: pontoCompaniesTable.toleranceMinutes,
     overtimeBlockEnabled: pontoCompaniesTable.overtimeBlockEnabled,
     defaultBreakMinutes: pontoCompaniesTable.defaultBreakMinutes,
+    modulePonto: pontoCompaniesTable.modulePonto,
+    moduleTriagem: pontoCompaniesTable.moduleTriagem,
+    moduleArcoIris: pontoCompaniesTable.moduleArcoIris,
     logoUrl: pontoCompaniesTable.logoUrl,
     createdAt: pontoCompaniesTable.createdAt,
     employeeCount: sql<number>`(SELECT COUNT(*)::int FROM ponto_employees WHERE company_id = ponto_companies.id)`,
@@ -114,6 +117,9 @@ router.put("/ponto/companies/:id", async (req, res) => {
   if (defaultBreakMinutes !== undefined) upd.defaultBreakMinutes = Number(defaultBreakMinutes);
   if (active !== undefined) upd.active = Boolean(active);
   if (logoUrl !== undefined) upd.logoUrl = logoUrl || null;
+  if (req.body.modulePonto !== undefined) upd.modulePonto = Boolean(req.body.modulePonto);
+  if (req.body.moduleTriagem !== undefined) upd.moduleTriagem = Boolean(req.body.moduleTriagem);
+  if (req.body.moduleArcoIris !== undefined) upd.moduleArcoIris = Boolean(req.body.moduleArcoIris);
   const [row] = await db.update(pontoCompaniesTable).set(upd).where(eq(pontoCompaniesTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Empresa não encontrada." });
   const { adminPassword: _, ...safe } = row;

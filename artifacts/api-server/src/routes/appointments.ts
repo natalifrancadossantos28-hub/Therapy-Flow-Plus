@@ -5,9 +5,18 @@ import { eq, and } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+function getCompanyId(req: any): number | null {
+  const h = req.headers["x-company-id"];
+  if (!h) return null;
+  const n = Number(h);
+  return isNaN(n) ? null : n;
+}
+
 router.get("/appointments/today", async (req, res) => {
+  const companyId = getCompanyId(req);
   const today = new Date().toISOString().split("T")[0];
   const conditions: ReturnType<typeof eq>[] = [eq(appointmentsTable.date, today)];
+  if (companyId) conditions.push(eq(appointmentsTable.companyId, companyId));
   if (req.query.professionalId) {
     conditions.push(eq(appointmentsTable.professionalId, Number(req.query.professionalId)));
   }
@@ -45,7 +54,8 @@ router.get("/appointments/today", async (req, res) => {
   })));
 });
 
-router.get("/appointments/stats", async (_req, res) => {
+router.get("/appointments/stats", async (req, res) => {
+  const companyId = getCompanyId(req);
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
@@ -58,7 +68,9 @@ router.get("/appointments/stats", async (_req, res) => {
 
   const fmt = (d: Date) => d.toISOString().split("T")[0];
 
-  const rows = await db.select({ date: appointmentsTable.date }).from(appointmentsTable);
+  const rows = companyId
+    ? await db.select({ date: appointmentsTable.date }).from(appointmentsTable).where(eq(appointmentsTable.companyId, companyId))
+    : await db.select({ date: appointmentsTable.date }).from(appointmentsTable);
 
   const count = (from: Date) => rows.filter(r => r.date >= fmt(from)).length;
 
@@ -72,7 +84,9 @@ router.get("/appointments/stats", async (_req, res) => {
 });
 
 router.get("/appointments", async (req, res) => {
+  const companyId = getCompanyId(req);
   const conditions: ReturnType<typeof eq>[] = [];
+  if (companyId) conditions.push(eq(appointmentsTable.companyId, companyId));
   if (req.query.date) conditions.push(eq(appointmentsTable.date, String(req.query.date)));
   if (req.query.professionalId) conditions.push(eq(appointmentsTable.professionalId, Number(req.query.professionalId)));
   if (req.query.patientId) conditions.push(eq(appointmentsTable.patientId, Number(req.query.patientId)));
@@ -84,6 +98,7 @@ router.get("/appointments", async (req, res) => {
 });
 
 router.post("/appointments", async (req, res) => {
+  const companyId = getCompanyId(req);
   const { patientId, professionalId, date, time, notes, fromWaitingList } = req.body;
   const [row] = await db.insert(appointmentsTable).values({
     patientId: Number(patientId),
@@ -92,6 +107,7 @@ router.post("/appointments", async (req, res) => {
     time,
     status: "agendado",
     notes: notes ?? null,
+    ...(companyId ? { companyId } : {}),
   }).returning();
 
   if (fromWaitingList) {

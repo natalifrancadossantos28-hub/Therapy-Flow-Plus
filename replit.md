@@ -118,13 +118,18 @@ This codebase is the master copy of a commercial SaaS therapeutic management sys
 ### Real-time Sync
 All modules use React Query with cache invalidation on key mutations (booking, status changes). Dashboard and Waiting List auto-refresh every 30s. Reception auto-refreshes every 20s. Booking from waiting list simultaneously: creates appointment + updates patient status to "Atendimento" + removes from waiting list + links professional to patient.
 
-### SaaS Multi-tenancy Roadmap (future)
-To commercialize this system for multiple clinics (SaaS), the following changes would be needed:
-1. Create a `clinics` table (`id`, `name`, `slug`, `settings`)
-2. Add `clinicId` foreign key to ALL tables (patients, professionals, appointments, waiting_list, triagens)
-3. Add clinic authentication (admin per clinic) — recommended: use Clerk or Replit Auth with clinic context
-4. Filter ALL API queries by `clinicId` from the authenticated session
-5. The code is already modular (monorepo) — duplication of the entire workspace per new client is the simplest short-term approach, full multi-tenant DB isolation is the long-term approach
+### SaaS Multi-tenancy (IMPLEMENTED)
+All three systems (Triagem, Arco-Íris, Ponto) now share a unified multi-tenant architecture:
+
+1. **Shared company registry** — `ponto_companies` table with module flags: `modulePonto`, `moduleTriagem`, `moduleArcoIris`
+2. **Data isolation** — `company_id` added to ALL tables: `triagens`, `professionals`, `patients`, `appointments`, `waiting_list`
+3. **Company auth** — All apps authenticate via `POST /api/ponto/auth/company {slug, password}` which returns module flags
+4. **CompanyGuard** (`artifacts/triagem/src/CompanyGuard.tsx`) — blocks Triagem unless `moduleTriagem: true`
+5. **AdminGuard** (`artifacts/arco-iris/src/components/AdminGuard.tsx`) — blocks Arco-Íris unless `moduleArcoIris: true`
+6. **window.fetch patch** — Both Triagem and Arco-Íris patch `window.fetch` in `main.tsx` to inject `x-company-id` / `x-company-auth` headers automatically for all `/api/` calls
+7. **Offline queue** — `artifacts/triagem/src/lib/offline-queue.ts` queues triagem submissions to localStorage when offline; auto-syncs on reconnect via `window.online` event; banner shows pending count
+8. **Master panel** — Ponto companies page shows module badges and allows toggling all 3 modules per company
+9. **Error logs** — `nfs_error_logs` table + `/api/error-logs` route for centralized error reporting
 
 ---
 

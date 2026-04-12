@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const appointmentsTable = pgTable("appointments", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id"),
   patientId: integer("patient_id").notNull(),
   professionalId: integer("professional_id").notNull(),
   date: text("date").notNull(),

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Building2, Trash2, Users, Edit, X, Check, Copy } from "lucide-react";
+import { Plus, Building2, Trash2, Users, Edit, X, Check, Copy, Clock, Stethoscope, LayoutDashboard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getSession } from "@/components/AdminGuard";
 
@@ -15,12 +15,14 @@ type Company = {
   id: number; name: string; slug: string; active: boolean;
   toleranceMinutes: number; overtimeBlockEnabled: boolean;
   defaultBreakMinutes: number; logoUrl: string | null;
+  modulePonto: boolean; moduleTriagem: boolean; moduleArcoIris: boolean;
   employeeCount: number; createdAt: string;
 };
 
 type FormData = {
   name: string; slug: string; adminPassword: string;
   toleranceMinutes: number; overtimeBlockEnabled: boolean; defaultBreakMinutes: number;
+  modulePonto: boolean; moduleTriagem: boolean; moduleArcoIris: boolean;
 };
 
 function authHeaders() {
@@ -45,6 +47,7 @@ export default function CompaniesPage() {
   const [form, setForm] = useState<FormData>({
     name: "", slug: "", adminPassword: "admin123",
     toleranceMinutes: 10, overtimeBlockEnabled: true, defaultBreakMinutes: 60,
+    modulePonto: true, moduleTriagem: false, moduleArcoIris: false,
   });
 
   const createMutation = useMutation({
@@ -95,7 +98,11 @@ export default function CompaniesPage() {
     onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
-  const resetForm = () => setForm({ name: "", slug: "", adminPassword: "admin123", toleranceMinutes: 10, overtimeBlockEnabled: true, defaultBreakMinutes: 60 });
+  const resetForm = () => setForm({
+    name: "", slug: "", adminPassword: "admin123",
+    toleranceMinutes: 10, overtimeBlockEnabled: true, defaultBreakMinutes: 60,
+    modulePonto: true, moduleTriagem: false, moduleArcoIris: false,
+  });
 
   const copyKioskUrl = (slug: string) => {
     const url = `${window.location.origin}${BASE_URL}/?c=${slug}`;
@@ -103,12 +110,18 @@ export default function CompaniesPage() {
     toast({ title: "URL do quiosque copiada!", description: url });
   };
 
+  const MODULE_LABELS = [
+    { key: "modulePonto", label: "Bater Ponto", icon: Clock, color: "text-blue-400" },
+    { key: "moduleTriagem", label: "Triagem", icon: Stethoscope, color: "text-violet-400" },
+    { key: "moduleArcoIris", label: "Gestão Terapêutica", icon: LayoutDashboard, color: "text-cyan-400" },
+  ] as const;
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Empresas</h1>
-          <p className="text-muted-foreground mt-1">Gerencie todas as empresas cadastradas no sistema.</p>
+          <p className="text-muted-foreground mt-1">Gerencie todas as empresas e seus módulos ativos.</p>
         </div>
         <Button onClick={() => { setShowForm(true); resetForm(); }} className="gap-2">
           <Plus className="w-4 h-4" /> Nova Empresa
@@ -144,6 +157,20 @@ export default function CompaniesPage() {
                 <label className="text-sm font-medium">Bloquear hora extra</label>
               </div>
             </div>
+
+            <div className="mt-5 border-t border-white/10 pt-5">
+              <p className="text-sm font-semibold text-foreground mb-3">Módulos Contratados</p>
+              <div className="flex flex-wrap gap-4">
+                {MODULE_LABELS.map(({ key, label, icon: Icon, color }) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <Switch checked={form[key]} onCheckedChange={v => setForm(f => ({ ...f, [key]: v }))} />
+                    <Icon className={`w-4 h-4 ${color}`} />
+                    <label className="text-sm">{label}</label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="flex gap-3 mt-6">
               <Button onClick={() => createMutation.mutate(form)} disabled={!form.name || !form.slug || createMutation.isPending}>
                 {createMutation.isPending ? "Criando..." : <><Check className="w-4 h-4 mr-2" />Criar Empresa</>}
@@ -188,6 +215,17 @@ export default function CompaniesPage() {
                       <Badge variant={company.active ? "default" : "secondary"} className="text-xs">
                         {company.active ? "Ativo" : "Inativo"}
                       </Badge>
+                    </div>
+
+                    {/* Module badges */}
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      {MODULE_LABELS.map(({ key, label, icon: Icon, color }) => (
+                        company[key] ? (
+                          <span key={key} className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-white/5 border border-white/10 ${color}`}>
+                            <Icon className="w-3 h-3" />{label}
+                          </span>
+                        ) : null
+                      ))}
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 mb-4 text-xs">
@@ -245,6 +283,9 @@ function EditCompanyForm({ company, onSave, onCancel, saving }: {
     overtimeBlockEnabled: company.overtimeBlockEnabled,
     defaultBreakMinutes: company.defaultBreakMinutes,
     active: company.active,
+    modulePonto: company.modulePonto,
+    moduleTriagem: company.moduleTriagem,
+    moduleArcoIris: company.moduleArcoIris,
   });
   return (
     <div className="space-y-3">
@@ -262,6 +303,25 @@ function EditCompanyForm({ company, onSave, onCancel, saving }: {
         <Switch checked={form.active} onCheckedChange={v => setForm(f => ({ ...f, active: v }))} />
         <label className="text-sm">Empresa ativa</label>
       </div>
+
+      <div className="border-t border-white/10 pt-3">
+        <p className="text-xs text-muted-foreground mb-2 font-semibold uppercase tracking-wider">Módulos</p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Switch checked={form.modulePonto} onCheckedChange={v => setForm(f => ({ ...f, modulePonto: v }))} />
+            <label className="text-sm flex items-center gap-1"><Clock className="w-3 h-3 text-blue-400" />Bater Ponto</label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch checked={form.moduleTriagem} onCheckedChange={v => setForm(f => ({ ...f, moduleTriagem: v }))} />
+            <label className="text-sm flex items-center gap-1"><Stethoscope className="w-3 h-3 text-violet-400" />Triagem Multidisciplinar</label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch checked={form.moduleArcoIris} onCheckedChange={v => setForm(f => ({ ...f, moduleArcoIris: v }))} />
+            <label className="text-sm flex items-center gap-1"><LayoutDashboard className="w-3 h-3 text-cyan-400" />Gestão Terapêutica</label>
+          </div>
+        </div>
+      </div>
+
       <div className="flex gap-2 pt-2">
         <Button size="sm" onClick={() => onSave(form)} disabled={saving}><Check className="w-3 h-3 mr-1" />{saving ? "..." : "Salvar"}</Button>
         <Button size="sm" variant="ghost" onClick={onCancel}><X className="w-3 h-3 mr-1" />Cancelar</Button>
