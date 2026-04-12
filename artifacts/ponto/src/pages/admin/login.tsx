@@ -24,7 +24,7 @@ export default function AdminLogin() {
     if (!slug.trim() || !password.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/ponto/auth/company`, {
+      const res = await fetch(`/api/ponto/auth/company`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: slug.trim().toLowerCase(), password }),
@@ -41,6 +41,9 @@ export default function AdminLogin() {
         companyName: company.name,
         companySlug: company.slug,
         adminToken: password,
+        modulePonto: company.modulePonto,
+        moduleTriagem: company.moduleTriagem,
+        moduleArcoIris: company.moduleArcoIris,
       }));
       sessionStorage.setItem("nfs_ponto_admin", "true");
       setLocation("/admin/dashboard");
@@ -56,7 +59,7 @@ export default function AdminLogin() {
     if (!password.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/ponto/auth/master`, {
+      const res = await fetch(`/api/ponto/auth/master`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),

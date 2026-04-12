@@ -50,7 +50,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${BASE_URL}/api/ponto/auth/company`, {
+      const res = await fetch(`/api/ponto/auth/company`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug, password }),
