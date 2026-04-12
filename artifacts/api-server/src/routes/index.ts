@@ -7,6 +7,7 @@ import waitingListRouter from "./waiting-list";
 import triagemRouter from "./triagens";
 import pontoRouter from "./ponto";
 import errorLogsRouter from "./error-logs";
+import whatsappRouter from "./whatsapp";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(waitingListRouter);
 router.use(triagemRouter);
 router.use(pontoRouter);
 router.use(errorLogsRouter);
+router.use("/whatsapp", whatsappRouter);
 
 export default router;

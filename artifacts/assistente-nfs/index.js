@@ -4,6 +4,7 @@ const bodyParser     = require("body-parser");
 const cron           = require("node-cron");
 const QRCode         = require("qrcode");
 const pino           = require("pino");
+const fs             = require("fs");
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -14,6 +15,18 @@ const {
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
+
+// Arquivo de status compartilhado com o servidor API
+const STATUS_FILE = "/tmp/whatsapp_bot_status.json";
+
+function salvarStatus(dados) {
+  try {
+    fs.writeFileSync(STATUS_FILE, JSON.stringify({
+      ...dados,
+      horario: new Date().toLocaleString("pt-BR"),
+    }));
+  } catch (e) { /* silencioso */ }
+}
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -437,13 +450,15 @@ async function conectarWhatsApp() {
     if (qr) {
       statusConexao = "conectando";
       qrCodeBase64  = await QRCode.toDataURL(qr);
-      console.log("📱 Novo QR Code gerado — acesse a tela para escanear.");
+      salvarStatus({ status: "conectando", qrCode: qrCodeBase64, numero: null, sessoes: sessoes.size });
+      console.log("📱 Novo QR Code gerado — acesse: /api/whatsapp/panel");
     }
 
     if (connection === "open") {
       statusConexao   = "conectado";
       qrCodeBase64    = null;
       numeroConectado = sock.user?.id?.split(":")[0] || sock.user?.id;
+      salvarStatus({ status: "conectado", qrCode: null, numero: numeroConectado, sessoes: sessoes.size });
       console.log(`✅ WhatsApp conectado! Número: +${numeroConectado}`);
     }
 
@@ -451,6 +466,7 @@ async function conectarWhatsApp() {
       const codigo    = lastDisconnect?.error?.output?.statusCode;
       const deslogado = codigo === DisconnectReason.loggedOut;
       statusConexao   = deslogado ? "desconectado" : "aguardando";
+      salvarStatus({ status: deslogado ? "desconectado" : "aguardando", qrCode: null, numero: null, sessoes: 0 });
       console.log(`🔴 Desconectado. Código: ${codigo}. Reconectando: ${!deslogado}`);
       if (!deslogado) setTimeout(conectarWhatsApp, 3000);
     }
@@ -545,13 +561,14 @@ cron.schedule("30 9 * * 1-6", async () => {
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   const conectado = statusConexao === "conectado";
-  res.setHeader("Refresh", conectado ? "30" : "5"); // auto-refresh
+  const refreshSeg = conectado ? 30 : 5;
   res.send(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Assistente NFS — ${CLINICA_NOME}</title>
+  <script>setTimeout(() => location.reload(), ${refreshSeg * 1000});</script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
