@@ -7,18 +7,22 @@ import { cn, getStatusColor } from "@/lib/utils";
 
 type Stats = { semanal: number; mensal: number; trimestral: number; semestral: number; anual: number };
 
+const POLL_MS = 30_000; // 30 s
+
 export default function Dashboard() {
-  const { data: patients } = useGetPatients();
-  const { data: professionals } = useGetProfessionals();
-  const { data: todayAppointments } = useGetTodayAppointments();
-  const { data: waitingList } = useGetWaitingList();
+  const { data: patients } = useGetPatients({} as any, { refetchInterval: POLL_MS } as any);
+  const { data: professionals } = useGetProfessionals({} as any, { refetchInterval: POLL_MS } as any);
+  const { data: todayAppointments } = useGetTodayAppointments({} as any, { refetchInterval: POLL_MS } as any);
+  const { data: waitingList } = useGetWaitingList({} as any, { refetchInterval: POLL_MS } as any);
   const [aptStats, setAptStats] = useState<Stats | null>(null);
 
+  const fetchStats = () =>
+    fetch("/api/appointments/stats").then(r => r.json()).then(setAptStats).catch(console.error);
+
   useEffect(() => {
-    fetch("/api/appointments/stats")
-      .then(r => r.json())
-      .then(setAptStats)
-      .catch(console.error);
+    fetchStats();
+    const id = setInterval(fetchStats, POLL_MS);
+    return () => clearInterval(id);
   }, []);
 
   const totalPatients = patients?.length || 0;

@@ -9,7 +9,7 @@ import { getPriorityColor, formatDate } from "@/lib/utils";
 
 export default function WaitingList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { data: waitingList, isLoading } = useGetWaitingList();
+  const { data: waitingList, isLoading } = useGetWaitingList({} as any, { refetchInterval: 20_000 } as any);
   const { data: patients } = useGetPatients();
   const { data: professionals } = useGetProfessionals();
   const createMutation = useCreateWaitingListEntry();
@@ -66,6 +66,16 @@ export default function WaitingList() {
         </Button>
       </div>
 
+      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary/40 border border-border rounded-xl px-4 py-2.5">
+        <span className="font-semibold">Ordenação automática por prioridade:</span>
+        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold border border-rose-200">ALTA</span>
+        <span className="text-muted-foreground">→</span>
+        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold border border-amber-200">MÉDIA</span>
+        <span className="text-muted-foreground">→</span>
+        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">BAIXA</span>
+        <span className="ml-2 text-muted-foreground">• Desempate por data de entrada</span>
+      </div>
+
       <Card className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -111,7 +121,9 @@ export default function WaitingList() {
                         {e.professionalSpecialty || e.professionalName || "Qualquer especialidade"}
                       </td>
                       <td className="px-6 py-4">
-                        <Badge className={getPriorityColor(entry.priority)}>{entry.priority.toUpperCase()}</Badge>
+                        <Badge className={getPriorityColor(entry.priority)}>
+                          {entry.priority === "alta" ? "ALTA" : entry.priority === "media" ? "MÉDIA" : "BAIXA"}
+                        </Badge>
                       </td>
                       <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
                       <td className="px-6 py-4 text-right">

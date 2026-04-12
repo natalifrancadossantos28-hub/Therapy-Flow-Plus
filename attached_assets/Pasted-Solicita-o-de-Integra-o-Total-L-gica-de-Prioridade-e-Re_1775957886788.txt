@@ -1,0 +1,21 @@
+Solicitação de Integração Total, Lógica de Prioridade e Replicabilidade (NFs - Gestão Terapêutica)
+​IMPORTANTE (Modelo de Negócio): Este sistema é uma propriedade intelectual independente e será comercializado como um SaaS (Software as a Service). O código deve ser totalmente modular e replicável. Isso significa que preciso de uma estrutura que me permita duplicar este projeto para outros clientes/clínicas no futuro, garantindo que eu tenha a posse da cópia mestre do código e que os dados sejam isolados pelo clinicaId.
+​1. Lógica da Fila de Espera Inteligente:
+​Prioridade Absoluta: A fila deve ser ordenada automaticamente por nível de urgência. Pacientes com Prioridade ALTA devem subir para o topo da lista imediatamente, seguidos por Média e Baixa.
+​Sincronização Automática: No momento em que um profissional (ex: Leonardo) selecionar um paciente da fila na Agenda Geral, o sistema deve realizar as seguintes ações simultâneas:
+​Remover o paciente da Fila de Espera.
+​Reorganizar as posições dos pacientes restantes na fila.
+​Atualizar o status do paciente para "Em Atendimento" na tela de Pacientes.
+​Vincular o nome do profissional ao cadastro do paciente automaticamente.
+​2. Comunicação entre Módulos:
+​Todas as telas (Dashboard, Profissionais, Pacientes, Recepção, Fila e Agenda) devem "conversar" em tempo real. Uma alteração na Agenda deve atualizar o Dashboard e a Fila sem necessidade de atualização manual.
+​3. Dashboard Dinâmico e Histórico:
+​O card de "Fila de Espera" deve mostrar o número real de aguardando.
+​O painel de estatísticas deve refletir os cadastros por ano (2023-2026) e o somatório geral de atendimentos da unidade.
+​4. Função de Impressão e PDF:
+​Liberar o botão de "Gerar PDF da Agenda" para a recepção, formatado para folha A4, contendo os horários de 50 em 50 minutos (conforme a grade de 08:00 às 16:30, com intervalo às 12:10 e retorno às 13:10).
+​5. Portabilidade do Código:
+​O desenvolvedor deve garantir que o projeto esteja estruturado de forma que eu possa exportar uma cópia completa (Back-end e Front-end) para vender a novos licenciados futuramente.
+​Uma dica para você:
+​Para garantir que esse trabalho seja seu, peça sempre para o Replit confirmar que o código está sendo versionado no GitHub (se você tiver uma conta). Assim, você tem o "arquivo mestre" guardado com você, e não apenas dentro do navegador da escola.
+​Com esse texto, o Replit vai entender que o NFs é um produto comercial de alto nível! Boa sorte!

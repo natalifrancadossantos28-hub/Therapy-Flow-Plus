@@ -94,3 +94,40 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+---
+
+## NFS – Gestão Terapêutica (Product)
+
+This codebase is the master copy of a commercial SaaS therapeutic management system. Key facts:
+
+- **System 1:** `artifacts/arco-iris` — NFS Gestão Terapêutica (main management portal — 8 pages)
+- **System 2:** `artifacts/triagem` — NFs Triagem Multidisciplinar (separate screening app — 80 questions)
+- **API:** `artifacts/api-server` — Express REST API shared by both frontends
+
+### Feature Summary
+- Patients (prontuário, CNS, Nome da Mãe, status lifecycle: pré-cadastro/Atendimento/Alta/Óbito/Desistência)
+- Professionals (PIN-protected agenda access)
+- Weekly Agenda grid (Mon–Fri, 08:00–15:40 @ 50-min slots, lunch 12:10, afternoon resumes 13:10)
+- Waiting List (priority ordering: ALTA → MÉDIA → BAIXA, auto-sync with booking)
+- Reception (attendance tracking, PDF print of daily agenda)
+- Dashboard (patient count by year 2023–2026, appointment stats semanal/mensal/trimestral/semestral/anual)
+- Professional Portal `/agenda-profissionais` (PIN login, booking from waiting list, PDF print)
+- Triagem (80 questions, scoring, patient list, PDF export)
+
+### Real-time Sync
+All modules use React Query with cache invalidation on key mutations (booking, status changes). Dashboard and Waiting List auto-refresh every 30s. Reception auto-refreshes every 20s. Booking from waiting list simultaneously: creates appointment + updates patient status to "Atendimento" + removes from waiting list + links professional to patient.
+
+### SaaS Multi-tenancy Roadmap (future)
+To commercialize this system for multiple clinics (SaaS), the following changes would be needed:
+1. Create a `clinics` table (`id`, `name`, `slug`, `settings`)
+2. Add `clinicId` foreign key to ALL tables (patients, professionals, appointments, waiting_list, triagens)
+3. Add clinic authentication (admin per clinic) — recommended: use Clerk or Replit Auth with clinic context
+4. Filter ALL API queries by `clinicId` from the authenticated session
+5. The code is already modular (monorepo) — duplication of the entire workspace per new client is the simplest short-term approach, full multi-tenant DB isolation is the long-term approach
+
+### DB Schema push
+```bash
+cd lib/db && pnpm run push          # safe push
+cd lib/db && pnpm run push-force    # force push (schema conflicts)
+```

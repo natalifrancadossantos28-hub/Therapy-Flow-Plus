@@ -241,7 +241,8 @@ export default function Reception() {
   const [profIdFilter, setProfIdFilter] = useState<string>("");
   const { data: professionals } = useGetProfessionals();
   const { data: appointments, isLoading } = useGetTodayAppointments(
-    profIdFilter ? { professionalId: parseInt(profIdFilter) } : undefined
+    profIdFilter ? { professionalId: parseInt(profIdFilter) } : undefined,
+    { refetchInterval: 20_000 } as any
   );
   const updateStatus = useUpdateAppointmentStatus();
   const deleteMutation = useDeletePatient();
