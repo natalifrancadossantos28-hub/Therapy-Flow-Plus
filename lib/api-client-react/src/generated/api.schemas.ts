@@ -255,6 +255,57 @@ export interface UpdateWaitingListEntryBody {
   notes?: string | null;
 }
 
+export interface PontoEmployee {
+  id: number;
+  name: string;
+  cpf: string;
+  role: string;
+  /** @nullable */
+  photo: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePontoEmployeeBody {
+  name: string;
+  cpf: string;
+  role: string;
+  /** @nullable */
+  photo?: string | null;
+  active?: boolean;
+}
+
+export interface PontoRecord {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName: string | null;
+  /** @nullable */
+  employeePhoto: string | null;
+  type: string;
+  punchedAt: string;
+  date: string;
+  createdAt: string;
+}
+
+export interface CreatePontoRecordBody {
+  employeeId: number;
+  type: string;
+}
+
+export interface PontoDaySummary {
+  employeeId: number;
+  employeeName: string;
+  /** @nullable */
+  employeePhoto: string | null;
+  role: string;
+  date: string;
+  records: PontoRecord[];
+  /** @nullable */
+  totalHours: string | null;
+}
+
 export type GetProfessionalScheduleParams = {
   date: string;
 };
@@ -297,4 +348,26 @@ export type GetWaitingListParams = {
    * @nullable
    */
   professionalId?: number | null;
+};
+
+export type GetPontoRecordsParams = {
+  /**
+   * @nullable
+   */
+  employeeId?: number | null;
+  /**
+   * @nullable
+   */
+  date?: string | null;
+};
+
+export type GetPontoSummaryParams = {
+  /**
+   * @nullable
+   */
+  date?: string | null;
+  /**
+   * @nullable
+   */
+  employeeId?: number | null;
 };

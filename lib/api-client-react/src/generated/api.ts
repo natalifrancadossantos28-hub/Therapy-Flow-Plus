@@ -21,11 +21,15 @@ import type {
   AppointmentWithDetails,
   CreateAppointmentBody,
   CreatePatientBody,
+  CreatePontoEmployeeBody,
+  CreatePontoRecordBody,
   CreateProfessionalBody,
   CreateWaitingListEntryBody,
   DailySchedule,
   GetAppointmentsParams,
   GetPatientsParams,
+  GetPontoRecordsParams,
+  GetPontoSummaryParams,
   GetProfessionalScheduleParams,
   GetTodayAppointmentsParams,
   GetWaitingListParams,
@@ -33,6 +37,9 @@ import type {
   Patient,
   PatientAbsenceInfo,
   PatientPdfData,
+  PontoDaySummary,
+  PontoEmployee,
+  PontoRecord,
   Professional,
   ProfessionalCapacity,
   UpdateAppointmentStatusBody,
@@ -2174,6 +2181,787 @@ export const useCreateWaitingListEntry = <
 > => {
   return useMutation(getCreateWaitingListEntryMutationOptions(options));
 };
+
+/**
+ * @summary List all employees
+ */
+export const getGetPontoEmployeesUrl = () => {
+  return `/api/ponto/employees`;
+};
+
+export const getPontoEmployees = async (
+  options?: RequestInit,
+): Promise<PontoEmployee[]> => {
+  return customFetch<PontoEmployee[]>(getGetPontoEmployeesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPontoEmployeesQueryKey = () => {
+  return [`/api/ponto/employees`] as const;
+};
+
+export const getGetPontoEmployeesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPontoEmployees>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPontoEmployees>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPontoEmployeesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPontoEmployees>>
+  > = ({ signal }) => getPontoEmployees({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPontoEmployees>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPontoEmployeesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPontoEmployees>>
+>;
+export type GetPontoEmployeesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all employees
+ */
+
+export function useGetPontoEmployees<
+  TData = Awaited<ReturnType<typeof getPontoEmployees>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPontoEmployees>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPontoEmployeesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create employee
+ */
+export const getCreatePontoEmployeeUrl = () => {
+  return `/api/ponto/employees`;
+};
+
+export const createPontoEmployee = async (
+  createPontoEmployeeBody: CreatePontoEmployeeBody,
+  options?: RequestInit,
+): Promise<PontoEmployee> => {
+  return customFetch<PontoEmployee>(getCreatePontoEmployeeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createPontoEmployeeBody),
+  });
+};
+
+export const getCreatePontoEmployeeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPontoEmployee>>,
+    TError,
+    { data: BodyType<CreatePontoEmployeeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPontoEmployee>>,
+  TError,
+  { data: BodyType<CreatePontoEmployeeBody> },
+  TContext
+> => {
+  const mutationKey = ["createPontoEmployee"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPontoEmployee>>,
+    { data: BodyType<CreatePontoEmployeeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPontoEmployee(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePontoEmployeeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPontoEmployee>>
+>;
+export type CreatePontoEmployeeMutationBody = BodyType<CreatePontoEmployeeBody>;
+export type CreatePontoEmployeeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create employee
+ */
+export const useCreatePontoEmployee = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPontoEmployee>>,
+    TError,
+    { data: BodyType<CreatePontoEmployeeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPontoEmployee>>,
+  TError,
+  { data: BodyType<CreatePontoEmployeeBody> },
+  TContext
+> => {
+  return useMutation(getCreatePontoEmployeeMutationOptions(options));
+};
+
+/**
+ * @summary Get employee by id
+ */
+export const getGetPontoEmployeeUrl = (id: number) => {
+  return `/api/ponto/employees/${id}`;
+};
+
+export const getPontoEmployee = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PontoEmployee> => {
+  return customFetch<PontoEmployee>(getGetPontoEmployeeUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPontoEmployeeQueryKey = (id: number) => {
+  return [`/api/ponto/employees/${id}`] as const;
+};
+
+export const getGetPontoEmployeeQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPontoEmployee>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPontoEmployee>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPontoEmployeeQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPontoEmployee>>
+  > = ({ signal }) => getPontoEmployee(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPontoEmployee>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPontoEmployeeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPontoEmployee>>
+>;
+export type GetPontoEmployeeQueryError = ErrorType<void>;
+
+/**
+ * @summary Get employee by id
+ */
+
+export function useGetPontoEmployee<
+  TData = Awaited<ReturnType<typeof getPontoEmployee>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPontoEmployee>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPontoEmployeeQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update employee
+ */
+export const getUpdatePontoEmployeeUrl = (id: number) => {
+  return `/api/ponto/employees/${id}`;
+};
+
+export const updatePontoEmployee = async (
+  id: number,
+  createPontoEmployeeBody: CreatePontoEmployeeBody,
+  options?: RequestInit,
+): Promise<PontoEmployee> => {
+  return customFetch<PontoEmployee>(getUpdatePontoEmployeeUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createPontoEmployeeBody),
+  });
+};
+
+export const getUpdatePontoEmployeeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePontoEmployee>>,
+    TError,
+    { id: number; data: BodyType<CreatePontoEmployeeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updatePontoEmployee>>,
+  TError,
+  { id: number; data: BodyType<CreatePontoEmployeeBody> },
+  TContext
+> => {
+  const mutationKey = ["updatePontoEmployee"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updatePontoEmployee>>,
+    { id: number; data: BodyType<CreatePontoEmployeeBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updatePontoEmployee(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdatePontoEmployeeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updatePontoEmployee>>
+>;
+export type UpdatePontoEmployeeMutationBody = BodyType<CreatePontoEmployeeBody>;
+export type UpdatePontoEmployeeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update employee
+ */
+export const useUpdatePontoEmployee = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePontoEmployee>>,
+    TError,
+    { id: number; data: BodyType<CreatePontoEmployeeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updatePontoEmployee>>,
+  TError,
+  { id: number; data: BodyType<CreatePontoEmployeeBody> },
+  TContext
+> => {
+  return useMutation(getUpdatePontoEmployeeMutationOptions(options));
+};
+
+/**
+ * @summary Delete employee
+ */
+export const getDeletePontoEmployeeUrl = (id: number) => {
+  return `/api/ponto/employees/${id}`;
+};
+
+export const deletePontoEmployee = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeletePontoEmployeeUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeletePontoEmployeeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePontoEmployee>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deletePontoEmployee>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deletePontoEmployee"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deletePontoEmployee>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deletePontoEmployee(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeletePontoEmployeeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deletePontoEmployee>>
+>;
+
+export type DeletePontoEmployeeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete employee
+ */
+export const useDeletePontoEmployee = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePontoEmployee>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deletePontoEmployee>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeletePontoEmployeeMutationOptions(options));
+};
+
+/**
+ * @summary Find employee by CPF (kiosk QR scan)
+ */
+export const getGetPontoEmployeeByCpfUrl = (cpf: string) => {
+  return `/api/ponto/employees/cpf/${cpf}`;
+};
+
+export const getPontoEmployeeByCpf = async (
+  cpf: string,
+  options?: RequestInit,
+): Promise<PontoEmployee> => {
+  return customFetch<PontoEmployee>(getGetPontoEmployeeByCpfUrl(cpf), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPontoEmployeeByCpfQueryKey = (cpf: string) => {
+  return [`/api/ponto/employees/cpf/${cpf}`] as const;
+};
+
+export const getGetPontoEmployeeByCpfQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPontoEmployeeByCpf>>,
+  TError = ErrorType<void>,
+>(
+  cpf: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPontoEmployeeByCpf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPontoEmployeeByCpfQueryKey(cpf);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPontoEmployeeByCpf>>
+  > = ({ signal }) => getPontoEmployeeByCpf(cpf, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!cpf,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPontoEmployeeByCpf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPontoEmployeeByCpfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPontoEmployeeByCpf>>
+>;
+export type GetPontoEmployeeByCpfQueryError = ErrorType<void>;
+
+/**
+ * @summary Find employee by CPF (kiosk QR scan)
+ */
+
+export function useGetPontoEmployeeByCpf<
+  TData = Awaited<ReturnType<typeof getPontoEmployeeByCpf>>,
+  TError = ErrorType<void>,
+>(
+  cpf: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPontoEmployeeByCpf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPontoEmployeeByCpfQueryOptions(cpf, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List punch records
+ */
+export const getGetPontoRecordsUrl = (params?: GetPontoRecordsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/ponto/records?${stringifiedParams}`
+    : `/api/ponto/records`;
+};
+
+export const getPontoRecords = async (
+  params?: GetPontoRecordsParams,
+  options?: RequestInit,
+): Promise<PontoRecord[]> => {
+  return customFetch<PontoRecord[]>(getGetPontoRecordsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPontoRecordsQueryKey = (params?: GetPontoRecordsParams) => {
+  return [`/api/ponto/records`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetPontoRecordsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPontoRecords>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPontoRecordsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPontoRecords>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPontoRecordsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPontoRecords>>> = ({
+    signal,
+  }) => getPontoRecords(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPontoRecords>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPontoRecordsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPontoRecords>>
+>;
+export type GetPontoRecordsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List punch records
+ */
+
+export function useGetPontoRecords<
+  TData = Awaited<ReturnType<typeof getPontoRecords>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPontoRecordsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPontoRecords>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPontoRecordsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Register a punch (entrada or saida)
+ */
+export const getCreatePontoRecordUrl = () => {
+  return `/api/ponto/records`;
+};
+
+export const createPontoRecord = async (
+  createPontoRecordBody: CreatePontoRecordBody,
+  options?: RequestInit,
+): Promise<PontoRecord> => {
+  return customFetch<PontoRecord>(getCreatePontoRecordUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createPontoRecordBody),
+  });
+};
+
+export const getCreatePontoRecordMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPontoRecord>>,
+    TError,
+    { data: BodyType<CreatePontoRecordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPontoRecord>>,
+  TError,
+  { data: BodyType<CreatePontoRecordBody> },
+  TContext
+> => {
+  const mutationKey = ["createPontoRecord"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPontoRecord>>,
+    { data: BodyType<CreatePontoRecordBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPontoRecord(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePontoRecordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPontoRecord>>
+>;
+export type CreatePontoRecordMutationBody = BodyType<CreatePontoRecordBody>;
+export type CreatePontoRecordMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Register a punch (entrada or saida)
+ */
+export const useCreatePontoRecord = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPontoRecord>>,
+    TError,
+    { data: BodyType<CreatePontoRecordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPontoRecord>>,
+  TError,
+  { data: BodyType<CreatePontoRecordBody> },
+  TContext
+> => {
+  return useMutation(getCreatePontoRecordMutationOptions(options));
+};
+
+/**
+ * @summary Espelho de ponto - summary grouped by employee and date
+ */
+export const getGetPontoSummaryUrl = (params?: GetPontoSummaryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/ponto/records/summary?${stringifiedParams}`
+    : `/api/ponto/records/summary`;
+};
+
+export const getPontoSummary = async (
+  params?: GetPontoSummaryParams,
+  options?: RequestInit,
+): Promise<PontoDaySummary[]> => {
+  return customFetch<PontoDaySummary[]>(getGetPontoSummaryUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPontoSummaryQueryKey = (params?: GetPontoSummaryParams) => {
+  return [`/api/ponto/records/summary`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetPontoSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPontoSummary>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPontoSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPontoSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPontoSummaryQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPontoSummary>>> = ({
+    signal,
+  }) => getPontoSummary(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPontoSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPontoSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPontoSummary>>
+>;
+export type GetPontoSummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Espelho de ponto - summary grouped by employee and date
+ */
+
+export function useGetPontoSummary<
+  TData = Awaited<ReturnType<typeof getPontoSummary>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPontoSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPontoSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPontoSummaryQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Update a waiting list entry

@@ -17,6 +17,8 @@ tags:
     description: Appointment scheduling
   - name: waiting-list
     description: Waiting list management
+  - name: ponto
+    description: NFs – Bater Ponto time clock
 paths:
   /healthz:
     get:
@@ -481,6 +483,185 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WaitingListEntry"
+
+  /ponto/employees:
+    get:
+      operationId: getPontoEmployees
+      tags: [ponto]
+      summary: List all employees
+      responses:
+        "200":
+          description: List of employees
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PontoEmployee"
+    post:
+      operationId: createPontoEmployee
+      tags: [ponto]
+      summary: Create employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePontoEmployeeBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PontoEmployee"
+
+  /ponto/employees/{id}:
+    get:
+      operationId: getPontoEmployee
+      tags: [ponto]
+      summary: Get employee by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Employee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PontoEmployee"
+        "404":
+          description: Not found
+    put:
+      operationId: updatePontoEmployee
+      tags: [ponto]
+      summary: Update employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePontoEmployeeBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PontoEmployee"
+    delete:
+      operationId: deletePontoEmployee
+      tags: [ponto]
+      summary: Delete employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /ponto/employees/cpf/{cpf}:
+    get:
+      operationId: getPontoEmployeeByCpf
+      tags: [ponto]
+      summary: Find employee by CPF (kiosk QR scan)
+      parameters:
+        - name: cpf
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Employee found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PontoEmployee"
+        "404":
+          description: Not found
+
+  /ponto/records:
+    get:
+      operationId: getPontoRecords
+      tags: [ponto]
+      summary: List punch records
+      parameters:
+        - name: employeeId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: List of records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PontoRecord"
+    post:
+      operationId: createPontoRecord
+      tags: [ponto]
+      summary: Register a punch (entrada or saida)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePontoRecordBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PontoRecord"
+
+  /ponto/records/summary:
+    get:
+      operationId: getPontoSummary
+      tags: [ponto]
+      summary: Espelho de ponto - summary grouped by employee and date
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: employeeId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PontoDaySummary"
 
   /waiting-list/{id}:
     put:
@@ -994,3 +1175,118 @@ components:
           type: string
         notes:
           type: ["string", "null"]
+
+    PontoEmployee:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        cpf:
+          type: string
+        role:
+          type: string
+        photo:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - cpf
+        - role
+        - photo
+        - active
+        - createdAt
+        - updatedAt
+
+    CreatePontoEmployeeBody:
+      type: object
+      properties:
+        name:
+          type: string
+        cpf:
+          type: string
+        role:
+          type: string
+        photo:
+          type: ["string", "null"]
+        active:
+          type: boolean
+      required:
+        - name
+        - cpf
+        - role
+
+    PontoRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: ["string", "null"]
+        employeePhoto:
+          type: ["string", "null"]
+        type:
+          type: string
+        punchedAt:
+          type: string
+        date:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - employeeId
+        - employeeName
+        - employeePhoto
+        - type
+        - punchedAt
+        - date
+        - createdAt
+
+    CreatePontoRecordBody:
+      type: object
+      properties:
+        employeeId:
+          type: integer
+        type:
+          type: string
+      required:
+        - employeeId
+        - type
+
+    PontoDaySummary:
+      type: object
+      properties:
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        employeePhoto:
+          type: ["string", "null"]
+        role:
+          type: string
+        date:
+          type: string
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/PontoRecord"
+        totalHours:
+          type: ["string", "null"]
+      required:
+        - employeeId
+        - employeeName
+        - employeePhoto
+        - role
+        - date
+        - records
+        - totalHours

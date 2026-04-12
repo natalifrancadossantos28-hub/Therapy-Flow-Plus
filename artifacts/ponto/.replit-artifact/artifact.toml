@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/ponto/"
+title = "NFs – Bater Ponto"
+version = "1.0.0"
+id = "artifacts/ponto"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/ponto/" ]
+localPort = 22875
+
+[services.development]
+run = "pnpm --filter @workspace/ponto run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ponto", "run", "build" ]
+publicDir = "artifacts/ponto/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22875"
+BASE_PATH = "/ponto/"

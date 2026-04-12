@@ -487,6 +487,161 @@ export const CreateWaitingListEntryBody = zod.object({
 });
 
 /**
+ * @summary List all employees
+ */
+export const GetPontoEmployeesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  cpf: zod.string(),
+  role: zod.string(),
+  photo: zod.string().nullable(),
+  active: zod.boolean(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const GetPontoEmployeesResponse = zod.array(
+  GetPontoEmployeesResponseItem,
+);
+
+/**
+ * @summary Create employee
+ */
+export const CreatePontoEmployeeBody = zod.object({
+  name: zod.string(),
+  cpf: zod.string(),
+  role: zod.string(),
+  photo: zod.string().nullish(),
+  active: zod.boolean().optional(),
+});
+
+/**
+ * @summary Get employee by id
+ */
+export const GetPontoEmployeeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetPontoEmployeeResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  cpf: zod.string(),
+  role: zod.string(),
+  photo: zod.string().nullable(),
+  active: zod.boolean(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Update employee
+ */
+export const UpdatePontoEmployeeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdatePontoEmployeeBody = zod.object({
+  name: zod.string(),
+  cpf: zod.string(),
+  role: zod.string(),
+  photo: zod.string().nullish(),
+  active: zod.boolean().optional(),
+});
+
+export const UpdatePontoEmployeeResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  cpf: zod.string(),
+  role: zod.string(),
+  photo: zod.string().nullable(),
+  active: zod.boolean(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete employee
+ */
+export const DeletePontoEmployeeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Find employee by CPF (kiosk QR scan)
+ */
+export const GetPontoEmployeeByCpfParams = zod.object({
+  cpf: zod.coerce.string(),
+});
+
+export const GetPontoEmployeeByCpfResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  cpf: zod.string(),
+  role: zod.string(),
+  photo: zod.string().nullable(),
+  active: zod.boolean(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary List punch records
+ */
+export const GetPontoRecordsQueryParams = zod.object({
+  employeeId: zod.coerce.number().nullish(),
+  date: zod.coerce.string().nullish(),
+});
+
+export const GetPontoRecordsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullable(),
+  employeePhoto: zod.string().nullable(),
+  type: zod.string(),
+  punchedAt: zod.string(),
+  date: zod.string(),
+  createdAt: zod.string(),
+});
+export const GetPontoRecordsResponse = zod.array(GetPontoRecordsResponseItem);
+
+/**
+ * @summary Register a punch (entrada or saida)
+ */
+export const CreatePontoRecordBody = zod.object({
+  employeeId: zod.number(),
+  type: zod.string(),
+});
+
+/**
+ * @summary Espelho de ponto - summary grouped by employee and date
+ */
+export const GetPontoSummaryQueryParams = zod.object({
+  date: zod.coerce.string().nullish(),
+  employeeId: zod.coerce.number().nullish(),
+});
+
+export const GetPontoSummaryResponseItem = zod.object({
+  employeeId: zod.number(),
+  employeeName: zod.string(),
+  employeePhoto: zod.string().nullable(),
+  role: zod.string(),
+  date: zod.string(),
+  records: zod.array(
+    zod.object({
+      id: zod.number(),
+      employeeId: zod.number(),
+      employeeName: zod.string().nullable(),
+      employeePhoto: zod.string().nullable(),
+      type: zod.string(),
+      punchedAt: zod.string(),
+      date: zod.string(),
+      createdAt: zod.string(),
+    }),
+  ),
+  totalHours: zod.string().nullable(),
+});
+export const GetPontoSummaryResponse = zod.array(GetPontoSummaryResponseItem);
+
+/**
  * @summary Update a waiting list entry
  */
 export const UpdateWaitingListEntryParams = zod.object({

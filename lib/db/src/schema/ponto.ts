@@ -1,0 +1,31 @@
+import { pgTable, text, serial, timestamp, boolean, date } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
+
+export const pontoEmployeesTable = pgTable("ponto_employees", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  cpf: text("cpf").notNull().unique(),
+  role: text("role").notNull(),
+  photo: text("photo"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const pontoRecordsTable = pgTable("ponto_records", {
+  id: serial("id").primaryKey(),
+  employeeId: serial("employee_id").references(() => pontoEmployeesTable.id).notNull(),
+  type: text("type").notNull(),
+  punchedAt: timestamp("punched_at", { withTimezone: true }).notNull().defaultNow(),
+  date: date("date").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertPontoEmployeeSchema = createInsertSchema(pontoEmployeesTable).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPontoEmployee = z.infer<typeof insertPontoEmployeeSchema>;
+export type PontoEmployee = typeof pontoEmployeesTable.$inferSelect;
+
+export const insertPontoRecordSchema = createInsertSchema(pontoRecordsTable).omit({ id: true, createdAt: true, punchedAt: true });
+export type InsertPontoRecord = z.infer<typeof insertPontoRecordSchema>;
+export type PontoRecord = typeof pontoRecordsTable.$inferSelect;
