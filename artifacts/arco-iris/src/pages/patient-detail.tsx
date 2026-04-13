@@ -89,7 +89,7 @@ export default function PatientDetail() {
   const [savingTriagem, setSavingTriagem] = useState(false);
 
   const [showFilaModal, setShowFilaModal] = useState(false);
-  const [filaProfId, setFilaProfId] = useState("");
+  const [filaSpecialty, setFilaSpecialty] = useState("");
   const [addingToFila, setAddingToFila] = useState(false);
 
   const handleDownloadPdf = () => {
@@ -173,7 +173,7 @@ export default function PatientDetail() {
     setAddingToFila(true);
     try {
       const result = await apiAddToFila(patientId, {
-        professionalId: filaProfId ? Number(filaProfId) : null,
+        specialty: filaSpecialty || null,
       });
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
@@ -519,10 +519,10 @@ export default function PatientDetail() {
             <div className="space-y-4">
               <div>
                 <Label>Especialidade Preferencial (Opcional)</Label>
-                <Select value={filaProfId} onChange={e => setFilaProfId(e.target.value)}>
+                <Select value={filaSpecialty} onChange={e => setFilaSpecialty(e.target.value)}>
                   <option value="">Qualquer Especialidade</option>
-                  {professionals?.map(p => (
-                    <option key={p.id} value={p.id}>{p.specialty} – {p.name}</option>
+                  {[...new Set(professionals?.map(p => p.specialty).filter(Boolean) ?? [])].map(sp => (
+                    <option key={sp} value={sp}>{sp}</option>
                   ))}
                 </Select>
               </div>

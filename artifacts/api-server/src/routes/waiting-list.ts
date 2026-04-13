@@ -29,6 +29,7 @@ router.get("/waiting-list", async (req, res) => {
     patientPhone: patientsTable.phone,
     patientProntuario: patientsTable.prontuario,
     professionalId: waitingListTable.professionalId,
+    specialty: waitingListTable.specialty,
     professionalName: professionalsTable.name,
     professionalSpecialty: professionalsTable.specialty,
     priority: waitingListTable.priority,
@@ -48,6 +49,7 @@ router.get("/waiting-list", async (req, res) => {
     patientName: r.patientName ?? "",
     patientPhone: r.patientPhone ?? null,
     patientProntuario: r.patientProntuario ?? null,
+    specialty: r.specialty ?? r.professionalSpecialty ?? null,
     professionalName: r.professionalName ?? null,
     professionalSpecialty: r.professionalSpecialty ?? null,
   })));
@@ -55,7 +57,7 @@ router.get("/waiting-list", async (req, res) => {
 
 router.post("/waiting-list", async (req, res) => {
   const companyId = getCompanyId(req);
-  const { patientId, professionalId, priority, notes, entryDate } = req.body;
+  const { patientId, specialty, priority, notes, entryDate } = req.body;
 
   const [patient] = await db.select({ triagemScore: patientsTable.triagemScore })
     .from(patientsTable)
@@ -71,7 +73,8 @@ router.post("/waiting-list", async (req, res) => {
 
   const [row] = await db.insert(waitingListTable).values({
     patientId: Number(patientId),
-    professionalId: professionalId ? Number(professionalId) : null,
+    professionalId: null,
+    specialty: specialty ?? null,
     priority: priority ?? "media",
     notes: notes ?? null,
     entryDate,
@@ -80,40 +83,34 @@ router.post("/waiting-list", async (req, res) => {
 
   const patientInfo = await db.select({ name: patientsTable.name, phone: patientsTable.phone })
     .from(patientsTable).where(eq(patientsTable.id, row.patientId));
-  const prof = row.professionalId
-    ? await db.select({ name: professionalsTable.name }).from(professionalsTable).where(eq(professionalsTable.id, row.professionalId))
-    : [];
 
   res.status(201).json({
     ...row,
     patientName: patientInfo[0]?.name ?? "",
     patientPhone: patientInfo[0]?.phone ?? null,
-    professionalName: prof[0]?.name ?? null,
+    specialty: row.specialty ?? null,
   });
 });
 
 router.put("/waiting-list/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { professionalId, priority, notes } = req.body;
+  const { specialty, priority, notes } = req.body;
   const updateData: Record<string, unknown> = {};
   if (priority !== undefined) updateData.priority = priority;
   if (notes !== undefined) updateData.notes = notes;
-  if (professionalId !== undefined) updateData.professionalId = professionalId;
+  if (specialty !== undefined) updateData.specialty = specialty;
 
   const [row] = await db.update(waitingListTable).set(updateData).where(eq(waitingListTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Entry not found" });
 
   const patient = await db.select({ name: patientsTable.name, phone: patientsTable.phone })
     .from(patientsTable).where(eq(patientsTable.id, row.patientId));
-  const prof = row.professionalId
-    ? await db.select({ name: professionalsTable.name }).from(professionalsTable).where(eq(professionalsTable.id, row.professionalId))
-    : [];
 
   res.json({
     ...row,
     patientName: patient[0]?.name ?? "",
     patientPhone: patient[0]?.phone ?? null,
-    professionalName: prof[0]?.name ?? null,
+    specialty: row.specialty ?? null,
   });
 });
 

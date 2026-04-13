@@ -7,6 +7,7 @@ export const waitingListTable = pgTable("waiting_list", {
   companyId: integer("company_id"),
   patientId: integer("patient_id").notNull(),
   professionalId: integer("professional_id"),
+  specialty: text("specialty"),
   priority: text("priority").notNull().default("media"),
   notes: text("notes"),
   entryDate: text("entry_date").notNull(),

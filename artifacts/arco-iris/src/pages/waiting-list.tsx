@@ -8,11 +8,11 @@ import { getPriorityColor, formatDate } from "@/lib/utils";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
 
-async function apiAddToFila(patientId: number, professionalId: number | null) {
+async function apiAddToFila(patientId: number, specialty: string | null) {
   const res = await fetch(`${BASE_URL}/api/patients/${patientId}/add-to-fila`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ professionalId }),
+    body: JSON.stringify({ specialty }),
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json.message ?? json.error ?? "Erro ao adicionar à fila");
@@ -33,7 +33,7 @@ export default function WaitingList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [formPatientId, setFormPatientId] = useState("");
-  const [formProfId, setFormProfId] = useState("");
+  const [formSpecialty, setFormSpecialty] = useState("");
 
   const { data: waitingList, isLoading } = useGetWaitingList({} as any, { refetchInterval: 20_000 } as any);
   const { data: patients } = useGetPatients();
@@ -51,7 +51,7 @@ export default function WaitingList() {
     return score != null && !alreadyInQueue && !inactiveStatus;
   });
 
-  const resetForm = () => { setFormPatientId(""); setFormProfId(""); };
+  const resetForm = () => { setFormPatientId(""); setFormSpecialty(""); };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +60,7 @@ export default function WaitingList() {
     try {
       const result = await apiAddToFila(
         parseInt(formPatientId),
-        formProfId ? parseInt(formProfId) : null,
+        formSpecialty || null,
       );
       queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
@@ -154,7 +154,7 @@ export default function WaitingList() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">
-                        {e.professionalSpecialty || e.professionalName || "Qualquer especialidade"}
+                        {e.specialty || "Qualquer especialidade"}
                       </td>
                       <td className="px-6 py-4">
                         <Badge className={getPriorityColor(entry.priority)}>
@@ -209,9 +209,11 @@ export default function WaitingList() {
               </div>
               <div>
                 <Label>Especialidade Preferencial (Opcional)</Label>
-                <Select value={formProfId} onChange={e => setFormProfId(e.target.value)}>
+                <Select value={formSpecialty} onChange={e => setFormSpecialty(e.target.value)}>
                   <option value="">Qualquer Especialidade</option>
-                  {professionals?.map(p => <option key={p.id} value={p.id}>{p.specialty} – {p.name}</option>)}
+                  {[...new Set(professionals?.map(p => p.specialty).filter(Boolean) ?? [])].map(sp => (
+                    <option key={sp} value={sp}>{sp}</option>
+                  ))}
                 </Select>
               </div>
               <div className="p-3 bg-secondary/40 rounded-xl text-xs text-muted-foreground">

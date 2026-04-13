@@ -155,11 +155,12 @@ router.post("/patients/:id/add-to-fila", async (req, res) => {
   );
 
   const today = new Date().toISOString().split("T")[0];
-  const professionalId = req.body.professionalId ? Number(req.body.professionalId) : null;
+  const specialty = req.body.specialty ?? null;
 
   const [entry] = await db.insert(waitingListTable).values({
     patientId: id,
-    professionalId,
+    professionalId: null,
+    specialty,
     priority,
     notes: req.body.notes ?? null,
     entryDate: today,
