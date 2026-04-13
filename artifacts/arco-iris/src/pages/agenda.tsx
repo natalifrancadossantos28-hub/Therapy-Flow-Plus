@@ -561,6 +561,7 @@ export default function Agenda() {
           time={bookingSlot.time}
           professionalId={Number(selectedProfId)}
           professionalName={selectedProf?.name || ""}
+          professionalSpecialty={selectedProf?.specialty || ""}
           onClose={() => setBookingSlot(null)}
           onSuccess={() => {
             setBookingSlot(null);

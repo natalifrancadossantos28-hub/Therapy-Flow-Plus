@@ -9,11 +9,13 @@ import { cn } from "@/lib/utils";
 type WaitingEntry = {
   id: number; patientId: number; patientName: string;
   patientProntuario?: string | null; priority: string;
+  specialty?: string | null;
 };
 
 type Props = {
   date: string; time: string;
   professionalId: number; professionalName: string;
+  professionalSpecialty?: string;
   onClose: () => void; onSuccess: () => void;
 };
 
@@ -29,7 +31,17 @@ const PRIORITY_LABELS: Record<string, string> = {
   baixa: "BAIXA",
 };
 
-export default function BookingModal({ date, time, professionalId, professionalName, onClose, onSuccess }: Props) {
+const OPEN_SPECIALTIES = ["qualquer", "qualquer especialidade", "multidisciplinar", "todos", ""];
+
+function matchesSpecialty(entrySpecialty: string | null | undefined, profSpecialty: string): boolean {
+  if (!profSpecialty) return true;
+  const s = (entrySpecialty ?? "").trim().toLowerCase();
+  if (OPEN_SPECIALTIES.includes(s)) return true;
+  return s.includes(profSpecialty.trim().toLowerCase()) ||
+    profSpecialty.trim().toLowerCase().includes(s);
+}
+
+export default function BookingModal({ date, time, professionalId, professionalName, professionalSpecialty = "", onClose, onSuccess }: Props) {
   const [waitingList, setWaitingList] = useState<WaitingEntry[]>([]);
   const [selectedEntryId, setSelectedEntryId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,6 +54,9 @@ export default function BookingModal({ date, time, professionalId, professionalN
       .then(setWaitingList)
       .catch(console.error);
   }, []);
+
+  const filteredList = waitingList.filter(e => matchesSpecialty(e.specialty, professionalSpecialty));
+  const hiddenCount = waitingList.length - filteredList.length;
 
   const selectedEntry = waitingList.find(e => String(e.id) === selectedEntryId);
 
@@ -113,15 +128,32 @@ export default function BookingModal({ date, time, professionalId, professionalN
               Fila de Espera — Selecione o Paciente{" "}
               <span className="font-normal text-muted-foreground text-xs">(ordenada por prioridade)</span>
             </Label>
-            {waitingList.length === 0 ? (
+            {professionalSpecialty && (
+              <div className="mb-3 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground flex items-center gap-2">
+                <span className="font-bold text-primary">Filtro ativo:</span>
+                <span>{professionalSpecialty}</span>
+                {hiddenCount > 0 && (
+                  <span className="ml-auto text-amber-600 font-semibold">
+                    {hiddenCount} paciente{hiddenCount > 1 ? "s" : ""} de outra especialidade ocultado{hiddenCount > 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+            )}
+            {filteredList.length === 0 ? (
               <div className="text-center py-8 bg-secondary/30 rounded-xl border border-border flex flex-col items-center gap-2">
                 <AlertCircle className="w-8 h-8 text-muted-foreground" />
-                <p className="text-muted-foreground font-semibold">Fila de espera vazia</p>
-                <p className="text-sm text-muted-foreground">Não há pacientes aguardando vaga.</p>
+                <p className="text-muted-foreground font-semibold">
+                  {waitingList.length === 0 ? "Fila de espera vazia" : `Nenhum paciente de ${professionalSpecialty} na fila`}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {waitingList.length === 0
+                    ? "Não há pacientes aguardando vaga."
+                    : "Pacientes de outras especialidades foram filtrados."}
+                </p>
               </div>
             ) : (
               <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                {waitingList.map((e, idx) => (
+                {filteredList.map((e, idx) => (
                   <button
                     key={e.id}
                     onClick={() => setSelectedEntryId(String(e.id))}
