@@ -958,7 +958,7 @@ app.post(["/cancel-notify", "/assistente-nfs/cancel-notify"], async (req, res) =
 
     const jid = numeroParaJid(guardianPhone);
     const msg =
-      `Olá, *${guardianName || "Responsável"}*! Aqui é a Carla da NFs Gestão. 😊\n\n` +
+      `Olá, *${guardianName || "Responsável"}*! Aqui é a Recepção. 😊\n\n` +
       `Infelizmente a terapeuta *${professionalName || "da unidade"}* teve um imprevisto e não poderá comparecer hoje.\n\n` +
       `A sessão do(a) *${patientName}* foi cancelada. Entraremos em contato em breve para o reagendamento.${ASSINATURA}`;
 
