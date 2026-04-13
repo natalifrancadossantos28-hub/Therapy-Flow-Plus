@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { db, triagens } from "@workspace/db";
-import { desc, eq, and } from "drizzle-orm";
+import { patientsTable, waitingListTable } from "@workspace/db";
+import { desc, eq, and, sql } from "drizzle-orm";
+import fs from "fs";
 
 const router = Router();
 
@@ -57,6 +59,128 @@ const extractFields = (body: any) => ({
   respostas: body.respostas ? JSON.stringify(body.respostas) : null,
 });
 
+function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "elevado" | "moderado" | "leve" | "baixo" {
+  const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
+  const baseIdx = triagemScore >= 432 ? 3 : triagemScore >= 288 ? 2 : triagemScore >= 144 ? 1 : 0;
+  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0);
+  const idx = Math.min(3, baseIdx + vuln);
+  return levels[idx];
+}
+
+const PRIORITY_LABELS: Record<string, string> = {
+  elevado: "Elevado 🔴",
+  moderado: "Moderado 🟠",
+  leve: "Leve 🔵",
+  baixo: "Baixo 🟢",
+};
+
+function writeCarlaNotification(patientName: string, priority: string) {
+  const label = PRIORITY_LABELS[priority] ?? priority;
+  const entry = {
+    mensagem: `🏥 Nati, triagem concluída! O(a) ${patientName} já está na fila de espera com prioridade ${label}.`,
+    tipo: "triagem",
+    timestamp: new Date().toISOString(),
+  };
+  try {
+    let log: any[] = [];
+    if (fs.existsSync("/tmp/bot_activity.json")) {
+      log = JSON.parse(fs.readFileSync("/tmp/bot_activity.json", "utf-8"));
+    }
+    log.unshift(entry);
+    if (log.length > 50) log = log.slice(0, 50);
+    fs.writeFileSync("/tmp/bot_activity.json", JSON.stringify(log));
+  } catch (e) {
+    console.error("Erro ao escrever notificação Carla:", e);
+  }
+}
+
+async function autoLinkTriagem(row: any, companyId: number | null) {
+  const respostas: number[] = row.respostas ? JSON.parse(row.respostas) : null;
+  if (!Array.isArray(respostas) || respostas.length < 120) return null;
+
+  const triagemScore = respostas.reduce((a: number, b: number) => a + b, 0);
+
+  const AREA_FIELDS = [
+    { field: "scorePsicologia",        start: 0   },
+    { field: "scorePsicomotricidade",  start: 15  },
+    { field: "scoreFisioterapia",      start: 30  },
+    { field: "scoreTO",                start: 45  },
+    { field: "scoreFonoaudiologia",    start: 60  },
+    { field: "scoreNutricionista",     start: 75  },
+    { field: "scorePsicopedagogia",    start: 90  },
+    { field: "scoreEdFisica",          start: 105 },
+  ];
+
+  const areaScores: Record<string, number> = {};
+  for (const { field, start } of AREA_FIELDS) {
+    areaScores[field] = respostas.slice(start, start + 15).reduce((a: number, b: number) => a + b, 0);
+  }
+
+  const escolaPublica = ["Municipal", "Estadual"].includes(row.tipoEscola ?? "");
+  const trabalhoNaRoca = ["Informal/Roça", "Desempregado"].includes(row.trabalhoPais ?? "");
+
+  let patient: any = null;
+
+  const cpfClean = row.cpf?.replace(/\D/g, "");
+  if (cpfClean && cpfClean.length >= 11) {
+    const conditions: any[] = [sql`REGEXP_REPLACE(cpf, '[^0-9]', '', 'g') = ${cpfClean}`];
+    if (companyId) conditions.push(eq(patientsTable.companyId, companyId));
+    const [p] = await db.select().from(patientsTable).where(and(...conditions));
+    patient = p;
+  }
+
+  if (!patient && row.nome) {
+    const conditions: any[] = [sql`LOWER(TRIM(name)) = LOWER(TRIM(${row.nome}))`];
+    if (companyId) conditions.push(eq(patientsTable.companyId, companyId));
+    const [p] = await db.select().from(patientsTable).where(and(...conditions));
+    patient = p;
+  }
+
+  if (!patient) return null;
+
+  await db.update(patientsTable).set({
+    triagemScore,
+    ...areaScores,
+    escolaPublica,
+    trabalhoNaRoca,
+  }).where(eq(patientsTable.id, patient.id));
+
+  const SKIP_STATUSES = new Set(["Alta", "Óbito", "Desistência", "Atendimento", "Fila de Espera"]);
+  if (SKIP_STATUSES.has(patient.status)) {
+    return { patientName: patient.name, linkedOnly: true, scoresUpdated: true };
+  }
+
+  const existing = await db.select({ id: waitingListTable.id })
+    .from(waitingListTable)
+    .where(eq(waitingListTable.patientId, patient.id));
+
+  if (existing.length > 0) {
+    return { patientName: patient.name, linkedOnly: true, scoresUpdated: true };
+  }
+
+  const priority = calcPriority(triagemScore, escolaPublica, trabalhoNaRoca);
+  const today = new Date().toISOString().split("T")[0];
+  const specialty = row.especialidade ?? null;
+
+  await db.insert(waitingListTable).values({
+    patientId: patient.id,
+    professionalId: null,
+    specialty,
+    priority,
+    notes: null,
+    entryDate: today,
+    ...(companyId ? { companyId } : {}),
+  });
+
+  await db.update(patientsTable)
+    .set({ status: "Fila de Espera" })
+    .where(eq(patientsTable.id, patient.id));
+
+  writeCarlaNotification(patient.name, priority);
+
+  return { patientName: patient.name, priority, addedToQueue: true, scoresUpdated: true };
+}
+
 router.get("/triagens", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
@@ -91,7 +215,13 @@ router.post("/triagens", async (req, res) => {
       ...extractFields(req.body),
       ...(companyId ? { companyId } : {}),
     }).returning();
-    res.status(201).json(row);
+
+    const autoResult = await autoLinkTriagem(row, companyId).catch(e => {
+      console.error("Erro na vinculação automática da triagem:", e);
+      return null;
+    });
+
+    res.status(201).json({ ...row, _autoLink: autoResult });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Erro ao salvar triagem" });
@@ -109,6 +239,11 @@ router.put("/triagens/:id", async (req, res) => {
       .where(and(...conditions))
       .returning();
     if (!row) return res.status(404).json({ error: "Triagem não encontrada" });
+
+    await autoLinkTriagem(row, companyId).catch(e => {
+      console.error("Erro na vinculação automática da triagem (PUT):", e);
+    });
+
     res.json(row);
   } catch (err) {
     console.error(err);

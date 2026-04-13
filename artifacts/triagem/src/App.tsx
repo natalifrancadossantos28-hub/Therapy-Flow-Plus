@@ -765,6 +765,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
+  const [autoLink, setAutoLink] = useState<{ patientName?: string; priority?: string; addedToQueue?: boolean; linkedOnly?: boolean } | null>(null);
   const [, navigate] = useLocation();
   const data = new Date().toLocaleDateString("pt-BR");
 
@@ -812,6 +813,9 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
       if (!res.ok && !editId) {
         const { addToOfflineQueue } = await import("./lib/offline-queue");
         addToOfflineQueue(bodyParaSalvar);
+      } else if (res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json?._autoLink) setAutoLink(json._autoLink);
       }
       setSalvo(true);
     } catch {
@@ -1041,10 +1045,22 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
             </button>
           )}
           {!viewOnly && salvo && (
-            <button onClick={() => navigate("/lista")}
-              className="px-6 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
-              ✓ {editId ? "Atualizado!" : "Salvo!"} Ver Pacientes →
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              {autoLink?.addedToQueue && (
+                <div className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold max-w-xs text-right">
+                  ✅ {autoLink.patientName} adicionado(a) à fila de espera automaticamente com prioridade <strong>{autoLink.priority}</strong>
+                </div>
+              )}
+              {autoLink?.linkedOnly && (
+                <div className="px-4 py-2 rounded-xl bg-blue-50 border border-blue-300 text-blue-800 text-xs font-semibold max-w-xs text-right">
+                  🔗 Scores atualizados no prontuário de {autoLink.patientName}
+                </div>
+              )}
+              <button onClick={() => navigate("/lista")}
+                className="px-6 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+                ✓ {editId ? "Atualizado!" : "Salvo!"} Ver Pacientes →
+              </button>
+            </div>
           )}
           {viewOnly && (
             <button onClick={() => navigate("/lista")}
