@@ -1,10 +1,39 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useGetPatients, useGetProfessionals, useGetTodayAppointments, useGetWaitingList } from "@workspace/api-client-react";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, Baby } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor } from "@/lib/utils";
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
+
+// ── Faixas Etárias ────────────────────────────────────────────────────────────
+const FAIXAS = [
+  { key: "bebe",      label: "Bebês",           emoji: "👶", range: "0–2 anos",   min: 0,  max: 2,  cor: "#a78bfa" },
+  { key: "inf1",      label: "1ª Infância",     emoji: "🧒", range: "3–6 anos",   min: 3,  max: 6,  cor: "#34d399" },
+  { key: "inf2",      label: "2ª Infância",     emoji: "🧒", range: "7–10 anos",  min: 7,  max: 10, cor: "#00d4ff" },
+  { key: "adol",      label: "Adolescentes",    emoji: "🧑", range: "11–18 anos", min: 11, max: 18, cor: "#f97316", alerta: true },
+  { key: "adulto",    label: "Adultos",         emoji: "👤", range: "18+ anos",   min: 19, max: 999,cor: "#ff2060" },
+  { key: "sem_data",  label: "Sem data nasc.",  emoji: "❓", range: "—",          min: -1, max: -1, cor: "#64748b" },
+] as const;
+
+function calcIdade(dob: string): number {
+  const d = new Date(dob + "T00:00:00");
+  const hoje = new Date();
+  let a = hoje.getFullYear() - d.getFullYear();
+  const m = hoje.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < d.getDate())) a--;
+  return a;
+}
+
+function faixaDeIdade(dob: string | null | undefined): string {
+  if (!dob) return "sem_data";
+  const idade = calcIdade(dob);
+  for (const f of FAIXAS) {
+    if (f.key === "sem_data") continue;
+    if (idade >= f.min && idade <= f.max) return f.key;
+  }
+  return "sem_data";
+}
 
 type Stats = { semanal: number; mensal: number; trimestral: number; semestral: number; anual: number };
 
@@ -44,6 +73,46 @@ export default function Dashboard() {
   const waitingCount = waitingList?.length || 0;
 
   const absentPatients = patients?.filter(p => p.absenceCount >= 3) || [];
+
+  // ── Censo por faixa etária ────────────────────────────────────────────────
+  const censo = useMemo(() => {
+    const ativos = (patients || []).filter(p =>
+      !["Alta", "Óbito", "Desistência"].includes(p.status)
+    );
+    const counts: Record<string, number> = {};
+    const redeCounts: Record<string, number> = {};
+    for (const f of FAIXAS) { counts[f.key] = 0; redeCounts[f.key] = 0; }
+    for (const p of ativos) {
+      const faixa = faixaDeIdade((p as any).dateOfBirth);
+      counts[faixa] = (counts[faixa] || 0) + 1;
+      if ((p as any).escolaPublica) redeCounts[faixa] = (redeCounts[faixa] || 0) + 1;
+    }
+    const totalAtivos = ativos.length;
+    const totalRede = ativos.filter(p => (p as any).escolaPublica).length;
+    const comData = ativos.filter(p => (p as any).dateOfBirth).length;
+    return { counts, redeCounts, totalAtivos, totalRede, comData };
+  }, [patients]);
+
+  // Pie chart data (só faixas com pacientes)
+  const pieData = FAIXAS
+    .filter(f => f.key !== "sem_data" && censo.counts[f.key] > 0)
+    .map(f => ({ name: f.label, value: censo.counts[f.key], cor: f.cor }));
+
+  // ── Perfil de pacientes por profissional ──────────────────────────────────
+  const profPerfil = useMemo(() => {
+    const perfil: Record<number, Record<string, number>> = {};
+    for (const p of patients || []) {
+      const profId = (p as any).professionalId;
+      if (!profId) continue;
+      if (!perfil[profId]) {
+        for (const f of FAIXAS) { perfil[profId] = {}; }
+        for (const f of FAIXAS) perfil[profId][f.key] = 0;
+      }
+      const faixa = faixaDeIdade((p as any).dateOfBirth);
+      perfil[profId][faixa] = (perfil[profId][faixa] || 0) + 1;
+    }
+    return perfil;
+  }, [patients]);
 
   const triadPatients = (patients || []).filter(p => (p as any).triagemScore != null);
   const avg = (key: string) => triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p as any)[key] || 0), 0) / triadPatients.length) : 0;
@@ -106,6 +175,109 @@ export default function Dashboard() {
           </MotionCard>
         ))}
       </div>
+
+      {/* Censo por Faixa Etária */}
+      <Card className="p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <h2 className="text-xl font-bold font-display flex items-center gap-2">
+            <Baby className="w-5 h-5 text-primary" />
+            Censo por Faixa Etária
+          </h2>
+          <div className="flex gap-3 flex-wrap text-xs font-semibold">
+            <span className="px-3 py-1.5 rounded-xl bg-secondary border border-border text-muted-foreground">
+              🏥 <strong className="text-foreground">{censo.totalAtivos}</strong> ativos
+            </span>
+            <span className="px-3 py-1.5 rounded-xl border" style={{ background: "rgba(52,211,153,0.07)", borderColor: "rgba(52,211,153,0.25)", color: "#34d399" }}>
+              🏫 <strong>{censo.totalRede}</strong> Rede Municipal
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-secondary border border-border text-muted-foreground">
+              📅 {censo.comData} com data nascimento
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {/* Barras neon */}
+          <div className="space-y-3">
+            {FAIXAS.map(f => {
+              const n = censo.counts[f.key] || 0;
+              const rede = censo.redeCounts[f.key] || 0;
+              const pct = censo.totalAtivos > 0 ? Math.round((n / censo.totalAtivos) * 100) : 0;
+              if (n === 0 && f.key === "sem_data") return null;
+              return (
+                <div key={f.key} className="group">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base leading-none">{f.emoji}</span>
+                      <span className="text-sm font-semibold text-foreground">{f.label}</span>
+                      <span className="text-xs text-muted-foreground">({f.range})</span>
+                      {(f as any).alerta && n > 0 && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                          style={{ background: "rgba(249,115,22,0.12)", color: "#f97316", border: "1px solid rgba(249,115,22,0.3)" }}>
+                          ⚠️ Limite
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-lg font-bold font-display" style={{ color: f.cor, textShadow: `0 0 12px ${f.cor}66` }}>{n}</span>
+                      {rede > 0 && <span className="text-xs text-muted-foreground ml-1">({rede} mun.)</span>}
+                    </div>
+                  </div>
+                  <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700" style={{
+                      width: `${pct}%`,
+                      background: `linear-gradient(90deg, ${f.cor}88, ${f.cor})`,
+                      boxShadow: `0 0 10px ${f.cor}66`,
+                    }} />
+                  </div>
+                  {rede > 0 && (
+                    <div className="h-1 bg-secondary rounded-full overflow-hidden mt-0.5 opacity-50">
+                      <div className="h-full rounded-full" style={{
+                        width: `${Math.round((rede / (n || 1)) * 100)}%`,
+                        background: "#34d399",
+                      }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Pizza */}
+          {pieData.length > 0 ? (
+            <div className="flex flex-col items-center">
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={90}
+                      dataKey="value" nameKey="name" paddingAngle={3}>
+                      {pieData.map((entry, i) => (
+                        <Cell key={i} fill={entry.cor}
+                          style={{ filter: `drop-shadow(0 0 8px ${entry.cor}88)` }} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v: any, name: any) => [`${v} pacientes`, name]}
+                      contentStyle={{ background: "hsl(222 50% 8%)", border: "1px solid rgba(0,240,255,0.2)", borderRadius: 12, color: "#e0f0ff" }}
+                    />
+                    <Legend formatter={(v) => <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>{v}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              {censo.totalRede > 0 && (
+                <p className="text-xs text-center text-muted-foreground mt-1">
+                  <span style={{ color: "#34d399" }}>●</span> {censo.totalRede} da Rede Municipal Ibiúna ({Math.round((censo.totalRede / (censo.totalAtivos || 1)) * 100)}% do total)
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-56 text-center">
+              <Baby className="w-10 h-10 text-muted-foreground/30 mb-2" />
+              <p className="text-sm text-muted-foreground">Preencha as datas de nascimento<br/>dos pacientes para ver o gráfico.</p>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Atendimentos Terapêuticos por período */}
       <Card className="p-6">
@@ -289,6 +461,17 @@ export default function Dashboard() {
                     </p>
                   ) : (
                     <p className="text-xs font-semibold" style={{ color: "#00f0ff" }}>✅ Meta atingida</p>
+                  )}
+                  {/* Mini perfil de faixa etária */}
+                  {profPerfil[o.id] && (
+                    <div className="flex flex-wrap gap-1 pt-1 border-t border-border/40">
+                      {FAIXAS.filter(f => f.key !== "sem_data" && (profPerfil[o.id]?.[f.key] || 0) > 0).map(f => (
+                        <span key={f.key} className="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                          style={{ background: `${f.cor}15`, border: `1px solid ${f.cor}40`, color: f.cor }}>
+                          {f.emoji} {profPerfil[o.id]?.[f.key] || 0}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
               );
