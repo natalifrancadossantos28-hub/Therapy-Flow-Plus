@@ -1,0 +1,19 @@
+Vou adicionar essa regra ao nosso plano de gestão. No seu sistema, isso funcionará como um Monitor de Ocupação.
+​Como vai funcionar o Alerta de Agenda:
+​Meta de Atendimento: O sistema terá um "piso" de 28 a 30 pacientes por profissional.
+​Gatilho de Alta: Sempre que um profissional der alta para uma criança ou se houver uma desistência definitiva, o sistema subtrai esse paciente da contagem dele.
+​Alerta Automático: Se o número de pacientes ativos cair para 27 ou menos, o sistema dispara um aviso imediato (pode ser um pop-up ou uma sinalização em destaque no painel):
+​Exemplo de Alerta: "⚠️ Atenção: O profissional [Nome] está com 27 pacientes. Agenda Aberta para novos encaminhamentos."
+​Prioridade na Fila: Quando a Carla identificar uma nova triagem ou um novo paciente vindo do WhatsApp, o sistema já vai sugerir automaticamente o profissional que estiver abaixo da meta.
+​📝 Compilado Atualizado para o seu Sistema (Replit):
+​Aqui está o resumo final com todas as suas solicitações para você ter como guia:
+​Migração Inteligente via WhatsApp: A Carla vai extrair o "Número do Prontuário + Nome" dos contatos e criar o pré-cadastro automático para adiantar o trabalho das 400 crianças.
+​Controle Sequencial: Alerta constante de qual é o próximo número de prontuário disponível (ex: "O próximo é o 401").
+​Gestão de Idade (Limite 11 anos):
+​Verde Neon: Atendimento normal.
+​Laranja Neon (Aos 11 anos): Alerta para preparar encaminhamento/reabilitação.
+​Vermelho Neon (Acima de 11 anos): Fora da faixa de atendimento da Rede Municipal de Ibiúna.
+​Monitor de Produtividade (Meta 28-30):
+​Aviso automático quando um profissional der alta e ficar com menos de 28 pacientes ativos.
+​Sinalização de "Vaga Disponível" para agilizar a entrada de novas crianças da fila de espera.
+​Dica para o Replit: Se você estiver criando o banco de dados agora, peça para o seu código criar uma tabela de Profissionais com uma coluna de contagem_pacientes. Assim, toda vez que um status_paciente mudar para "Alta", o sistema já verifica se deve disparar o alerta de agenda aberta.

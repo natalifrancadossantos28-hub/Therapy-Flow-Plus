@@ -1,0 +1,23 @@
+Plano de Ação: Carla na Gestão do Prontuário e WhatsApp
+​1. Limpeza e Cadastro Automático (O "Pulo do Gato"):
+​O que ela vai fazer: Ao assumir o WhatsApp amanhã, ela vai varrer a lista de contatos. Todo contato que tiver o padrão [Número] + [Nome] será identificado.
+​Ação no Sistema: Ela vai extrair esses dois dados e já criar um "Pré-Cadastro" no seu novo sistema.
+​Exemplo: Se ela ler "402 - Maria Oliveira", ela já abre uma ficha no sistema com: Prontuário: 402 | Nome: Maria Oliveira.
+​Vantagem: Vocês não precisam digitar esses 400 nomes manualmente. Quando a mãe vier pessoalmente, vocês só completam o que faltar (CPF, endereço, etc).
+​2. O Guardião da Numeração (Trabalho de Formiguinha):
+​Aviso de Próximo: Para você não se perder, a cada novo cadastro que você abrir, a Carla dará o alerta: "O último foi o 400, o próximo agora é o 401".
+​Controle de Duplicidade: Se você tentar colocar um número que ela já puxou do WhatsApp, ela te avisa na hora: "O prontuário 380 já existe para o paciente [Nome]".
+​3. Monitoramento de Idade e Rede Municipal (Ibiúna):
+​Alerta de Faixa Etária: O sistema calculará a idade automaticamente.
+​Até 10 anos: Tudo certo.
+​11 anos: Ela coloca um alerta neon laranja: "⚠️ Preparar Encaminhamento (Limite 11 anos)".
+​Passou de 11 anos: Alerta vermelho: "🛑 Fora da faixa - Encaminhar para Reabilitação".
+​Filtro Escolar: Ela vai marcar quem é da Rede Municipal de Ibiúna para garantir a prioridade.
+​📝 Resumo para você copiar e usar como guia (ou mandar para quem estiver te ajudando no Replit):
+​DIRETRIZES DO SISTEMA - UNIDADE DE ATENDIMENTO
+​MIGRAÇÃO WHATSAPP: Extrair "Prontuário + Nome" dos contatos existentes para criar pré-cadastros automáticos.
+​CONTADOR DE PRONTUÁRIO: Gerenciar sequência numérica manual a partir do 400, alertando o próximo número disponível.
+​REGRAS DE NEGÓCIO (IDADE): >    - Público-alvo: Até 11 anos incompletos.
+​Alerta Visual: Aos 11 anos, sinalizar necessidade de transferência para outro setor (Reabilitação).
+​Requisito: Estar matriculado na Rede Municipal de Ibiúna.
+​INTERFACE: Estilo Profissional com destaques em Neon para alertas críticos

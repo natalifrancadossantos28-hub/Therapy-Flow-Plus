@@ -64,6 +64,71 @@ async function buscarPacientePorTelefone(telefone) {
   return rows[0] || null;
 }
 
+async function buscarPorProntuario(prontuario) {
+  const rows = await query(
+    `SELECT id, name FROM patients WHERE company_id = $1 AND prontuario = $2 LIMIT 1`,
+    [COMPANY_ID, String(prontuario)]
+  );
+  return rows[0] || null;
+}
+
+async function criarPreCadastro(prontuario, nome, guardianPhone) {
+  const hoje = new Date().toISOString().split("T")[0];
+  await query(
+    `INSERT INTO patients (company_id, prontuario, name, guardian_phone, status, absence_count, entry_date, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, 'Aguardando Triagem', 0, $5, NOW(), NOW())
+     ON CONFLICT DO NOTHING`,
+    [COMPANY_ID, String(prontuario), nome, guardianPhone || null, hoje]
+  );
+}
+
+// Cache de todos contatos WhatsApp recebidos via contacts.set
+let cacheTodosContatos = [];
+
+// Padrão: "402 - Maria Oliveira" ou "402 – Maria" ou "402 —Maria"
+const PADRAO_CONTATO = /^(\d{2,4})\s*[-–—]\s*(.+)$/;
+
+async function migrarContatosWhatsApp(contacts) {
+  const matches = contacts.filter(c => {
+    const nome = (c.name || c.notify || "").trim();
+    return PADRAO_CONTATO.test(nome);
+  });
+
+  if (matches.length === 0) return { criados: 0, duplicados: 0, total: contacts.length };
+
+  let criados = 0, duplicados = 0;
+  for (const c of matches) {
+    const nome = (c.name || c.notify || "").trim();
+    const m = nome.match(PADRAO_CONTATO);
+    if (!m) continue;
+    const prontuario = m[1].trim();
+    const nomePaciente = m[2].trim();
+    const telefone = limparNumero(c.id || "");
+    try {
+      const existente = await buscarPorProntuario(prontuario);
+      if (existente) { duplicados++; continue; }
+      await criarPreCadastro(prontuario, nomePaciente, telefone || null);
+      // Registra na identificação de contatos
+      if (telefone) {
+        contatosNfs.set(telefone, {
+          label: `${nomePaciente} · NFs`,
+          paciente: nomePaciente,
+          responsavel: null,
+          identificadoEm: new Date().toISOString(),
+        });
+      }
+      criados++;
+    } catch (e) {
+      console.error(`❌ Migração: erro ao processar ${prontuario} - ${nomePaciente}:`, e.message);
+    }
+  }
+  if (criados > 0) salvarContatosNfs();
+  const msg = `📒 Migração WhatsApp: ${criados} pré-cadastros criados, ${duplicados} já existiam (${contacts.length} contatos analisados)`;
+  if (criados > 0 || duplicados > 0) logAtividade(msg, criados > 0 ? "sucesso" : "info");
+  console.log(msg);
+  return { criados, duplicados, total: contacts.length };
+}
+
 async function buscarConsultasData(data) {
   return query(
     `SELECT a.*, p.name AS patient_name, p.guardian_name, p.guardian_phone,
@@ -844,6 +909,25 @@ async function conectarWhatsApp() {
     }
   });
 
+  // Quando WhatsApp sincroniza a lista completa de contatos ao conectar
+  sock.ev.on("contacts.set", async ({ contacts }) => {
+    if (!contacts || contacts.length === 0) return;
+    console.log(`📒 contacts.set: ${contacts.length} contatos recebidos`);
+    cacheTodosContatos = contacts;
+    try { await migrarContatosWhatsApp(contacts); } catch (e) { console.error("Erro migração contacts.set:", e.message); }
+  });
+
+  // Novos contatos chegando incrementalmente
+  sock.ev.on("contacts.upsert", async (contacts) => {
+    if (!contacts || contacts.length === 0) return;
+    // Atualiza cache
+    for (const c of contacts) {
+      const idx = cacheTodosContatos.findIndex(x => x.id === c.id);
+      if (idx >= 0) cacheTodosContatos[idx] = c; else cacheTodosContatos.push(c);
+    }
+    try { await migrarContatosWhatsApp(contacts); } catch (e) { console.error("Erro migração contacts.upsert:", e.message); }
+  });
+
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     console.log(`🔔 [upsert] type=${type} count=${messages.length}`);
     for (const msg of messages) {
@@ -1137,6 +1221,19 @@ app.get(["/atestados", "/assistente-nfs/atestados"], (req, res) => {
     res.json(lista.filter(a => !a.processado));
   } catch (err) {
     res.json([]);
+  }
+});
+
+// Disparar migração manual de contatos do WhatsApp
+app.post(["/migrar-contatos", "/assistente-nfs/migrar-contatos"], async (req, res) => {
+  try {
+    if (cacheTodosContatos.length === 0) {
+      return res.json({ ok: false, mensagem: "Nenhum contato em cache. Aguarde a conexão do WhatsApp." });
+    }
+    const resultado = await migrarContatosWhatsApp(cacheTodosContatos);
+    res.json({ ok: true, ...resultado });
+  } catch (err) {
+    res.status(500).json({ ok: false, erro: err.message });
   }
 });
 

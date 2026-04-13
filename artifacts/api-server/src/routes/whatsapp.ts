@@ -101,6 +101,16 @@ router.post("/identificar-contato", async (req, res) => {
   }
 });
 
+router.post("/migrar-contatos", async (req, res) => {
+  try {
+    const r = await fetch(`${BOT_URL}/migrar-contatos`, { method: "POST" });
+    const data = await r.json();
+    res.json(data);
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
 router.post("/dispensar-contato", async (req, res) => {
   try {
     const r = await fetch(`${BOT_URL}/dispensar-contato`, {

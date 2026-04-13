@@ -75,6 +75,36 @@ router.post("/patients", async (req, res) => {
   res.status(201).json(row);
 });
 
+router.get("/patients/next-prontuario", async (req, res) => {
+  const companyId = getCompanyId(req);
+  const conditions = [];
+  if (companyId) conditions.push(eq(patientsTable.companyId, companyId));
+  const rows = conditions.length
+    ? await db.select({ prontuario: patientsTable.prontuario }).from(patientsTable).where(and(...conditions))
+    : await db.select({ prontuario: patientsTable.prontuario }).from(patientsTable);
+  let max = 399;
+  for (const r of rows) {
+    const n = parseInt((r.prontuario || "").replace(/\D/g, ""), 10);
+    if (!isNaN(n) && n >= 400 && n > max) max = n;
+  }
+  const ultimo = max > 399 ? String(max) : null;
+  res.json({ nextProntuario: String(max + 1), ultimo });
+});
+
+router.get("/patients/check-prontuario/:prontuario", async (req, res) => {
+  const companyId = getCompanyId(req);
+  const prontuario = req.params.prontuario;
+  const conditions = [eq(patientsTable.prontuario, prontuario)];
+  if (companyId) conditions.push(eq(patientsTable.companyId, companyId));
+  const rows = await db.select({ id: patientsTable.id, name: patientsTable.name })
+    .from(patientsTable).where(and(...conditions)).limit(1);
+  if (rows.length > 0) {
+    res.json({ existe: true, paciente: rows[0] });
+  } else {
+    res.json({ existe: false });
+  }
+});
+
 router.get("/patients/:id", async (req, res) => {
   const id = Number(req.params.id);
   const [row] = await db.select().from(patientsTable).where(eq(patientsTable.id, id));
