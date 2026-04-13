@@ -251,6 +251,81 @@ function registrarAtestado(guardianPhone, patientName) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// IDENTIFICAÇÃO AUTOMÁTICA DE CONTATOS
+// ─────────────────────────────────────────────────────────────────────────────
+const CONTATOS_FILE = "/tmp/contatos_nfs.json";
+
+// Mapa em memória: telefone (só dígitos) → { label, paciente, responsavel }
+const contatosNfs = new Map();
+
+// Carrega contatos identificados anteriormente
+(function carregarContatosSalvos() {
+  try {
+    if (fs.existsSync(CONTATOS_FILE)) {
+      const dados = JSON.parse(fs.readFileSync(CONTATOS_FILE, "utf8"));
+      for (const [num, info] of Object.entries(dados)) {
+        contatosNfs.set(num, info);
+      }
+      console.log(`📒 ${contatosNfs.size} contato(s) NFs carregados do cache`);
+    }
+  } catch (e) {
+    console.error("Erro ao carregar contatos_nfs.json:", e.message);
+  }
+})();
+
+function salvarContatosNfs() {
+  try {
+    const obj = {};
+    for (const [k, v] of contatosNfs.entries()) obj[k] = v;
+    fs.writeFileSync(CONTATOS_FILE, JSON.stringify(obj, null, 2));
+  } catch {}
+}
+
+function labelContato(paciente) {
+  const nome = (paciente.guardian_name || paciente.name || "Responsável").trim();
+  const pacienteNome = (paciente.name || "").trim();
+  if (pacienteNome && nome.toLowerCase() !== pacienteNome.toLowerCase()) {
+    return `${nome} — Resp. ${pacienteNome} · NFs`;
+  }
+  return `${nome} · NFs`;
+}
+
+async function identificarContato(jid, paciente) {
+  const num = (jid || "").replace(/@.+$/, "").replace(/\D/g, "");
+  if (!num || !paciente) return;
+
+  const jaConhecido = contatosNfs.has(num);
+  const label = labelContato(paciente);
+
+  // Atualiza ou cria entrada
+  contatosNfs.set(num, {
+    label,
+    paciente: paciente.name,
+    responsavel: paciente.guardian_name,
+    identificadoEm: jaConhecido ? contatosNfs.get(num).identificadoEm : new Date().toISOString(),
+  });
+  salvarContatosNfs();
+
+  // Notifica o Baileys para atualizar seu store interno de contatos
+  if (sock) {
+    try {
+      sock.ev.emit("contacts.update", [{ id: jid, name: label, notify: label }]);
+    } catch {}
+  }
+
+  // Só loga e notifica na PRIMEIRA vez (número não reconhecido anteriormente)
+  if (!jaConhecido) {
+    logAtividade(`🔍 Contato identificado: +${num} → ${label}`, "sucesso");
+    console.log(`🔍 Número +${num} identificado: ${label}`);
+  }
+}
+
+function nomeContato(jid) {
+  const num = (jid || "").replace(/@.+$/, "").replace(/\D/g, "");
+  return contatosNfs.has(num) ? contatosNfs.get(num).label : `+${num}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 function limparNumero(jid) { return (jid || "").replace(/@.+$/, "").replace(/\D/g, ""); }
@@ -546,8 +621,21 @@ async function processarMensagem(jid, mensagem, temAnexo) {
   const isMotorista = ehMotorista(jid);
 
   // Buscar contexto do remetente
+  const eraPrimeiraVez = !sessao.paciente;
   if (!sessao.paciente) {
     sessao.paciente = await buscarPacientePorTelefone(jid);
+    // Identificar e "nomear" o contato automaticamente na primeira mensagem
+    if (sessao.paciente) {
+      await identificarContato(jid, sessao.paciente);
+    } else if (eraPrimeiraVez) {
+      // Número desconhecido — loga para a recepção investigar
+      const numLimpo = limparNumero(jid);
+      if (!contatosNfs.has(numLimpo)) {
+        logAtividade(`❓ Número desconhecido: +${numLimpo} — não encontrado no cadastro`, "aviso");
+        contatosNfs.set(numLimpo, { label: `Desconhecido (+${numLimpo})`, paciente: null, responsavel: null, identificadoEm: new Date().toISOString() });
+        salvarContatosNfs();
+      }
+    }
   }
   if (sessao.consultasHoje.length === 0 && sessao.paciente) {
     sessao.consultasHoje = await buscarConsultasPacienteHoje(sessao.paciente.id);
@@ -782,16 +870,18 @@ async function conectarWhatsApp() {
         msg.message.audioMessage
       );
 
-      console.log(`  📩 [${jid}] texto="${texto}" temAnexo=${temAnexo}`);
+      const nomeLog = nomeContato(jid);
+      console.log(`  📩 [${nomeLog}] texto="${texto}" temAnexo=${temAnexo}`);
+      logAtividade(`💬 ${nomeLog}: ${texto ? texto.substring(0, 60) : "(arquivo)"}`, "info");
 
       if (!texto && !temAnexo) { console.log("  ⏭️  sem texto nem anexo, ignorando"); continue; }
 
       try {
         const resposta = await processarMensagem(jid, texto || "(arquivo enviado)", temAnexo);
-        console.log(`  ✉️  resposta=${resposta?.substring(0, 60)}`);
+        console.log(`  ✉️  [${nomeLog}] resposta=${resposta?.substring(0, 60)}`);
         if (resposta) await enviar(jid, resposta);
       } catch (err) {
-        console.error(`  ❌ Erro processarMensagem: ${err.message}`, err.stack?.split("\n")[1]);
+        console.error(`  ❌ Erro processarMensagem [${nomeLog}]: ${err.message}`, err.stack?.split("\n")[1]);
       }
     }
   });
@@ -1047,6 +1137,40 @@ app.get(["/atestados", "/assistente-nfs/atestados"], (req, res) => {
     res.json(lista.filter(a => !a.processado));
   } catch (err) {
     res.json([]);
+  }
+});
+
+// Contatos identificados automaticamente
+app.get(["/contatos", "/assistente-nfs/contatos"], (req, res) => {
+  const lista = [];
+  for (const [num, info] of contatosNfs.entries()) {
+    lista.push({ telefone: num, ...info });
+  }
+  // Ordenar: conhecidos primeiro, depois desconhecidos
+  lista.sort((a, b) => {
+    const aConhecido = !!a.paciente;
+    const bConhecido = !!b.paciente;
+    if (aConhecido !== bConhecido) return bConhecido ? 1 : -1;
+    return (a.label || "").localeCompare(b.label || "");
+  });
+  res.json(lista);
+});
+
+// Forçar identificação de um número manualmente
+app.post(["/identificar-contato", "/assistente-nfs/identificar-contato"], async (req, res) => {
+  try {
+    const { telefone } = req.body;
+    if (!telefone) return res.status(400).json({ ok: false, erro: "telefone obrigatório" });
+    const jid = numeroParaJid(telefone);
+    const paciente = await buscarPacientePorTelefone(jid);
+    if (paciente) {
+      await identificarContato(jid, paciente);
+      res.json({ ok: true, label: labelContato(paciente), paciente: paciente.name });
+    } else {
+      res.json({ ok: false, mensagem: "Número não encontrado no cadastro de pacientes" });
+    }
+  } catch (err) {
+    res.status(500).json({ ok: false, erro: err.message });
   }
 });
 

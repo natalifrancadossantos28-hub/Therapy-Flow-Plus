@@ -71,6 +71,36 @@ router.get("/atestados", (req, res) => {
   } catch { res.json([]); }
 });
 
+const CONTATOS_FILE = "/tmp/contatos_nfs.json";
+
+router.get("/contatos", (req, res) => {
+  try {
+    if (!fs.existsSync(CONTATOS_FILE)) return res.json([]);
+    const dados: Record<string, any> = JSON.parse(fs.readFileSync(CONTATOS_FILE, "utf8"));
+    const lista = Object.entries(dados).map(([telefone, info]) => ({ telefone, ...(info as object) }));
+    lista.sort((a: any, b: any) => {
+      const aK = !!a.paciente, bK = !!b.paciente;
+      if (aK !== bK) return bK ? 1 : -1;
+      return (a.label || "").localeCompare(b.label || "");
+    });
+    res.json(lista);
+  } catch { res.json([]); }
+});
+
+router.post("/identificar-contato", async (req, res) => {
+  try {
+    const r = await fetch(`${BOT_URL}/identificar-contato`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await r.json();
+    res.json(data);
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
 router.post("/abonar-notify", async (req, res) => {
   try {
     const r = await fetch(`${BOT_URL}/abonar-notify`, {
