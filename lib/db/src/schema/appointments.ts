@@ -13,6 +13,7 @@ export const appointmentsTable = pgTable("appointments", {
   notes: text("notes"),
   rescheduledTo: text("rescheduled_to"),
   recurrenceGroupId: text("recurrence_group_id"),
+  frequency: text("frequency").default("semanal"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

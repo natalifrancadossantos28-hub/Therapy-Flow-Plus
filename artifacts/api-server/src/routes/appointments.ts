@@ -13,12 +13,27 @@ function getCompanyId(req: any): number | null {
   return isNaN(n) ? null : n;
 }
 
-function addWeeksToDate(dateStr: string, weeks: number): string {
+function addDaysToDate(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
-  dt.setDate(dt.getDate() + weeks * 7);
+  dt.setDate(dt.getDate() + days);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 }
+
+function addWeeksToDate(dateStr: string, weeks: number): string {
+  return addDaysToDate(dateStr, weeks * 7);
+}
+
+// ISO week number (1-53)
+function isoWeekNumber(dateStr: string): number {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const week1 = new Date(d.getFullYear(), 0, 4);
+  return 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+}
+
+export { isoWeekNumber };
 
 router.get("/appointments/today", async (req, res) => {
   const companyId = getCompanyId(req);
@@ -39,6 +54,7 @@ router.get("/appointments/today", async (req, res) => {
     notes: appointmentsTable.notes,
     rescheduledTo: appointmentsTable.rescheduledTo,
     recurrenceGroupId: appointmentsTable.recurrenceGroupId,
+    frequency: appointmentsTable.frequency,
     patientName: patientsTable.name,
     patientPhone: patientsTable.phone,
     patientAbsenceCount: patientsTable.absenceCount,
@@ -53,14 +69,20 @@ router.get("/appointments/today", async (req, res) => {
     .where(and(...conditions))
     .orderBy(appointmentsTable.time);
 
-  res.json(rows.map(r => ({
-    ...r,
-    patientName: r.patientName ?? "",
-    patientPhone: r.patientPhone ?? null,
-    patientAbsenceCount: r.patientAbsenceCount ?? 0,
-    professionalName: r.professionalName ?? "",
-    professionalSpecialty: r.professionalSpecialty ?? "",
-  })));
+  res.json(rows.map(r => {
+    const ciclo = r.frequency === "quinzenal"
+      ? (isoWeekNumber(r.date) % 2 === 1 ? "A" : "B")
+      : r.frequency === "mensal" ? "M" : null;
+    return {
+      ...r,
+      ciclo,
+      patientName: r.patientName ?? "",
+      patientPhone: r.patientPhone ?? null,
+      patientAbsenceCount: r.patientAbsenceCount ?? 0,
+      professionalName: r.professionalName ?? "",
+      professionalSpecialty: r.professionalSpecialty ?? "",
+    };
+  }));
 });
 
 router.get("/appointments/stats", async (req, res) => {
@@ -129,23 +151,70 @@ router.get("/appointments", async (req, res) => {
   res.json(rows);
 });
 
+// GET /appointments/next — próximo agendamento futuro de um paciente/profissional
+router.get("/appointments/next", async (req, res) => {
+  const today = new Date().toISOString().split("T")[0];
+  const conditions: any[] = [gte(appointmentsTable.date, today), eq(appointmentsTable.status, "agendado")];
+  if (req.query.patientId) conditions.push(eq(appointmentsTable.patientId, Number(req.query.patientId)));
+  if (req.query.professionalId) conditions.push(eq(appointmentsTable.professionalId, Number(req.query.professionalId)));
+
+  const [next] = await db.select({
+    id: appointmentsTable.id,
+    date: appointmentsTable.date,
+    time: appointmentsTable.time,
+    frequency: appointmentsTable.frequency,
+    patientId: appointmentsTable.patientId,
+    professionalId: appointmentsTable.professionalId,
+    patientName: patientsTable.name,
+    professionalName: professionalsTable.name,
+  })
+    .from(appointmentsTable)
+    .leftJoin(patientsTable, eq(appointmentsTable.patientId, patientsTable.id))
+    .leftJoin(professionalsTable, eq(appointmentsTable.professionalId, professionalsTable.id))
+    .where(and(...conditions))
+    .orderBy(appointmentsTable.date, appointmentsTable.time)
+    .limit(1);
+
+  if (!next) return res.json(null);
+
+  // Calcula Semana A ou B
+  const week = isoWeekNumber(next.date);
+  const ciclo = (next.frequency === "quinzenal") ? (week % 2 === 1 ? "A" : "B") : null;
+  res.json({ ...next, ciclo });
+});
+
 router.post("/appointments", async (req, res) => {
   const companyId = getCompanyId(req);
-  const { patientId, professionalId, date, time, notes, fromWaitingList, noRecurrence } = req.body;
+  const { patientId, professionalId, date, time, notes, fromWaitingList, noRecurrence, frequency } = req.body;
 
+  const freq: "semanal" | "quinzenal" | "mensal" = frequency || "semanal";
   const recurrenceGroupId = randomUUID();
-  const WEEKS = noRecurrence ? 1 : 52;
 
-  const records = Array.from({ length: WEEKS }, (_, i) => ({
-    patientId: Number(patientId),
-    professionalId: Number(professionalId),
-    date: addWeeksToDate(date, i),
-    time,
-    status: "agendado" as const,
-    notes: notes ?? null,
-    recurrenceGroupId: WEEKS > 1 ? recurrenceGroupId : null,
-    ...(companyId ? { companyId } : {}),
-  }));
+  let records: any[];
+  if (noRecurrence) {
+    records = [{
+      patientId: Number(patientId),
+      professionalId: Number(professionalId),
+      date, time, status: "agendado" as const,
+      notes: notes ?? null,
+      recurrenceGroupId: null,
+      frequency: freq,
+      ...(companyId ? { companyId } : {}),
+    }];
+  } else {
+    const stepDays = freq === "quinzenal" ? 14 : freq === "mensal" ? 28 : 7;
+    const total = freq === "quinzenal" ? 26 : freq === "mensal" ? 13 : 52;
+    records = Array.from({ length: total }, (_, i) => ({
+      patientId: Number(patientId),
+      professionalId: Number(professionalId),
+      date: addDaysToDate(date, i * stepDays),
+      time, status: "agendado" as const,
+      notes: notes ?? null,
+      recurrenceGroupId,
+      frequency: freq,
+      ...(companyId ? { companyId } : {}),
+    }));
+  }
 
   const inserted = await db.insert(appointmentsTable).values(records).returning();
   const firstRow = inserted[0];

@@ -1,0 +1,20 @@
+Como você pediu, a Carla agora está configurada para gerenciar essa "dança" das cadeiras de forma inteligente. Veja como ficou o ajuste para a Nutri, a Fono e para qualquer outro profissional que você cadastrar:
+​1. Sistema de "Ciclos de Atendimento"
+​Em vez de uma agenda travada, o sistema agora trabalha com Frequência Configurável:
+​Semanal: Ocupa o mesmo horário toda semana (padrão da maioria).
+​Quinzenal (Semana A / Semana B): O sistema entende que o horário das 09:00 na segunda-feira pertence ao "Paciente 1" na semana 1 e ao "Paciente 2" na semana 2. Ele alterna isso automaticamente.
+​Mensal: O sistema reserva aquele horário apenas uma vez por mês e deixa as outras semanas livres para outros encaixes ou avaliações.
+​2. Sincronização Automática
+​Você não precisará ajustar a agenda manualmente toda semana. O sistema fará assim:
+​A Carla vai olhar o histórico. Se a Fono atendeu o João hoje (dia 13), daqui a 7 dias ela vai mostrar a agenda da "Semana B" (com a outra criança). Daqui a 14 dias, ela traz o João de volta para a tela automaticamente.
+​Aviso de Próximo: No painel do profissional, aparecerá: "Próximo atendimento deste paciente: 27/04".
+​3. Meta de Ocupação Inteligente (28-30 pacientes)
+​Isso resolve o problema da meta! Para profissionais quinzenais, a Carla vai somar os pacientes de todas as semanas do ciclo para calcular a produtividade. Assim, mesmo atendendo cada um a cada 15 dias, a meta de 28 a 30 pacientes ativos será contabilizada corretamente.
+​4. Data e Hora 100% Atualizadas
+​Conforme combinamos, o sistema agora está "acordado". Amanhã, Segunda-feira, 13 de Abril de 2026, ele iniciará com:
+​Data e hora exatas de Brasília.
+​O calendário semanal pronto para receber os primeiros nomes do WhatsApp.
+​O visual Neon destacando quem é o paciente do dia e quem é o da semana seguinte.
+​📝 Resumo do "Pacote de Venda" (Para o futuro):
+​Seu sistema agora tem um diferencial enorme: Gestão de Agendas Multimodais. Isso é perfeito para clínicas que têm nutricionistas, fonoaudiólogos e médicos especialistas que não vêm toda semana.
+​Tudo pronto, Nati! Pode descansar tranquila. Amanhã, quando você abrir o sistema, a Carla já terá essa lógica instalada e as datas estarão certinhas.

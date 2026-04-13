@@ -41,9 +41,16 @@ function matchesSpecialty(entrySpecialty: string | null | undefined, profSpecial
     profSpecialty.trim().toLowerCase().includes(s);
 }
 
+const FREQUENCY_OPTIONS = [
+  { value: "semanal",   label: "Semanal",   desc: "Toda semana — 52 sessões/ano", icon: "📅" },
+  { value: "quinzenal", label: "Quinzenal", desc: "A cada 14 dias — Semana A e B", icon: "🔄" },
+  { value: "mensal",    label: "Mensal",    desc: "Uma vez por mês — 13 sessões/ano", icon: "📆" },
+];
+
 export default function BookingModal({ date, time, professionalId, professionalName, professionalSpecialty = "", onClose, onSuccess }: Props) {
   const [waitingList, setWaitingList] = useState<WaitingEntry[]>([]);
   const [selectedEntryId, setSelectedEntryId] = useState("");
+  const [frequency, setFrequency] = useState<"semanal" | "quinzenal" | "mensal">("semanal");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
@@ -73,6 +80,7 @@ export default function BookingModal({ date, time, professionalId, professionalN
           professionalId,
           date,
           time,
+          frequency,
           fromWaitingList: true,
         }),
       });
@@ -184,6 +192,40 @@ export default function BookingModal({ date, time, professionalId, professionalN
             )}
           </div>
 
+          {/* Frequência de atendimento */}
+          <div>
+            <Label className="mb-2 block font-semibold">Frequência de Atendimento</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {FREQUENCY_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setFrequency(opt.value as any)}
+                  className={cn(
+                    "flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-all text-xs",
+                    frequency === opt.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-secondary/30 text-muted-foreground hover:border-primary/40"
+                  )}
+                >
+                  <span className="text-lg leading-none">{opt.icon}</span>
+                  <span className="font-bold text-xs">{opt.label}</span>
+                  <span className="text-[10px] leading-tight opacity-70">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+            {frequency === "quinzenal" && (
+              <p className="mt-2 text-xs text-muted-foreground px-1">
+                🔄 O sistema alternará automaticamente entre <strong>Semana A</strong> e <strong>Semana B</strong> a cada 14 dias.
+              </p>
+            )}
+            {frequency === "mensal" && (
+              <p className="mt-2 text-xs text-muted-foreground px-1">
+                📆 Agendamento mensal — ideal para Nutrição e Fonoaudiologia de manutenção.
+              </p>
+            )}
+          </div>
+
           {selectedEntry && (
             <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-sm">
               <p className="font-bold text-foreground">{selectedEntry.patientName}</p>
@@ -191,7 +233,8 @@ export default function BookingModal({ date, time, professionalId, professionalN
                 <p className="text-xs text-muted-foreground font-mono">{selectedEntry.patientProntuario}</p>
               )}
               <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                Ao confirmar: o paciente é <strong>removido da fila</strong>, seu status muda para <strong>Atendimento</strong> e o profissional <strong>{professionalName}</strong> é vinculado ao cadastro.
+                Ao confirmar: o paciente é <strong>removido da fila</strong>, status muda para <strong>Atendimento</strong>, profissional <strong>{professionalName}</strong> vinculado.
+                {frequency !== "semanal" && <span className="ml-1">Frequência: <strong>{FREQUENCY_OPTIONS.find(o => o.value === frequency)?.label}</strong>.</span>}
               </p>
             </div>
           )}
