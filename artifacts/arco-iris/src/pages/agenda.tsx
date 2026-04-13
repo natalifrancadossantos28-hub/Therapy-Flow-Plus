@@ -1,9 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useGetProfessionals } from "@workspace/api-client-react";
 import { Card, Select, Button, Label } from "@/components/ui-custom";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink, X, MessageCircle, CheckCircle } from "lucide-react";
+import {
+  Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
+  X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle
+} from "lucide-react";
 import { cn, getStatusColor } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -31,15 +34,93 @@ type Appointment = {
   date: string;
   time: string;
   status: string;
+  recurrenceGroupId?: string | null;
 };
 
 type CancelDialog = {
   apt: Appointment;
   profName: string;
-  originalStatus: string; // status antes do cancelamento, para revert
+  originalStatus: string;
 };
 
-const CANCELABLE = new Set(["agendado", "presente", "atendimento", "remarcado"]);
+type RemanejFlow = {
+  apt: Appointment;
+  step: "slot" | "carla";
+  newDate?: string;
+  newTime?: string;
+};
+
+// ── Neon button styles ──────────────────────────────────────────────
+const NEON: Record<string, React.CSSProperties> = {
+  green: {
+    background: "rgba(5,10,5,0.92)",
+    border: "1px solid #22c55e",
+    color: "#4ade80",
+    boxShadow: "0 0 14px rgba(34,197,94,0.55), inset 0 0 8px rgba(34,197,94,0.12)",
+    textShadow: "0 0 8px rgba(74,222,128,0.9)",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    fontWeight: 700,
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    width: "100%",
+    transition: "all 0.15s",
+  },
+  orange: {
+    background: "rgba(10,5,0,0.92)",
+    border: "1px solid #f97316",
+    color: "#fb923c",
+    boxShadow: "0 0 14px rgba(249,115,22,0.55), inset 0 0 8px rgba(249,115,22,0.12)",
+    textShadow: "0 0 8px rgba(251,146,60,0.9)",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    fontWeight: 700,
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    width: "100%",
+    transition: "all 0.15s",
+  },
+  blue: {
+    background: "rgba(0,5,15,0.92)",
+    border: "1px solid #3b82f6",
+    color: "#60a5fa",
+    boxShadow: "0 0 14px rgba(59,130,246,0.55), inset 0 0 8px rgba(59,130,246,0.12)",
+    textShadow: "0 0 8px rgba(96,165,250,0.9)",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    fontWeight: 700,
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    width: "100%",
+    transition: "all 0.15s",
+  },
+  red: {
+    background: "rgba(10,0,0,0.92)",
+    border: "1px solid #ef4444",
+    color: "#f87171",
+    boxShadow: "0 0 14px rgba(239,68,68,0.55), inset 0 0 8px rgba(239,68,68,0.12)",
+    textShadow: "0 0 8px rgba(248,113,113,0.9)",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    fontWeight: 700,
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    width: "100%",
+    transition: "all 0.15s",
+  },
+};
 
 const isAdminSession = () => sessionStorage.getItem("nfs_admin_auth") === "true";
 
@@ -56,6 +137,12 @@ export default function Agenda() {
   const [cancelDialog, setCancelDialog] = useState<CancelDialog | null>(null);
   const [notifySending, setNotifySending] = useState(false);
   const [notifyDone, setNotifyDone] = useState(false);
+  const [actionMenuId, setActionMenuId] = useState<number | null>(null);
+  const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
+  const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
+  const [remanejSending, setRemanejSending] = useState(false);
+  const [remanejDone, setRemanejDone] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { data: professionals } = useGetProfessionals();
   const { toast } = useToast();
 
@@ -65,13 +152,26 @@ export default function Agenda() {
 
   const fetchAppointments = () => {
     if (!selectedProfId) return;
-    fetch(`/api/appointments?professionalId=${selectedProfId}`)
+    const from = weekDates[0];
+    const to = weekDates[4];
+    fetch(`/api/appointments?professionalId=${selectedProfId}&dateFrom=${from}&dateTo=${to}`)
       .then(r => r.json()).then(setAppointments).catch(console.error);
   };
 
   useEffect(() => {
     if (canView && selectedProfId) fetchAppointments();
   }, [selectedProfId, canView]);
+
+  // Close action menu on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActionMenuId(null);
+      }
+    };
+    if (actionMenuId !== null) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [actionMenuId]);
 
   const handleProfChange = (id: string) => {
     setSelectedProfId(id);
@@ -93,23 +193,41 @@ export default function Agenda() {
     finally { setPinLoading(false); }
   };
 
-  const handleCancelClick = async (apt: Appointment, profName: string) => {
-    if (!CANCELABLE.has(apt.status.toLowerCase())) return;
-    const originalStatus = apt.status;
+  // ── Patch status (single occurrence) ──
+  const patchStatus = async (apt: Appointment, status: string) => {
+    await fetch(`/api/appointments/${apt.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
+  };
+
+  // ── Atendimento ──
+  const handleAtendimento = async (apt: Appointment) => {
+    setActionMenuId(null);
     try {
-      await fetch(`/api/appointments/${apt.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "desmarcado" }),
-      });
-      setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: "desmarcado" } : a));
-      setNotifyDone(false);
-      setCancelDialog({ apt: { ...apt, status: "desmarcado" }, profName, originalStatus });
+      await patchStatus(apt, "atendimento");
+      toast({ title: "Em Atendimento", description: `${apt.patientName} confirmado na sessão.` });
     } catch {
-      toast({ title: "Erro", description: "Não foi possível cancelar o agendamento.", variant: "destructive" });
+      toast({ title: "Erro", description: "Não foi possível atualizar.", variant: "destructive" });
     }
   };
 
+  // ── Desmarcado (single date) ──
+  const handleDesmarcado = async (apt: Appointment, profName: string) => {
+    setActionMenuId(null);
+    const originalStatus = apt.status;
+    try {
+      await patchStatus(apt, "desmarcado");
+      setNotifyDone(false);
+      setCancelDialog({ apt: { ...apt, status: "desmarcado" }, profName, originalStatus });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível desmarcar.", variant: "destructive" });
+    }
+  };
+
+  // ── Reverter desmarcado ──
   const handleRevertClick = async (apt: Appointment) => {
     const revertTo = cancelDialog?.originalStatus || "agendado";
     try {
@@ -122,10 +240,81 @@ export default function Agenda() {
       setCancelDialog(null);
       toast({ title: "Revertido", description: `Agendamento voltou para "${revertTo}".` });
     } catch {
-      toast({ title: "Erro", description: "Não foi possível reverter o agendamento.", variant: "destructive" });
+      toast({ title: "Erro", description: "Não foi possível reverter.", variant: "destructive" });
     }
   };
 
+  // ── Dar Alta ──
+  const handleDarAlta = (apt: Appointment) => {
+    setActionMenuId(null);
+    setAltaConfirm(apt);
+  };
+
+  const confirmDarAlta = async () => {
+    if (!altaConfirm) return;
+    try {
+      await fetch(`/api/appointments/${altaConfirm.id}/alta`, { method: "DELETE" });
+      setAppointments(prev => prev.filter(a =>
+        a.id !== altaConfirm.id &&
+        !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.date >= altaConfirm.date)
+      ));
+      setAltaConfirm(null);
+      toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado permanentemente.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
+    }
+  };
+
+  // ── Remanejar ──
+  const handleStartRemanejar = (apt: Appointment) => {
+    setActionMenuId(null);
+    setRemanejFlow({ apt, step: "slot" });
+    setRemanejDone(false);
+  };
+
+  const handlePickRemanejSlot = (newDate: string, newTime: string) => {
+    if (!remanejFlow) return;
+    setRemanejFlow({ ...remanejFlow, step: "carla", newDate, newTime });
+  };
+
+  const confirmRemanejar = async (notifyCarla: boolean) => {
+    if (!remanejFlow?.newDate || !remanejFlow?.newTime) return;
+    setRemanejSending(true);
+    try {
+      await fetch(`/api/appointments/${remanejFlow.apt.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: remanejFlow.newDate, time: remanejFlow.newTime, status: "remarcado" }),
+      });
+      setAppointments(prev => prev.map(a =>
+        a.id === remanejFlow.apt.id
+          ? { ...a, date: remanejFlow.newDate!, time: remanejFlow.newTime!, status: "remarcado" }
+          : a
+      ));
+      if (notifyCarla && remanejFlow.apt.guardianPhone) {
+        const dayLabel = weekDays.find(d => format(d, "yyyy-MM-dd") === remanejFlow.newDate);
+        const dayStr = dayLabel ? format(dayLabel, "EEEE dd/MM", { locale: ptBR }) : remanejFlow.newDate;
+        await fetch("/api/whatsapp/cancel-notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            guardianPhone: remanejFlow.apt.guardianPhone,
+            guardianName: remanejFlow.apt.guardianName || "Responsável",
+            patientName: remanejFlow.apt.patientName || "Paciente",
+            professionalName: selectedProf?.name || "",
+            remanejadoPara: `${dayStr} às ${remanejFlow.newTime}`,
+          }),
+        });
+      }
+      setRemanejDone(true);
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível remanejar.", variant: "destructive" });
+    } finally {
+      setRemanejSending(false);
+    }
+  };
+
+  // ── Cancel notification (Carla) ──
   const sendCancelNotification = async () => {
     if (!cancelDialog) return;
     const { apt, profName } = cancelDialog;
@@ -161,6 +350,11 @@ export default function Agenda() {
 
   const getApt = (date: string, time: string) => appointments.find(a => a.date === date && a.time === time);
   const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
+
+  // Available slots for remanejar (no appointment in that slot)
+  const availableSlots = weekDates.flatMap(date =>
+    TIME_SLOTS.filter(t => t !== "12:10" && !getApt(date, t)).map(time => ({ date, time }))
+  );
 
   return (
     <div className="space-y-8">
@@ -231,7 +425,7 @@ export default function Agenda() {
           {selectedProf && (
             <div className="px-6 py-4 border-b border-border bg-primary/5">
               <p className="font-bold text-foreground text-lg">{selectedProf.name}</p>
-              <p className="text-sm text-muted-foreground">{selectedProf.specialty}</p>
+              <p className="text-sm text-muted-foreground">{selectedProf.specialty} — Agendamento recorrente automático (52 semanas)</p>
             </div>
           )}
           <div className="overflow-x-auto">
@@ -240,7 +434,7 @@ export default function Agenda() {
                 <tr>
                   <th className="px-4 py-4 w-24 sticky left-0 bg-secondary/90 backdrop-blur z-10 border-r border-border">Horário</th>
                   {weekDays.map((d, i) => (
-                    <th key={i} className="px-4 py-4 text-center min-w-[140px]">
+                    <th key={i} className="px-4 py-4 text-center min-w-[150px]">
                       <span className="font-bold text-foreground capitalize">{format(d, "EEEE", { locale: ptBR })}</span>
                       <div className="font-normal mt-0.5">{format(d, "dd/MM")}</div>
                     </th>
@@ -259,50 +453,90 @@ export default function Agenda() {
                         weekDates.map((date, i) => {
                           const apt = getApt(date, time);
                           const isDesmarcado = apt?.status?.toLowerCase() === "desmarcado";
-                          const isCancelable = apt && CANCELABLE.has(apt.status.toLowerCase());
+                          const isAtendimento = apt?.status?.toLowerCase() === "atendimento";
+                          const isRemarcado = apt?.status?.toLowerCase() === "remarcado";
+                          const isMenuOpen = apt && actionMenuId === apt.id;
+
                           return (
-                            <td key={i} className="px-4 py-3">
+                            <td key={i} className="px-3 py-2 relative">
                               {apt ? (
-                                <div
-                                  className={cn(
-                                    "p-2 rounded-xl border flex flex-col gap-1 transition-all",
-                                    isDesmarcado
-                                      ? "bg-red-50 border-red-300 shadow-sm"
-                                      : "bg-white border-border/50 shadow-sm",
-                                    isCancelable && "cursor-pointer hover:border-red-300 hover:bg-red-50/60 group",
-                                    isDesmarcado && "cursor-pointer hover:bg-green-50 hover:border-green-300 group"
-                                  )}
-                                  onClick={() => {
-                                    if (isDesmarcado) handleRevertClick(apt);
-                                    else if (isCancelable) handleCancelClick(apt, selectedProf?.name || "");
-                                  }}
-                                  title={isDesmarcado ? "Clique para reverter" : isCancelable ? "Clique para desmarcar" : undefined}
-                                >
-                                  <Link
-                                    href={`/patients/${apt.patientId}`}
-                                    className="font-bold text-foreground hover:text-primary hover:underline truncate block text-xs"
-                                    onClick={e => e.stopPropagation()}
+                                <div className="relative" ref={isMenuOpen ? menuRef : null}>
+                                  {/* Appointment block */}
+                                  <div
+                                    onClick={() => setActionMenuId(isMenuOpen ? null : apt.id)}
+                                    className={cn(
+                                      "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
+                                      isDesmarcado && "bg-orange-950/10 border-orange-400/40",
+                                      isAtendimento && "bg-green-950/10 border-green-400/40",
+                                      isRemarcado && "bg-blue-950/10 border-blue-400/40",
+                                      !isDesmarcado && !isAtendimento && !isRemarcado && "bg-white border-border/50",
+                                      isMenuOpen && "ring-2 ring-primary/40"
+                                    )}
+                                    style={{
+                                      boxShadow: isDesmarcado
+                                        ? "0 0 8px rgba(249,115,22,0.2)"
+                                        : isAtendimento
+                                        ? "0 0 8px rgba(34,197,94,0.2)"
+                                        : isRemarcado
+                                        ? "0 0 8px rgba(59,130,246,0.2)"
+                                        : "none",
+                                    }}
                                   >
-                                    {apt.patientName || `Paciente #${apt.patientId}`}
-                                  </Link>
-                                  <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
-                                    {apt.status}
-                                  </span>
-                                  {isCancelable && (
-                                    <span className="text-[9px] text-muted-foreground/50 group-hover:text-red-400 transition-colors">
-                                      clique para desmarcar
+                                    <span className="font-bold text-foreground truncate text-xs leading-tight">
+                                      {apt.patientName || `Paciente #${apt.patientId}`}
                                     </span>
-                                  )}
-                                  {isDesmarcado && (
-                                    <span className="text-[9px] text-red-400 group-hover:text-green-500 transition-colors">
-                                      clique para reverter ↩
+                                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
+                                      {apt.status}
                                     </span>
+                                    {isDesmarcado && (
+                                      <span className="text-[9px] text-orange-400 font-semibold">⚠ só esta data</span>
+                                    )}
+                                    {isRemarcado && (
+                                      <span className="text-[9px] text-blue-400 font-semibold">↩ remanejado</span>
+                                    )}
+                                    {apt.recurrenceGroupId && !isDesmarcado && !isRemarcado && (
+                                      <span className="text-[9px] text-muted-foreground/50">↺ recorrente</span>
+                                    )}
+                                  </div>
+
+                                  {/* Action menu */}
+                                  {isMenuOpen && (
+                                    <div
+                                      className="absolute z-50 top-full mt-1 left-0 w-52 rounded-2xl overflow-hidden shadow-2xl"
+                                      style={{
+                                        background: "rgba(2,4,8,0.97)",
+                                        border: "1px solid rgba(255,255,255,0.08)",
+                                        backdropFilter: "blur(20px)",
+                                        padding: "10px",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "6px",
+                                      }}
+                                    >
+                                      <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
+
+                                      <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
+                                        <Activity className="w-3.5 h-3.5" /> Atendimento
+                                      </button>
+
+                                      <button style={NEON.orange} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
+                                        <AlertTriangle className="w-3.5 h-3.5" /> Desmarcado
+                                      </button>
+
+                                      <button style={NEON.blue} onClick={() => handleStartRemanejar(apt)}>
+                                        <RotateCcw className="w-3.5 h-3.5" /> Remanejar
+                                      </button>
+
+                                      <button style={NEON.red} onClick={() => handleDarAlta(apt)}>
+                                        <LogOut className="w-3.5 h-3.5" /> Dar Alta
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               ) : (
                                 <button
                                   onClick={() => setBookingSlot({ date, time })}
-                                  className="w-full h-full min-h-[50px] flex items-center justify-center border-2 border-dashed border-border/40 rounded-xl text-muted-foreground/40 hover:border-primary/40 hover:text-primary/60 hover:bg-primary/5 transition-colors text-[10px] font-semibold cursor-pointer"
+                                  className="w-full h-full min-h-[54px] flex items-center justify-center border-2 border-dashed border-border/40 rounded-xl text-muted-foreground/40 hover:border-primary/40 hover:text-primary/60 hover:bg-primary/5 transition-colors text-[10px] font-semibold cursor-pointer"
                                 >
                                   + Agendar
                                 </button>
@@ -320,6 +554,7 @@ export default function Agenda() {
         </Card>
       )}
 
+      {/* ── BookingModal ── */}
       {bookingSlot && selectedProfId && (
         <BookingModal
           date={bookingSlot.date}
@@ -327,32 +562,181 @@ export default function Agenda() {
           professionalId={Number(selectedProfId)}
           professionalName={selectedProf?.name || ""}
           onClose={() => setBookingSlot(null)}
-          onSuccess={() => { setBookingSlot(null); fetchAppointments(); toast({ title: "Agendado!", description: "Paciente incluído na agenda." }); }}
+          onSuccess={() => {
+            setBookingSlot(null);
+            fetchAppointments();
+            toast({ title: "Agendado!", description: "Sessões semanais criadas automaticamente para as próximas 52 semanas." });
+          }}
         />
+      )}
+
+      {/* ── Dar Alta Confirmation ── */}
+      {altaConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444" }}>
+                  <LogOut className="w-5 h-5" style={{ color: "#f87171" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>Dar Alta</p>
+                  <p className="text-xs text-white/50">Ação permanente e irreversível</p>
+                </div>
+              </div>
+              <p className="text-sm text-white/80 mb-1">
+                Isso removerá <strong className="text-white">{altaConfirm.patientName}</strong> deste horário
+                <strong className="text-white"> e de todas as semanas futuras</strong>.
+              </p>
+              {altaConfirm.recurrenceGroupId && (
+                <p className="text-xs text-orange-400/80 mt-2">
+                  ⚠ Este é um agendamento recorrente. Todos os próximos serão cancelados.
+                </p>
+              )}
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={confirmDarAlta}
+                  style={{ ...NEON.red, flex: 1, justifyContent: "center", padding: "10px" }}
+                >
+                  <LogOut className="w-4 h-4" /> Confirmar Alta
+                </button>
+                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setAltaConfirm(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Remanejar: Pick Slot ── */}
+      {remanejFlow?.step === "slot" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,5,15,0.97)", border: "1px solid rgba(59,130,246,0.3)" }}>
+            <div className="px-6 py-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "rgba(59,130,246,0.15)", border: "1px solid #3b82f6" }}>
+                    <RotateCcw className="w-4 h-4" style={{ color: "#60a5fa" }} />
+                  </div>
+                  <div>
+                    <p className="font-bold" style={{ color: "#60a5fa", textShadow: "0 0 8px rgba(96,165,250,0.8)" }}>Remanejar</p>
+                    <p className="text-xs text-white/50">{remanejFlow.apt.patientName}</p>
+                  </div>
+                </div>
+                <button onClick={() => setRemanejFlow(null)} className="text-white/30 hover:text-white/70"><X className="w-5 h-5" /></button>
+              </div>
+
+              <p className="text-sm text-white/60 mb-4">Escolha um novo horário disponível nesta semana:</p>
+
+              {availableSlots.length === 0 ? (
+                <p className="text-center text-white/40 py-8">Nenhum horário disponível nesta semana.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                  {weekDates.map(date => {
+                    const daySlots = availableSlots.filter(s => s.date === date);
+                    if (daySlots.length === 0) return null;
+                    const dayLabel = weekDays.find(d => format(d, "yyyy-MM-dd") === date);
+                    return (
+                      <div key={date}>
+                        <p className="text-[10px] text-white/40 uppercase font-bold mb-1">
+                          {dayLabel ? format(dayLabel, "EEE dd/MM", { locale: ptBR }) : date}
+                        </p>
+                        {daySlots.map(slot => (
+                          <button
+                            key={slot.time}
+                            onClick={() => handlePickRemanejSlot(slot.date, slot.time)}
+                            style={NEON.blue}
+                            className="mb-1"
+                          >
+                            {slot.time}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Remanejar: Carla Notify ── */}
+      {remanejFlow?.step === "carla" && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">C</div>
+              <div className="flex-1">
+                <p className="text-white font-bold text-sm">Carla — NFs Gestão</p>
+                <p className="text-white/70 text-xs">Assistente</p>
+              </div>
+              <button onClick={() => setRemanejFlow(null)} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="px-5 py-5">
+              {remanejDone ? (
+                <div className="flex flex-col items-center gap-3 py-4 text-center">
+                  <CheckCircle className="w-10 h-10 text-blue-500" />
+                  <p className="font-semibold">Remanejamento concluído!</p>
+                  <p className="text-sm text-muted-foreground">
+                    {remanejFlow.apt.patientName} movido(a) para {remanejFlow.newTime} do dia {remanejFlow.newDate}.
+                  </p>
+                  <Button onClick={() => setRemanejFlow(null)} className="mt-2 w-full">Fechar</Button>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-blue-50 border border-blue-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
+                    <p className="text-sm text-foreground leading-relaxed">
+                      Vi que você remanejou a sessão de{" "}
+                      <strong>{remanejFlow.apt.patientName}</strong> para{" "}
+                      <strong>{remanejFlow.newTime} — {
+                        weekDays.find(d => format(d, "yyyy-MM-dd") === remanejFlow.newDate)
+                          ? format(weekDays.find(d => format(d, "yyyy-MM-dd") === remanejFlow.newDate)!, "EEEE dd/MM", { locale: ptBR })
+                          : remanejFlow.newDate
+                      }</strong>.{" "}
+                      Posso avisar o responsável pelo WhatsApp?
+                    </p>
+                  </div>
+                  {!remanejFlow.apt.guardianPhone && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                      ⚠️ Responsável sem telefone cadastrado.
+                    </p>
+                  )}
+                  <div className="flex gap-3">
+                    <Button
+                      className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700 text-xs"
+                      onClick={() => confirmRemanejar(true)}
+                      disabled={remanejSending || !remanejFlow.apt.guardianPhone}
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      {remanejSending ? "Processando..." : "Confirmar e Avisar Mãe"}
+                    </Button>
+                    <Button variant="outline" className="flex-1" onClick={() => confirmRemanejar(false)} disabled={remanejSending}>
+                      Só remanejar
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Carla Cancel Dialog ── */}
       {cancelDialog && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-            {/* Header */}
             <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-violet-600 to-indigo-600">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-                C
-              </div>
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">C</div>
               <div className="flex-1 min-w-0">
                 <p className="text-white font-bold text-sm">Carla — NFs Gestão</p>
                 <p className="text-white/70 text-xs">Assistente</p>
               </div>
-              <button
-                onClick={() => setCancelDialog(null)}
-                className="text-white/60 hover:text-white transition-colors"
-              >
+              <button onClick={() => setCancelDialog(null)} className="text-white/60 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-
-            {/* Message bubble */}
             <div className="px-5 py-5">
               {notifyDone ? (
                 <div className="flex flex-col items-center gap-3 py-4 text-center">
@@ -361,27 +745,21 @@ export default function Agenda() {
                   <p className="text-sm text-muted-foreground">
                     O responsável de <strong>{cancelDialog.apt.patientName}</strong> foi avisado pelo WhatsApp.
                   </p>
-                  <Button onClick={() => setCancelDialog(null)} className="mt-2 w-full">
-                    Fechar
-                  </Button>
+                  <Button onClick={() => setCancelDialog(null)} className="mt-2 w-full">Fechar</Button>
                 </div>
               ) : (
                 <>
                   <div className="bg-violet-50 border border-violet-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
                     <p className="text-sm text-foreground leading-relaxed">
-                      Vi que você desmarcou a sessão de{" "}
-                      <strong>{cancelDialog.profName}</strong>.{" "}
-                      Posso avisar o responsável pelo(a){" "}
-                      <strong>{cancelDialog.apt.patientName || "Paciente"}</strong> agora?
+                      Vi que você desmarcou a sessão de <strong>{cancelDialog.profName}</strong>.{" "}
+                      Posso avisar o responsável pelo(a) <strong>{cancelDialog.apt.patientName || "Paciente"}</strong> agora?
                     </p>
                   </div>
-
                   {!cancelDialog.apt.guardianPhone && (
                     <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
                       ⚠️ Responsável sem telefone cadastrado — não será possível enviar o WhatsApp.
                     </p>
                   )}
-
                   <div className="flex gap-3">
                     <Button
                       className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700 text-xs"
@@ -391,13 +769,10 @@ export default function Agenda() {
                       <MessageCircle className="w-4 h-4" />
                       {notifySending ? "Enviando..." : "Confirmar Cancelamento e Avisar Mãe"}
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => setCancelDialog(null)}
-                      disabled={notifySending}
-                    >
-                      Agora não
+                    <Button variant="outline" className="flex-1" onClick={() => {
+                      if (cancelDialog) handleRevertClick(cancelDialog.apt);
+                    }} disabled={notifySending}>
+                      Reverter
                     </Button>
                   </div>
                 </>

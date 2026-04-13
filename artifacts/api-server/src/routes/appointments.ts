@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { appointmentsTable, patientsTable, professionalsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte, lte, or } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
 
@@ -12,10 +13,17 @@ function getCompanyId(req: any): number | null {
   return isNaN(n) ? null : n;
 }
 
+function addWeeksToDate(dateStr: string, weeks: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + weeks * 7);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
 router.get("/appointments/today", async (req, res) => {
   const companyId = getCompanyId(req);
   const today = new Date().toISOString().split("T")[0];
-  const conditions: ReturnType<typeof eq>[] = [eq(appointmentsTable.date, today)];
+  const conditions: any[] = [eq(appointmentsTable.date, today)];
   if (companyId) conditions.push(eq(appointmentsTable.companyId, companyId));
   if (req.query.professionalId) {
     conditions.push(eq(appointmentsTable.professionalId, Number(req.query.professionalId)));
@@ -30,6 +38,7 @@ router.get("/appointments/today", async (req, res) => {
     status: appointmentsTable.status,
     notes: appointmentsTable.notes,
     rescheduledTo: appointmentsTable.rescheduledTo,
+    recurrenceGroupId: appointmentsTable.recurrenceGroupId,
     patientName: patientsTable.name,
     patientPhone: patientsTable.phone,
     patientAbsenceCount: patientsTable.absenceCount,
@@ -85,11 +94,13 @@ router.get("/appointments/stats", async (req, res) => {
 
 router.get("/appointments", async (req, res) => {
   const companyId = getCompanyId(req);
-  const conditions: ReturnType<typeof eq>[] = [];
+  const conditions: any[] = [];
   if (companyId) conditions.push(eq(appointmentsTable.companyId, companyId));
   if (req.query.date) conditions.push(eq(appointmentsTable.date, String(req.query.date)));
   if (req.query.professionalId) conditions.push(eq(appointmentsTable.professionalId, Number(req.query.professionalId)));
   if (req.query.patientId) conditions.push(eq(appointmentsTable.patientId, Number(req.query.patientId)));
+  if (req.query.dateFrom) conditions.push(gte(appointmentsTable.date, String(req.query.dateFrom)));
+  if (req.query.dateTo) conditions.push(lte(appointmentsTable.date, String(req.query.dateTo)));
 
   const rows = await db
     .select({
@@ -101,6 +112,7 @@ router.get("/appointments", async (req, res) => {
       status: appointmentsTable.status,
       notes: appointmentsTable.notes,
       rescheduledTo: appointmentsTable.rescheduledTo,
+      recurrenceGroupId: appointmentsTable.recurrenceGroupId,
       companyId: appointmentsTable.companyId,
       createdAt: appointmentsTable.createdAt,
       updatedAt: appointmentsTable.updatedAt,
@@ -119,16 +131,24 @@ router.get("/appointments", async (req, res) => {
 
 router.post("/appointments", async (req, res) => {
   const companyId = getCompanyId(req);
-  const { patientId, professionalId, date, time, notes, fromWaitingList } = req.body;
-  const [row] = await db.insert(appointmentsTable).values({
+  const { patientId, professionalId, date, time, notes, fromWaitingList, noRecurrence } = req.body;
+
+  const recurrenceGroupId = randomUUID();
+  const WEEKS = noRecurrence ? 1 : 52;
+
+  const records = Array.from({ length: WEEKS }, (_, i) => ({
     patientId: Number(patientId),
     professionalId: Number(professionalId),
-    date,
+    date: addWeeksToDate(date, i),
     time,
-    status: "agendado",
+    status: "agendado" as const,
     notes: notes ?? null,
+    recurrenceGroupId: WEEKS > 1 ? recurrenceGroupId : null,
     ...(companyId ? { companyId } : {}),
-  }).returning();
+  }));
+
+  const inserted = await db.insert(appointmentsTable).values(records).returning();
+  const firstRow = inserted[0];
 
   if (fromWaitingList) {
     await db.update(patientsTable)
@@ -139,7 +159,7 @@ router.post("/appointments", async (req, res) => {
     await db.delete(waitingListTable).where(eq(waitingListTable.patientId, Number(patientId)));
   }
 
-  res.status(201).json(row);
+  res.status(201).json({ ...firstRow, totalCreated: inserted.length });
 });
 
 router.get("/appointments/:id", async (req, res) => {
@@ -151,13 +171,20 @@ router.get("/appointments/:id", async (req, res) => {
 
 router.patch("/appointments/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { status, rescheduledTo, notes } = req.body;
+  const { status, rescheduledTo, notes, date, time } = req.body;
 
   const [existing] = await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, id));
   if (!existing) return res.status(404).json({ error: "Appointment not found" });
 
+  const updateData: any = {};
+  if (status !== undefined) updateData.status = status;
+  if (rescheduledTo !== undefined) updateData.rescheduledTo = rescheduledTo;
+  if (notes !== undefined) updateData.notes = notes;
+  if (date !== undefined) updateData.date = date;
+  if (time !== undefined) updateData.time = time;
+
   const [row] = await db.update(appointmentsTable)
-    .set({ status, rescheduledTo: rescheduledTo ?? null, notes: notes ?? existing.notes })
+    .set(updateData)
     .where(eq(appointmentsTable.id, id))
     .returning();
 
@@ -165,19 +192,43 @@ router.patch("/appointments/:id", async (req, res) => {
     const [patient] = await db.select({ absenceCount: patientsTable.absenceCount })
       .from(patientsTable).where(eq(patientsTable.id, existing.patientId));
     const newCount = (patient?.absenceCount ?? 0) + 1;
-    await db.update(patientsTable)
-      .set({ absenceCount: newCount })
-      .where(eq(patientsTable.id, existing.patientId));
+    await db.update(patientsTable).set({ absenceCount: newCount }).where(eq(patientsTable.id, existing.patientId));
   } else if (existing.status === "ausente" && status !== "ausente") {
     const [patient] = await db.select({ absenceCount: patientsTable.absenceCount })
       .from(patientsTable).where(eq(patientsTable.id, existing.patientId));
     const newCount = Math.max(0, (patient?.absenceCount ?? 1) - 1);
-    await db.update(patientsTable)
-      .set({ absenceCount: newCount })
-      .where(eq(patientsTable.id, existing.patientId));
+    await db.update(patientsTable).set({ absenceCount: newCount }).where(eq(patientsTable.id, existing.patientId));
   }
 
   res.json(row);
+});
+
+router.delete("/appointments/:id/alta", async (req, res) => {
+  const id = Number(req.params.id);
+  const [existing] = await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Appointment not found" });
+
+  let deletedCount = 0;
+
+  if (existing.recurrenceGroupId) {
+    const future = await db.select({ id: appointmentsTable.id })
+      .from(appointmentsTable)
+      .where(
+        and(
+          eq(appointmentsTable.recurrenceGroupId, existing.recurrenceGroupId),
+          gte(appointmentsTable.date, existing.date)
+        )
+      );
+    for (const row of future) {
+      await db.delete(appointmentsTable).where(eq(appointmentsTable.id, row.id));
+    }
+    deletedCount = future.length;
+  } else {
+    await db.delete(appointmentsTable).where(eq(appointmentsTable.id, id));
+    deletedCount = 1;
+  }
+
+  res.json({ ok: true, deletedCount });
 });
 
 router.delete("/appointments/:id", async (req, res) => {

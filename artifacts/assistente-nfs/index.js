@@ -953,17 +953,27 @@ app.get(["/activity", "/assistente-nfs/activity"], (req, res) => {
 // Cancelamento inteligente — enviado pelo Arco-Íris quando terapeuta desmarca
 app.post(["/cancel-notify", "/assistente-nfs/cancel-notify"], async (req, res) => {
   try {
-    const { guardianPhone, guardianName, patientName, professionalName } = req.body;
+    const { guardianPhone, guardianName, patientName, professionalName, remanejadoPara } = req.body;
     if (!guardianPhone) return res.status(400).json({ ok: false, error: "guardianPhone obrigatório" });
 
     const jid = numeroParaJid(guardianPhone);
-    const msg =
-      `Olá, *${guardianName || "Responsável"}*! Aqui é a Recepção. 😊\n\n` +
-      `Infelizmente a terapeuta *${professionalName || "da unidade"}* teve um imprevisto e não poderá comparecer hoje.\n\n` +
-      `A sessão do(a) *${patientName}* foi cancelada. Entraremos em contato em breve para o reagendamento.${ASSINATURA}`;
+    let msg;
+    if (remanejadoPara) {
+      msg =
+        `Olá, *${guardianName || "Responsável"}*! Aqui é a Recepção. 😊\n\n` +
+        `Informamos que a sessão do(a) *${patientName}* com *${professionalName || "a terapeuta"}* foi remanejada.\n\n` +
+        `📅 *Novo horário:* ${remanejadoPara}\n\n` +
+        `Qualquer dúvida, estamos à disposição!${ASSINATURA}`;
+      logAtividade(`📤 Remanejar enviado — ${patientName} → ${remanejadoPara}`, "info");
+    } else {
+      msg =
+        `Olá, *${guardianName || "Responsável"}*! Aqui é a Recepção. 😊\n\n` +
+        `Infelizmente a terapeuta *${professionalName || "da unidade"}* teve um imprevisto e não poderá comparecer hoje.\n\n` +
+        `A sessão do(a) *${patientName}* foi cancelada. Entraremos em contato em breve para o reagendamento.${ASSINATURA}`;
+      logAtividade(`📤 Cancelamento enviado — ${patientName} (responsável: ${guardianName || guardianPhone})`, "info");
+    }
 
     await enviar(jid, msg);
-    logAtividade(`📤 Cancelamento enviado — ${patientName} (responsável: ${guardianName || guardianPhone})`, "info");
     res.json({ ok: true });
   } catch (err) {
     console.error("❌ cancel-notify:", err.message);
