@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 import { useGetPatients, useGetProfessionals, useGetTodayAppointments, useGetWaitingList } from "@workspace/api-client-react";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor } from "@/lib/utils";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from "recharts";
 
 type Stats = { semanal: number; mensal: number; trimestral: number; semestral: number; anual: number };
+
+type Ocupacao = {
+  id: number; name: string; specialty: string; cargaHoraria: string;
+  pacientesAtivos: number; capacidade: number; meta: number; metaMin: number;
+  pct: number; vagasAbertas: boolean; alerta: string | null;
+};
 
 const POLL_MS = 30_000; // 30 s
 
@@ -16,14 +22,19 @@ export default function Dashboard() {
   const { data: todayAppointments } = useGetTodayAppointments({} as any, { refetchInterval: POLL_MS } as any);
   const { data: waitingList } = useGetWaitingList({} as any, { refetchInterval: POLL_MS } as any);
   const [aptStats, setAptStats] = useState<Stats | null>(null);
+  const [ocupacao, setOcupacao] = useState<Ocupacao[]>([]);
 
   const fetchStats = () =>
     fetch("/api/appointments/stats").then(r => r.json()).then(setAptStats).catch(console.error);
+  const fetchOcupacao = () =>
+    fetch("/api/professionals/ocupacao").then(r => r.json()).then(setOcupacao).catch(console.error);
 
   useEffect(() => {
     fetchStats();
-    const id = setInterval(fetchStats, POLL_MS);
-    return () => clearInterval(id);
+    fetchOcupacao();
+    const id1 = setInterval(fetchStats, POLL_MS);
+    const id2 = setInterval(fetchOcupacao, POLL_MS);
+    return () => { clearInterval(id1); clearInterval(id2); };
   }, []);
 
   const totalPatients = patients?.length || 0;
@@ -221,6 +232,70 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
+
+      {/* Monitor de Ocupação */}
+      {ocupacao.length > 0 && (
+        <Card className={cn("p-6", ocupacao.some(o => o.vagasAbertas) ? "border-[rgba(249,115,22,0.35)] shadow-[0_0_24px_rgba(249,115,22,0.08)]" : "")}>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold font-display flex items-center gap-2"
+              style={ocupacao.some(o => o.vagasAbertas) ? { color: "#f97316", textShadow: "0 0 12px rgba(249,115,22,0.4)" } : {}}>
+              <Briefcase className="w-5 h-5" />
+              Monitor de Ocupação
+              {ocupacao.some(o => o.vagasAbertas) && (
+                <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-lg animate-pulse"
+                  style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.4)", color: "#f97316" }}>
+                  Vagas Abertas
+                </span>
+              )}
+            </h2>
+            <span className="text-xs text-muted-foreground font-semibold">Meta: 28–30 pacientes/profissional</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {ocupacao.map(o => {
+              const cor = o.vagasAbertas
+                ? o.pacientesAtivos < 20 ? "#ef4444" : "#f97316"
+                : "#00f0ff";
+              const bgCor = o.vagasAbertas
+                ? o.pacientesAtivos < 20 ? "rgba(239,68,68,0.07)" : "rgba(249,115,22,0.07)"
+                : "rgba(0,240,255,0.04)";
+              const borderCor = o.vagasAbertas
+                ? o.pacientesAtivos < 20 ? "rgba(239,68,68,0.25)" : "rgba(249,115,22,0.25)"
+                : "rgba(0,240,255,0.12)";
+              return (
+                <div key={o.id}
+                  className="p-4 rounded-xl flex flex-col gap-3 transition-all"
+                  style={{ background: bgCor, border: `1px solid ${borderCor}` }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-bold text-sm text-foreground">{o.name}</p>
+                      <p className="text-xs text-muted-foreground">{o.specialty || "—"} · {o.cargaHoraria}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold font-display" style={{ color: cor }}>{o.pacientesAtivos}</p>
+                      <p className="text-[10px] text-muted-foreground">/ {o.meta} meta</p>
+                    </div>
+                  </div>
+                  {/* Barra de progresso */}
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{
+                      width: `${o.pct}%`,
+                      background: `linear-gradient(90deg, ${cor}99, ${cor})`,
+                      boxShadow: `0 0 8px ${cor}66`,
+                    }} />
+                  </div>
+                  {o.vagasAbertas ? (
+                    <p className="text-xs font-bold" style={{ color: cor }}>
+                      ⚠️ Agenda aberta — {o.meta - o.pacientesAtivos} vaga{o.meta - o.pacientesAtivos !== 1 ? "s" : ""} disponíve{o.meta - o.pacientesAtivos !== 1 ? "is" : "l"}
+                    </p>
+                  ) : (
+                    <p className="text-xs font-semibold" style={{ color: "#00f0ff" }}>✅ Meta atingida</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Alertas de Faltas */}
       {absentPatients.length > 0 && (

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { professionalsTable, patientsTable, waitingListTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, notInArray } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -42,6 +42,47 @@ router.post("/professionals/:id/verify-pin", async (req, res) => {
   if (!prof.pin) return res.status(400).json({ error: "PIN não configurado para este profissional" });
   if (prof.pin !== String(pin)) return res.status(401).json({ error: "PIN incorreto" });
   res.json({ ok: true });
+});
+
+const META_MIN = 28;
+const META_MAX = 30;
+const INACTIVE = ["Alta", "Óbito", "Desistência"];
+
+// Retorna ocupação de todos os profissionais — DEVE vir antes de /:id
+router.get("/professionals/ocupacao", async (req, res) => {
+  const companyId = getCompanyId(req);
+  const profs = companyId
+    ? await db.select().from(professionalsTable).where(eq(professionalsTable.companyId, companyId))
+    : await db.select().from(professionalsTable);
+
+  const result = await Promise.all(profs.map(async (prof) => {
+    const [row] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(patientsTable)
+      .where(and(
+        eq(patientsTable.professionalId, prof.id),
+        notInArray(patientsTable.status, INACTIVE),
+      ));
+    const count = row?.count ?? 0;
+    const capacidade = getMaxCapacity(prof.cargaHoraria ?? "30h");
+    const vagasAbertas = count < META_MIN;
+    const pct = Math.min(100, Math.round((count / META_MAX) * 100));
+    return {
+      id: prof.id,
+      name: prof.name,
+      specialty: prof.specialty,
+      cargaHoraria: prof.cargaHoraria ?? "30h",
+      pacientesAtivos: count,
+      capacidade,
+      meta: META_MAX,
+      metaMin: META_MIN,
+      pct,
+      vagasAbertas,
+      alerta: vagasAbertas ? `⚠️ Agenda aberta — ${count} de ${META_MAX} pacientes` : null,
+    };
+  }));
+
+  result.sort((a, b) => a.pacientesAtivos - b.pacientesAtivos);
+  res.json(result);
 });
 
 router.get("/professionals/:id", async (req, res) => {
