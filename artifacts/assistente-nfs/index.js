@@ -31,8 +31,6 @@ const NUMEROS_RECEPCAO   = (process.env.NUMEROS_RECEPCAO   || "").split(",").map
 const NUMEROS_MOTORISTAS = (process.env.NUMEROS_MOTORISTAS || "").split(",").map(n => n.trim()).filter(Boolean);
 const GRUPO_PROFISSIONAIS = process.env.GRUPO_PROFISSIONAIS || ""; // JID do grupo de WhatsApp dos profissionais
 
-const AI_BASE = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
-const AI_KEY  = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BANCO DE DADOS
@@ -432,10 +430,6 @@ async function enviarGrupoProfissionais(texto) {
 // INTELIGÊNCIA ARTIFICIAL — INTERPRETAÇÃO DE MENSAGENS
 // ─────────────────────────────────────────────────────────────────────────────
 async function interpretarMensagem(mensagem, contexto) {
-  if (!AI_BASE || !AI_KEY) {
-    return { intencao: "outro", resposta: "Olá! Como posso ajudar?" + ASSINATURA, acoes: [] };
-  }
-
   const nomeResponsavel = contexto.paciente?.responsavel || "Responsável";
   const nomePaciente    = contexto.paciente?.nome || "Paciente";
   const consultaHoje    = contexto.consultasHoje?.[0];
@@ -515,35 +509,7 @@ AÇÕES DISPONÍVEIS (inclua na lista "acoes" quando aplicável):
 - {"tipo": "notificar_profissionais", "mensagem": "texto para o grupo interno"}
 - {"tipo": "notificar_recepcao", "mensagem": "texto para a recepção"}`;
 
-  try {
-    const response = await fetch(`${AI_BASE}/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": AI_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 1024,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await response.json();
-    if (!data.content || !data.content[0]) throw new Error("Resposta vazia da IA");
-
-    const texto = data.content[0].text.trim();
-    // Extrair JSON da resposta
-    const match = texto.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("JSON não encontrado na resposta");
-
-    return JSON.parse(match[0]);
-  } catch (err) {
-    console.error("❌ Erro IA:", err.message);
-    // Fallback com palavras-chave
-    return interpretarFallback(mensagem);
-  }
+  return interpretarFallback(mensagem);
 }
 
 function interpretarFallback(mensagem) {
@@ -1118,23 +1084,14 @@ COLEGA PERGUNTOU: "${pergunta}"
 
 Responda como a Carla responderia ao vivo — rápida, humana e com os dados acima.`;
 
-    const response = await fetch(`${AI_BASE}/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": AI_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 400,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await response.json();
-    const resposta = data.content?.[0]?.text?.trim() || "Desculpe, não consegui processar sua pergunta agora.";
-    logAtividade(`🎙️ Voz: "${pergunta.substring(0, 40)}..." → IA respondeu`, "info");
+    // Resposta baseada nos dados do dia (sem IA)
+    const resposta =
+      `Resumo de hoje, ${dataFormatada}: ` +
+      `${stats.agendados} agendados, ${stats.presentes} presentes, ${stats.ausentes} ausentes, ${stats.cancelados} cancelados. ` +
+      `Fila de espera: ${stats.fila_espera} paciente(s). ` +
+      (stats.ausentes > 0 ? `Atenção: há ${stats.ausentes} ausência(s) registrada(s) hoje. ` : "") +
+      `Para detalhes, consulte a agenda no sistema.`;
+    logAtividade(`🎙️ Voz: "${pergunta.substring(0, 40)}..." → resumo automático`, "info");
     res.json({ resposta });
   } catch (err) {
     console.error("❌ voice-chat:", err.message);
@@ -1398,7 +1355,7 @@ async function iniciarWhatsApp() {
 const server = app.listen(PORT, () => {
   console.log(`\n💬 Assistente NFs — ${CLINICA_NOME}`);
   console.log(`✅ Servidor na porta ${PORT}`);
-  console.log(`🤖 IA: ${AI_BASE ? "Anthropic Claude ativo" : "⚠️  IA não configurada"}`);
+  console.log(`🤖 Modo: interpretação por palavras-chave (sem IA externa)`);
   console.log(`🗄️  DB: ${process.env.DATABASE_URL ? "PostgreSQL conectado" : "⚠️  DATABASE_URL ausente"}`);
   console.log(`📱 Acesse /api/whatsapp/panel para o QR Code\n`);
   iniciarWhatsApp();
