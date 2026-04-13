@@ -101,6 +101,28 @@ router.post("/identificar-contato", async (req, res) => {
   }
 });
 
+router.post("/dispensar-contato", async (req, res) => {
+  try {
+    const r = await fetch(`${BOT_URL}/dispensar-contato`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await r.json();
+    res.json(data);
+  } catch (err: any) {
+    // fallback: update file directly if bot offline
+    try {
+      if (fs.existsSync(CONTATOS_FILE)) {
+        const dados = JSON.parse(fs.readFileSync(CONTATOS_FILE, "utf8"));
+        const num = (req.body.telefone || "").replace(/\D/g, "");
+        if (dados[num]) { dados[num].dispensado = true; fs.writeFileSync(CONTATOS_FILE, JSON.stringify(dados, null, 2)); }
+      }
+      res.json({ ok: true });
+    } catch { res.status(502).json({ ok: false, error: err.message }); }
+  }
+});
+
 router.post("/abonar-notify", async (req, res) => {
   try {
     const r = await fetch(`${BOT_URL}/abonar-notify`, {

@@ -1140,6 +1140,23 @@ app.get(["/atestados", "/assistente-nfs/atestados"], (req, res) => {
   }
 });
 
+// Dispensar um contato desconhecido (remove o alerta)
+app.post(["/dispensar-contato", "/assistente-nfs/dispensar-contato"], (req, res) => {
+  try {
+    const { telefone } = req.body;
+    if (!telefone) return res.status(400).json({ ok: false, erro: "telefone obrigatório" });
+    const num = telefone.replace(/\D/g, "");
+    if (contatosNfs.has(num)) {
+      const atual = contatosNfs.get(num);
+      contatosNfs.set(num, { ...atual, dispensado: true });
+      salvarContatosNfs();
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, erro: err.message });
+  }
+});
+
 // Contatos identificados automaticamente
 app.get(["/contatos", "/assistente-nfs/contatos"], (req, res) => {
   const lista = [];

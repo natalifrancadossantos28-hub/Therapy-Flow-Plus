@@ -11,11 +11,12 @@ import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom"
 import { getStatusColor, cn } from "@/lib/utils";
 import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
-  ChevronRight, Printer, ShieldCheck, MessageCircle, CheckCircle,
+  ChevronRight, Printer, ShieldCheck, CheckCircle,
+  UserPlus, PhoneOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 type Appointment = {
   id: number;
@@ -56,6 +57,13 @@ type Atestado = {
 type AbonarDialog = {
   apt: Appointment;
   atestado: Atestado;
+};
+
+type ContatoDesconhecido = {
+  telefone: string;
+  label: string;
+  identificadoEm: string;
+  dispensado?: boolean;
 };
 
 function DischargeModal({
@@ -244,10 +252,12 @@ export default function Reception() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const [, navigate] = useLocation();
   const [dischargeAlert, setDischargeAlert] = useState<DischargeAlert | null>(null);
   const [vacancyAlert, setVacancyAlert] = useState<VacancyAlert | null>(null);
   const [vacancyProfId, setVacancyProfId] = useState<number>(0);
   const [atestados, setAtestados] = useState<Atestado[]>([]);
+  const [desconhecidos, setDesconhecidos] = useState<ContatoDesconhecido[]>([]);
   const [abonarDialog, setAbonarDialog] = useState<AbonarDialog | null>(null);
   const [abonarSending, setAbonarSending] = useState(false);
   const [abonarDone, setAbonarDone] = useState(false);
@@ -256,18 +266,34 @@ export default function Reception() {
     query: { enabled: false },
   });
 
-  // Poll atestados pendentes
+  // Poll atestados e contatos desconhecidos
   useEffect(() => {
-    const fetchAtestados = () => {
+    const fetchData = () => {
       fetch("/api/whatsapp/atestados")
         .then(r => r.json())
         .then(setAtestados)
         .catch(() => {});
+
+      fetch("/api/whatsapp/contatos")
+        .then(r => r.json())
+        .then((lista: any[]) =>
+          setDesconhecidos(lista.filter(c => !c.paciente && !c.dispensado))
+        )
+        .catch(() => {});
     };
-    fetchAtestados();
-    const interval = setInterval(fetchAtestados, 20_000);
+    fetchData();
+    const interval = setInterval(fetchData, 20_000);
     return () => clearInterval(interval);
   }, []);
+
+  const dispensarContato = async (telefone: string) => {
+    setDesconhecidos(prev => prev.filter(c => c.telefone !== telefone));
+    await fetch("/api/whatsapp/dispensar-contato", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ telefone }),
+    }).catch(() => {});
+  };
 
   // Match atestado by normalized phone
   const findAtestado = (apt: Appointment): Atestado | null => {
@@ -429,6 +455,61 @@ export default function Reception() {
           )}
         </p>
       </div>
+
+      {/* ── Alertas Carla: Números Desconhecidos ── */}
+      {desconhecidos.length > 0 && (
+        <div className="space-y-3">
+          {desconhecidos.map((c) => (
+            <div key={c.telefone}
+              className="flex items-start gap-4 rounded-2xl p-4 border"
+              style={{
+                background: "linear-gradient(135deg, rgba(124,58,237,0.06), rgba(6,182,212,0.04))",
+                borderColor: "rgba(124,58,237,0.2)",
+                boxShadow: "0 0 20px rgba(124,58,237,0.08)",
+              }}>
+              {/* Avatar Carla */}
+              <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-lg font-bold text-white"
+                style={{ background: "linear-gradient(135deg, #7c3aed, #06b6d4)" }}>
+                C
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  Carla <span className="font-normal text-muted-foreground text-xs">· Assistente NFs</span>
+                </p>
+                <p className="text-sm text-foreground mt-0.5">
+                  Nati, recebi uma mensagem de um número desconhecido{" "}
+                  <span className="font-bold text-violet-700">+{c.telefone}</span>.
+                  Esse número não está cadastrado em nenhum paciente.
+                  Deseja cadastrá-lo como um novo responsável?
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {new Date(c.identificadoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                </p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0 ml-2">
+                <Link href={`/patients?guardianPhone=${encodeURIComponent(c.telefone)}`}>
+                  <button
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all"
+                    style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 4px 12px rgba(124,58,237,0.35)" }}
+                    onClick={() => dispensarContato(c.telefone)}
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Cadastrar
+                  </button>
+                </Link>
+                <button
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-secondary transition-colors border border-border"
+                  onClick={() => dispensarContato(c.telefone)}
+                  title="Dispensar alerta"
+                >
+                  <PhoneOff className="w-3.5 h-3.5" />
+                  Dispensar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">

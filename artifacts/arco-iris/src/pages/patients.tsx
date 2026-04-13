@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGetPatients, useCreatePatient, useGetProfessionals } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
-import { Users, Plus, Search, AlertCircle } from "lucide-react";
+import { Users, Plus, Search, AlertCircle, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getStatusColor } from "@/lib/utils";
 import { Link } from "wouter";
@@ -41,6 +41,24 @@ export default function Patients() {
     diagnosis: "",
     entryDate: today(),
   });
+
+  // Pré-preencher telefone do responsável via query param (vindo de alerta da Carla)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const telefone = params.get("guardianPhone");
+    if (telefone) {
+      const num = telefone.replace(/\D/g, "");
+      const formatado = num.length === 11
+        ? `(${num.slice(0,2)}) ${num.slice(2,7)}-${num.slice(7)}`
+        : num.length === 10
+          ? `(${num.slice(0,2)}) ${num.slice(2,6)}-${num.slice(6)}`
+          : telefone;
+      setFormData(prev => ({ ...prev, guardianPhone: formatado }));
+      setIsDialogOpen(true);
+      // Limpa o param da URL sem reload
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   const filteredPatients = (patients || []).filter(p => {
     const matchName = p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -171,6 +189,13 @@ export default function Patients() {
       {isDialogOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <MotionCard className="w-full max-w-lg p-6 overflow-y-auto max-h-[90vh]" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            {formData.guardianPhone && (
+              <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl text-xs font-medium"
+                style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", color: "#7c3aed" }}>
+                <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                Número {formData.guardianPhone} pre-preenchido a partir do alerta da Carla
+              </div>
+            )}
             <h2 className="text-2xl font-bold font-display mb-1">Novo Paciente</h2>
             <p className="text-sm text-muted-foreground mb-6">
               O paciente será cadastrado com status <strong>Aguardando Triagem</strong>. A triagem é feita no prontuário.
