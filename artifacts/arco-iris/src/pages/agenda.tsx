@@ -36,6 +36,7 @@ type Appointment = {
 type CancelDialog = {
   apt: Appointment;
   profName: string;
+  originalStatus: string; // status antes do cancelamento, para revert
 };
 
 const CANCELABLE = new Set(["agendado", "presente", "atendimento", "remarcado"]);
@@ -94,6 +95,7 @@ export default function Agenda() {
 
   const handleCancelClick = async (apt: Appointment, profName: string) => {
     if (!CANCELABLE.has(apt.status.toLowerCase())) return;
+    const originalStatus = apt.status;
     try {
       await fetch(`/api/appointments/${apt.id}`, {
         method: "PATCH",
@@ -102,9 +104,25 @@ export default function Agenda() {
       });
       setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: "desmarcado" } : a));
       setNotifyDone(false);
-      setCancelDialog({ apt: { ...apt, status: "desmarcado" }, profName });
+      setCancelDialog({ apt: { ...apt, status: "desmarcado" }, profName, originalStatus });
     } catch {
       toast({ title: "Erro", description: "Não foi possível cancelar o agendamento.", variant: "destructive" });
+    }
+  };
+
+  const handleRevertClick = async (apt: Appointment) => {
+    const revertTo = cancelDialog?.originalStatus || "agendado";
+    try {
+      await fetch(`/api/appointments/${apt.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: revertTo }),
+      });
+      setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: revertTo } : a));
+      setCancelDialog(null);
+      toast({ title: "Revertido", description: `Agendamento voltou para "${revertTo}".` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível reverter o agendamento.", variant: "destructive" });
     }
   };
 
@@ -249,12 +267,16 @@ export default function Agenda() {
                                   className={cn(
                                     "p-2 rounded-xl border flex flex-col gap-1 transition-all",
                                     isDesmarcado
-                                      ? "bg-red-50 border-red-200 shadow-sm"
+                                      ? "bg-red-50 border-red-300 shadow-sm"
                                       : "bg-white border-border/50 shadow-sm",
-                                    isCancelable && "cursor-pointer hover:border-red-300 hover:bg-red-50/60 group"
+                                    isCancelable && "cursor-pointer hover:border-red-300 hover:bg-red-50/60 group",
+                                    isDesmarcado && "cursor-pointer hover:bg-green-50 hover:border-green-300 group"
                                   )}
-                                  onClick={() => isCancelable && handleCancelClick(apt, selectedProf?.name || "")}
-                                  title={isCancelable ? "Clique para desmarcar" : undefined}
+                                  onClick={() => {
+                                    if (isDesmarcado) handleRevertClick(apt);
+                                    else if (isCancelable) handleCancelClick(apt, selectedProf?.name || "");
+                                  }}
+                                  title={isDesmarcado ? "Clique para reverter" : isCancelable ? "Clique para desmarcar" : undefined}
                                 >
                                   <Link
                                     href={`/patients/${apt.patientId}`}
@@ -269,6 +291,11 @@ export default function Agenda() {
                                   {isCancelable && (
                                     <span className="text-[9px] text-muted-foreground/50 group-hover:text-red-400 transition-colors">
                                       clique para desmarcar
+                                    </span>
+                                  )}
+                                  {isDesmarcado && (
+                                    <span className="text-[9px] text-red-400 group-hover:text-green-500 transition-colors">
+                                      clique para reverter ↩
                                     </span>
                                   )}
                                 </div>
@@ -357,12 +384,12 @@ export default function Agenda() {
 
                   <div className="flex gap-3">
                     <Button
-                      className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700"
+                      className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700 text-xs"
                       onClick={sendCancelNotification}
                       disabled={notifySending || !cancelDialog.apt.guardianPhone}
                     >
                       <MessageCircle className="w-4 h-4" />
-                      {notifySending ? "Enviando..." : "Sim, avisar agora"}
+                      {notifySending ? "Enviando..." : "Confirmar Cancelamento e Avisar Mãe"}
                     </Button>
                     <Button
                       variant="outline"
