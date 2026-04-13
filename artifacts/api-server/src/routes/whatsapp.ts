@@ -48,6 +48,20 @@ router.post("/voice-chat", async (req, res) => {
   }
 });
 
+router.post("/cancel-notify", async (req, res) => {
+  try {
+    const r = await fetch(`${BOT_URL}/cancel-notify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await r.json();
+    res.json(data);
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
 router.get("/panel", (req, res) => {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(`<!DOCTYPE html>

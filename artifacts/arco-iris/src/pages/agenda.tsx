@@ -3,7 +3,7 @@ import { useGetProfessionals } from "@workspace/api-client-react";
 import { Card, Select, Button, Label } from "@/components/ui-custom";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink, X, MessageCircle, CheckCircle } from "lucide-react";
 import { cn, getStatusColor } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -21,9 +21,24 @@ function getWeekDays(ref: Date): Date[] {
 }
 
 type Appointment = {
-  id: number; patientId: number; patientName?: string;
-  professionalId: number; date: string; time: string; status: string;
+  id: number;
+  patientId: number;
+  patientName?: string | null;
+  guardianName?: string | null;
+  guardianPhone?: string | null;
+  professionalName?: string | null;
+  professionalId: number;
+  date: string;
+  time: string;
+  status: string;
 };
+
+type CancelDialog = {
+  apt: Appointment;
+  profName: string;
+};
+
+const CANCELABLE = new Set(["agendado", "presente", "atendimento", "remarcado"]);
 
 const isAdminSession = () => sessionStorage.getItem("nfs_admin_auth") === "true";
 
@@ -37,12 +52,13 @@ export default function Agenda() {
   const [weekRef] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
+  const [cancelDialog, setCancelDialog] = useState<CancelDialog | null>(null);
+  const [notifySending, setNotifySending] = useState(false);
+  const [notifyDone, setNotifyDone] = useState(false);
   const { data: professionals } = useGetProfessionals();
   const { toast } = useToast();
 
-  // Admin bypasses PIN — access is granted by the admin session itself
   const canView = isAdmin || pinVerified;
-
   const weekDays = getWeekDays(weekRef);
   const weekDates = weekDays.map(d => format(d, "yyyy-MM-dd"));
 
@@ -58,17 +74,12 @@ export default function Agenda() {
 
   const handleProfChange = (id: string) => {
     setSelectedProfId(id);
-    if (!isAdmin) {
-      setPinVerified(false);
-      setPinInput("");
-      setPinError("");
-    }
+    if (!isAdmin) { setPinVerified(false); setPinInput(""); setPinError(""); }
   };
 
   const verifyPin = async () => {
     if (!selectedProfId || pinInput.length !== 4) return;
-    setPinLoading(true);
-    setPinError("");
+    setPinLoading(true); setPinError("");
     try {
       const res = await fetch(`/api/professionals/${selectedProfId}/verify-pin`, {
         method: "POST",
@@ -76,13 +87,58 @@ export default function Agenda() {
         body: JSON.stringify({ pin: pinInput }),
       });
       if (res.ok) { setPinVerified(true); }
-      else {
-        const data = await res.json();
-        setPinError(data.error || "PIN incorreto");
-        setPinInput("");
-      }
+      else { const d = await res.json(); setPinError(d.error || "PIN incorreto"); setPinInput(""); }
     } catch { setPinError("Erro ao verificar PIN."); }
     finally { setPinLoading(false); }
+  };
+
+  const handleCancelClick = async (apt: Appointment, profName: string) => {
+    if (!CANCELABLE.has(apt.status.toLowerCase())) return;
+    try {
+      await fetch(`/api/appointments/${apt.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "desmarcado" }),
+      });
+      setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: "desmarcado" } : a));
+      setNotifyDone(false);
+      setCancelDialog({ apt: { ...apt, status: "desmarcado" }, profName });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível cancelar o agendamento.", variant: "destructive" });
+    }
+  };
+
+  const sendCancelNotification = async () => {
+    if (!cancelDialog) return;
+    const { apt, profName } = cancelDialog;
+    if (!apt.guardianPhone) {
+      toast({ title: "Sem telefone", description: "O responsável não tem telefone cadastrado.", variant: "destructive" });
+      return;
+    }
+    setNotifySending(true);
+    try {
+      const res = await fetch("/api/whatsapp/cancel-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guardianPhone: apt.guardianPhone,
+          guardianName: apt.guardianName || "Responsável",
+          patientName: apt.patientName || "Paciente",
+          professionalName: profName,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setNotifyDone(true);
+        toast({ title: "Mensagem enviada!", description: `Carla avisou o responsável de ${apt.patientName}.` });
+      } else {
+        toast({ title: "Erro no envio", description: data.error || "Tente novamente.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Bot offline", description: "O WhatsApp não está conectado ainda.", variant: "destructive" });
+    } finally {
+      setNotifySending(false);
+    }
   };
 
   const getApt = (date: string, time: string) => appointments.find(a => a.date === date && a.time === time);
@@ -104,7 +160,6 @@ export default function Agenda() {
         </Link>
       </div>
 
-      {/* Professional selector */}
       <Card className="p-5 flex flex-col sm:flex-row items-start sm:items-end gap-4">
         <div className="flex-1">
           <Label className="mb-2 block">Profissional</Label>
@@ -118,9 +173,7 @@ export default function Agenda() {
             <Label className="mb-2 block flex items-center gap-1"><Lock className="w-3 h-3" /> PIN de acesso (4 dígitos)</Label>
             <div className="flex gap-2">
               <input
-                type="password"
-                maxLength={4}
-                value={pinInput}
+                type="password" maxLength={4} value={pinInput}
                 onChange={e => setPinInput(e.target.value.replace(/\D/, ""))}
                 onKeyDown={e => e.key === "Enter" && verifyPin()}
                 placeholder="••••"
@@ -187,14 +240,37 @@ export default function Agenda() {
                       ) : (
                         weekDates.map((date, i) => {
                           const apt = getApt(date, time);
+                          const isDesmarcado = apt?.status?.toLowerCase() === "desmarcado";
+                          const isCancelable = apt && CANCELABLE.has(apt.status.toLowerCase());
                           return (
                             <td key={i} className="px-4 py-3">
                               {apt ? (
-                                <div className="p-2 rounded-xl border border-border/50 bg-white shadow-sm flex flex-col gap-1">
-                                  <Link href={`/patients/${apt.patientId}`} className="font-bold text-foreground hover:text-primary hover:underline truncate block text-xs">
+                                <div
+                                  className={cn(
+                                    "p-2 rounded-xl border flex flex-col gap-1 transition-all",
+                                    isDesmarcado
+                                      ? "bg-red-50 border-red-200 shadow-sm"
+                                      : "bg-white border-border/50 shadow-sm",
+                                    isCancelable && "cursor-pointer hover:border-red-300 hover:bg-red-50/60 group"
+                                  )}
+                                  onClick={() => isCancelable && handleCancelClick(apt, selectedProf?.name || "")}
+                                  title={isCancelable ? "Clique para desmarcar" : undefined}
+                                >
+                                  <Link
+                                    href={`/patients/${apt.patientId}`}
+                                    className="font-bold text-foreground hover:text-primary hover:underline truncate block text-xs"
+                                    onClick={e => e.stopPropagation()}
+                                  >
                                     {apt.patientName || `Paciente #${apt.patientId}`}
                                   </Link>
-                                  <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{apt.status}</span>
+                                  <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
+                                    {apt.status}
+                                  </span>
+                                  {isCancelable && (
+                                    <span className="text-[9px] text-muted-foreground/50 group-hover:text-red-400 transition-colors">
+                                      clique para desmarcar
+                                    </span>
+                                  )}
                                 </div>
                               ) : (
                                 <button
@@ -226,6 +302,82 @@ export default function Agenda() {
           onClose={() => setBookingSlot(null)}
           onSuccess={() => { setBookingSlot(null); fetchAppointments(); toast({ title: "Agendado!", description: "Paciente incluído na agenda." }); }}
         />
+      )}
+
+      {/* ── Carla Cancel Dialog ── */}
+      {cancelDialog && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            {/* Header */}
+            <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-violet-600 to-indigo-600">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
+                C
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-sm">Carla — NFs Gestão</p>
+                <p className="text-white/70 text-xs">Assistente</p>
+              </div>
+              <button
+                onClick={() => setCancelDialog(null)}
+                className="text-white/60 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Message bubble */}
+            <div className="px-5 py-5">
+              {notifyDone ? (
+                <div className="flex flex-col items-center gap-3 py-4 text-center">
+                  <CheckCircle className="w-10 h-10 text-green-500" />
+                  <p className="font-semibold text-foreground">Mensagem enviada!</p>
+                  <p className="text-sm text-muted-foreground">
+                    O responsável de <strong>{cancelDialog.apt.patientName}</strong> foi avisado pelo WhatsApp.
+                  </p>
+                  <Button onClick={() => setCancelDialog(null)} className="mt-2 w-full">
+                    Fechar
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-violet-50 border border-violet-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
+                    <p className="text-sm text-foreground leading-relaxed">
+                      Vi que você desmarcou a sessão de{" "}
+                      <strong>{cancelDialog.profName}</strong>.{" "}
+                      Posso avisar o responsável pelo(a){" "}
+                      <strong>{cancelDialog.apt.patientName || "Paciente"}</strong> agora?
+                    </p>
+                  </div>
+
+                  {!cancelDialog.apt.guardianPhone && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                      ⚠️ Responsável sem telefone cadastrado — não será possível enviar o WhatsApp.
+                    </p>
+                  )}
+
+                  <div className="flex gap-3">
+                    <Button
+                      className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700"
+                      onClick={sendCancelNotification}
+                      disabled={notifySending || !cancelDialog.apt.guardianPhone}
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      {notifySending ? "Enviando..." : "Sim, avisar agora"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setCancelDialog(null)}
+                      disabled={notifySending}
+                    >
+                      Agora não
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

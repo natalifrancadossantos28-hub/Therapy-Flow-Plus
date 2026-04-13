@@ -19,7 +19,7 @@ export function formatDate(dateStr: string | null | undefined, dateFormat = "dd/
 export const getStatusColor = (status: string) => {
   const s = status.toLowerCase();
   if (s === "ativo" || s === "presente") return "badge-neon-green";
-  if (s === "inativo" || s === "ausente") return "badge-neon-red";
+  if (s === "inativo" || s === "ausente" || s === "desmarcado") return "badge-neon-red";
   if (s === "alta") return "badge-neon-blue";
   if (s === "agendado") return "badge-neon-blue";
   if (s === "remarcado") return "badge-neon-orange";

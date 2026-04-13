@@ -91,9 +91,29 @@ router.get("/appointments", async (req, res) => {
   if (req.query.professionalId) conditions.push(eq(appointmentsTable.professionalId, Number(req.query.professionalId)));
   if (req.query.patientId) conditions.push(eq(appointmentsTable.patientId, Number(req.query.patientId)));
 
-  const rows = conditions.length
-    ? await db.select().from(appointmentsTable).where(and(...conditions))
-    : await db.select().from(appointmentsTable);
+  const rows = await db
+    .select({
+      id: appointmentsTable.id,
+      patientId: appointmentsTable.patientId,
+      professionalId: appointmentsTable.professionalId,
+      date: appointmentsTable.date,
+      time: appointmentsTable.time,
+      status: appointmentsTable.status,
+      notes: appointmentsTable.notes,
+      rescheduledTo: appointmentsTable.rescheduledTo,
+      companyId: appointmentsTable.companyId,
+      createdAt: appointmentsTable.createdAt,
+      updatedAt: appointmentsTable.updatedAt,
+      patientName: patientsTable.name,
+      guardianName: patientsTable.guardianName,
+      guardianPhone: patientsTable.guardianPhone,
+      professionalName: professionalsTable.name,
+    })
+    .from(appointmentsTable)
+    .leftJoin(patientsTable, eq(appointmentsTable.patientId, patientsTable.id))
+    .leftJoin(professionalsTable, eq(appointmentsTable.professionalId, professionalsTable.id))
+    .where(conditions.length ? and(...conditions) : undefined);
+
   res.json(rows);
 });
 
