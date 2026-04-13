@@ -3,9 +3,10 @@ import fs from "fs";
 
 const router = Router();
 
-const STATUS_FILE   = "/tmp/whatsapp_bot_status.json";
-const ACTIVITY_FILE = "/tmp/bot_activity.json";
-const BOT_URL       = "http://localhost:3001";
+const STATUS_FILE    = "/tmp/whatsapp_bot_status.json";
+const ACTIVITY_FILE  = "/tmp/bot_activity.json";
+const ATESTADOS_FILE = "/tmp/atestados.json";
+const BOT_URL        = "http://localhost:3001";
 
 function lerStatus() {
   try {
@@ -51,6 +52,28 @@ router.post("/voice-chat", async (req, res) => {
 router.post("/cancel-notify", async (req, res) => {
   try {
     const r = await fetch(`${BOT_URL}/cancel-notify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await r.json();
+    res.json(data);
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+router.get("/atestados", (req, res) => {
+  try {
+    if (!fs.existsSync(ATESTADOS_FILE)) return res.json([]);
+    const lista = JSON.parse(fs.readFileSync(ATESTADOS_FILE, "utf8"));
+    res.json(lista.filter((a: any) => !a.processado));
+  } catch { res.json([]); }
+});
+
+router.post("/abonar-notify", async (req, res) => {
+  try {
+    const r = await fetch(`${BOT_URL}/abonar-notify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body),

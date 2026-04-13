@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetTodayAppointments,
   useUpdateAppointmentStatus,
@@ -9,7 +9,10 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom";
 import { getStatusColor, cn } from "@/lib/utils";
-import { Check, X, CalendarClock, AlertCircle, UserMinus, ChevronRight, Printer } from "lucide-react";
+import {
+  Check, X, CalendarClock, AlertCircle, UserMinus,
+  ChevronRight, Printer, ShieldCheck, MessageCircle, CheckCircle,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
@@ -43,24 +46,24 @@ type VacancyAlert = {
   priority: string;
 };
 
+type Atestado = {
+  guardianPhone: string;
+  patientName: string;
+  timestamp: string;
+  processado: boolean;
+};
+
+type AbonarDialog = {
+  apt: Appointment;
+  atestado: Atestado;
+};
+
 function DischargeModal({
-  alert,
-  onDischarge,
-  onClose,
-  isLoading,
-}: {
-  alert: DischargeAlert;
-  onDischarge: () => void;
-  onClose: () => void;
-  isLoading: boolean;
-}) {
+  alert, onDischarge, onClose, isLoading,
+}: { alert: DischargeAlert; onDischarge: () => void; onClose: () => void; isLoading: boolean }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <MotionCard
-        className="w-full max-w-md p-8 shadow-2xl"
-        initial={{ scale: 0.92, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-      >
+      <MotionCard className="w-full max-w-md p-8 shadow-2xl" initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
         <div className="flex flex-col items-center text-center gap-4 mb-6">
           <div className="w-16 h-16 rounded-2xl bg-rose-100 flex items-center justify-center">
             <AlertCircle className="w-8 h-8 text-rose-600" />
@@ -73,21 +76,12 @@ function DischargeModal({
             </p>
           </div>
         </div>
-
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl mb-6 text-sm text-rose-800 font-medium">
           O protocolo da clínica indica que pacientes com 3 ou mais faltas devem ter alta avaliada. Deseja dar alta para este paciente e liberar a vaga?
         </div>
-
         <div className="flex gap-3">
-          <Button variant="ghost" className="flex-1" onClick={onClose}>
-            Manter Paciente
-          </Button>
-          <Button
-            variant="destructive"
-            className="flex-1 gap-2"
-            onClick={onDischarge}
-            disabled={isLoading}
-          >
+          <Button variant="ghost" className="flex-1" onClick={onClose}>Manter Paciente</Button>
+          <Button variant="destructive" className="flex-1 gap-2" onClick={onDischarge} disabled={isLoading}>
             <UserMinus className="w-4 h-4" />
             {isLoading ? "Dando Alta..." : "Dar Alta"}
           </Button>
@@ -97,39 +91,21 @@ function DischargeModal({
   );
 }
 
-function VacancyModal({
-  alert,
-  onClose,
-}: {
-  alert: VacancyAlert;
-  onClose: () => void;
-}) {
+function VacancyModal({ alert, onClose }: { alert: VacancyAlert; onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <MotionCard
-        className="w-full max-w-md p-8 shadow-2xl border-2 border-emerald-200"
-        initial={{ scale: 0.92, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-      >
+      <MotionCard className="w-full max-w-md p-8 shadow-2xl border-2 border-emerald-200" initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
         <div className="flex flex-col items-center text-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center text-3xl">
-            🎉
-          </div>
+          <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center text-3xl">🎉</div>
           <div>
             <h3 className="text-2xl font-bold text-foreground">Vaga Liberada!</h3>
-            <p className="text-muted-foreground mt-1">
-              Uma nova vaga foi aberta. A lista de espera sugere chamar:
-            </p>
+            <p className="text-muted-foreground mt-1">Uma nova vaga foi aberta. A lista de espera sugere chamar:</p>
           </div>
         </div>
-
         <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-xl mb-6 flex items-center justify-between">
           <div>
             <p className="font-bold text-lg text-emerald-900">{alert.patientName}</p>
-            <p className="text-sm text-emerald-700 mt-0.5">
-              Prioridade:{" "}
-              <span className="font-semibold capitalize">{alert.priority}</span>
-            </p>
+            <p className="text-sm text-emerald-700 mt-0.5">Prioridade: <span className="font-semibold capitalize">{alert.priority}</span></p>
           </div>
           <Link href="/waiting-list" onClick={onClose}>
             <Button variant="outline" className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-100">
@@ -137,33 +113,26 @@ function VacancyModal({
             </Button>
           </Link>
         </div>
-
-        <Button variant="ghost" className="w-full" onClick={onClose}>
-          Fechar
-        </Button>
+        <Button variant="ghost" className="w-full" onClick={onClose}>Fechar</Button>
       </MotionCard>
     </div>
   );
 }
 
 function AppointmentRow({
-  apt,
-  index,
-  onStatusChange,
-  onDischargeRequest,
-  isUpdating,
+  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating,
 }: {
   apt: Appointment;
   index: number;
+  atestado: Atestado | null;
   onStatusChange: (id: number, status: string) => Promise<number>;
   onDischargeRequest: (apt: Appointment, count: number) => void;
+  onAbonarClick: (apt: Appointment, atestado: Atestado) => void;
   isUpdating: boolean;
 }) {
   const handleAbsent = async () => {
     const newCount = await onStatusChange(apt.id, "ausente");
-    if (newCount >= 3) {
-      onDischargeRequest(apt, newCount);
-    }
+    if (newCount >= 3) onDischargeRequest(apt, newCount);
   };
 
   const hasWarning = apt.patientAbsenceCount >= 3;
@@ -172,9 +141,7 @@ function AppointmentRow({
     <MotionCard
       className={cn(
         "p-4 border transition-colors",
-        hasWarning
-          ? "border-rose-300 bg-rose-50/50"
-          : "border-border/50 hover:border-primary/30"
+        hasWarning ? "border-rose-300 bg-rose-50/50" : "border-border/50 hover:border-primary/30"
       )}
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
@@ -200,6 +167,19 @@ function AppointmentRow({
             {apt.patientPhone && (
               <p className="text-xs text-muted-foreground">{apt.patientPhone}</p>
             )}
+            {/* ── Atestado badge neon amarelo ── */}
+            {atestado && (
+              <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold"
+                style={{
+                  background: "rgba(255,220,0,0.10)",
+                  border: "1px solid rgba(255,220,0,0.40)",
+                  color: "#ffd700",
+                  boxShadow: "0 0 10px rgba(255,220,0,0.25), 0 0 20px rgba(255,220,0,0.08)",
+                  textShadow: "0 0 6px rgba(255,220,0,0.7)",
+                }}>
+                ⚠️ Atestado recebido via WhatsApp
+              </div>
+            )}
           </div>
         </div>
 
@@ -207,6 +187,7 @@ function AppointmentRow({
           <Badge className={getStatusColor(apt.status)}>{apt.status}</Badge>
 
           <div className="flex gap-2 ml-4 pl-4 border-l border-border">
+            {/* ✓ Presente */}
             <button
               className="h-9 w-9 rounded-lg border border-emerald-200 text-emerald-600 hover:bg-emerald-50 flex items-center justify-center transition-colors disabled:opacity-40"
               onClick={() => onStatusChange(apt.id, "presente")}
@@ -215,6 +196,8 @@ function AppointmentRow({
             >
               <Check className="w-4 h-4" />
             </button>
+
+            {/* ✗ Falta */}
             <button
               className="h-9 w-9 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors disabled:opacity-40"
               onClick={handleAbsent}
@@ -223,13 +206,25 @@ function AppointmentRow({
             >
               <X className="w-4 h-4" />
             </button>
-            <button
-              className="h-9 px-3 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 text-sm font-bold transition-colors disabled:opacity-40"
-              onClick={() => onStatusChange(apt.id, "remarcado")}
-              disabled={isUpdating}
-            >
-              Remarcar
-            </button>
+
+            {/* Abonar (só aparece quando há atestado) */}
+            {atestado && (
+              <button
+                className="h-9 px-3 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
+                style={{
+                  background: "rgba(255,220,0,0.10)",
+                  border: "1px solid rgba(255,220,0,0.40)",
+                  color: "#ffd700",
+                  boxShadow: "0 0 8px rgba(255,220,0,0.20)",
+                }}
+                onClick={() => onAbonarClick(apt, atestado)}
+                disabled={isUpdating}
+                title="Abonar falta com atestado"
+              >
+                <ShieldCheck className="w-4 h-4 inline mr-1" />
+                Abonar
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -252,10 +247,37 @@ export default function Reception() {
   const [dischargeAlert, setDischargeAlert] = useState<DischargeAlert | null>(null);
   const [vacancyAlert, setVacancyAlert] = useState<VacancyAlert | null>(null);
   const [vacancyProfId, setVacancyProfId] = useState<number>(0);
+  const [atestados, setAtestados] = useState<Atestado[]>([]);
+  const [abonarDialog, setAbonarDialog] = useState<AbonarDialog | null>(null);
+  const [abonarSending, setAbonarSending] = useState(false);
+  const [abonarDone, setAbonarDone] = useState(false);
 
   const { refetch: checkVacancy } = useGetProfessionalVacancyAlert(vacancyProfId, {
     query: { enabled: false },
   });
+
+  // Poll atestados pendentes
+  useEffect(() => {
+    const fetchAtestados = () => {
+      fetch("/api/whatsapp/atestados")
+        .then(r => r.json())
+        .then(setAtestados)
+        .catch(() => {});
+    };
+    fetchAtestados();
+    const interval = setInterval(fetchAtestados, 20_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Match atestado by normalized phone
+  const findAtestado = (apt: Appointment): Atestado | null => {
+    if (!apt.patientPhone) return null;
+    const aptPhone = apt.patientPhone.replace(/\D/g, "");
+    return atestados.find(a => {
+      const aPhone = (a.guardianPhone || "").replace(/\D/g, "");
+      return aPhone && (aPhone === aptPhone || aPhone.endsWith(aptPhone) || aptPhone.endsWith(aPhone));
+    }) ?? null;
+  };
 
   const handlePrintPDF = () => {
     const todayStr = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
@@ -311,7 +333,6 @@ export default function Reception() {
   const handleStatusChange = async (id: number, status: string): Promise<number> => {
     const apt = appointments?.find((a) => a.id === id);
     let newAbsenceCount = apt?.patientAbsenceCount ?? 0;
-
     try {
       await updateStatus.mutateAsync({ id, data: { status } });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
@@ -323,10 +344,7 @@ export default function Reception() {
         newAbsenceCount = Math.max(0, (apt?.patientAbsenceCount ?? 1) - 1);
       }
 
-      toast({
-        title: "Status Atualizado",
-        description: `Consulta de ${apt?.patientName} marcada como ${status}.`,
-      });
+      toast({ title: "Status Atualizado", description: `Consulta de ${apt?.patientName} marcada como ${status}.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
     }
@@ -341,14 +359,12 @@ export default function Reception() {
   const handleConfirmDischarge = async () => {
     if (!dischargeAlert) return;
     const { appointment } = dischargeAlert;
-
     try {
       await deleteMutation.mutateAsync({ id: appointment.patientId });
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
       queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
       setDischargeAlert(null);
-
       toast({ title: "Alta Realizada", description: `${appointment.patientName} recebeu alta.` });
 
       const { data: alertData } = await checkVacancy();
@@ -364,11 +380,54 @@ export default function Reception() {
     }
   };
 
+  const handleAbonarClick = (apt: Appointment, atestado: Atestado) => {
+    setAbonarDone(false);
+    setAbonarDialog({ apt, atestado });
+  };
+
+  const confirmAbonar = async () => {
+    if (!abonarDialog) return;
+    setAbonarSending(true);
+    const { apt } = abonarDialog;
+    try {
+      // 1. Marcar como abonado
+      await updateStatus.mutateAsync({ id: apt.id, data: { status: "abonado" } });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
+
+      // 2. Carla notifica profissional
+      await fetch("/api/whatsapp/abonar-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientName: apt.patientName, professionalName: apt.professionalName }),
+      });
+
+      // 3. Remove do estado local
+      setAtestados(prev => prev.filter(a => a.guardianPhone !== abonarDialog.atestado.guardianPhone));
+
+      setAbonarDone(true);
+      toast({ title: "Falta Abonada!", description: `Carla avisou ${apt.professionalName} sobre o atestado de ${apt.patientName}.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível abonar a falta.", variant: "destructive" });
+    } finally {
+      setAbonarSending(false);
+    }
+  };
+
+  const atestadoCount = atestados.length;
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Recepção</h1>
-        <p className="text-muted-foreground mt-1">Gestão diária de presenças e faltas.</p>
+        <p className="text-muted-foreground mt-1">
+          Gestão diária de presenças e faltas.
+          {atestadoCount > 0 && (
+            <span className="ml-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold"
+              style={{ background: "rgba(255,220,0,0.12)", border: "1px solid rgba(255,220,0,0.35)", color: "#ffd700" }}>
+              ⚠️ {atestadoCount} atestado{atestadoCount > 1 ? "s" : ""} pendente{atestadoCount > 1 ? "s" : ""}
+            </span>
+          )}
+        </p>
       </div>
 
       <Card className="p-6">
@@ -376,16 +435,10 @@ export default function Reception() {
           <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-sm font-semibold text-muted-foreground">Filtrar:</span>
-            <Select
-              className="w-48"
-              value={profIdFilter}
-              onChange={(e) => setProfIdFilter(e.target.value)}
-            >
+            <Select className="w-48" value={profIdFilter} onChange={(e) => setProfIdFilter(e.target.value)}>
               <option value="">Todos os Profissionais</option>
               {professionals?.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </Select>
             <Button variant="outline" className="gap-2" onClick={handlePrintPDF}>
@@ -396,18 +449,14 @@ export default function Reception() {
 
         <div className="space-y-4">
           {isLoading ? (
-            <div className="text-center py-12 animate-pulse text-muted-foreground">
-              Carregando agenda do dia...
-            </div>
+            <div className="text-center py-12 animate-pulse text-muted-foreground">Carregando agenda do dia...</div>
           ) : appointments?.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4">
                 <CalendarClock className="w-8 h-8 text-muted-foreground" />
               </div>
               <p className="text-lg font-bold text-foreground">Agenda Vazia</p>
-              <p className="text-muted-foreground">
-                Nenhuma consulta encontrada para os filtros selecionados.
-              </p>
+              <p className="text-muted-foreground">Nenhuma consulta encontrada para os filtros selecionados.</p>
             </div>
           ) : (
             appointments?.map((apt, i) => (
@@ -415,8 +464,10 @@ export default function Reception() {
                 key={apt.id}
                 apt={apt as Appointment}
                 index={i}
+                atestado={findAtestado(apt as Appointment)}
                 onStatusChange={handleStatusChange}
                 onDischargeRequest={handleDischargeRequest}
+                onAbonarClick={handleAbonarClick}
                 isUpdating={updateStatus.isPending || deleteMutation.isPending}
               />
             ))
@@ -426,20 +477,69 @@ export default function Reception() {
 
       <AnimatePresence>
         {dischargeAlert && (
-          <DischargeModal
-            alert={dischargeAlert}
-            onDischarge={handleConfirmDischarge}
-            onClose={() => setDischargeAlert(null)}
-            isLoading={deleteMutation.isPending}
-          />
+          <DischargeModal alert={dischargeAlert} onDischarge={handleConfirmDischarge} onClose={() => setDischargeAlert(null)} isLoading={deleteMutation.isPending} />
         )}
         {vacancyAlert && (
-          <VacancyModal
-            alert={vacancyAlert}
-            onClose={() => setVacancyAlert(null)}
-          />
+          <VacancyModal alert={vacancyAlert} onClose={() => setVacancyAlert(null)} />
         )}
       </AnimatePresence>
+
+      {/* ── Carla: Abonar Dialog ── */}
+      {abonarDialog && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            {/* Header Carla */}
+            <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-amber-500 to-yellow-500">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">C</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-sm">Carla — NFs Gestão</p>
+                <p className="text-white/70 text-xs">Atestado Recebido</p>
+              </div>
+              <button onClick={() => setAbonarDialog(null)} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-5 py-5">
+              {abonarDone ? (
+                <div className="flex flex-col items-center gap-3 py-4 text-center">
+                  <CheckCircle className="w-10 h-10 text-yellow-500" />
+                  <p className="font-semibold text-foreground">Falta abonada com sucesso!</p>
+                  <p className="text-sm text-muted-foreground">
+                    Carla avisou <strong>{abonarDialog.apt.professionalName}</strong> sobre o atestado de <strong>{abonarDialog.apt.patientName}</strong>.
+                  </p>
+                  <Button onClick={() => setAbonarDialog(null)} className="mt-2 w-full">Fechar</Button>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-amber-50 border border-amber-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
+                    <p className="text-sm text-foreground leading-relaxed">
+                      Recebi um atestado de <strong>{abonarDialog.apt.patientName}</strong> via WhatsApp. Deseja abonar a falta na agenda de <strong>{abonarDialog.apt.professionalName}</strong>?
+                    </p>
+                    <p className="text-xs text-amber-700 mt-2">
+                      A sessão não precisa ser cobrada nem a falta será contabilizada.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      className="flex-1 gap-2 bg-amber-500 hover:bg-amber-600 text-white text-xs"
+                      onClick={confirmAbonar}
+                      disabled={abonarSending}
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      {abonarSending ? "Abonando..." : "Abonar e Avisar Profissional"}
+                    </Button>
+                    <Button variant="outline" className="flex-1" onClick={() => setAbonarDialog(null)} disabled={abonarSending}>
+                      Agora não
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

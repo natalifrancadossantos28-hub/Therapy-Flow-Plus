@@ -204,8 +204,9 @@ async function buscarTodosPacientes() {
 // ─────────────────────────────────────────────────────────────────────────────
 // ESTADO DO BOT
 // ─────────────────────────────────────────────────────────────────────────────
-const STATUS_FILE   = "/tmp/whatsapp_bot_status.json";
-const ACTIVITY_FILE = "/tmp/bot_activity.json";
+const STATUS_FILE    = "/tmp/whatsapp_bot_status.json";
+const ACTIVITY_FILE  = "/tmp/bot_activity.json";
+const ATESTADOS_FILE = "/tmp/atestados.json";
 let sock           = null;
 let qrCodeBase64   = null;
 let statusConexao  = "aguardando";
@@ -228,6 +229,25 @@ function logAtividade(mensagem, tipo = "info") {
     if (lista.length > 50) lista = lista.slice(0, 50); // manter últimas 50
     fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(lista));
   } catch {}
+}
+
+function registrarAtestado(guardianPhone, patientName) {
+  try {
+    let lista = [];
+    try { lista = JSON.parse(fs.readFileSync(ATESTADOS_FILE, "utf8")); } catch {}
+    const entrada = {
+      guardianPhone: (guardianPhone || "").replace(/\D/g, ""),
+      patientName: patientName || "Paciente",
+      timestamp: new Date().toISOString(),
+      processado: false,
+    };
+    lista.unshift(entrada);
+    if (lista.length > 50) lista = lista.slice(0, 50);
+    fs.writeFileSync(ATESTADOS_FILE, JSON.stringify(lista));
+    logAtividade(`📋 Atestado registrado — ${patientName}`, "info");
+  } catch (e) {
+    console.error("Erro ao salvar atestado:", e.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -555,6 +575,15 @@ async function processarMensagem(jid, mensagem, temAnexo) {
     temAnexo,
     horarioAtual: new Date().toLocaleString("pt-BR"),
   };
+
+  // Detectar atestado antes da IA (imagem OU palavra-chave de responsável)
+  if (!isRecepcao && !isMotorista && paciente) {
+    const isAtestadoTexto = /atestado|laudo|documento médico/.test(mensagem.toLowerCase());
+    const isAtestadoImagem = temAnexo === true;
+    if (isAtestadoTexto || isAtestadoImagem) {
+      registrarAtestado(jidParaNumero(jid), paciente.name || "Paciente");
+    }
+  }
 
   // Motoristas: fluxo específico
   if (isMotorista) {
@@ -978,6 +1007,46 @@ app.post(["/cancel-notify", "/assistente-nfs/cancel-notify"], async (req, res) =
   } catch (err) {
     console.error("❌ cancel-notify:", err.message);
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Abonar falta — notifica profissional que atestado foi aceito
+app.post(["/abonar-notify", "/assistente-nfs/abonar-notify"], async (req, res) => {
+  try {
+    const { patientName, professionalName } = req.body;
+    const msgGrupo =
+      `✅ *FALTA ABONADA*\n` +
+      `👤 Paciente: *${patientName || "Paciente"}*\n` +
+      `👩‍⚕️ Profissional: *${professionalName || "–"}*\n` +
+      `📋 Atestado médico recebido via WhatsApp — falta justificada.\n` +
+      `ℹ️ A sessão não precisa ser cobrada nem contabilizada.`;
+    await enviarGrupoProfissionais(msgGrupo);
+
+    // Marcar atestado como processado no arquivo
+    try {
+      let lista = [];
+      try { lista = JSON.parse(fs.readFileSync(ATESTADOS_FILE, "utf8")); } catch {}
+      const idx = lista.findIndex(a => a.patientName === patientName && !a.processado);
+      if (idx >= 0) lista[idx].processado = true;
+      fs.writeFileSync(ATESTADOS_FILE, JSON.stringify(lista));
+    } catch {}
+
+    logAtividade(`✅ Abono confirmado — ${patientName}`, "sucesso");
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ abonar-notify:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Buscar atestados pendentes
+app.get(["/atestados", "/assistente-nfs/atestados"], (req, res) => {
+  try {
+    let lista = [];
+    try { lista = JSON.parse(fs.readFileSync(ATESTADOS_FILE, "utf8")); } catch {}
+    res.json(lista.filter(a => !a.processado));
+  } catch (err) {
+    res.json([]);
   }
 });
 

@@ -26,6 +26,7 @@ export const getStatusColor = (status: string) => {
   if (s === "aguardando triagem") return "badge-neon-blue";
   if (s === "fila de espera") return "badge-neon-orange";
   if (s === "atendimento") return "badge-neon-green";
+  if (s === "abonado" || s === "falta_justificada" || s === "justificado") return "badge-neon-yellow";
   if (s === "pré-cadastro") return "bg-secondary text-muted-foreground border-border";
   if (s === "desistência") return "bg-secondary text-muted-foreground border-border";
   if (s === "óbito") return "bg-secondary text-muted-foreground border-border";
