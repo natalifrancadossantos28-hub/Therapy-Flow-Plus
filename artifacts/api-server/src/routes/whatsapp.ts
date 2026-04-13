@@ -154,7 +154,7 @@ router.get("/panel", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Carla — NFs gestão</title>
+<title>WhatsApp Bot — NFs gestão</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
@@ -459,8 +459,8 @@ body{
       <div class="avatar-ring-inner"></div>
       <div class="avatar-emoji">👩‍💼</div>
     </div>
-    <div class="hero-name">Olá, sou a Carla!</div>
-    <div class="hero-sub">Recepcionista Virtual · NFs gestão</div>
+    <div class="hero-name">WhatsApp Bot</div>
+    <div class="hero-sub">NFs gestão · Assistente de Recepção</div>
 
     <!-- Status dinâmico -->
     <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap">
@@ -469,49 +469,6 @@ body{
     </div>
     <div id="status-body" style="margin-top:14px"></div>
     <p id="status-loader" style="font-size:11px;color:rgba(255,255,255,.2);margin-top:8px">Conectando...</p>
-  </div>
-
-  <!-- ── CHAT ── -->
-  <div class="glass" style="padding:22px">
-    <div class="chat-header">
-      <div>
-        <div class="chat-title">💬 Fale com a Carla</div>
-        <div class="chat-sub">Ela conhece toda a agenda e responde ao vivo</div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        <button class="tts-btn" onclick="toggleTTS()" id="tts-label">🔊 Voz ON</button>
-        <div id="voz-nome" style="font-size:10px;color:rgba(255,255,255,.35);max-width:160px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="trocarVoz()" title="Clique para tentar outra voz">aguardando voz...</div>
-      </div>
-    </div>
-
-    <div class="iframe-warn" id="iframe-warn">
-      <a id="open-link" href="#" target="_blank">🔗 Abrir em nova aba para usar o microfone</a>
-    </div>
-
-    <!-- Bolha de resposta Carla (inicial) -->
-    <div class="bubble carla" id="va-response"></div>
-    <div class="bubble user" id="va-user"></div>
-    <div class="loading-dots" id="va-loading">
-      <div class="dot-wave"><span></span><span></span><span></span></div>
-    </div>
-
-    <!-- Input -->
-    <div class="input-row">
-      <input id="texto-input" type="text" placeholder="Pergunte algo para a Carla..."
-        onkeydown="if(event.key==='Enter')enviarTexto()" />
-      <button class="send-btn" onclick="enviarTexto()" title="Enviar">➤</button>
-      <button class="mic-btn" id="mic-btn" onclick="clicarMic()" title="Falar">🎤</button>
-    </div>
-
-    <!-- Atalhos -->
-    <div class="chips">
-      <span class="chip" onclick="perguntarIA('Quem faltou hoje?')">Quem faltou?</span>
-      <span class="chip" onclick="perguntarIA('Quantas consultas temos hoje?')">Agenda de hoje</span>
-      <span class="chip" onclick="perguntarIA('Próximo paciente da van?')">Van</span>
-      <span class="chip" onclick="perguntarIA('Quem ainda não confirmou?')">Pendentes</span>
-      <span class="chip" onclick="perguntarIA('Resumo do dia')">Resumo</span>
-    </div>
-    <div class="va-status" id="va-status"></div>
   </div>
 
   <!-- ── TERMINAL LOG ── -->
@@ -529,195 +486,6 @@ body{
 </div>
 
 <script>
-/* ── Saudação inicial ── */
-(function(){
-  var h=new Date().getHours();
-  var s=h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';
-  var msgs=[
-    s+'! Tô aqui, pode perguntar o que precisar. 😊',
-    s+'! Pode falar, tô de olho na agenda.',
-    s+'! Qualquer dúvida é só chamar!',
-  ];
-  var el=document.getElementById('va-response');
-  el.textContent='👩‍💼 '+msgs[Math.floor(Math.random()*msgs.length)];
-  el.style.display='block';
-})();
-
-/* ── TTS ── */
-var ttsAtivo=true;
-var vozCache=null;
-/* Nomes conhecidos de vozes MASCULINAS a excluir */
-var VOZES_MASC=/daniel|ricardo|benedito|carlos|jorge|antonio|joao|male|masculin/i;
-/* Nomes conhecidos de vozes FEMININAS a preferir (Google, Microsoft, Apple) */
-var VOZES_FEM=/maria|luciana|vitoria|francisca|edith|google portugu|female|feminino/i;
-function selecionarVoz(){
-  if(!window.speechSynthesis)return null;
-  var vs=speechSynthesis.getVoices();
-  if(!vs.length)return null;
-  var br=vs.filter(function(x){return x.lang==='pt-BR'||x.lang==='pt_BR'||x.lang==='pt-br';});
-  /* 1ª: voz BR com nome feminino explícito */
-  var v=br.find(function(x){return VOZES_FEM.test(x.name);});
-  /* 2ª: voz BR que NÃO tem nome masculino */
-  if(!v)v=br.find(function(x){return !VOZES_MASC.test(x.name);});
-  /* 3ª: qualquer voz BR */
-  if(!v)v=br[0];
-  /* 4ª: qualquer voz em pt */
-  if(!v)v=vs.find(function(x){return x.lang.startsWith('pt');});
-  return v||null;
-}
-function carregarVoz(){
-  var v=selecionarVoz();
-  if(v){
-    vozCache=v;
-    var el=document.getElementById('voz-nome');
-    if(el)el.textContent='🎙️ '+v.name;
-  }
-}
-var vozIdx=0;
-function trocarVoz(){
-  if(!window.speechSynthesis)return;
-  var vs=speechSynthesis.getVoices().filter(function(x){return x.lang==='pt-BR'||x.lang==='pt_BR'||x.lang==='pt-br'||x.lang.startsWith('pt');});
-  if(!vs.length){setStatus('Nenhuma voz pt-BR disponível no navegador');return;}
-  vozIdx=(vozIdx+1)%vs.length;
-  vozCache=vs[vozIdx];
-  var el=document.getElementById('voz-nome');
-  if(el)el.textContent='🎙️ '+vozCache.name;
-  /* Testa a nova voz imediatamente */
-  speechSynthesis.cancel();
-  var u=new SpeechSynthesisUtterance('Olá, sou a Carla!');
-  u.lang='pt-BR';u.rate=1.45;u.pitch=1.4;u.volume=1;u.voice=vozCache;
-  speechSynthesis.speak(u);
-}
-/* Tenta carregar imediatamente e nas mudanças de lista */
-if(window.speechSynthesis){
-  speechSynthesis.onvoiceschanged=carregarVoz;
-  carregarVoz();
-  [200,600,1200,2500].forEach(function(t){setTimeout(carregarVoz,t);});
-}
-function toggleTTS(){
-  ttsAtivo=!ttsAtivo;
-  document.getElementById('tts-label').textContent=ttsAtivo?'🔊 Voz ON':'🔇 Voz OFF';
-  if(!ttsAtivo&&window.speechSynthesis)speechSynthesis.cancel();
-}
-function falar(texto,callback){
-  if(!ttsAtivo||!window.speechSynthesis){if(callback)callback();return;}
-  speechSynthesis.cancel();
-  /* Re-seleciona voz a cada fala para garantir escolha correta */
-  var voz=vozCache||selecionarVoz();
-  var u=new SpeechSynthesisUtterance(texto);
-  u.lang='pt-BR';
-  u.rate=1.45;
-  u.pitch=1.4;
-  u.volume=1;
-  if(voz)u.voice=voz;
-  u.onend=function(){setStatus('');if(callback)callback();};
-  u.onerror=function(){if(callback)callback();};
-  speechSynthesis.speak(u);
-}
-
-/* ── UI ── */
-function setStatus(m){document.getElementById('va-status').textContent=m}
-function enviarTexto(){
-  var inp=document.getElementById('texto-input');
-  var p=(inp.value||'').trim();if(!p)return;inp.value='';perguntarIA(p);
-}
-function mostrarCarregando(p){
-  var u=document.getElementById('va-user');
-  u.textContent='🗣️ "'+p+'"';u.style.display='block';
-  document.getElementById('va-response').style.display='none';
-  document.getElementById('va-loading').style.display='block';
-  setStatus('⏳ Carla está respondendo...');
-}
-function mostrarResposta(p,resp){
-  var r=document.getElementById('va-response');
-  r.textContent='👩‍💼 '+resp;r.style.display='block';
-  document.getElementById('va-loading').style.display='none';
-  setStatus('');
-}
-async function perguntarIA(p){
-  mostrarCarregando(p);
-  var reiniciarDepois=modoConversa;
-  try{
-    var r=await fetch('/api/whatsapp/voice-chat',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({pergunta:p})
-    });
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    var d=await r.json();
-    var txt=d.resposta||'Não consegui obter resposta agora.';
-    mostrarResposta(p,txt);
-    setStatus('🔊 Falando...');
-    falar(txt,function(){
-      if(reiniciarDepois&&modoConversa){
-        setStatus('🎙️ Ouvindo novamente...');
-        setTimeout(iniciarMic,400);
-      }
-    });
-  }catch(e){
-    mostrarResposta(p,'Eita, tive um problema técnico agora. Tenta de novo?');
-    setStatus('❌ '+e.message);
-    if(reiniciarDepois&&modoConversa)setTimeout(iniciarMic,1000);
-  }
-}
-
-/* ── iframe detect ── */
-(function(){
-  var inIframe=false;try{inIframe=window.self!==window.top}catch(e){inIframe=true}
-  if(inIframe){
-    document.getElementById('iframe-warn').style.display='block';
-    document.getElementById('open-link').href=window.location.protocol+'//'+window.location.hostname+'/api/whatsapp/panel';
-  }
-})();
-
-/* ── Mic STT ── */
-var recognition=null,ouvindo=false,modoConversa=false,micPermitido=false;
-var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-function clicarMic(){
-  if(!SR){setStatus('Use o Chrome ou Edge para voz. Ou digite acima.');return;}
-  if(ouvindo){modoConversa=false;pararMic();return;}
-  modoConversa=true;
-  iniciarMic();
-}
-async function iniciarMic(){
-  if(!micPermitido){
-    try{var s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(function(t){t.stop()});micPermitido=true;}
-    catch(e){setStatus('🚫 Microfone bloqueado — abra em nova aba ou permita nas configurações do Chrome');document.getElementById('iframe-warn').style.display='block';modoConversa=false;return;}
-  }
-  if(recognition){try{recognition.abort();}catch(e){}}
-  recognition=new SR();
-  recognition.lang='pt-BR';
-  recognition.continuous=false;
-  recognition.interimResults=true;
-  var ft='';
-  recognition.onstart=function(){ouvindo=true;var b=document.getElementById('mic-btn');b.classList.add('listening');b.textContent='⏹';setStatus('🎙️ Ouvindo — clique para parar');};
-  recognition.onresult=function(e){
-    ft='';var interim='';
-    for(var i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal)ft+=e.results[i][0].transcript;
-      else interim+=e.results[i][0].transcript;
-    }
-    if(interim)setStatus('⌛ "'+interim+'"');
-  };
-  recognition.onerror=function(e){
-    if(e.error==='no-speech'){if(modoConversa){setTimeout(iniciarMic,300);}return;}
-    setStatus(e.error==='not-allowed'?'🚫 Microfone bloqueado':'❌ Erro mic: '+e.error);
-    modoConversa=false;pararMic();
-  };
-  recognition.onend=function(){
-    ouvindo=false;
-    var b=document.getElementById('mic-btn');b.classList.remove('listening');b.textContent='🎤';
-    if(ft.trim()){perguntarIA(ft.trim());}
-    else if(modoConversa){setTimeout(iniciarMic,200);}
-  };
-  try{recognition.start();}catch(e){setTimeout(iniciarMic,500);}
-}
-function pararMic(){
-  ouvindo=false;modoConversa=false;
-  var b=document.getElementById('mic-btn');b.classList.remove('listening');b.textContent='🎤';
-  try{if(recognition)recognition.abort();}catch(e){}
-  setStatus('');
-}
-
 /* ── Status polling ── */
 async function pollStatus(){
   try{
@@ -784,7 +552,6 @@ async function pollLog(){
       var cls='log-txt';
       if(e.tipo==='erro')cls+=' erro';
       else if(e.tipo==='aviso')cls+=' aviso';
-      else if(e.m&&e.m.includes('🎙️'))cls+=' voz';
       html+='<div class="log-row"><span class="log-ts">['+esc(e.t)+']</span><span class="'+cls+'">'+esc(e.m)+'</span></div>';
     });
     body.innerHTML=html;body.scrollTop=0;
