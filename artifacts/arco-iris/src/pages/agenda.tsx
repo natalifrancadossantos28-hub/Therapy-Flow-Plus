@@ -496,27 +496,11 @@ export default function Agenda() {
                                     {isRemarcado && (
                                       <span className="text-[9px] text-blue-400 font-semibold">↩ remanejado</span>
                                     )}
-                                    {apt.recurrenceGroupId && !isDesmarcado && !isRemarcado && (() => {
-                                      if (apt.ciclo === "A") return (
-                                        <span className="text-[9px] font-bold px-1 py-px rounded"
-                                          style={{ background: "rgba(0,212,255,0.12)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.3)" }}>
-                                          🔄 Sem. A
-                                        </span>
-                                      );
-                                      if (apt.ciclo === "B") return (
-                                        <span className="text-[9px] font-bold px-1 py-px rounded"
-                                          style={{ background: "rgba(167,139,250,0.12)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.3)" }}>
-                                          🔄 Sem. B
-                                        </span>
-                                      );
-                                      if (apt.ciclo === "M") return (
-                                        <span className="text-[9px] font-bold px-1 py-px rounded"
-                                          style={{ background: "rgba(52,211,153,0.12)", color: "#34d399", border: "1px solid rgba(52,211,153,0.3)" }}>
-                                          📆 Mensal
-                                        </span>
-                                      );
-                                      return <span className="text-[9px] text-muted-foreground/50">↺ semanal</span>;
-                                    })()}
+                                    {apt.recurrenceGroupId && !isDesmarcado && !isRemarcado && (
+                                      <span className="text-[9px] text-muted-foreground/50">
+                                        {apt.ciclo === "A" ? "↺ quinzenal A" : apt.ciclo === "B" ? "↺ quinzenal B" : apt.ciclo === "M" ? "↺ mensal" : "↺ semanal"}
+                                      </span>
+                                    )}
                                   </div>
 
                                   {/* Action menu */}
