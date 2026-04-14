@@ -1034,9 +1034,33 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
         {/* Ações */}
         <div className="flex flex-wrap gap-3 justify-center pb-8 no-print">
-          <button onClick={() => window.print()}
-            className="px-6 py-3 rounded-xl border border-border text-sm font-semibold hover:bg-secondary">
-            Imprimir / Salvar PDF
+          <button
+            onClick={() => {
+              const dataFmt = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
+              const base = `Triagem_${(nomePaciente || "Paciente").replace(/\s+/g, "_")}_${dataFmt}`;
+              const orig = document.title;
+              document.title = `IMPRESSAO_${base}`;
+              window.print();
+              setTimeout(() => { document.title = orig; }, 1500);
+            }}
+            style={{ background: "#00e5ff", color: "#000", border: "none", fontWeight: 700, cursor: "pointer" }}
+            className="px-6 py-3 rounded-xl text-sm font-semibold flex items-center gap-2"
+          >
+            🖨️ Imprimir Agora
+          </button>
+          <button
+            onClick={() => {
+              const dataFmt = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
+              const base = `Triagem_${(nomePaciente || "Paciente").replace(/\s+/g, "_")}_${dataFmt}`;
+              const orig = document.title;
+              document.title = `SALVAR_NA_PASTA_${base}`;
+              window.print();
+              setTimeout(() => { document.title = orig; }, 1500);
+            }}
+            style={{ background: "#bc13fe", color: "#fff", border: "none", fontWeight: 700, cursor: "pointer" }}
+            className="px-6 py-3 rounded-xl text-sm font-semibold flex items-center gap-2"
+          >
+            💾 Salvar em PDF
           </button>
           {!viewOnly && !salvo && (
             <button onClick={salvarTriagem} disabled={salvando}
