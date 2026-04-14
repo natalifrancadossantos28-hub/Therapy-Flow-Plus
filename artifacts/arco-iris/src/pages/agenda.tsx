@@ -205,23 +205,43 @@ export default function Agenda() {
     setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
   };
 
-  // ── Atendimento ──
+  // ── Log na tabela Notificações_Recepção ──
+  const logNotificacao = async (apt: Appointment, acao: string) => {
+    try {
+      await fetch("/api/notificacoes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointmentId: apt.id,
+          patientName: apt.patientName || `Paciente #${apt.patientId}`,
+          professionalName: apt.professionalName || selectedProf?.name || "—",
+          acao,
+          dataConsulta: apt.date,
+          horaConsulta: apt.time,
+        }),
+      });
+    } catch { /* silencioso — log não crítico */ }
+  };
+
+  // ── Concluir (era Atendimento) ──
   const handleAtendimento = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
       await patchStatus(apt, "atendimento");
-      toast({ title: "Em Atendimento", description: `${apt.patientName} confirmado na sessão.` });
+      await logNotificacao(apt, "Concluir");
+      toast({ title: "✅ Concluído", description: `${apt.patientName} confirmado na sessão.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível atualizar.", variant: "destructive" });
     }
   };
 
-  // ── Desmarcado (single date) ──
+  // ── Desmarcar (single date) ──
   const handleDesmarcado = async (apt: Appointment, profName: string) => {
     setActionMenuId(null);
     const originalStatus = apt.status;
     try {
       await patchStatus(apt, "desmarcado");
+      await logNotificacao(apt, "Desmarcar");
       setNotifyDone(false);
       setCancelDialog({ apt: { ...apt, status: "desmarcado" }, profName, originalStatus });
     } catch {
@@ -308,6 +328,10 @@ export default function Agenda() {
           }),
         });
       }
+      await logNotificacao(
+        { ...remanejFlow.apt, date: remanejFlow.newDate, time: remanejFlow.newTime },
+        "Remanejar"
+      );
       setRemanejDone(true);
     } catch {
       toast({ title: "Erro", description: "Não foi possível remanejar.", variant: "destructive" });
@@ -468,19 +492,19 @@ export default function Agenda() {
                                     onClick={() => setActionMenuId(isMenuOpen ? null : apt.id)}
                                     className={cn(
                                       "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
-                                      isDesmarcado && "bg-orange-950/10 border-orange-400/40",
+                                      isDesmarcado && "bg-red-950/10 border-red-500/40",
                                       isAtendimento && "bg-green-950/10 border-green-400/40",
-                                      isRemarcado && "bg-blue-950/10 border-blue-400/40",
+                                      isRemarcado && "bg-orange-950/10 border-orange-400/40",
                                       !isDesmarcado && !isAtendimento && !isRemarcado && "bg-white border-border/50",
                                       isMenuOpen && "ring-2 ring-primary/40"
                                     )}
                                     style={{
                                       boxShadow: isDesmarcado
-                                        ? "0 0 8px rgba(249,115,22,0.2)"
+                                        ? "0 0 8px rgba(239,68,68,0.25)"
                                         : isAtendimento
                                         ? "0 0 8px rgba(34,197,94,0.2)"
                                         : isRemarcado
-                                        ? "0 0 8px rgba(59,130,246,0.2)"
+                                        ? "0 0 8px rgba(249,115,22,0.2)"
                                         : "none",
                                     }}
                                   >
@@ -520,14 +544,14 @@ export default function Agenda() {
                                       <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
 
                                       <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                        <Activity className="w-3.5 h-3.5" /> Atendimento
+                                        <Activity className="w-3.5 h-3.5" /> Concluir
                                       </button>
 
-                                      <button style={NEON.orange} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
-                                        <AlertTriangle className="w-3.5 h-3.5" /> Desmarcado
+                                      <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
+                                        <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
                                       </button>
 
-                                      <button style={NEON.blue} onClick={() => handleStartRemanejar(apt)}>
+                                      <button style={NEON.orange} onClick={() => handleStartRemanejar(apt)}>
                                         <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                       </button>
 

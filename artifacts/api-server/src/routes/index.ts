@@ -8,6 +8,7 @@ import triagemRouter from "./triagens";
 import pontoRouter from "./ponto";
 import errorLogsRouter from "./error-logs";
 import whatsappRouter from "./whatsapp";
+import notificacoesRouter from "./notificacoes";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(triagemRouter);
 router.use(pontoRouter);
 router.use(errorLogsRouter);
 router.use("/whatsapp", whatsappRouter);
+router.use(notificacoesRouter);
 
 export default router;

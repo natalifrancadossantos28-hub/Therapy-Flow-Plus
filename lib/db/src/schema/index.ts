@@ -5,3 +5,4 @@ export * from "./waiting-list";
 export * from "./triagens";
 export * from "./ponto";
 export * from "./error-logs";
+export * from "./notificacoes";
