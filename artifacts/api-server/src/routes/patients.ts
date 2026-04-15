@@ -168,13 +168,17 @@ router.post("/patients/:id/add-to-fila", async (req, res) => {
     });
   }
 
+  const specialty = req.body.specialty ?? null;
+  const existingConditions: any[] = [eq(waitingListTable.patientId, id)];
+  if (specialty) existingConditions.push(eq(waitingListTable.specialty, specialty));
+  else existingConditions.push(sql`${waitingListTable.specialty} IS NULL`);
   const existing = await db.select({ id: waitingListTable.id })
     .from(waitingListTable)
-    .where(eq(waitingListTable.patientId, id));
+    .where(and(...existingConditions));
   if (existing.length > 0) {
     return res.status(409).json({
       error: "Já na fila",
-      message: "Este paciente já está na fila de espera.",
+      message: `Este paciente já está na fila${specialty ? ` para ${specialty}` : ""}.`,
     });
   }
 
@@ -185,7 +189,6 @@ router.post("/patients/:id/add-to-fila", async (req, res) => {
   );
 
   const today = new Date().toISOString().split("T")[0];
-  const specialty = req.body.specialty ?? null;
 
   const [entry] = await db.insert(waitingListTable).values({
     patientId: id,

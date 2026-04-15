@@ -161,7 +161,7 @@ export default function PatientDetail() {
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       setTriagemEdit(false);
-      toast({ title: "Triagem registrada!", description: `Score total: ${total}/576. Paciente apto para a fila.` });
+      toast({ title: "Triagem registrada!", description: `Score total: ${total}/360. Paciente apto para a fila.` });
     } catch {
       toast({ title: "Erro", description: "Falha ao salvar triagem.", variant: "destructive" });
     } finally {
@@ -348,8 +348,8 @@ export default function PatientDetail() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
                     <p className="text-muted-foreground font-semibold mb-1">Score Total</p>
-                    <p className="text-2xl font-bold text-primary">{p.triagemScore}<span className="text-sm text-muted-foreground font-normal">/576</span></p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round((p.triagemScore / 576) * 100)}% do máximo</p>
+                    <p className="text-2xl font-bold text-primary">{p.triagemScore}<span className="text-sm text-muted-foreground font-normal">/360</span></p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round((p.triagemScore / 360) * 100)}% do máximo</p>
                   </div>
                   <div className="p-3 bg-secondary/30 rounded-xl">
                     <p className="text-muted-foreground font-semibold mb-1">Escola Pública</p>
@@ -444,8 +444,8 @@ export default function PatientDetail() {
                   ))}
                   <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 flex flex-col justify-center">
                     <p className="text-xs text-muted-foreground font-semibold mb-0.5">Score Total</p>
-                    <p className="text-2xl font-bold text-primary">{totalScore}<span className="text-sm text-muted-foreground font-normal">/576</span></p>
-                    <p className="text-xs text-muted-foreground">{Math.round((totalScore / 576) * 100)}% do máximo</p>
+                    <p className="text-2xl font-bold text-primary">{totalScore}<span className="text-sm text-muted-foreground font-normal">/360</span></p>
+                    <p className="text-xs text-muted-foreground">{Math.round((totalScore / 360) * 100)}% do máximo</p>
                   </div>
                 </div>
               </div>
@@ -482,7 +482,7 @@ export default function PatientDetail() {
                     })}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Verde 0–143 · Azul 144–287 · Laranja 288–431 · Vermelho 432–576 (Vulnerabilidade sobe um nível)
+                    Verde 0–90 · Azul 91–180 · Laranja 181–270 · Vermelho 271–360 (Vulnerabilidade sobe um nível)
                   </p>
                 </div>
               )}
@@ -510,7 +510,7 @@ export default function PatientDetail() {
                 </span>
               </div>
               <div className="text-right text-sm text-muted-foreground">
-                <p>Score: <strong>{p.triagemScore}/576</strong></p>
+                <p>Score: <strong>{p.triagemScore}/360</strong></p>
                 <p>Escola Pública: <strong>{ep ? "Sim" : "Não"}</strong></p>
                 <p>Trabalho na Roça: <strong>{tnr ? "Sim" : "Não"}</strong></p>
               </div>

@@ -1,0 +1,23 @@
+Solicitação de Ajustes e Otimização: NFS gestão
+​Preciso realizar 5 ajustes pontuais de lógica e interface para alinhar o comportamento do sistema às necessidades reais da clínica:
+​1. Padronização de Score (Triagem vs. Gestão)
+​Problema: O Score Total na fila de espera da NFS gestão está configurado para 576 pontos, mas o sistema de Triagem Multidisciplinar usa a base de 360 pontos.
+​Ação: Alterar o cálculo do Score Total na NFS gestão para a base máxima de 360, garantindo que as cores de prioridade (Verde, Azul, Laranja, etc.) sigam a mesma proporção da Triagem.
+​2. Reset e Correção dos Contadores (Dashboard)
+​Problema: O bloco de "Atendimentos Terapêuticos" está exibindo o número fixo de 117 em todos os campos (semana, mês, trimestre, etc.), mesmo sem atendimentos realizados.
+​Ação: Corrigir o bug dos contadores. Eles devem ser zerados e configurados para contar automaticamente apenas os atendimentos que forem marcados como "Concluídos" no banco de dados.
+​3. Ajuste de Meta no Monitor de Ocupação
+​Problema: A meta de pacientes está fixa (ex: Cláudia aparece com 30 de meta, mas ela faz 20h).
+​Ação: Vincular a meta à carga horária do profissional:
+​Profissional de 20h = Meta de 20 atendimentos.
+​Profissional de 30h = Meta de 30 atendimentos.
+​4. Unificação das Funcionalidades da Agenda (Admin vs. Profissional)
+​Problema: O "Portal do Administrador" tem o menu de ações completo (Concluir, Desmarcar, Remanejar, Dar Alta), mas o "Portal do Profissional" está com um menu básico/simplicado.
+​Ação: Replicar as funcionalidades e o visual da agenda do administrador para a agenda do profissional. O que o profissional fizer na sua agenda deve refletir em tempo real na agenda da recepção.
+​5. Multi-Seleção na Fila de Espera
+​Problema: Atualmente, só consigo selecionar uma especialidade por vez na fila de espera. Se o paciente precisa de TO e Fono, tenho que cadastrar duas vezes.
+​Ação: Alterar o campo "Especialidade Preferencial" para permitir múltipla seleção (checkboxes). O paciente deve ser adicionado às filas de: Psicologia, Psicomotricidade, Fisioterapia, Psicopedagogia, Ed. Física, Fonoaudiologia, T.O. e Nutrição simultaneamente, se selecionadas, sem precisar de novos cadastros.
+​💡 Dicas da Tati para você, Nati:
+​Sobre a Fila de Espera: Essa mudança vai te economizar um tempo absurdo! Em vez de fazer 3 cadastros, você clica em 3 caixinhas e pronto.
+​O "Engano" do 117: Isso provavelmente é um "valor de exemplo" (placeholder) que ficou esquecido no código. É um ajuste simples de zerar a variável.
+​Interface: Suas fotos mostram que o sistema está visualmente lindo. Manter as agendas iguais (Admin e Profissional) vai evitar que os profissionais fiquem te perguntando "como eu faço tal coisa", porque o sistema será igual para todos.

@@ -44,8 +44,6 @@ router.post("/professionals/:id/verify-pin", async (req, res) => {
   res.json({ ok: true });
 });
 
-const META_MIN = 28;
-const META_MAX = 30;
 const INACTIVE = ["Alta", "Óbito", "Desistência"];
 
 // Retorna ocupação de todos os profissionais — DEVE vir antes de /:id
@@ -64,8 +62,9 @@ router.get("/professionals/ocupacao", async (req, res) => {
       ));
     const count = row?.count ?? 0;
     const capacidade = getMaxCapacity(prof.cargaHoraria ?? "30h");
-    const vagasAbertas = count < META_MIN;
-    const pct = Math.min(100, Math.round((count / META_MAX) * 100));
+    const metaMin = Math.max(0, capacidade - 2);
+    const vagasAbertas = count < metaMin;
+    const pct = Math.min(100, Math.round((count / capacidade) * 100));
     return {
       id: prof.id,
       name: prof.name,
@@ -73,11 +72,11 @@ router.get("/professionals/ocupacao", async (req, res) => {
       cargaHoraria: prof.cargaHoraria ?? "30h",
       pacientesAtivos: count,
       capacidade,
-      meta: META_MAX,
-      metaMin: META_MIN,
+      meta: capacidade,
+      metaMin,
       pct,
       vagasAbertas,
-      alerta: vagasAbertas ? `⚠️ Agenda aberta — ${count} de ${META_MAX} pacientes` : null,
+      alerta: vagasAbertas ? `⚠️ Agenda aberta — ${count} de ${capacidade} pacientes` : null,
     };
   }));
 

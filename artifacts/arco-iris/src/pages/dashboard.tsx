@@ -335,7 +335,7 @@ export default function Dashboard() {
               ))}
               <div className="mt-3 pt-3 border-t border-border flex justify-between text-sm">
                 <span className="font-semibold text-muted-foreground">Score Médio Total</span>
-                <span className="font-bold text-primary">{Math.round(radarData.reduce((s, d) => s + d.score, 0))}/576</span>
+                <span className="font-bold text-primary">{Math.round(radarData.reduce((s, d) => s + d.score, 0))}/360</span>
               </div>
             </div>
           </div>

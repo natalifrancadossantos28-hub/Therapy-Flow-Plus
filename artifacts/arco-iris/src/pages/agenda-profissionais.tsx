@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, Activity, AlertTriangle, RotateCcw, XCircle } from "lucide-react";
 import { cn, getStatusColor } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -20,6 +20,12 @@ function getWeekDays(ref: Date): Date[] {
 type Professional = { id: number; name: string; specialty: string; pin?: string };
 type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number };
 
+const NEON: Record<string, React.CSSProperties> = {
+  green: { background: "rgba(5,10,5,0.92)", border: "1px solid #22c55e", color: "#4ade80", boxShadow: "0 0 14px rgba(34,197,94,0.55)", textShadow: "0 0 8px rgba(74,222,128,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
+  red: { background: "rgba(10,0,0,0.92)", border: "1px solid #ef4444", color: "#f87171", boxShadow: "0 0 14px rgba(239,68,68,0.55)", textShadow: "0 0 8px rgba(248,113,113,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
+  orange: { background: "rgba(10,5,0,0.92)", border: "1px solid #f97316", color: "#fb923c", boxShadow: "0 0 14px rgba(249,115,22,0.55)", textShadow: "0 0 8px rgba(251,146,60,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
+};
+
 export default function AgendaProfissionais() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [selectedProfId, setSelectedProfId] = useState("");
@@ -30,6 +36,8 @@ export default function AgendaProfissionais() {
   const [weekRef] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
+  const [actionMenuId, setActionMenuId] = useState<number | null>(null);
+  const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
   const { toast } = useToast();
 
   const weekDays = getWeekDays(weekRef);
@@ -136,6 +144,82 @@ export default function AgendaProfissionais() {
       <p style="margin-top:24px;font-size:11px;color:#94a3b8;">Encerramento: 16:30 | NFS – Gestão Terapêutica</p>
     </body></html>`);
     printWindow.document.close();
+  };
+
+  const patchStatus = async (apt: Appointment, status: string) => {
+    await fetch(`/api/appointments/${apt.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
+  };
+
+  const logNotificacao = async (apt: Appointment, acao: string) => {
+    try {
+      await fetch("/api/notificacoes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointmentId: apt.id,
+          patientName: apt.patientName || `Paciente #${apt.patientId}`,
+          professionalName: selectedProf?.name || "—",
+          acao,
+          dataConsulta: apt.date,
+          horaConsulta: apt.time,
+        }),
+      });
+    } catch { /* silencioso */ }
+  };
+
+  const handleConcluir = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "atendimento");
+      await logNotificacao(apt, "Concluir");
+      toast({ title: "✅ Concluído", description: `${apt.patientName} confirmado na sessão.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível atualizar.", variant: "destructive" });
+    }
+  };
+
+  const handleDesmarcar = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "desmarcado");
+      await logNotificacao(apt, "Desmarcar");
+      toast({ title: "🔴 Desmarcado", description: `${apt.patientName} removido da sessão.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível desmarcar.", variant: "destructive" });
+    }
+  };
+
+  const handleRemanejar = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "remarcado");
+      await logNotificacao(apt, "Remanejar");
+      toast({ title: "🟠 Remanejar", description: `${apt.patientName} marcado para reagendamento. A recepção será notificada.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível remarcar.", variant: "destructive" });
+    }
+  };
+
+  const handleDarAlta = (apt: Appointment) => {
+    setActionMenuId(null);
+    setAltaConfirm(apt);
+  };
+
+  const confirmDarAlta = async () => {
+    if (!altaConfirm) return;
+    try {
+      await fetch(`/api/appointments/${altaConfirm.id}/alta`, { method: "DELETE" });
+      setAppointments(prev => prev.filter(a => a.id !== altaConfirm.id));
+      setAltaConfirm(null);
+      toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
+    }
   };
 
   const getApt = (date: string, time: string) => appointments.find(a => a.date === date && a.time === time);
@@ -289,17 +373,59 @@ export default function AgendaProfissionais() {
                               const apt = getApt(date, time);
                               const isToday = date === today;
                               return (
-                                <td key={i} className={cn("px-4 py-2.5", isToday && "bg-primary/5")}>
-                                  {apt ? (
-                                    <div className="p-2.5 rounded-xl border border-border bg-secondary/50">
-                                      <p className="font-semibold text-foreground text-xs truncate">
-                                        {apt.patientName || `Paciente #${apt.patientId}`}
-                                      </p>
-                                      <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max mt-1 block", getStatusColor(apt.status))}>
-                                        {apt.status}
-                                      </span>
-                                    </div>
-                                  ) : (
+                                <td key={i} className={cn("px-4 py-2.5 relative", isToday && "bg-primary/5")}>
+                                  {apt ? (() => {
+                                    const isMenuOpen = actionMenuId === apt.id;
+                                    const isDesmarcado = apt.status?.toLowerCase() === "desmarcado";
+                                    const isAtendimento = apt.status?.toLowerCase() === "atendimento";
+                                    const isRemarcado = apt.status?.toLowerCase() === "remarcado";
+                                    return (
+                                      <div className="relative">
+                                        <div
+                                          onClick={() => setActionMenuId(isMenuOpen ? null : apt.id)}
+                                          className={cn(
+                                            "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
+                                            isDesmarcado && "bg-red-950/10 border-red-500/40",
+                                            isAtendimento && "bg-green-950/10 border-green-400/40",
+                                            isRemarcado && "bg-orange-950/10 border-orange-400/40",
+                                            !isDesmarcado && !isAtendimento && !isRemarcado && "bg-secondary/50 border-border",
+                                            isMenuOpen && "ring-2 ring-primary/40"
+                                          )}
+                                          style={{
+                                            boxShadow: isDesmarcado ? "0 0 8px rgba(239,68,68,0.25)" : isAtendimento ? "0 0 8px rgba(34,197,94,0.2)" : isRemarcado ? "0 0 8px rgba(249,115,22,0.2)" : "none",
+                                          }}
+                                        >
+                                          <p className="font-bold text-foreground truncate text-xs leading-tight">{apt.patientName || `Paciente #${apt.patientId}`}</p>
+                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{apt.status}</span>
+                                        </div>
+                                        {isMenuOpen && (
+                                          <div
+                                            className="absolute z-50 top-full left-0 mt-1 min-w-[180px] rounded-2xl shadow-2xl"
+                                            style={{ background: "rgba(2,4,8,0.97)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)", padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}
+                                          >
+                                            <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
+                                            <button style={NEON.green} onClick={() => handleConcluir(apt)}>
+                                              <Activity className="w-3.5 h-3.5" /> Concluir
+                                            </button>
+                                            <button style={NEON.red} onClick={() => handleDesmarcar(apt)}>
+                                              <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
+                                            </button>
+                                            <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
+                                              <RotateCcw className="w-3.5 h-3.5" /> Remanejar
+                                            </button>
+                                            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "4px", paddingTop: "6px" }}>
+                                              <button style={NEON.red} onClick={() => handleDarAlta(apt)}>
+                                                <LogOut className="w-3.5 h-3.5" /> Dar Alta
+                                              </button>
+                                            </div>
+                                            <button onClick={() => setActionMenuId(null)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.3)", fontSize: "10px", cursor: "pointer", marginTop: "2px", textAlign: "center" }}>
+                                              <XCircle className="w-3 h-3 inline mr-1" />Fechar
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })() : (
                                     <button
                                       onClick={() => setBookingSlot({ date, time })}
                                       className="w-full min-h-[50px] flex items-center justify-center border-2 border-dashed border-border/50 rounded-xl text-muted-foreground/40 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all text-[10px] font-semibold cursor-pointer"
@@ -342,6 +468,35 @@ export default function AgendaProfissionais() {
           </>
         )}
       </div>
+
+      {altaConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setAltaConfirm(null)}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }} onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444" }}>
+                  <LogOut className="w-5 h-5" style={{ color: "#f87171" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#f87171" }}>Dar Alta</p>
+                  <p className="text-xs text-white/50">Esta ação liberará o horário permanentemente</p>
+                </div>
+              </div>
+              <p className="text-sm text-white/70 mb-5">
+                Confirmar alta de <strong className="text-white">{altaConfirm.patientName}</strong>? Os próximos agendamentos recorrentes serão cancelados.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setAltaConfirm(null)} className="flex-1 py-3 rounded-xl font-semibold text-sm" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
+                  Cancelar
+                </button>
+                <button onClick={confirmDarAlta} className="flex-1 py-3 rounded-xl font-bold text-sm" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444", color: "#f87171", boxShadow: "0 0 16px rgba(239,68,68,0.3)" }}>
+                  Confirmar Alta
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {bookingSlot && selectedProfId && (
         <BookingModal

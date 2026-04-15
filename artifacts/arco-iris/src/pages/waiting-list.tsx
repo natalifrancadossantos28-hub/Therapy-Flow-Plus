@@ -33,7 +33,7 @@ export default function WaitingList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [formPatientId, setFormPatientId] = useState("");
-  const [formSpecialty, setFormSpecialty] = useState("");
+  const [formSpecialties, setFormSpecialties] = useState<string[]>([]);
 
   const { data: waitingList, isLoading } = useGetWaitingList({} as any, { refetchInterval: 20_000 } as any);
   const { data: patients } = useGetPatients();
@@ -42,34 +42,51 @@ export default function WaitingList() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const waitingListIds = new Set((waitingList ?? []).map((e) => e.patientId));
-
   const eligiblePatients = (patients ?? []).filter((p) => {
     const score = (p as any).triagemScore;
-    const alreadyInQueue = waitingListIds.has(p.id);
-    const inactiveStatus = ["Alta", "Óbito", "Desistência", "Atendimento", "Fila de Espera"].includes(p.status ?? "");
-    return score != null && !alreadyInQueue && !inactiveStatus;
+    const inactiveStatus = ["Alta", "Óbito", "Desistência", "Atendimento"].includes(p.status ?? "");
+    return score != null && !inactiveStatus;
   });
 
-  const resetForm = () => { setFormPatientId(""); setFormSpecialty(""); };
+  const ALL_SPECIALTIES = [
+    "Psicologia", "Psicomotricidade", "Fisioterapia", "Psicopedagogia",
+    "Educação Física", "Fonoaudiologia", "Terapia Ocupacional", "Nutrição",
+  ];
+
+  const toggleSpecialty = (sp: string) => {
+    setFormSpecialties(prev =>
+      prev.includes(sp) ? prev.filter(s => s !== sp) : [...prev, sp]
+    );
+  };
+
+  const resetForm = () => { setFormPatientId(""); setFormSpecialties([]); };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formPatientId) return;
+    const specialtiesToAdd = formSpecialties.length > 0 ? formSpecialties : [null as unknown as string];
     setAdding(true);
+    let added = 0;
+    let skipped = 0;
+    let lastPriority = "";
     try {
-      const result = await apiAddToFila(
-        parseInt(formPatientId),
-        formSpecialty || null,
-      );
+      for (const sp of specialtiesToAdd) {
+        try {
+          const result = await apiAddToFila(parseInt(formPatientId), sp ?? null);
+          lastPriority = result.priority;
+          added++;
+        } catch (err: any) {
+          if (err.message?.includes("Já na fila")) skipped++;
+          else throw err;
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      toast({
-        title: "Adicionado à fila!",
-        description: `Prioridade calculada automaticamente: ${PRIORITY_LABEL[result.priority] ?? result.priority}`,
-      });
-      setIsDialogOpen(false);
-      resetForm();
+      const desc = added > 0
+        ? `${added} entrada(s) adicionada(s)${skipped > 0 ? `, ${skipped} já existia(m)` : ""}. Prioridade: ${PRIORITY_LABEL[lastPriority] ?? lastPriority}`
+        : `Todas as especialidades já estavam na fila.`;
+      toast({ title: added > 0 ? "Adicionado à fila!" : "Aviso", description: desc, variant: added > 0 ? "default" : "destructive" });
+      if (added > 0) { setIsDialogOpen(false); resetForm(); }
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
@@ -196,7 +213,7 @@ export default function WaitingList() {
                     const score = (p as any).triagemScore;
                     return (
                       <option key={p.id} value={p.id}>
-                        {p.name} — Score: {score}/576
+                        {p.name} — Score: {score}/360
                       </option>
                     );
                   })}
@@ -208,16 +225,27 @@ export default function WaitingList() {
                 )}
               </div>
               <div>
-                <Label>Especialidade Preferencial (Opcional)</Label>
-                <Select value={formSpecialty} onChange={e => setFormSpecialty(e.target.value)}>
-                  <option value="">Qualquer Especialidade</option>
-                  {[...new Set(professionals?.map(p => p.specialty).filter(Boolean) ?? [])].map(sp => (
-                    <option key={sp} value={sp}>{sp}</option>
+                <Label>Especialidades Preferenciais</Label>
+                <p className="text-xs text-muted-foreground mb-2">Selecione uma ou mais especialidades. O paciente entrará na fila de cada uma selecionada.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {ALL_SPECIALTIES.map(sp => (
+                    <label key={sp} className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-colors text-sm font-medium select-none ${formSpecialties.includes(sp) ? "bg-primary/10 border-primary/40 text-primary" : "bg-secondary/30 border-border text-muted-foreground hover:bg-secondary/60"}`}>
+                      <input
+                        type="checkbox"
+                        checked={formSpecialties.includes(sp)}
+                        onChange={() => toggleSpecialty(sp)}
+                        className="accent-primary w-4 h-4 shrink-0"
+                      />
+                      {sp}
+                    </label>
                   ))}
-                </Select>
+                </div>
+                {formSpecialties.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-2 font-semibold">Nenhuma selecionada → entrará como "Qualquer Especialidade"</p>
+                )}
               </div>
               <div className="p-3 bg-secondary/40 rounded-xl text-xs text-muted-foreground">
-                A prioridade (Alta / Média / Baixa) será calculada automaticamente com base no score clínico e critérios de vulnerabilidade registrados na triagem.
+                A prioridade (Elevado / Moderado / Leve / Baixo) é calculada automaticamente com base no score clínico e critérios de vulnerabilidade da triagem.
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <Button type="button" variant="ghost" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>

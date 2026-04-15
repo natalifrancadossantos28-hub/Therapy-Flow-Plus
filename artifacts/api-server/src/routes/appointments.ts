@@ -99,9 +99,11 @@ router.get("/appointments/stats", async (req, res) => {
 
   const fmt = (d: Date) => d.toISOString().split("T")[0];
 
-  const rows = companyId
-    ? await db.select({ date: appointmentsTable.date }).from(appointmentsTable).where(eq(appointmentsTable.companyId, companyId))
-    : await db.select({ date: appointmentsTable.date }).from(appointmentsTable);
+  const baseCondition = companyId
+    ? and(eq(appointmentsTable.companyId, companyId), eq(appointmentsTable.status, "atendimento"))
+    : eq(appointmentsTable.status, "atendimento");
+
+  const rows = await db.select({ date: appointmentsTable.date }).from(appointmentsTable).where(baseCondition);
 
   const count = (from: Date) => rows.filter(r => r.date >= fmt(from)).length;
 
