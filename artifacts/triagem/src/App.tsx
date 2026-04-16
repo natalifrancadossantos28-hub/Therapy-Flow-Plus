@@ -892,7 +892,8 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
   }, []);
 
   // Simplified Censo confirmation screen
-  if (isCenso) {
+  // ── Censo: tela de confirmação (novo cadastro, não viewOnly)
+  if (isCenso && !viewOnly && !editId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="w-full max-w-md text-center space-y-6">
@@ -927,6 +928,86 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
               </>
             )}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Censo: ficha de impressão (viewOnly ou editId)
+  if (isCenso) {
+    const camposCenso: { label: string; valor?: string | null }[] = [
+      { label: "Nome", valor: nomePaciente },
+      { label: "Data de Nascimento", valor: dataNascimento ? new Date(dataNascimento + "T12:00:00").toLocaleDateString("pt-BR") : undefined },
+      { label: "Idade", valor: idade },
+      { label: "Naturalidade", valor: naturalidade },
+      { label: "CPF", valor: cpf },
+      { label: "RG", valor: rg },
+      { label: "Cartão SUS", valor: sus },
+      { label: "Responsável", valor: nomeResponsavel },
+      { label: "Telefone", valor: telefone },
+      { label: "Endereço", valor: endereco },
+      { label: "Diagnóstico", valor: diagnostico },
+      { label: "CID-10", valor: cid },
+      { label: "CID-11", valor: cid11 },
+      { label: "Data do Registro", valor: data },
+    ].filter(c => c.valor && String(c.valor).trim());
+    return (
+      <div className="min-h-screen bg-background">
+        <Header page="relatorio" />
+        <div className="max-w-2xl mx-auto p-6 space-y-6">
+
+          {/* Botões de impressão — ficam ocultos na impressão */}
+          <div className="flex gap-3 no-print">
+            <button onClick={() => navigate("/lista")}
+              className="px-4 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-secondary transition-colors">
+              ← Voltar
+            </button>
+            <button onClick={() => window.print()}
+              className="px-4 py-2 rounded-xl bg-secondary border border-border text-sm font-semibold hover:bg-secondary/80 transition-colors">
+              🖨️ Imprimir
+            </button>
+            <button onClick={() => {
+              const prev = document.title;
+              document.title = `Censo_PCD_${(nomePaciente || "paciente").replace(/\s+/g, "_")}_${new Date().toLocaleDateString("pt-BR").replace(/\//g, "-")}`;
+              window.print();
+              setTimeout(() => { document.title = prev; }, 1000);
+            }}
+              className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors">
+              💾 Salvar PDF
+            </button>
+          </div>
+
+          {/* Ficha — visível na tela e na impressão */}
+          <div className="bg-card rounded-2xl border-2 border-violet-500/40 p-6 space-y-5">
+            {/* Cabeçalho da ficha */}
+            <div className="border-b border-border pb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-2xl">🏛️</span>
+                <h1 className="text-xl font-black">{CLINIC_CONFIG.name}</h1>
+              </div>
+              <p className="text-xs text-muted-foreground">{CLINIC_CONFIG.subtitle}</p>
+              <span className="inline-block mt-2 text-xs font-bold px-3 py-1 rounded-full bg-violet-950/40 text-violet-300 border border-violet-500/40">
+                Registro Censo Municipal PCD
+              </span>
+            </div>
+
+            {/* Grid de dados */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              {camposCenso.map(({ label, valor }) => (
+                <div key={label} className={label === "Nome" || label === "Endereço" || label === "Diagnóstico" ? "sm:col-span-2" : ""}>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
+                  <p className="font-bold mt-0.5">{valor}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Rodapé */}
+            <div className="border-t border-border pt-4 text-xs text-muted-foreground flex justify-between">
+              <span>Impresso em {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</span>
+              <span>Sistema NFs – Triagem Multidisciplinar</span>
+            </div>
+          </div>
+
         </div>
       </div>
     );
