@@ -484,14 +484,14 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
             <label className={`flex-1 flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${tipoRegistro === "Registro Censo Municipal" ? "border-violet-500 bg-violet-950/30" : "border-border hover:border-violet-500/40"}`}>
               <input type="radio" name="tipoRegistro" checked={tipoRegistro === "Registro Censo Municipal"} onChange={() => setTipoRegistro("Registro Censo Municipal")} className="accent-primary w-4 h-4" />
               <div>
-                <p className="font-bold text-sm">Registro Censo Municipal (Geral)</p>
-                <p className="text-xs text-muted-foreground">Mapeamento PCD – Ibiúna</p>
+                <p className="font-bold text-sm">Registro Censo</p>
+                <p className="text-xs text-muted-foreground">Mapeamento PCD</p>
               </div>
             </label>
           </div>
           {tipoRegistro === "Registro Censo Municipal" && (
             <div className="mt-3 p-3 bg-violet-900/20 rounded-xl border border-violet-500/30 text-xs text-violet-300 font-semibold">
-              🏛️ Este registro conta para o Contador PCD Municipal e não gera fila de espera na clínica.
+              🏛️ Este registro conta para o Contador PCD e não gera fila de espera na clínica.
             </div>
           )}
         </div>
@@ -690,99 +690,110 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
               <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome</label>
               <input value={profissional} onChange={e => setProfissional(e.target.value)} className={fc} placeholder="Nome do profissional" />
             </div>
-            <div className="mt-3 rounded-xl bg-emerald-950/30 border border-emerald-700/40 px-4 py-3 text-xs text-emerald-300 font-semibold">
-              ✅ As especialidades serão adicionadas automaticamente à fila de espera com base nas áreas pontuadas no Perfil Multidisciplinar. Não é necessário selecionar manualmente.
-            </div>
-          </div>
-        </div>
-
-        {/* Navegação áreas */}
-        <div className="flex flex-wrap gap-2">
-          {AREAS.map((area) => {
-            const pergs = PERGUNTAS.map((p, idx) => ({ ...p, idx })).filter((p) => p.area === area);
-            const temResposta = pergs.some((p) => respostas[p.idx] > 0);
-            return (
-              <button key={area} type="button" onClick={() => setAreaAtiva(area)}
-                className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-                  areaAtiva === area ? "bg-primary text-primary-foreground border-primary shadow-md"
-                    : "bg-secondary text-muted-foreground border-border hover:border-primary/40"
-                }`}>
-                <span>{AREA_ICONS[area] ?? "📋"}</span>
-                <span className="hidden md:inline">{area}</span>
-                {temResposta && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Perguntas */}
-        <div className="bg-card rounded-2xl border border-border/60 glow-card overflow-hidden">
-          <div className={`px-6 py-4 border-b border-border ${CORES_AREA[areaAtiva] ?? "bg-secondary"}`}>
-            <h2 className="font-bold text-lg">{areaAtiva}</h2>
-            <p className="text-sm opacity-80">Área {areaIdx + 1} de {AREAS.length} — {perguntasDaArea.length} perguntas</p>
-          </div>
-          <div className="divide-y divide-border">
-            {perguntasDaArea.map(({ pergunta, explicacao, idx }) => (
-              <div key={idx} className="px-6 py-5">
-                <div className="flex flex-col md:flex-row md:items-start gap-4">
-                  <div className="flex-1">
-                    <p className="font-bold text-foreground">[{pergunta}]</p>
-                    <p className="text-sm text-muted-foreground italic mt-0.5">({explicacao})</p>
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    {ESCALA.map((e) => (
-                      <button key={e.valor} type="button"
-                        onClick={() => { const n = [...respostas]; n[idx] = e.valor; setRespostas(n); }}
-                        title={e.label}
-                        className={`w-12 h-12 rounded-xl text-sm font-bold border-2 transition-all ${
-                          respostas[idx] === e.valor
-                            ? e.valor === 0 ? "bg-emerald-500 text-white border-emerald-500"
-                              : e.valor === 1 ? "bg-blue-500 text-white border-blue-500"
-                              : e.valor === 2 ? "bg-amber-500 text-white border-amber-500"
-                              : "bg-rose-500 text-white border-rose-500"
-                            : "bg-secondary text-muted-foreground border-border hover:border-primary/50"
-                        }`}>{e.valor}</button>
-                    ))}
-                  </div>
-                </div>
+            {tipoRegistro !== "Registro Censo Municipal" && (
+              <div className="mt-3 rounded-xl bg-emerald-950/30 border border-emerald-700/40 px-4 py-3 text-xs text-emerald-300 font-semibold">
+                ✅ As especialidades serão adicionadas automaticamente à fila de espera com base nas áreas pontuadas no Perfil Multidisciplinar. Não é necessário selecionar manualmente.
               </div>
-            ))}
-          </div>
-          <div className="px-6 py-4 bg-muted/30 flex justify-between items-center border-t border-border">
-            <button type="button" onClick={() => setAreaAtiva(AREAS[Math.max(0, areaIdx - 1)])}
-              disabled={areaIdx === 0}
-              className="px-4 py-2 rounded-lg border border-border text-sm font-semibold disabled:opacity-40 hover:bg-secondary">
-              ← Anterior
-            </button>
-            <span className="text-sm text-muted-foreground">{areaIdx + 1} / {AREAS.length}</span>
-            {areaIdx < AREAS.length - 1 ? (
-              <button type="button" onClick={() => setAreaAtiva(AREAS[areaIdx + 1])}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90">
-                Próxima →
-              </button>
-            ) : (
+            )}
+            {tipoRegistro === "Registro Censo Municipal" && (
               <button type="submit"
-                className="px-6 py-2 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 shadow-sm">
-                Ver Resultado ✓
+                className="mt-5 w-full py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all"
+                style={{ background: "rgba(139,92,246,0.15)", border: "2px solid #7c3aed", color: "#c4b5fd", boxShadow: "0 0 24px rgba(124,58,237,0.35)", letterSpacing: "0.04em" }}>
+                🏛️ Salvar Registro Censo
               </button>
             )}
           </div>
         </div>
 
-        {/* Legenda */}
-        <div className="bg-card rounded-2xl border border-border/60 p-4 glow-card">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Escala de Pontuação</p>
-          <div className="flex flex-wrap gap-4">
-            {ESCALA.map((e) => (
-              <span key={e.valor} className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold ${
-                  e.valor === 0 ? "bg-emerald-500" : e.valor === 1 ? "bg-blue-500" : e.valor === 2 ? "bg-amber-500" : "bg-rose-500"
-                }`}>{e.valor}</span>
-                {e.label.split("–")[1].trim()}
-              </span>
-            ))}
+        {tipoRegistro !== "Registro Censo Municipal" && (<>
+          {/* Navegação áreas */}
+          <div className="flex flex-wrap gap-2">
+            {AREAS.map((area) => {
+              const pergs = PERGUNTAS.map((p, idx) => ({ ...p, idx })).filter((p) => p.area === area);
+              const temResposta = pergs.some((p) => respostas[p.idx] > 0);
+              return (
+                <button key={area} type="button" onClick={() => setAreaAtiva(area)}
+                  className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all flex items-center gap-1.5 ${
+                    areaAtiva === area ? "bg-primary text-primary-foreground border-primary shadow-md"
+                      : "bg-secondary text-muted-foreground border-border hover:border-primary/40"
+                  }`}>
+                  <span>{AREA_ICONS[area] ?? "📋"}</span>
+                  <span className="hidden md:inline">{area}</span>
+                  {temResposta && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />}
+                </button>
+              );
+            })}
           </div>
-        </div>
+
+          {/* Perguntas */}
+          <div className="bg-card rounded-2xl border border-border/60 glow-card overflow-hidden">
+            <div className={`px-6 py-4 border-b border-border ${CORES_AREA[areaAtiva] ?? "bg-secondary"}`}>
+              <h2 className="font-bold text-lg">{areaAtiva}</h2>
+              <p className="text-sm opacity-80">Área {areaIdx + 1} de {AREAS.length} — {perguntasDaArea.length} perguntas</p>
+            </div>
+            <div className="divide-y divide-border">
+              {perguntasDaArea.map(({ pergunta, explicacao, idx }) => (
+                <div key={idx} className="px-6 py-5">
+                  <div className="flex flex-col md:flex-row md:items-start gap-4">
+                    <div className="flex-1">
+                      <p className="font-bold text-foreground">[{pergunta}]</p>
+                      <p className="text-sm text-muted-foreground italic mt-0.5">({explicacao})</p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      {ESCALA.map((e) => (
+                        <button key={e.valor} type="button"
+                          onClick={() => { const n = [...respostas]; n[idx] = e.valor; setRespostas(n); }}
+                          title={e.label}
+                          className={`w-12 h-12 rounded-xl text-sm font-bold border-2 transition-all ${
+                            respostas[idx] === e.valor
+                              ? e.valor === 0 ? "bg-emerald-500 text-white border-emerald-500"
+                                : e.valor === 1 ? "bg-blue-500 text-white border-blue-500"
+                                : e.valor === 2 ? "bg-amber-500 text-white border-amber-500"
+                                : "bg-rose-500 text-white border-rose-500"
+                              : "bg-secondary text-muted-foreground border-border hover:border-primary/50"
+                          }`}>{e.valor}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 bg-muted/30 flex justify-between items-center border-t border-border">
+              <button type="button" onClick={() => setAreaAtiva(AREAS[Math.max(0, areaIdx - 1)])}
+                disabled={areaIdx === 0}
+                className="px-4 py-2 rounded-lg border border-border text-sm font-semibold disabled:opacity-40 hover:bg-secondary">
+                ← Anterior
+              </button>
+              <span className="text-sm text-muted-foreground">{areaIdx + 1} / {AREAS.length}</span>
+              {areaIdx < AREAS.length - 1 ? (
+                <button type="button" onClick={() => setAreaAtiva(AREAS[areaIdx + 1])}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90">
+                  Próxima →
+                </button>
+              ) : (
+                <button type="submit"
+                  className="px-6 py-2 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 shadow-sm">
+                  Ver Resultado ✓
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Legenda */}
+          <div className="bg-card rounded-2xl border border-border/60 p-4 glow-card">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Escala de Pontuação</p>
+            <div className="flex flex-wrap gap-4">
+              {ESCALA.map((e) => (
+                <span key={e.valor} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold ${
+                    e.valor === 0 ? "bg-emerald-500" : e.valor === 1 ? "bg-blue-500" : e.valor === 2 ? "bg-amber-500" : "bg-rose-500"
+                  }`}>{e.valor}</span>
+                  {e.label.split("–")[1].trim()}
+                </span>
+              ))}
+            </div>
+          </div>
+        </>)}
       </form>
     </div>
   );
@@ -811,6 +822,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
   const [autoLink, setAutoLink] = useState<{ patientName?: string; priority?: string; addedToQueue?: boolean; linkedOnly?: boolean; specialties?: string[]; alreadyQueued?: string[] } | null>(null);
   const [, navigate] = useLocation();
   const data = new Date().toLocaleDateString("pt-BR");
+  const isCenso = tipoRegistro === "Registro Censo Municipal";
 
   const porArea = AREAS.map((area) => {
     const pergs = PERGUNTAS.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === area);
@@ -870,6 +882,55 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
       }
     } finally { setSalvando(false); }
   };
+
+  // Auto-save for Censo registros – no need to show the full report
+  useEffect(() => {
+    if (isCenso && !editId && !viewOnly && !salvo && !salvando) {
+      salvarTriagem();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Simplified Censo confirmation screen
+  if (isCenso) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="w-full max-w-md text-center space-y-6">
+          <div className="rounded-2xl p-8" style={{ background: "rgba(139,92,246,0.1)", border: "2px solid #7c3aed" }}>
+            {salvando && (
+              <>
+                <div className="text-5xl mb-4 animate-pulse">🏛️</div>
+                <p className="text-lg font-bold" style={{ color: "#c4b5fd" }}>Salvando registro…</p>
+                <p className="text-sm text-muted-foreground mt-2">Aguarde um momento</p>
+              </>
+            )}
+            {salvo && (
+              <>
+                <div className="text-5xl mb-4">✅</div>
+                <p className="text-xl font-extrabold" style={{ color: "#a78bfa" }}>Registro Censo Salvo!</p>
+                <p className="text-sm text-muted-foreground mt-2 mb-1">
+                  <strong className="text-foreground">{nomePaciente}</strong> foi registrado no mapeamento PCD.
+                </p>
+                <p className="text-xs text-violet-400 mb-6">Este registro não gera fila de espera na clínica.</p>
+                <div className="flex flex-col gap-3">
+                  <button onClick={onNova}
+                    className="w-full py-3 rounded-xl font-bold text-sm"
+                    style={{ background: "rgba(139,92,246,0.2)", border: "1px solid #7c3aed", color: "#c4b5fd" }}>
+                    + Novo Registro Censo
+                  </button>
+                  <button onClick={() => navigate("/lista")}
+                    className="w-full py-3 rounded-xl font-bold text-sm"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
+                    Ver Pacientes →
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const beneficios = [
     bolsaFamilia && "Bolsa Família", bpc && "BPC",
