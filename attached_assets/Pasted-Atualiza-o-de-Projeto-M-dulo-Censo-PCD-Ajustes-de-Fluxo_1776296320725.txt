@@ -1,0 +1,26 @@
+Atualização de Projeto: Módulo Censo PCD + Ajustes de Fluxo
+​Preciso incluir uma nova funcionalidade de Busca Ativa/Censo PCD e realizar ajustes de lógica nos sistemas NFS gestão e Triagem Multidisciplinar.
+​1. Novo Campo de Segmentação (Cadastro de Pacientes)
+​Para permitir o cadastramento de PCDs de toda a cidade sem misturar com a demanda interna da unidade, adicione os seguintes campos no formulário de cadastro:
+​Campo "Tipo de Registro": Opções: [ ] Paciente da Unidade (Até 11 anos) | [ ] Registro Censo Municipal (Geral).
+​Lógica de Fluxo: Se for selecionado "Registro Censo Municipal", o sistema não deve enviar esse nome para a Fila de Espera ou para a Agenda. Ele deve ir apenas para o Banco de Dados geral.
+​Campo "Local de Atendimento Atual": Pergunta aberta ou seleção: (Ex: CAPS, Reabilitação, Particular, Sem Atendimento).
+​2. Dashboard de Contagem Municipal (Contador PCD)
+​Criar uma aba ou um card visual no Dashboard (onde já geramos os PDFs) que mostre:
+​Total de PCDs Cadastrados em Ibiúna: (Soma de todos os registros do sistema).
+​Filtros Rápidos: Quantos usam cadeira de rodas, quantos são autistas, etc. (aproveitando os campos que já existem no cadastro).
+​3. Padronização de Score e Pesos (Social vs. Clínico)
+​Nos dois sistemas, reduza o peso dos critérios sociais para priorizar a demanda clínica:
+​Sem terapia em outro local: de +15 para +5 pontos.
+​Escola Pública: Alterar para +3 pontos.
+​Trabalho Informal/Renda: Alterar para +3 pontos.
+​Base do Score: Ambos os sistemas devem usar o máximo de 360 pontos.
+​4. Multi-Seleção na Fila de Espera
+​No cadastro da fila, permitir selecionar múltiplas especialidades de uma vez (Checkbox) para o mesmo paciente:
+​(Fono, Psico, T.O, Fisioterapia, Psicomotricidade, Psicopedagogia, Ed. Física, Nutrição).
+​5. Simplificação de Linguagem (T.O.)
+​Alterar pergunta: "Dificuldade de planejamento motor - não consegue se conhecer" para "Dificuldade em planejar ou executar movimentos (Ex: usar tesoura, pular, abotoar ou imitar gestos)".
+​Dicas para a sua organização, Nati:
+​Busca Ativa: Quando a prefeitura achar um PCD na cidade, você cadastra ele com o "Tipo de Registro" como Censo Municipal. Assim, quando seu chefe perguntar "Quantos PCDs temos?", você clica no botão e o sistema te dá o número exato, mas a sua agenda de atendimentos continua limpa, só com as suas crianças.
+​O "Onde faz atendimento": Isso vai ser ótimo para a prefeitura saber, por exemplo, se o CAPS está sobrecarregado ou se muita gente está sem atendimento nenhum.
+​Independência: Como o sistema já tem as perguntas sobre cadeira de rodas e deficiências, esse "Censo" já vai nascer completo.
