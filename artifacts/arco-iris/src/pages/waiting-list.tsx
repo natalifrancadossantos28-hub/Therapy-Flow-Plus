@@ -170,18 +170,30 @@ export default function WaitingList() {
           <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">VERDE – Baixo</span>
         </div>
         {specialtyOptions.length > 0 && (
-          <Select
-            value={filterSpecialty}
-            onChange={e => setFilterSpecialty(e.target.value)}
-            className="text-sm min-w-[200px]"
-          >
-            <option value="__all__">Todas as especialidades</option>
-            {specialtyOptions.map(sp => (
-              <option key={sp} value={sp}>
-                {sp === "__null__" ? "Qualquer especialidade" : sp}
+          <div className="relative">
+            <select
+              value={filterSpecialty}
+              onChange={e => setFilterSpecialty(e.target.value)}
+              className="appearance-none cursor-pointer font-bold text-xs rounded-full px-5 py-2 pr-8 border-2 transition-all outline-none"
+              style={{
+                background: "rgba(8, 145, 178, 0.08)",
+                borderColor: "rgba(34, 211, 238, 0.55)",
+                color: "#67e8f9",
+                boxShadow: "0 0 12px rgba(34, 211, 238, 0.18), inset 0 0 8px rgba(34, 211, 238, 0.04)",
+              }}
+            >
+              <option value="__all__" style={{ background: "#0f172a", color: "#e2e8f0" }}>
+                ✦ Todas as especialidades
               </option>
-            ))}
-          </Select>
+              {specialtyOptions.map(sp => (
+                <option key={sp} value={sp} style={{ background: "#0f172a", color: "#e2e8f0" }}>
+                  {sp === "__null__" ? "Qualquer especialidade" : sp}
+                </option>
+              ))}
+            </select>
+            {/* Seta customizada */}
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-cyan-400 text-xs">▾</span>
+          </div>
         )}
       </div>
 
