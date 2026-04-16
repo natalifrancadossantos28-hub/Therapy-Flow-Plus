@@ -22,6 +22,7 @@ export const patientsTable = pgTable("patients", {
   status: text("status").notNull().default("Aguardando Triagem"),
   entryDate: text("entry_date"),
   absenceCount: integer("absence_count").notNull().default(0),
+  consecutiveUnjustifiedAbsences: integer("consecutive_unjustified_absences").notNull().default(0),
   triagemScore: integer("triagem_score"),
   scorePsicologia: integer("score_psicologia"),
   scorePsicomotricidade: integer("score_psicomotricidade"),

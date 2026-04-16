@@ -37,6 +37,16 @@ type Appointment = {
   recurrenceGroupId?: string | null;
   frequency?: string | null;
   ciclo?: "A" | "B" | "M" | null;
+  escolaPublica?: boolean | null;
+  trabalhoNaRoca?: boolean | null;
+  consecutiveUnjustifiedAbsences?: number | null;
+};
+
+type AbsenceAlert = {
+  patientName: string;
+  consecutive: number;
+  escolaPublica: boolean;
+  trabalhoNaRoca: boolean;
 };
 
 type CancelDialog = {
@@ -54,6 +64,23 @@ type RemanejFlow = {
 
 // ── Neon button styles ──────────────────────────────────────────────
 const NEON: Record<string, React.CSSProperties> = {
+  yellow: {
+    background: "rgba(10,8,0,0.92)",
+    border: "1px solid #eab308",
+    color: "#fde047",
+    boxShadow: "0 0 14px rgba(234,179,8,0.55), inset 0 0 8px rgba(234,179,8,0.12)",
+    textShadow: "0 0 8px rgba(253,224,71,0.9)",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    fontWeight: 700,
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    width: "100%",
+    transition: "all 0.15s",
+  },
   green: {
     background: "rgba(5,10,5,0.92)",
     border: "1px solid #22c55e",
@@ -141,6 +168,7 @@ export default function Agenda() {
   const [notifyDone, setNotifyDone] = useState(false);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
+  const [absenceAlert, setAbsenceAlert] = useState<AbsenceAlert | null>(null);
   const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
   const [remanejSending, setRemanejSending] = useState(false);
   const [remanejDone, setRemanejDone] = useState(false);
@@ -197,12 +225,14 @@ export default function Agenda() {
 
   // ── Patch status (single occurrence) ──
   const patchStatus = async (apt: Appointment, status: string) => {
-    await fetch(`/api/appointments/${apt.id}`, {
+    const res = await fetch(`/api/appointments/${apt.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
+    const data = await res.json();
     setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
+    return data;
   };
 
   // ── Log na tabela Notificações_Recepção ──
@@ -263,6 +293,40 @@ export default function Agenda() {
       toast({ title: "Revertido", description: `Agendamento voltou para "${revertTo}".` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível reverter.", variant: "destructive" });
+    }
+  };
+
+  // ── Falta Justificada ──
+  const handleFaltaJustificada = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "falta_justificada");
+      await logNotificacao(apt, "Falta Justificada");
+      toast({ title: "✅ Falta Justificada registrada", description: `${apt.patientName} — sequência de alertas zerada.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
+    }
+  };
+
+  // ── Falta Não Justificada ──
+  const handleFaltaNaoJustificada = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      const result = await patchStatus(apt, "falta_nao_justificada");
+      await logNotificacao(apt, "Falta Não Justificada");
+      const consecutive: number = result?.consecutiveUnjustifiedAbsences ?? 1;
+      if (consecutive >= 2) {
+        setAbsenceAlert({
+          patientName: apt.patientName ?? `Paciente #${apt.patientId}`,
+          consecutive,
+          escolaPublica: result?.escolaPublica ?? false,
+          trabalhoNaRoca: result?.trabalhoNaRoca ?? false,
+        });
+      } else {
+        toast({ title: "⚠️ Falta Não Justificada registrada", description: `${apt.patientName} — 1ª ausência sem justificativa.` });
+      }
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
     }
   };
 
@@ -544,8 +608,18 @@ export default function Agenda() {
                                       <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
 
                                       <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                        <Activity className="w-3.5 h-3.5" /> Concluir
+                                        <Activity className="w-3.5 h-3.5" /> ✅ Presente
                                       </button>
+
+                                      <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
+                                        <CheckCircle className="w-3.5 h-3.5" /> ⚠️ Falta Justificada
+                                      </button>
+
+                                      <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
+                                        <AlertTriangle className="w-3.5 h-3.5" /> 🔴 Falta N. Justificada
+                                      </button>
+
+                                      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
 
                                       <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
                                         <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
@@ -632,6 +706,80 @@ export default function Agenda() {
                 <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setAltaConfirm(null)}>
                   Cancelar
                 </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Alerta de Ausência ── */}
+      {absenceAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{
+            background: absenceAlert.consecutive >= 3 ? "rgba(10,0,0,0.97)" : "rgba(10,8,0,0.97)",
+            border: absenceAlert.consecutive >= 3 ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(234,179,8,0.5)",
+          }}>
+            <div className="px-6 py-5 space-y-4">
+              {/* Cabeçalho */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{
+                  background: absenceAlert.consecutive >= 3 ? "rgba(239,68,68,0.15)" : "rgba(234,179,8,0.15)",
+                  border: absenceAlert.consecutive >= 3 ? "1px solid #ef4444" : "1px solid #eab308",
+                }}>
+                  <span className="text-xl">{absenceAlert.consecutive >= 3 ? "🚨" : "⚠️"}</span>
+                </div>
+                <div>
+                  <p className="font-bold text-base" style={{
+                    color: absenceAlert.consecutive >= 3 ? "#f87171" : "#fde047",
+                    textShadow: absenceAlert.consecutive >= 3 ? "0 0 8px rgba(248,113,113,0.8)" : "0 0 8px rgba(253,224,71,0.8)",
+                  }}>
+                    {absenceAlert.consecutive >= 3 ? "Protocolo de Gestão de Vagas" : "Alerta de Evasão"}
+                  </p>
+                  <p className="text-xs text-white/50">{absenceAlert.patientName}</p>
+                </div>
+              </div>
+
+              {/* Mensagem principal */}
+              <div className="rounded-xl p-4 text-sm text-white/85 leading-relaxed" style={{
+                background: absenceAlert.consecutive >= 3 ? "rgba(239,68,68,0.08)" : "rgba(234,179,8,0.08)",
+                border: absenceAlert.consecutive >= 3 ? "1px solid rgba(239,68,68,0.2)" : "1px solid rgba(234,179,8,0.2)",
+              }}>
+                {absenceAlert.consecutive >= 3 ? (
+                  <>
+                    <p className="font-bold text-white mb-2">Protocolo de Gestão de Vagas</p>
+                    <p>Limite de <strong>3 ausências não justificadas</strong> atingido. O prontuário será encaminhado para a coordenação para liberação da vaga e redirecionamento de fila. Favor notificar a família sobre o encerramento do ciclo terapêutico atual.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-bold text-white mb-2">Atenção Recepção</p>
+                    <p>Identificada <strong>2ª ausência não justificada</strong>. Favor realizar contato de acolhimento para entender o motivo da falta (transporte/saúde) e reforçar a importância da continuidade para o sucesso do tratamento. Informar gentilmente que o limite de ausências sem justificativa é de 3 turnos.</p>
+                  </>
+                )}
+              </div>
+
+              {/* Alerta de vulnerabilidade */}
+              {(absenceAlert.escolaPublica || absenceAlert.trabalhoNaRoca) && (
+                <div className="rounded-xl p-3 text-xs text-cyan-300/90 leading-relaxed flex gap-2 items-start" style={{
+                  background: "rgba(34,211,238,0.07)",
+                  border: "1px solid rgba(34,211,238,0.2)",
+                }}>
+                  <span className="text-base flex-shrink-0">🔍</span>
+                  <span>
+                    <strong className="text-cyan-200">Olhar Especial — Vulnerabilidade Social:</strong> Este paciente possui indicadores de vulnerabilidade
+                    {absenceAlert.trabalhoNaRoca && " (trabalho informal/rural)"}
+                    {absenceAlert.escolaPublica && " (rede pública de ensino)"}
+                    . Verificar se há dificuldade com transporte municipal antes de acionar o protocolo.
+                  </span>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setAbsenceAlert(null)}
+                  style={{ ...NEON.green, flex: 1, justifyContent: "center", padding: "10px" }}
+                >
+                  <CheckCircle className="w-4 h-4" /> Entendido
+                </button>
               </div>
             </div>
           </div>

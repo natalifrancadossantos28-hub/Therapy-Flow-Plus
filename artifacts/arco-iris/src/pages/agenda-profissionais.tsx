@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, Activity, AlertTriangle, RotateCcw, XCircle } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, Activity, AlertTriangle, RotateCcw, XCircle, CheckCircle } from "lucide-react";
 import { cn, getStatusColor } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -18,10 +18,13 @@ function getWeekDays(ref: Date): Date[] {
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
-type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number };
+type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; };
+
+type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
 const NEON: Record<string, React.CSSProperties> = {
   green: { background: "rgba(5,10,5,0.92)", border: "1px solid #22c55e", color: "#4ade80", boxShadow: "0 0 14px rgba(34,197,94,0.55)", textShadow: "0 0 8px rgba(74,222,128,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
+  yellow: { background: "rgba(10,8,0,0.92)", border: "1px solid #eab308", color: "#fde047", boxShadow: "0 0 14px rgba(234,179,8,0.55)", textShadow: "0 0 8px rgba(253,224,71,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   red: { background: "rgba(10,0,0,0.92)", border: "1px solid #ef4444", color: "#f87171", boxShadow: "0 0 14px rgba(239,68,68,0.55)", textShadow: "0 0 8px rgba(248,113,113,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   orange: { background: "rgba(10,5,0,0.92)", border: "1px solid #f97316", color: "#fb923c", boxShadow: "0 0 14px rgba(249,115,22,0.55)", textShadow: "0 0 8px rgba(251,146,60,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
 };
@@ -38,6 +41,7 @@ export default function AgendaProfissionais() {
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
+  const [absenceAlert, setAbsenceAlert] = useState<AbsenceAlert | null>(null);
   const { toast } = useToast();
 
   const weekDays = getWeekDays(weekRef);
@@ -147,12 +151,14 @@ export default function AgendaProfissionais() {
   };
 
   const patchStatus = async (apt: Appointment, status: string) => {
-    await fetch(`/api/appointments/${apt.id}`, {
+    const res = await fetch(`/api/appointments/${apt.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
+    const data = await res.json();
     setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
+    return data;
   };
 
   const logNotificacao = async (apt: Appointment, acao: string) => {
@@ -202,6 +208,38 @@ export default function AgendaProfissionais() {
       toast({ title: "🟠 Remanejar", description: `${apt.patientName} marcado para reagendamento. A recepção será notificada.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível remarcar.", variant: "destructive" });
+    }
+  };
+
+  const handleFaltaJustificada = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "falta_justificada");
+      await logNotificacao(apt, "Falta Justificada");
+      toast({ title: "✅ Falta Justificada registrada", description: `${apt.patientName} — sequência de alertas zerada.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
+    }
+  };
+
+  const handleFaltaNaoJustificada = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      const result = await patchStatus(apt, "falta_nao_justificada");
+      await logNotificacao(apt, "Falta Não Justificada");
+      const consecutive: number = result?.consecutiveUnjustifiedAbsences ?? 1;
+      if (consecutive >= 2) {
+        setAbsenceAlert({
+          patientName: apt.patientName ?? `Paciente #${apt.patientId}`,
+          consecutive,
+          escolaPublica: result?.escolaPublica ?? false,
+          trabalhoNaRoca: result?.trabalhoNaRoca ?? false,
+        });
+      } else {
+        toast({ title: "⚠️ Falta Não Justificada registrada", description: `${apt.patientName} — 1ª ausência sem justificativa.` });
+      }
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
     }
   };
 
@@ -405,11 +443,19 @@ export default function AgendaProfissionais() {
                                           >
                                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
                                             <button style={NEON.green} onClick={() => handleConcluir(apt)}>
-                                              <Activity className="w-3.5 h-3.5" /> Concluir
+                                              <Activity className="w-3.5 h-3.5" /> ✅ Presente
                                             </button>
-                                            <button style={NEON.red} onClick={() => handleDesmarcar(apt)}>
-                                              <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
+                                            <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
+                                              <CheckCircle className="w-3.5 h-3.5" /> ⚠️ Falta Justificada
                                             </button>
+                                            <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
+                                              <AlertTriangle className="w-3.5 h-3.5" /> 🔴 Falta N. Justificada
+                                            </button>
+                                            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "4px", paddingTop: "6px" }}>
+                                              <button style={NEON.red} onClick={() => handleDesmarcar(apt)}>
+                                                <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
+                                              </button>
+                                            </div>
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
                                               <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                             </button>
@@ -493,6 +539,49 @@ export default function AgendaProfissionais() {
                   Confirmar Alta
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {absenceAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setAbsenceAlert(null)}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(4,3,0,0.97)", border: `1px solid ${absenceAlert.consecutive >= 3 ? "rgba(239,68,68,0.5)" : "rgba(234,179,8,0.5)"}` }} onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: absenceAlert.consecutive >= 3 ? "rgba(239,68,68,0.15)" : "rgba(234,179,8,0.15)", border: `1px solid ${absenceAlert.consecutive >= 3 ? "#ef4444" : "#eab308"}` }}>
+                  <AlertTriangle className="w-5 h-5" style={{ color: absenceAlert.consecutive >= 3 ? "#f87171" : "#fde047" }} />
+                </div>
+                <div>
+                  <p className="font-bold text-sm" style={{ color: absenceAlert.consecutive >= 3 ? "#f87171" : "#fde047" }}>
+                    {absenceAlert.consecutive >= 3 ? "🚨 Protocolo de Gestão de Vagas" : "⚠️ Alerta de Evasão"}
+                  </p>
+                  <p className="text-xs text-white/50">
+                    {absenceAlert.consecutive >= 3 ? "3ª falta consecutiva — ação imediata" : "2ª falta consecutiva — iniciar busca ativa"}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-white/70 mb-3">
+                <strong className="text-white">{absenceAlert.patientName}</strong> acumula <strong style={{ color: absenceAlert.consecutive >= 3 ? "#f87171" : "#fde047" }}>{absenceAlert.consecutive} faltas não justificadas consecutivas</strong>.
+              </p>
+              {absenceAlert.consecutive >= 3 && (
+                <div className="mb-3 p-3 rounded-xl text-xs" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#fca5a5" }}>
+                  Acionar a coordenação para aplicar protocolo de gestão de vagas. O espaço pode ser realocado para outro paciente em lista de espera.
+                </div>
+              )}
+              {absenceAlert.consecutive === 2 && (
+                <div className="mb-3 p-3 rounded-xl text-xs" style={{ background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.3)", color: "#fde047" }}>
+                  Realizar busca ativa: contatar a família e verificar barreiras de transporte antes da próxima sessão.
+                </div>
+              )}
+              {(absenceAlert.escolaPublica || absenceAlert.trabalhoNaRoca) && (
+                <div className="mb-3 p-3 rounded-xl text-xs" style={{ background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.35)", color: "#67e8f9" }}>
+                  <strong>Atenção à vulnerabilidade:</strong> paciente é de {[absenceAlert.escolaPublica && "escola pública", absenceAlert.trabalhoNaRoca && "família que trabalha na roça"].filter(Boolean).join(" e ")}. Avaliar barreiras de transporte antes de acionar protocolo.
+                </div>
+              )}
+              <button onClick={() => setAbsenceAlert(null)} className="w-full py-3 rounded-xl font-bold text-sm mt-1" style={{ background: absenceAlert.consecutive >= 3 ? "rgba(239,68,68,0.15)" : "rgba(234,179,8,0.12)", border: `1px solid ${absenceAlert.consecutive >= 3 ? "#ef4444" : "#eab308"}`, color: absenceAlert.consecutive >= 3 ? "#f87171" : "#fde047" }}>
+                Entendido
+              </button>
             </div>
           </div>
         </div>

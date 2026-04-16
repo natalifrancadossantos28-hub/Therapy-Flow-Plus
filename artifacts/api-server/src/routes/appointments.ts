@@ -150,6 +150,9 @@ router.get("/appointments", async (req, res) => {
       guardianName: patientsTable.guardianName,
       guardianPhone: patientsTable.guardianPhone,
       professionalName: professionalsTable.name,
+      escolaPublica: patientsTable.escolaPublica,
+      trabalhoNaRoca: patientsTable.trabalhoNaRoca,
+      consecutiveUnjustifiedAbsences: patientsTable.consecutiveUnjustifiedAbsences,
     })
     .from(appointmentsTable)
     .leftJoin(patientsTable, eq(appointmentsTable.patientId, patientsTable.id))
@@ -276,19 +279,73 @@ router.patch("/appointments/:id", async (req, res) => {
     .where(eq(appointmentsTable.id, id))
     .returning();
 
-  if (status === "ausente" && existing.status !== "ausente") {
-    const [patient] = await db.select({ absenceCount: patientsTable.absenceCount })
-      .from(patientsTable).where(eq(patientsTable.id, existing.patientId));
-    const newCount = (patient?.absenceCount ?? 0) + 1;
-    await db.update(patientsTable).set({ absenceCount: newCount }).where(eq(patientsTable.id, existing.patientId));
-  } else if (existing.status === "ausente" && status !== "ausente") {
-    const [patient] = await db.select({ absenceCount: patientsTable.absenceCount })
-      .from(patientsTable).where(eq(patientsTable.id, existing.patientId));
-    const newCount = Math.max(0, (patient?.absenceCount ?? 1) - 1);
-    await db.update(patientsTable).set({ absenceCount: newCount }).where(eq(patientsTable.id, existing.patientId));
+  const ABSENCE_STATUSES = ["ausente", "falta_justificada", "falta_nao_justificada"];
+  const wasAbsence = ABSENCE_STATUSES.includes(existing.status ?? "");
+  const isAbsence  = ABSENCE_STATUSES.includes(status ?? "");
+
+  let patientAfter: any = null;
+
+  if (status && isAbsence && !wasAbsence) {
+    // Registrar nova falta
+    const [patient] = await db.select({
+      absenceCount: patientsTable.absenceCount,
+      consecutiveUnjustifiedAbsences: patientsTable.consecutiveUnjustifiedAbsences,
+      escolaPublica: patientsTable.escolaPublica,
+      trabalhoNaRoca: patientsTable.trabalhoNaRoca,
+    }).from(patientsTable).where(eq(patientsTable.id, existing.patientId));
+
+    const newAbsenceCount = (patient?.absenceCount ?? 0) + 1;
+    let newConsecutive = patient?.consecutiveUnjustifiedAbsences ?? 0;
+
+    if (status === "falta_nao_justificada" || status === "ausente") {
+      newConsecutive += 1;
+    } else if (status === "falta_justificada") {
+      newConsecutive = 0; // justificada zera a sequência
+    }
+
+    const [updated] = await db.update(patientsTable)
+      .set({ absenceCount: newAbsenceCount, consecutiveUnjustifiedAbsences: newConsecutive })
+      .where(eq(patientsTable.id, existing.patientId))
+      .returning();
+    patientAfter = updated;
+
+  } else if (wasAbsence && status && !isAbsence) {
+    // Revertendo falta
+    const [patient] = await db.select({
+      absenceCount: patientsTable.absenceCount,
+      consecutiveUnjustifiedAbsences: patientsTable.consecutiveUnjustifiedAbsences,
+      escolaPublica: patientsTable.escolaPublica,
+      trabalhoNaRoca: patientsTable.trabalhoNaRoca,
+    }).from(patientsTable).where(eq(patientsTable.id, existing.patientId));
+
+    const newAbsenceCount = Math.max(0, (patient?.absenceCount ?? 1) - 1);
+    let newConsecutive = patient?.consecutiveUnjustifiedAbsences ?? 0;
+    if (existing.status === "falta_nao_justificada" || existing.status === "ausente") {
+      newConsecutive = Math.max(0, newConsecutive - 1);
+    }
+
+    const [updated] = await db.update(patientsTable)
+      .set({ absenceCount: newAbsenceCount, consecutiveUnjustifiedAbsences: newConsecutive })
+      .where(eq(patientsTable.id, existing.patientId))
+      .returning();
+    patientAfter = updated;
   }
 
-  res.json(row);
+  if (!patientAfter) {
+    const [p] = await db.select({
+      consecutiveUnjustifiedAbsences: patientsTable.consecutiveUnjustifiedAbsences,
+      escolaPublica: patientsTable.escolaPublica,
+      trabalhoNaRoca: patientsTable.trabalhoNaRoca,
+    }).from(patientsTable).where(eq(patientsTable.id, existing.patientId));
+    patientAfter = p;
+  }
+
+  res.json({
+    ...row,
+    consecutiveUnjustifiedAbsences: patientAfter?.consecutiveUnjustifiedAbsences ?? 0,
+    escolaPublica: patientAfter?.escolaPublica ?? false,
+    trabalhoNaRoca: patientAfter?.trabalhoNaRoca ?? false,
+  });
 });
 
 router.delete("/appointments/:id/alta", async (req, res) => {
