@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import {
   useGetPatient,
   useGetPatientPdf,
@@ -86,18 +86,8 @@ export default function PatientDetail() {
   const [trabalhoNaRoca, setTrabalhoNaRoca] = useState<boolean | null>(null);
   const [savingTriagem, setSavingTriagem] = useState(false);
 
-  const [showFilaModal, setShowFilaModal] = useState(false);
-  const [filaSpecialties, setFilaSpecialties] = useState<string[]>([]);
   const [addingToFila, setAddingToFila] = useState(false);
-
-  const ALL_SPECIALTIES = [
-    "Psicologia", "Psicomotricidade", "Fisioterapia", "Psicopedagogia",
-    "Educação Física", "Fonoaudiologia", "Terapia Ocupacional", "Nutrição",
-  ];
-
-  const toggleFilaSpecialty = (sp: string) => {
-    setFilaSpecialties(prev => prev.includes(sp) ? prev.filter(s => s !== sp) : [...prev, sp]);
-  };
+  const [, navigate] = useLocation();
 
   const handleDownloadPdf = () => {
     if (pdfData) {
@@ -176,35 +166,50 @@ export default function PatientDetail() {
     }
   };
 
+  const SCORE_SPECIALTY_MAP: Array<{ field: keyof typeof patient & string; specialty: string }> = [
+    { field: "scorePsicologia",       specialty: "Psicologia"         },
+    { field: "scorePsicomotricidade", specialty: "Psicomotricidade"   },
+    { field: "scoreFisioterapia",     specialty: "Fisioterapia"       },
+    { field: "scoreTO",               specialty: "Terapia Ocupacional"},
+    { field: "scoreFonoaudiologia",   specialty: "Fonoaudiologia"     },
+    { field: "scoreNutricionista",    specialty: "Nutrição"           },
+    { field: "scorePsicopedagogia",   specialty: "Psicopedagogia"     },
+    { field: "scoreEdFisica",         specialty: "Educação Física"    },
+  ];
+
   const handleAddToFila = async () => {
+    if (!patient) return;
     setAddingToFila(true);
-    const targets = filaSpecialties.length > 0 ? filaSpecialties : [null];
-    const results: string[] = [];
-    const errors: string[] = [];
+
+    // Auto-detect: only specialties with score > 0
+    const scoredSpecialties = SCORE_SPECIALTY_MAP
+      .filter(({ field }) => ((patient as any)[field] ?? 0) > 0)
+      .map(({ specialty }) => specialty);
+
+    const targets: (string | null)[] = scoredSpecialties.length > 0 ? scoredSpecialties : [null];
+
+    const added: string[] = [];
+    const skipped: string[] = [];
     try {
       for (const sp of targets) {
         try {
           await apiAddToFila(patientId, { specialty: sp });
-          results.push(sp ?? "Qualquer");
+          added.push(sp ?? "Geral");
         } catch (err: any) {
-          errors.push(`${sp ?? "Qualquer"}: ${err.message}`);
+          if (err.message?.toLowerCase().includes("fila")) skipped.push(sp ?? "Geral");
+          else throw err;
         }
       }
-      await refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
-      setShowFilaModal(false);
-      setFilaSpecialties([]);
-      if (results.length > 0) {
+      if (added.length > 0) {
         toast({
-          title: results.length === 1 ? "Adicionado à fila!" : `${results.length} especialidades adicionadas!`,
-          description: results.length === 1
-            ? `Especialidade: ${results[0]}`
-            : results.join(", "),
+          title: added.length === 1 ? "✅ Adicionado à fila!" : `✅ ${added.length} filas adicionadas!`,
+          description: added.join(", ") + (skipped.length > 0 ? ` · Já na fila: ${skipped.join(", ")}` : ""),
         });
-      }
-      if (errors.length > 0) {
-        toast({ title: "Alguns itens não foram adicionados", description: errors.join(" | "), variant: "destructive" });
+        navigate("/waiting-list");
+      } else {
+        toast({ title: "Aviso", description: "Paciente já está em todas as filas correspondentes.", variant: "destructive" });
       }
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
@@ -274,8 +279,8 @@ export default function PatientDetail() {
             <Download className="w-4 h-4" /> Gerar PDF
           </Button>
           {podeAdicionarFila && (
-            <Button onClick={() => setShowFilaModal(true)} className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
-              <ListPlus className="w-4 h-4" /> Adicionar à Fila
+            <Button onClick={handleAddToFila} disabled={addingToFila} className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
+              <ListPlus className="w-4 h-4" /> {addingToFila ? "Adicionando..." : "Confirmar e Adicionar na Fila"}
             </Button>
           )}
           {naFila && (
@@ -540,71 +545,6 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {/* Modal: Adicionar à Fila */}
-      {showFilaModal && previewPriority && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <MotionCard className="w-full max-w-md p-6" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-            <h2 className="text-2xl font-bold font-display mb-1">Adicionar à Fila de Espera</h2>
-            <p className="text-sm text-muted-foreground mb-5">A prioridade é calculada automaticamente com base na triagem.</p>
-
-            <div className="p-4 rounded-xl border mb-5 flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-semibold">Prioridade calculada</p>
-                <span className={cn("font-bold px-3 py-1 rounded-full border text-sm mt-1 inline-block", PRIORITY_STYLE[previewPriority])}>
-                  {PRIORITY_LABEL[previewPriority]}
-                </span>
-              </div>
-              <div className="text-right text-sm text-muted-foreground">
-                <p>Score: <strong>{p.triagemScore}/360</strong></p>
-                <p>Escola Pública: <strong>{ep ? "Sim" : "Não"}</strong></p>
-                <p>Trabalho na Roça: <strong>{tnr ? "Sim" : "Não"}</strong></p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <Label className="mb-2 block">Especialidades (selecione uma ou mais)</Label>
-                <p className="text-xs text-muted-foreground mb-3">Será criado um registro na fila para cada especialidade marcada. Deixe em branco para qualquer especialidade.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {ALL_SPECIALTIES.map(sp => {
-                    const checked = filaSpecialties.includes(sp);
-                    return (
-                      <label key={sp} className={cn(
-                        "flex items-center gap-2.5 p-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm font-semibold select-none",
-                        checked
-                          ? "border-orange-400 bg-orange-50 text-orange-800"
-                          : "border-border text-muted-foreground hover:border-orange-300 hover:bg-orange-50/30"
-                      )}>
-                        <div className={cn(
-                          "w-4 h-4 rounded flex-shrink-0 border-2 flex items-center justify-center transition-all",
-                          checked ? "bg-orange-500 border-orange-500" : "border-border"
-                        )}>
-                          {checked && <span className="text-white text-[10px] font-black leading-none">✓</span>}
-                        </div>
-                        <input type="checkbox" className="sr-only" checked={checked} onChange={() => toggleFilaSpecialty(sp)} />
-                        {sp}
-                      </label>
-                    );
-                  })}
-                </div>
-                {filaSpecialties.length > 0 && (
-                  <p className="text-xs text-orange-600 font-semibold mt-2">
-                    {filaSpecialties.length} especialidade{filaSpecialties.length > 1 ? "s" : ""} selecionada{filaSpecialties.length > 1 ? "s" : ""} — serão criados {filaSpecialties.length} registro{filaSpecialties.length > 1 ? "s" : ""} na fila.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <Button type="button" variant="ghost" onClick={() => { setShowFilaModal(false); setFilaSpecialties([]); }}>Cancelar</Button>
-              <Button onClick={handleAddToFila} disabled={addingToFila} className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
-                <ListPlus className="w-4 h-4" />
-                {addingToFila ? "Adicionando..." : filaSpecialties.length > 1 ? `Adicionar ${filaSpecialties.length} Especialidades` : "Confirmar e Adicionar"}
-              </Button>
-            </div>
-          </MotionCard>
-        </div>
-      )}
     </div>
   );
 }
