@@ -5,6 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
+import { API_BASE as API } from "@/lib/api";
 
 // ─── WHITE LABEL CONFIG ──────────────────────────────────────────────────────
 export const CLINIC_CONFIG = {
@@ -14,8 +15,6 @@ export const CLINIC_CONFIG = {
   // logoUrl: "/logo.png",
 };
 // ─────────────────────────────────────────────────────────────────────────────
-
-const API = "/api";
 
 type Pergunta = { area: string; pergunta: string; explicacao: string };
 

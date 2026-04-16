@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, type ReactNode, type FormEvent } from "react";
 import { processOfflineQueue, getOfflineQueueCount } from "./lib/offline-queue";
 
-const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+import { API_BASE } from "./lib/api";
 const SESSION_KEY = "nfs_ponto_session";
 
 type Session = {
@@ -65,7 +65,7 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/ponto/auth/company`, {
+      const res = await fetch(`${API_BASE}/ponto/auth/company`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug, password }),

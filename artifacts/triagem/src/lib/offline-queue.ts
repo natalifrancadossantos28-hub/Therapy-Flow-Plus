@@ -1,3 +1,5 @@
+import { API_BASE } from "./api";
+
 const OFFLINE_QUEUE_KEY = "nfs_triagem_offline_queue";
 
 type OfflineItem = { id: string; data: object; createdAt: string; attempts: number };
@@ -9,12 +11,11 @@ export async function processOfflineQueue(): Promise<number> {
     const queue: OfflineItem[] = JSON.parse(raw);
     if (!queue.length) return 0;
 
-    const BASE_URL = (import.meta as any).env?.BASE_URL?.replace(/\/$/, "") ?? "";
     const remaining: OfflineItem[] = [];
     let synced = 0;
     for (const item of queue) {
       try {
-        const res = await fetch(`${BASE_URL}/api/triagens`, {
+        const res = await fetch(`${API_BASE}/triagens`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(item.data),
