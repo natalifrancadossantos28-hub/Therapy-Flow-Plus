@@ -89,6 +89,8 @@ export default function Patients() {
     diagnosis: "",
     entryDate: today(),
     escolaPublica: false,
+    tipoRegistro: "Paciente da Unidade",
+    localAtendimento: "",
   });
 
   const [nextProntuario, setNextProntuario] = useState<string>("");
@@ -151,6 +153,7 @@ export default function Patients() {
       name: "", prontuario: next, cpf: "", cns: "", phone: "", dateOfBirth: "",
       motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
       entryDate: today(), escolaPublica: false,
+      tipoRegistro: "Paciente da Unidade", localAtendimento: "",
     });
     setIsDialogOpen(true);
   };
@@ -162,6 +165,7 @@ export default function Patients() {
       name: "", prontuario: "", cpf: "", cns: "", phone: "", dateOfBirth: "",
       motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
       entryDate: today(), escolaPublica: false,
+      tipoRegistro: "Paciente da Unidade", localAtendimento: "",
     });
   };
 
@@ -442,6 +446,43 @@ export default function Patients() {
                 <div className="col-span-2">
                   <Label>Diagnóstico</Label>
                   <Input value={formData.diagnosis} onChange={e => setFormData({ ...formData, diagnosis: e.target.value })} placeholder="Ex.: TEA, TDAH, sem diagnóstico" />
+                </div>
+
+                {/* Tipo de Registro */}
+                <div className="col-span-2">
+                  <Label>Tipo de Registro</Label>
+                  <div className="flex flex-col sm:flex-row gap-2 mt-1">
+                    {["Paciente da Unidade", "Registro Censo Municipal"].map(opt => (
+                      <label key={opt} className={cn(
+                        "flex-1 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all text-sm font-semibold",
+                        formData.tipoRegistro === opt
+                          ? opt === "Registro Censo Municipal"
+                            ? "border-violet-500 bg-violet-50 text-violet-800"
+                            : "border-primary bg-primary/5 text-primary"
+                          : "border-border text-muted-foreground hover:border-primary/40"
+                      )}>
+                        <input type="radio" name="tipoReg" checked={formData.tipoRegistro === opt}
+                          onChange={() => setFormData({ ...formData, tipoRegistro: opt })} className="sr-only" />
+                        {opt === "Registro Censo Municipal" ? "🏛️ " : "🏥 "}{opt}
+                      </label>
+                    ))}
+                  </div>
+                  {formData.tipoRegistro === "Registro Censo Municipal" && (
+                    <p className="text-xs text-violet-600 mt-1 font-semibold">Este paciente não será elegível para a fila de espera da clínica.</p>
+                  )}
+                </div>
+
+                {/* Local de Atendimento */}
+                <div className="col-span-2">
+                  <Label>Onde realiza atendimento atualmente?</Label>
+                  <select
+                    value={formData.localAtendimento}
+                    onChange={e => setFormData({ ...formData, localAtendimento: e.target.value })}
+                    className="mt-1 w-full border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-background"
+                  >
+                    <option value="">Selecione...</option>
+                    {["CAPS", "Reabilitação", "Particular", "Sem Atendimento"].map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
                 </div>
 
                 {/* Rede Municipal Ibiúna */}

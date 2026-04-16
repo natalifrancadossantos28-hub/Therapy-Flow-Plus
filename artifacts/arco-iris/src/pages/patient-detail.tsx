@@ -6,10 +6,9 @@ import {
   useDeletePatient,
   useGetProfessionalVacancyAlert,
   useGetPatientAbsences,
-  useGetProfessionals,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, Button, Badge, MotionCard, Input, Label, Select } from "@/components/ui-custom";
+import { Card, Button, Badge, MotionCard, Input, Label } from "@/components/ui-custom";
 import { generatePatientPdf } from "@/hooks/use-pdf";
 import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -17,10 +16,10 @@ import { cn, getStatusColor, formatDate } from "@/lib/utils";
 import { AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 
-function calcPriority(score: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "elevado" | "moderado" | "leve" | "baixo" {
+function calcPriority(score: number, escolaPublica: boolean, trabalhoNaRoca: boolean, semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
-  const baseIdx = score >= 432 ? 3 : score >= 288 ? 2 : score >= 144 ? 1 : 0;
-  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0);
+  const baseIdx = score >= 270 ? 3 : score >= 180 ? 2 : score >= 90 ? 1 : 0;
+  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0) + (semTerapia ? 1 : 0);
   return levels[Math.min(3, baseIdx + vuln)];
 }
 
@@ -69,7 +68,6 @@ export default function PatientDetail() {
   const { data: patient, isLoading, refetch } = useGetPatient(patientId);
   const { data: pdfData } = useGetPatientPdf(patientId);
   const { data: absenceInfo } = useGetPatientAbsences(patientId);
-  const { data: professionals } = useGetProfessionals();
   const deleteMutation = useDeletePatient();
 
   const [showVacancyAlert, setShowVacancyAlert] = useState<{ show: boolean; data: any }>({ show: false, data: null });
@@ -89,8 +87,17 @@ export default function PatientDetail() {
   const [savingTriagem, setSavingTriagem] = useState(false);
 
   const [showFilaModal, setShowFilaModal] = useState(false);
-  const [filaSpecialty, setFilaSpecialty] = useState("");
+  const [filaSpecialties, setFilaSpecialties] = useState<string[]>([]);
   const [addingToFila, setAddingToFila] = useState(false);
+
+  const ALL_SPECIALTIES = [
+    "Psicologia", "Psicomotricidade", "Fisioterapia", "Psicopedagogia",
+    "Educação Física", "Fonoaudiologia", "Terapia Ocupacional", "Nutrição",
+  ];
+
+  const toggleFilaSpecialty = (sp: string) => {
+    setFilaSpecialties(prev => prev.includes(sp) ? prev.filter(s => s !== sp) : [...prev, sp]);
+  };
 
   const handleDownloadPdf = () => {
     if (pdfData) {
@@ -118,7 +125,7 @@ export default function PatientDetail() {
     }
   };
 
-  const p = patient as any;
+  const p = patient;
   const totalScore = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri]
     .reduce((acc, v) => acc + (parseInt(v) || 0), 0);
 
@@ -171,18 +178,34 @@ export default function PatientDetail() {
 
   const handleAddToFila = async () => {
     setAddingToFila(true);
+    const targets = filaSpecialties.length > 0 ? filaSpecialties : [null];
+    const results: string[] = [];
+    const errors: string[] = [];
     try {
-      const result = await apiAddToFila(patientId, {
-        specialty: filaSpecialty || null,
-      });
+      for (const sp of targets) {
+        try {
+          await apiAddToFila(patientId, { specialty: sp });
+          results.push(sp ?? "Qualquer");
+        } catch (err: any) {
+          errors.push(`${sp ?? "Qualquer"}: ${err.message}`);
+        }
+      }
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
       setShowFilaModal(false);
-      toast({
-        title: "Paciente adicionado à fila!",
-        description: `Prioridade calculada: ${PRIORITY_LABEL[result.priority] ?? result.priority}`,
-      });
+      setFilaSpecialties([]);
+      if (results.length > 0) {
+        toast({
+          title: results.length === 1 ? "Adicionado à fila!" : `${results.length} especialidades adicionadas!`,
+          description: results.length === 1
+            ? `Especialidade: ${results[0]}`
+            : results.join(", "),
+        });
+      }
+      if (errors.length > 0) {
+        toast({ title: "Alguns itens não foram adicionados", description: errors.join(" | "), variant: "destructive" });
+      }
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
@@ -193,16 +216,18 @@ export default function PatientDetail() {
   if (isLoading || !patient) return <div className="p-8 text-center animate-pulse">Carregando prontuário...</div>;
 
   const hasWarning = patient.absenceCount >= 3;
-  const triagemFeita = (patient as any).triagemScore != null;
-  const ep = (patient as any).escolaPublica ?? false;
-  const tnr = (patient as any).trabalhoNaRoca ?? false;
+  const triagemFeita = patient.triagemScore != null;
+  const ep = patient.escolaPublica ?? false;
+  const tnr = patient.trabalhoNaRoca ?? false;
+  const semTerapia = patient.localAtendimento === "Sem Atendimento" || patient.localAtendimento === "Nenhum";
   const previewPriority = triagemFeita
-    ? calcPriority((patient as any).triagemScore, ep, tnr)
+    ? calcPriority(patient.triagemScore!, ep, tnr, semTerapia)
     : null;
 
+  const isCensoMunicipal = patient.tipoRegistro === "Registro Censo Municipal";
   const naFila = patient.status === "Fila de Espera";
   const emAtendimento = patient.status === "Atendimento";
-  const podeAdicionarFila = triagemFeita && !naFila && !emAtendimento && patient.status !== "Alta";
+  const podeAdicionarFila = triagemFeita && !naFila && !emAtendimento && patient.status !== "Alta" && !isCensoMunicipal;
 
   return (
     <div className="space-y-8">
@@ -234,7 +259,10 @@ export default function PatientDetail() {
           <div className="flex items-center gap-4 flex-wrap">
             <h1 className="text-3xl font-display font-bold text-foreground">{patient.name}</h1>
             <Badge className={getStatusColor(patient.status)}>{patient.status}</Badge>
-            {triagemFeita && previewPriority && (
+            {isCensoMunicipal && (
+              <Badge className="bg-violet-100 text-violet-800 border-violet-300">🏛️ Censo Municipal PCD</Badge>
+            )}
+            {triagemFeita && previewPriority && !isCensoMunicipal && (
               <Badge className={PRIORITY_STYLE[previewPriority]}>
                 Prioridade {PRIORITY_LABEL[previewPriority]}
               </Badge>
@@ -292,6 +320,23 @@ export default function PatientDetail() {
                 <p className="text-lg">{patient.guardianName || "-"} <span className="text-muted-foreground text-sm ml-2">{patient.guardianPhone}</span></p>
               </div>
             </div>
+
+            {(patient.tipoRegistro || patient.localAtendimento) && (
+              <div className="mt-6 pt-4 border-t border-border grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-12">
+                {patient.tipoRegistro && (
+                  <div>
+                    <p className="text-sm font-semibold text-muted-foreground">Tipo de Registro</p>
+                    <p className="text-base font-semibold mt-1">{patient.tipoRegistro === "Registro Censo Municipal" ? "🏛️ Censo Municipal PCD" : "🏥 Paciente da Unidade"}</p>
+                  </div>
+                )}
+                {patient.localAtendimento && (
+                  <div>
+                    <p className="text-sm font-semibold text-muted-foreground">Atendimento Atual</p>
+                    <p className="text-base font-semibold mt-1">{patient.localAtendimento}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <h2 className="text-xl font-bold font-display mt-10 mb-6 border-b border-border pb-4">Quadro Clínico</h2>
             <div>
@@ -473,7 +518,7 @@ export default function PatientDetail() {
                   <p className="text-muted-foreground font-semibold mb-2">Classificação que será atribuída:</p>
                   <div className="flex flex-wrap gap-2">
                     {(["baixo", "leve", "moderado", "elevado"] as const).map(lvl => {
-                      const active = calcPriority(totalScore, escolaPublica ?? false, trabalhoNaRoca ?? false) === lvl;
+                      const active = calcPriority(totalScore, escolaPublica ?? false, trabalhoNaRoca ?? false, semTerapia) === lvl;
                       return (
                         <span key={lvl} className={cn("px-3 py-1 rounded-full border text-xs font-bold transition-all", active ? PRIORITY_STYLE[lvl] + " ring-2 ring-offset-1 ring-current" : "bg-secondary text-muted-foreground border-border opacity-50")}>
                           {PRIORITY_LABEL[lvl]}
@@ -516,23 +561,45 @@ export default function PatientDetail() {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
-                <Label>Especialidade Preferencial (Opcional)</Label>
-                <Select value={filaSpecialty} onChange={e => setFilaSpecialty(e.target.value)}>
-                  <option value="">Qualquer Especialidade</option>
-                  {[...new Set(professionals?.map(p => p.specialty).filter(Boolean) ?? [])].map(sp => (
-                    <option key={sp} value={sp}>{sp}</option>
-                  ))}
-                </Select>
+                <Label className="mb-2 block">Especialidades (selecione uma ou mais)</Label>
+                <p className="text-xs text-muted-foreground mb-3">Será criado um registro na fila para cada especialidade marcada. Deixe em branco para qualquer especialidade.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {ALL_SPECIALTIES.map(sp => {
+                    const checked = filaSpecialties.includes(sp);
+                    return (
+                      <label key={sp} className={cn(
+                        "flex items-center gap-2.5 p-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm font-semibold select-none",
+                        checked
+                          ? "border-orange-400 bg-orange-50 text-orange-800"
+                          : "border-border text-muted-foreground hover:border-orange-300 hover:bg-orange-50/30"
+                      )}>
+                        <div className={cn(
+                          "w-4 h-4 rounded flex-shrink-0 border-2 flex items-center justify-center transition-all",
+                          checked ? "bg-orange-500 border-orange-500" : "border-border"
+                        )}>
+                          {checked && <span className="text-white text-[10px] font-black leading-none">✓</span>}
+                        </div>
+                        <input type="checkbox" className="sr-only" checked={checked} onChange={() => toggleFilaSpecialty(sp)} />
+                        {sp}
+                      </label>
+                    );
+                  })}
+                </div>
+                {filaSpecialties.length > 0 && (
+                  <p className="text-xs text-orange-600 font-semibold mt-2">
+                    {filaSpecialties.length} especialidade{filaSpecialties.length > 1 ? "s" : ""} selecionada{filaSpecialties.length > 1 ? "s" : ""} — serão criados {filaSpecialties.length} registro{filaSpecialties.length > 1 ? "s" : ""} na fila.
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
-              <Button type="button" variant="ghost" onClick={() => setShowFilaModal(false)}>Cancelar</Button>
+              <Button type="button" variant="ghost" onClick={() => { setShowFilaModal(false); setFilaSpecialties([]); }}>Cancelar</Button>
               <Button onClick={handleAddToFila} disabled={addingToFila} className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
                 <ListPlus className="w-4 h-4" />
-                {addingToFila ? "Adicionando..." : "Confirmar e Adicionar"}
+                {addingToFila ? "Adicionando..." : filaSpecialties.length > 1 ? `Adicionar ${filaSpecialties.length} Especialidades` : "Confirmar e Adicionar"}
               </Button>
             </div>
           </MotionCard>

@@ -12,10 +12,10 @@ function getCompanyId(req: any): number | null {
   return isNaN(n) ? null : n;
 }
 
-function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "elevado" | "moderado" | "leve" | "baixo" {
+function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean, semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
-  const baseIdx = triagemScore >= 432 ? 3 : triagemScore >= 288 ? 2 : triagemScore >= 144 ? 1 : 0;
-  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0);
+  const baseIdx = triagemScore >= 270 ? 3 : triagemScore >= 180 ? 2 : triagemScore >= 90 ? 1 : 0;
+  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0) + (semTerapia ? 1 : 0);
   const idx = Math.min(3, baseIdx + vuln);
   return levels[idx];
 }
@@ -70,6 +70,8 @@ router.post("/patients", async (req, res) => {
     scoreNutricionista: body.scoreNutricionista !== undefined ? Number(body.scoreNutricionista) : null,
     escolaPublica: body.escolaPublica !== undefined ? Boolean(body.escolaPublica) : null,
     trabalhoNaRoca: body.trabalhoNaRoca !== undefined ? Boolean(body.trabalhoNaRoca) : null,
+    tipoRegistro: body.tipoRegistro ?? "Paciente da Unidade",
+    localAtendimento: body.localAtendimento ?? null,
   }).returning();
 
   res.status(201).json(row);
@@ -143,6 +145,8 @@ router.put("/patients/:id", async (req, res) => {
   if (body.scoreNutricionista !== undefined) updateData.scoreNutricionista = body.scoreNutricionista !== null ? Number(body.scoreNutricionista) : null;
   if (body.escolaPublica !== undefined) updateData.escolaPublica = body.escolaPublica !== null ? Boolean(body.escolaPublica) : null;
   if (body.trabalhoNaRoca !== undefined) updateData.trabalhoNaRoca = body.trabalhoNaRoca !== null ? Boolean(body.trabalhoNaRoca) : null;
+  if (body.tipoRegistro !== undefined) updateData.tipoRegistro = body.tipoRegistro;
+  if (body.localAtendimento !== undefined) updateData.localAtendimento = body.localAtendimento || null;
 
   const [row] = await db.update(patientsTable).set(updateData).where(eq(patientsTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Patient not found" });
@@ -160,6 +164,13 @@ router.post("/patients/:id/add-to-fila", async (req, res) => {
   const companyId = getCompanyId(req);
   const [patient] = await db.select().from(patientsTable).where(eq(patientsTable.id, id));
   if (!patient) return res.status(404).json({ error: "Patient not found" });
+
+  if (patient.tipoRegistro === "Registro Censo Municipal") {
+    return res.status(422).json({
+      error: "Paciente do Censo Municipal",
+      message: "Pacientes do Censo Municipal não podem ser adicionados à fila de espera da clínica.",
+    });
+  }
 
   if (patient.triagemScore === null || patient.triagemScore === undefined) {
     return res.status(422).json({
@@ -182,10 +193,12 @@ router.post("/patients/:id/add-to-fila", async (req, res) => {
     });
   }
 
+  const semTerapia = patient.localAtendimento === "Sem Atendimento" || patient.localAtendimento === "Nenhum";
   const priority = calcPriority(
     patient.triagemScore,
     patient.escolaPublica ?? false,
     patient.trabalhoNaRoca ?? false,
+    semTerapia,
   );
 
   const today = new Date().toISOString().split("T")[0];

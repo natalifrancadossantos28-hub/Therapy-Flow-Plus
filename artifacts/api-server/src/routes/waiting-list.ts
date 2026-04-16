@@ -22,6 +22,9 @@ router.get("/waiting-list", async (req, res) => {
     conditions.push(eq(waitingListTable.professionalId, Number(req.query.professionalId)));
   }
 
+  // Exclude Censo Municipal patients from the waiting list
+  conditions.push(sql`(${patientsTable.tipoRegistro} IS NULL OR ${patientsTable.tipoRegistro} != 'Registro Censo Municipal')`);
+
   const rows = await db.select({
     id: waitingListTable.id,
     patientId: waitingListTable.patientId,
@@ -41,7 +44,7 @@ router.get("/waiting-list", async (req, res) => {
     .from(waitingListTable)
     .leftJoin(patientsTable, eq(waitingListTable.patientId, patientsTable.id))
     .leftJoin(professionalsTable, eq(waitingListTable.professionalId, professionalsTable.id))
-    .where(conditions.length ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(priorityOrder, asc(waitingListTable.entryDate));
 
   res.json(rows.map(r => ({
@@ -59,11 +62,17 @@ router.post("/waiting-list", async (req, res) => {
   const companyId = getCompanyId(req);
   const { patientId, specialty, priority, notes, entryDate } = req.body;
 
-  const [patient] = await db.select({ triagemScore: patientsTable.triagemScore })
+  const [patient] = await db.select({ triagemScore: patientsTable.triagemScore, tipoRegistro: patientsTable.tipoRegistro })
     .from(patientsTable)
     .where(eq(patientsTable.id, Number(patientId)));
 
   if (!patient) return res.status(404).json({ error: "Paciente não encontrado" });
+  if (patient.tipoRegistro === "Registro Censo Municipal") {
+    return res.status(422).json({
+      error: "Registro Censo Municipal",
+      message: "Pacientes do Censo Municipal não podem ser adicionados à fila de espera da clínica.",
+    });
+  }
   if (patient.triagemScore === null || patient.triagemScore === undefined) {
     return res.status(422).json({
       error: "Triagem não realizada",

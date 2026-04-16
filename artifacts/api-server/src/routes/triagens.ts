@@ -52,6 +52,8 @@ const extractFields = (body: any) => ({
   tipoEscola: body.tipoEscola,
   trabalhoPais: body.trabalhoPais,
   outroAtendimento: body.outroAtendimento !== undefined ? !!body.outroAtendimento : null,
+  localAtendimento: body.localAtendimento || null,
+  tipoRegistro: body.tipoRegistro || "Paciente da Unidade",
   profissional: body.profissional,
   especialidade: body.especialidade,
   data: body.data,
@@ -59,10 +61,10 @@ const extractFields = (body: any) => ({
   respostas: body.respostas ? JSON.stringify(body.respostas) : null,
 });
 
-function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean): "elevado" | "moderado" | "leve" | "baixo" {
+function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean, semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
-  const baseIdx = triagemScore >= 432 ? 3 : triagemScore >= 288 ? 2 : triagemScore >= 144 ? 1 : 0;
-  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0);
+  const baseIdx = triagemScore >= 270 ? 3 : triagemScore >= 180 ? 2 : triagemScore >= 90 ? 1 : 0;
+  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0) + (semTerapia ? 1 : 0);
   const idx = Math.min(3, baseIdx + vuln);
   return levels[idx];
 }
@@ -138,12 +140,29 @@ async function autoLinkTriagem(row: any, companyId: number | null) {
 
   if (!patient) return null;
 
-  await db.update(patientsTable).set({
+  // Propagate tipoRegistro from triagem record to patient (if not already set)
+  const triagemTipo = row.tipoRegistro ?? null;
+  const patientTipo = patient.tipoRegistro ?? null;
+  const updateFields: Record<string, unknown> = {
     triagemScore,
     ...areaScores,
     escolaPublica,
     trabalhoNaRoca,
-  }).where(eq(patientsTable.id, patient.id));
+  };
+  if (triagemTipo && !patientTipo) {
+    updateFields.tipoRegistro = triagemTipo;
+  }
+  if (row.localAtendimento && !patient.localAtendimento) {
+    updateFields.localAtendimento = row.localAtendimento;
+  }
+
+  await db.update(patientsTable).set(updateFields).where(eq(patientsTable.id, patient.id));
+
+  // Censo Municipal patients must never enter the waiting list
+  const resolvedTipo = triagemTipo || patientTipo;
+  if (resolvedTipo === "Registro Censo Municipal") {
+    return { patientName: patient.name, linkedOnly: true, scoresUpdated: true, censoMunicipal: true };
+  }
 
   const SKIP_STATUSES = new Set(["Alta", "Óbito", "Desistência", "Atendimento", "Fila de Espera"]);
   if (SKIP_STATUSES.has(patient.status)) {
@@ -158,7 +177,8 @@ async function autoLinkTriagem(row: any, companyId: number | null) {
     return { patientName: patient.name, linkedOnly: true, scoresUpdated: true };
   }
 
-  const priority = calcPriority(triagemScore, escolaPublica, trabalhoNaRoca);
+  const semTerapia = (row.localAtendimento === "Sem Atendimento" || row.localAtendimento === "Nenhum");
+  const priority = calcPriority(triagemScore, escolaPublica, trabalhoNaRoca, semTerapia);
   const today = new Date().toISOString().split("T")[0];
   const specialty = row.especialidade ?? null;
 

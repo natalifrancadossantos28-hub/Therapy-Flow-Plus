@@ -97,7 +97,7 @@ const PERGUNTAS: Pergunta[] = [
   { area: "Terapia Ocupacional", pergunta: "Hipersensibilidade sensorial", explicacao: "Reação excessiva a texturas, sons, luzes ou odores" },
   { area: "Terapia Ocupacional", pergunta: "Hiposensibilidade sensorial", explicacao: "Baixa resposta a estímulos sensoriais; busca por sensações intensas" },
   { area: "Terapia Ocupacional", pergunta: "Dificuldade nas atividades de vida diária", explicacao: "Problemas para se vestir, alimentar ou higienizar de forma independente" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade de planejamento motor", explicacao: "Não consegue sequenciar ou planejar movimentos para executar tarefas" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade em planejar ou executar movimentos (Ex: usar tesoura, pular, abotoar ou imitar gestos)", explicacao: "Não consegue sequenciar ou planejar movimentos para executar tarefas" },
   { area: "Terapia Ocupacional", pergunta: "Resistência a brincadeiras ou atividades lúdicas", explicacao: "Evita jogar ou participar de atividades próprias da idade" },
   { area: "Terapia Ocupacional", pergunta: "Dificuldade de organização do espaço e materiais", explicacao: "Dificuldade em organizar o ambiente, mochila ou mesa de trabalho" },
   { area: "Terapia Ocupacional", pergunta: "Dificuldade de concentração em tarefas manuais", explicacao: "Abandona rapidamente atividades que exigem atenção e uso das mãos" },
@@ -223,6 +223,8 @@ type FormData = {
   cadeiraDeRodas: boolean; ortesesProteses: boolean; aparelhoAuditivo: boolean;
   medicacaoContinua: string; alergias: string; problemasSaude: string;
   tipoEscola: string; trabalhoPais: string; outroAtendimento: boolean;
+  localAtendimento: string;
+  tipoRegistro: string;
   profissional: string; especialidade: string;
 };
 
@@ -241,6 +243,8 @@ type TriagemSalva = {
   cadeiraDeRodas: boolean | null; ortesesProteses: boolean | null; aparelhoAuditivo: boolean | null;
   medicacaoContinua: string | null; alergias: string | null; problemasSaude: string | null;
   tipoEscola: string | null; trabalhoPais: string | null; outroAtendimento: boolean | null;
+  localAtendimento: string | null;
+  tipoRegistro: string | null;
   profissional: string | null; especialidade: string | null;
   data: string | null; resultado: string | null; respostas: string | null;
   createdAt: string;
@@ -279,6 +283,8 @@ function triSalvaToFormData(t: TriagemSalva): FormData {
     alergias: t.alergias || "", problemasSaude: t.problemasSaude || "",
     tipoEscola: t.tipoEscola || "", trabalhoPais: t.trabalhoPais || "",
     outroAtendimento: t.outroAtendimento !== false,
+    localAtendimento: t.localAtendimento || "",
+    tipoRegistro: t.tipoRegistro || "Paciente da Unidade",
     profissional: t.profissional || "", especialidade: t.especialidade || "",
   };
 }
@@ -298,16 +304,16 @@ function calcVulnScore(t: {
   bpc?: boolean | null; bolsaFamilia?: boolean | null; outroAtendimento?: boolean | null;
 }): number {
   let score = 0;
-  if (t.tipoEscola === "Municipal" || t.tipoEscola === "Estadual") score += 10;
-  if (t.trabalhoPais === "Informal/Roça" || t.trabalhoPais === "Desempregado") score += 10;
+  if (t.tipoEscola === "Municipal" || t.tipoEscola === "Estadual") score += 3;
+  if (t.trabalhoPais === "Informal/Roça" || t.trabalhoPais === "Desempregado") score += 3;
   if (t.bpc || t.bolsaFamilia) score += 5;
-  if (t.outroAtendimento === false) score += 15;
+  if (t.outroAtendimento === false) score += 5;
   return score;
 }
 
 function getPrioridadeBadge(vulnScore: number, clinicalPts: number) {
   const total = vulnScore + Math.round(clinicalPts / 8);
-  if (total >= 35 || vulnScore === 40) return { label: "Prioridade Máxima", cls: "bg-red-100 text-red-800 border-red-300", icon: "🔴" };
+  if (total >= 35 || vulnScore >= 16) return { label: "Prioridade Máxima", cls: "bg-red-100 text-red-800 border-red-300", icon: "🔴" };
   if (total >= 20) return { label: "Alta Prioridade", cls: "bg-orange-100 text-orange-800 border-orange-300", icon: "🟠" };
   if (vulnScore >= 10) return { label: "Vulnerabilidade Social", cls: "bg-yellow-100 text-yellow-800 border-yellow-300", icon: "🟡" };
   return null;
@@ -424,6 +430,8 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
   const [tipoEscola, setTipoEscola] = useState(b?.tipoEscola ?? "");
   const [trabalhoPais, setTrabalhoPais] = useState(b?.trabalhoPais ?? "");
   const [outroAtendimento, setOutroAtendimento] = useState(b?.outroAtendimento ?? true);
+  const [localAtendimento, setLocalAtendimento] = useState(b?.localAtendimento ?? "");
+  const [tipoRegistro, setTipoRegistro] = useState(b?.tipoRegistro ?? "Paciente da Unidade");
   const [profissional, setProfissional] = useState(b?.profissional ?? "");
   const [especialidade, setEspecialidade] = useState(b?.especialidade ?? "");
   const [areaAtiva, setAreaAtiva] = useState(AREAS[0]);
@@ -443,6 +451,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
       cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
       medicacaoContinua, alergias, problemasSaude,
       tipoEscola, trabalhoPais, outroAtendimento,
+      localAtendimento, tipoRegistro,
       profissional, especialidade,
     });
   };
@@ -461,6 +470,32 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
     <div className="min-h-screen bg-background">
       <Header page="form" />
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
+
+        {/* ── Tipo de Registro – Censo PCD ── */}
+        <div className={`rounded-2xl border-2 p-5 ${tipoRegistro === "Registro Censo Municipal" ? "bg-violet-950/30 border-violet-500/60" : "bg-card border-primary/30"}`}>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Tipo de Registro</p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <label className={`flex-1 flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${tipoRegistro === "Paciente da Unidade" ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"}`}>
+              <input type="radio" name="tipoRegistro" checked={tipoRegistro === "Paciente da Unidade"} onChange={() => setTipoRegistro("Paciente da Unidade")} className="accent-primary w-4 h-4" />
+              <div>
+                <p className="font-bold text-sm">Paciente da Unidade</p>
+                <p className="text-xs text-muted-foreground">Atendimento regular na clínica</p>
+              </div>
+            </label>
+            <label className={`flex-1 flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${tipoRegistro === "Registro Censo Municipal" ? "border-violet-500 bg-violet-950/30" : "border-border hover:border-violet-500/40"}`}>
+              <input type="radio" name="tipoRegistro" checked={tipoRegistro === "Registro Censo Municipal"} onChange={() => setTipoRegistro("Registro Censo Municipal")} className="accent-primary w-4 h-4" />
+              <div>
+                <p className="font-bold text-sm">Registro Censo Municipal (Geral)</p>
+                <p className="text-xs text-muted-foreground">Mapeamento PCD – Ibiúna</p>
+              </div>
+            </label>
+          </div>
+          {tipoRegistro === "Registro Censo Municipal" && (
+            <div className="mt-3 p-3 bg-violet-900/20 rounded-xl border border-violet-500/30 text-xs text-violet-300 font-semibold">
+              🏛️ Este registro conta para o Contador PCD Municipal e não gera fila de espera na clínica.
+            </div>
+          )}
+        </div>
 
         {/* ── Dados Pessoais ── */}
         <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card space-y-6">
@@ -570,9 +605,16 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="radio" checked={outroAtendimento === false} onChange={() => setOutroAtendimento(false)} className="accent-primary w-4 h-4" />
-                    <span className="text-sm font-semibold text-muted-foreground">Não — atendimento exclusivo aqui (+15 pts prioridade)</span>
+                    <span className="text-sm font-semibold text-muted-foreground">Não — atendimento exclusivo aqui (+5 pts prioridade)</span>
                   </label>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-muted-foreground mb-1">Onde realiza atendimento atualmente?</label>
+                <select value={localAtendimento} onChange={e => setLocalAtendimento(e.target.value)} className={fc}>
+                  <option value="">Selecione...</option>
+                  {["CAPS", "Reabilitação", "Particular", "Sem Atendimento"].map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
               </div>
             </div>
           </div>
@@ -760,6 +802,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
     cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
     medicacaoContinua, alergias, problemasSaude,
     tipoEscola, trabalhoPais, outroAtendimento,
+    localAtendimento, tipoRegistro,
     profissional, especialidade,
   } = formData;
 
@@ -793,6 +836,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
     cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
     medicacaoContinua, alergias, problemasSaude,
     tipoEscola, trabalhoPais, outroAtendimento,
+    localAtendimento, tipoRegistro,
     profissional, especialidade, data, resultado: resultadoTexto, respostas,
   };
 
@@ -889,7 +933,14 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
         {/* Dados do Paciente */}
         <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card space-y-4">
-          <h2 className="font-bold text-sm text-primary uppercase tracking-wider">Dados do Paciente</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-sm text-primary uppercase tracking-wider">Dados do Paciente</h2>
+            {tipoRegistro === "Registro Censo Municipal" ? (
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-violet-950/40 text-violet-300 border border-violet-500/40">🏛️ Censo Municipal PCD</span>
+            ) : (
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">🏥 Paciente da Unidade</span>
+            )}
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Nome</p><p className="font-bold">{nomePaciente || "—"}</p></div>
             <div><p className="text-muted-foreground font-semibold">Data da Triagem</p><p className="font-bold">{data}</p></div>
@@ -914,6 +965,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
                 {tipoImovel && <div><p className="text-muted-foreground font-semibold">Moradia</p><p className="font-bold">{tipoImovel}</p></div>}
                 {rendaFamiliar && <div><p className="text-muted-foreground font-semibold">Renda Familiar</p><p className="font-bold">{rendaFamiliar}</p></div>}
                 {beneficios && <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Benefícios</p><p className="font-bold">{beneficios}</p></div>}
+                {localAtendimento && <div><p className="text-muted-foreground font-semibold">Atendimento Atual</p><p className="font-bold">{localAtendimento}</p></div>}
               </div>
             </div>
           )}
@@ -1191,7 +1243,10 @@ function ListaPacientes() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-bold text-lg truncate">{t.nome}</p>
-                        {prioridade && (
+                        {t.tipoRegistro === "Registro Censo Municipal" ? (
+                          <span className="text-xs font-bold bg-violet-950/60 text-violet-400 border border-violet-700/50 px-2 py-0.5 rounded-full">🏛️ Censo</span>
+                        ) : null}
+                        {prioridade && t.tipoRegistro !== "Registro Censo Municipal" && (
                           <span className={`text-xs font-bold border px-2 py-0.5 rounded-full ${prioridade.cls}`}>
                             {prioridade.icon} {prioridade.label}
                           </span>
@@ -1280,6 +1335,14 @@ function Dashboard() {
   }
 
   const total = triagens.length;
+  const totalUnidade = triagens.filter(t => !t.tipoRegistro || t.tipoRegistro === "Paciente da Unidade").length;
+  const totalCenso = triagens.filter(t => t.tipoRegistro === "Registro Censo Municipal").length;
+  const localAtendStats = {
+    caps: triagens.filter(t => t.localAtendimento === "CAPS").length,
+    reabilitacao: triagens.filter(t => t.localAtendimento === "Reabilitação").length,
+    particular: triagens.filter(t => t.localAtendimento === "Particular").length,
+    nenhum: triagens.filter(t => t.localAtendimento === "Sem Atendimento" || t.localAtendimento === "Nenhum").length,
+  };
   const stats = {
     bpc: triagens.filter(t => t.bpc).length,
     bolsaFamilia: triagens.filter(t => t.bolsaFamilia).length,
@@ -1290,7 +1353,7 @@ function Dashboard() {
     aparelhoAuditivo: triagens.filter(t => t.aparelhoAuditivo).length,
     comAlergias: triagens.filter(t => t.alergias && t.alergias.trim()).length,
     comMedicacao: triagens.filter(t => t.medicacaoContinua && t.medicacaoContinua.trim()).length,
-    vulnAguardando: triagens.filter(t => calcVulnScore(t) >= 15).length,
+    vulnAguardando: triagens.filter(t => calcVulnScore(t) >= 8).length,
     redePublica: triagens.filter(t => t.tipoEscola === "Municipal" || t.tipoEscola === "Estadual").length,
     semOutroAtend: triagens.filter(t => t.outroAtendimento === false).length,
     prioridadeMaxima: triagens.filter(t => {
@@ -1353,6 +1416,53 @@ function Dashboard() {
           </div>
         ) : (
           <>
+            {/* ─── CONTADOR PCD MUNICIPAL ─── */}
+            <div className="bg-gradient-to-r from-violet-950/40 to-violet-900/20 border-2 border-violet-500/50 rounded-2xl p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <span className="text-3xl">🏛️</span>
+                <div>
+                  <h3 className="text-lg font-bold text-violet-200">Contador PCD – Ibiúna</h3>
+                  <p className="text-xs text-violet-400">Total de pessoas com deficiência mapeadas no município</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+                <div className="bg-violet-950/60 rounded-2xl border border-violet-500/40 p-5 text-center">
+                  <p className="text-xs font-bold text-violet-400 uppercase tracking-wider mb-1">Total de PCDs Cadastrados</p>
+                  <p className="text-5xl font-black text-violet-100">{total}</p>
+                  <p className="text-xs text-violet-400 mt-1">registros no sistema</p>
+                </div>
+                <div className="bg-card rounded-2xl border border-primary/30 p-5 text-center">
+                  <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">Pacientes da Unidade</p>
+                  <p className="text-4xl font-black text-primary">{totalUnidade}</p>
+                  <p className="text-xs text-muted-foreground mt-1">em atendimento / triagem</p>
+                </div>
+                <div className="bg-violet-950/40 rounded-2xl border border-violet-500/40 p-5 text-center">
+                  <p className="text-xs font-bold text-violet-300 uppercase tracking-wider mb-1">Censo Municipal (Geral)</p>
+                  <p className="text-4xl font-black text-violet-200">{totalCenso}</p>
+                  <p className="text-xs text-violet-400 mt-1">mapeados na cidade</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-violet-400 uppercase tracking-wider mb-3">Onde Realiza Atendimento</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { label: "CAPS", value: localAtendStats.caps, color: "bg-blue-500" },
+                    { label: "Reabilitação", value: localAtendStats.reabilitacao, color: "bg-emerald-500" },
+                    { label: "Particular", value: localAtendStats.particular, color: "bg-amber-500" },
+                    { label: "Sem Atendimento", value: localAtendStats.nenhum, color: "bg-rose-500" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="bg-black/20 rounded-xl p-3 flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${color}`} />
+                      <div>
+                        <p className="text-xs text-violet-300 font-semibold">{label}</p>
+                        <p className="text-xl font-bold text-white">{value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* Impacto Social — destaque */}
             <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-6">
               <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-4">Impacto Social — Fila de Prioridade</h3>

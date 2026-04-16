@@ -43,9 +43,10 @@ export default function WaitingList() {
   const { toast } = useToast();
 
   const eligiblePatients = (patients ?? []).filter((p) => {
-    const score = (p as any).triagemScore;
+    const score = p.triagemScore;
     const inactiveStatus = ["Alta", "Óbito", "Desistência", "Atendimento"].includes(p.status ?? "");
-    return score != null && !inactiveStatus;
+    const isCenso = p.tipoRegistro === "Registro Censo Municipal";
+    return score != null && !inactiveStatus && !isCenso;
   });
 
   const ALL_SPECIALTIES = [
@@ -64,7 +65,7 @@ export default function WaitingList() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formPatientId) return;
-    const specialtiesToAdd = formSpecialties.length > 0 ? formSpecialties : [null as unknown as string];
+    const specialtiesToAdd: (string | null)[] = formSpecialties.length > 0 ? formSpecialties : [null];
     setAdding(true);
     let added = 0;
     let skipped = 0;
@@ -210,7 +211,7 @@ export default function WaitingList() {
                 <Select required value={formPatientId} onChange={e => setFormPatientId(e.target.value)}>
                   <option value="">Selecione um paciente triado...</option>
                   {eligiblePatients.map(p => {
-                    const score = (p as any).triagemScore;
+                    const score = p.triagemScore;
                     return (
                       <option key={p.id} value={p.id}>
                         {p.name} — Score: {score}/360

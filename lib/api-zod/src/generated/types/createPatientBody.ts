@@ -29,4 +29,8 @@ export interface CreatePatientBody {
   /** @nullable */
   professionalId?: number | null;
   status: string;
+  /** @nullable */
+  tipoRegistro?: string | null;
+  /** @nullable */
+  localAtendimento?: string | null;
 }

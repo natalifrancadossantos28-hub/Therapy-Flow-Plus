@@ -33,4 +33,38 @@ export interface Patient {
   absenceCount: number;
   createdAt: string;
   updatedAt: string;
+  /** @nullable */
+  tipoRegistro: string | null;
+  /** @nullable */
+  localAtendimento: string | null;
+  /** @nullable */
+  triagemScore: number | null;
+  /** @nullable */
+  escolaPublica: boolean | null;
+  /** @nullable */
+  trabalhoNaRoca: boolean | null;
+  /** @nullable */
+  scorePsicologia: number | null;
+  /** @nullable */
+  scorePsicomotricidade: number | null;
+  /** @nullable */
+  scoreFisioterapia: number | null;
+  /** @nullable */
+  scorePsicopedagogia: number | null;
+  /** @nullable */
+  scoreEdFisica: number | null;
+  /** @nullable */
+  scoreFonoaudiologia: number | null;
+  /** @nullable */
+  scoreTO: number | null;
+  /** @nullable */
+  scoreNutricionista: number | null;
+  /** @nullable */
+  prontuario: string | null;
+  /** @nullable */
+  entryDate: string | null;
+  /** @nullable */
+  motherName: string | null;
+  /** @nullable */
+  cns: string | null;
 }

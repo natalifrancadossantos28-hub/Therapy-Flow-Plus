@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { appointmentsTable, patientsTable, professionalsTable } from "@workspace/db";
-import { eq, and, gte, lte, or } from "drizzle-orm";
+import { eq, and, gte, lte, or, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -43,6 +43,9 @@ router.get("/appointments/today", async (req, res) => {
   if (req.query.professionalId) {
     conditions.push(eq(appointmentsTable.professionalId, Number(req.query.professionalId)));
   }
+
+  // Exclude Censo Municipal patients from the agenda
+  conditions.push(sql`(${patientsTable.tipoRegistro} IS NULL OR ${patientsTable.tipoRegistro} != 'Registro Censo Municipal')`);
 
   const rows = await db.select({
     id: appointmentsTable.id,
@@ -126,6 +129,9 @@ router.get("/appointments", async (req, res) => {
   if (req.query.dateFrom) conditions.push(gte(appointmentsTable.date, String(req.query.dateFrom)));
   if (req.query.dateTo) conditions.push(lte(appointmentsTable.date, String(req.query.dateTo)));
 
+  // Exclude Censo Municipal patients from the agenda
+  conditions.push(sql`(${patientsTable.tipoRegistro} IS NULL OR ${patientsTable.tipoRegistro} != 'Registro Censo Municipal')`);
+
   const rows = await db
     .select({
       id: appointmentsTable.id,
@@ -148,7 +154,7 @@ router.get("/appointments", async (req, res) => {
     .from(appointmentsTable)
     .leftJoin(patientsTable, eq(appointmentsTable.patientId, patientsTable.id))
     .leftJoin(professionalsTable, eq(appointmentsTable.professionalId, professionalsTable.id))
-    .where(conditions.length ? and(...conditions) : undefined);
+    .where(and(...conditions));
 
   res.json(rows);
 });
@@ -188,6 +194,17 @@ router.get("/appointments/next", async (req, res) => {
 router.post("/appointments", async (req, res) => {
   const companyId = getCompanyId(req);
   const { patientId, professionalId, date, time, notes, fromWaitingList, noRecurrence, frequency } = req.body;
+
+  if (patientId) {
+    const [pt] = await db.select({ tipoRegistro: patientsTable.tipoRegistro })
+      .from(patientsTable).where(eq(patientsTable.id, Number(patientId)));
+    if (pt?.tipoRegistro === "Registro Censo Municipal") {
+      return res.status(422).json({
+        error: "Registro Censo Municipal",
+        message: "Pacientes do Censo Municipal não podem ser agendados na agenda da clínica.",
+      });
+    }
+  }
 
   const freq: "semanal" | "quinzenal" | "mensal" = frequency || "semanal";
   const recurrenceGroupId = randomUUID();
