@@ -29,10 +29,18 @@ const PRIORITY_LABEL: Record<string, string> = {
   baixa: "VERDE – Baixo",
 };
 
+const PRIORITY_ORDER: Record<string, number> = {
+  elevado: 0, alta: 0,
+  moderado: 1, media: 1,
+  leve: 2,
+  baixo: 3, baixa: 3,
+};
+
 export default function WaitingList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [formPatientId, setFormPatientId] = useState("");
+  const [filterSpecialty, setFilterSpecialty] = useState<string>("__all__");
   const { data: waitingList, isLoading } = useGetWaitingList({} as any, { refetchInterval: 20_000 } as any);
   const { data: patients } = useGetPatients();
   const { data: professionals } = useGetProfessionals();
@@ -111,6 +119,33 @@ export default function WaitingList() {
     }
   };
 
+  // ── Posições independentes por especialidade ─────────────────────────────
+  const perSpecialtyPosition = new Map<number, number>();
+  const specialtyOptions: string[] = [];
+  if (waitingList) {
+    const grouped = new Map<string, (typeof waitingList)[number][]>();
+    for (const entry of waitingList) {
+      const sp: string = (entry as any).specialty ?? "__null__";
+      if (!grouped.has(sp)) { grouped.set(sp, []); specialtyOptions.push(sp); }
+      grouped.get(sp)!.push(entry);
+    }
+    for (const [, entries] of grouped) {
+      const sorted = [...entries].sort((a, b) => {
+        const pa = PRIORITY_ORDER[a.priority ?? ""] ?? 99;
+        const pb = PRIORITY_ORDER[b.priority ?? ""] ?? 99;
+        return pa - pb;
+      });
+      sorted.forEach((entry, i) => perSpecialtyPosition.set(entry.id, i + 1));
+    }
+  }
+
+  // ── Lista filtrada por especialidade ─────────────────────────────────────
+  const displayList = (waitingList ?? []).filter(entry => {
+    if (filterSpecialty === "__all__") return true;
+    const sp: string = (entry as any).specialty ?? "__null__";
+    return sp === filterSpecialty;
+  });
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -123,15 +158,31 @@ export default function WaitingList() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground bg-secondary/40 border border-border rounded-xl px-4 py-2.5">
-        <span className="font-semibold">Ordenação por prioridade:</span>
-        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold border border-rose-200">VERMELHO – Elevado</span>
-        <span className="text-muted-foreground">→</span>
-        <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold border border-orange-200">LARANJA – Moderado</span>
-        <span className="text-muted-foreground">→</span>
-        <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-bold border border-sky-200">AZUL – Leve</span>
-        <span className="text-muted-foreground">→</span>
-        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">VERDE – Baixo</span>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground bg-secondary/40 border border-border rounded-xl px-4 py-2.5 flex-1">
+          <span className="font-semibold">Ordenação por prioridade:</span>
+          <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold border border-rose-200">VERMELHO – Elevado</span>
+          <span className="text-muted-foreground">→</span>
+          <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold border border-orange-200">LARANJA – Moderado</span>
+          <span className="text-muted-foreground">→</span>
+          <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-bold border border-sky-200">AZUL – Leve</span>
+          <span className="text-muted-foreground">→</span>
+          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">VERDE – Baixo</span>
+        </div>
+        {specialtyOptions.length > 0 && (
+          <Select
+            value={filterSpecialty}
+            onChange={e => setFilterSpecialty(e.target.value)}
+            className="text-sm min-w-[200px]"
+          >
+            <option value="__all__">Todas as especialidades</option>
+            {specialtyOptions.map(sp => (
+              <option key={sp} value={sp}>
+                {sp === "__null__" ? "Qualquer especialidade" : sp}
+              </option>
+            ))}
+          </Select>
+        )}
       </div>
 
       <Card className="p-0 overflow-hidden">
@@ -160,12 +211,19 @@ export default function WaitingList() {
                     <p className="text-muted-foreground">Nenhum paciente aguardando vaga.</p>
                   </td>
                 </tr>
+              ) : displayList.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                    Nenhum paciente nesta especialidade.
+                  </td>
+                </tr>
               ) : (
-                waitingList?.map((entry, idx) => {
+                displayList.map((entry) => {
                   const e = entry as any;
+                  const pos = perSpecialtyPosition.get(entry.id) ?? "—";
                   return (
                     <tr key={entry.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
-                      <td className="px-6 py-4 font-display font-bold text-lg text-primary">#{idx + 1}</td>
+                      <td className="px-6 py-4 font-display font-bold text-lg text-primary">#{pos}</td>
                       <td className="px-6 py-4 font-semibold text-foreground">
                         {entry.patientName}
                         <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">
