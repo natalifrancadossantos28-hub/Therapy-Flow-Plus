@@ -165,5 +165,13 @@ input[type="checkbox"], input[type="radio"] {
     box-shadow: none !important;
   }
   .glow-card, .glow-card-red, .glow-card-orange { box-shadow: 0 0 0 1px #e5e7eb !important; }
-  @page { margin: 1.5cm; }
+  /* Recharts SVG — manter cores dos gráficos legíveis */
+  svg rect, svg path, svg circle { background-color: transparent !important; }
+  svg text { color: #374151 !important; fill: #374151 !important; }
+  .recharts-text { fill: #374151 !important; }
+  .recharts-cartesian-grid line { stroke: #d1d5db !important; }
+  .recharts-tooltip-wrapper { display: none !important; }
+  /* Evitar quebra de página dentro dos cards */
+  .bg-card, .rounded-2xl { break-inside: avoid; page-break-inside: avoid; }
+  @page { margin: 1.5cm; size: A4; }
 }

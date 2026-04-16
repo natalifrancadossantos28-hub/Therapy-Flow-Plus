@@ -1473,9 +1473,39 @@ function Dashboard() {
     <div className="min-h-screen bg-background">
       <Header page="dashboard" />
       <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-8">
-        <div>
-          <h2 className="text-2xl font-bold">Dashboard Estatístico</h2>
-          <p className="text-muted-foreground text-sm mt-0.5">Visão geral dos pacientes triados — atualizado em tempo real</p>
+
+        {/* Cabeçalho – aparece apenas na impressão */}
+        <div className="print-only hidden border-b-2 border-gray-700 pb-4 mb-2">
+          <p className="text-lg font-black">NFs Ibiúna — Dashboard Estatístico</p>
+          <p className="text-xs text-gray-500 mt-0.5">Gerado em {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</p>
+        </div>
+
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold">Dashboard Estatístico</h2>
+            <p className="text-muted-foreground text-sm mt-0.5">Visão geral dos pacientes triados — atualizado em tempo real</p>
+          </div>
+          {total > 0 && (
+            <div className="flex gap-2 no-print">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary text-secondary-foreground border border-border text-sm font-semibold hover:bg-secondary/80 transition-colors"
+              >
+                🖨️ Imprimir
+              </button>
+              <button
+                onClick={() => {
+                  const prevTitle = document.title;
+                  document.title = `Dashboard_Estatístico_NFs_${new Date().toLocaleDateString("pt-BR").replace(/\//g, "-")}`;
+                  window.print();
+                  setTimeout(() => { document.title = prevTitle; }, 1000);
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+              >
+                💾 Salvar PDF
+              </button>
+            </div>
+          )}
         </div>
 
         {total === 0 ? (
