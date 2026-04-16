@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { X, Calendar, Clock, AlertCircle } from "lucide-react";
-import { MotionCard, Button, Label, Select } from "@/components/ui-custom";
+import { MotionCard, Button, Label } from "@/components/ui-custom";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +64,6 @@ export default function BookingModal({ date, time, professionalId, professionalN
 
   const filteredList = waitingList.filter(e => matchesSpecialty(e.specialty, professionalSpecialty));
   const hiddenCount = waitingList.length - filteredList.length;
-
   const selectedEntry = waitingList.find(e => String(e.id) === selectedEntryId);
 
   const handleSave = async () => {
@@ -86,7 +85,6 @@ export default function BookingModal({ date, time, professionalId, professionalN
       });
       if (!res.ok) throw new Error("Falha ao criar agendamento");
 
-      // Invalidar todos os módulos afetados → sincronização automática
       await queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
@@ -103,17 +101,29 @@ export default function BookingModal({ date, time, professionalId, professionalN
   const formattedDate = format(new Date(date + "T12:00:00"), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    /* Backdrop — clique fora fecha o modal */
+    <div
+      className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Card — stopPropagation evita que o clique interno feche o modal */}
       <MotionCard
-        className="w-full max-w-md p-0 overflow-hidden shadow-2xl"
+        className="w-full max-w-md p-0 overflow-hidden shadow-2xl flex flex-col"
+        style={{ maxHeight: "90vh" }}
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="bg-primary p-6 text-primary-foreground">
+        {/* ── Header fixo (não rola) ───────────────────────────────── */}
+        <div className="bg-primary p-5 text-primary-foreground shrink-0">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-bold font-display">Agendar Paciente</h2>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/20 transition-colors">
+            {/* Botão X bem visível */}
+            <button
+              onClick={onClose}
+              aria-label="Fechar"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 transition-colors"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -129,8 +139,10 @@ export default function BookingModal({ date, time, professionalId, professionalN
           </div>
         </div>
 
-        {/* Body */}
-        <div className="p-6 space-y-5">
+        {/* ── Corpo com rolagem ────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
+          {/* Fila de Espera */}
           <div>
             <Label className="mb-2 block font-semibold">
               Fila de Espera — Selecione o Paciente{" "}
@@ -160,7 +172,8 @@ export default function BookingModal({ date, time, professionalId, professionalN
                 </p>
               </div>
             ) : (
-              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+              /* Lista de pacientes — scroll próprio dentro do corpo já rolável */
+              <div className="space-y-2">
                 {filteredList.map((e, idx) => (
                   <button
                     key={e.id}
@@ -240,13 +253,14 @@ export default function BookingModal({ date, time, professionalId, professionalN
           )}
 
           {error && <p className="text-destructive text-sm font-semibold">{error}</p>}
+        </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={!selectedEntry || loading}>
-              {loading ? "Agendando..." : "Confirmar Agendamento"}
-            </Button>
-          </div>
+        {/* ── Rodapé fixo (não rola) com botões sempre visíveis ───── */}
+        <div className="shrink-0 flex justify-end gap-3 px-6 py-4 border-t border-border bg-card">
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={!selectedEntry || loading}>
+            {loading ? "Agendando..." : "Confirmar Agendamento"}
+          </Button>
         </div>
       </MotionCard>
     </div>
