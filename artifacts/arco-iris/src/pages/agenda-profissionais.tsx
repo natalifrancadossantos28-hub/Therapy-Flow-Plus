@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, Activity, AlertTriangle, RotateCcw, XCircle, CheckCircle } from "lucide-react";
-import { cn, getStatusColor } from "@/lib/utils";
+import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 
@@ -415,8 +415,10 @@ export default function AgendaProfissionais() {
                                   {apt ? (() => {
                                     const isMenuOpen = actionMenuId === apt.id;
                                     const isDesmarcado = apt.status?.toLowerCase() === "desmarcado";
-                                    const isAtendimento = apt.status?.toLowerCase() === "atendimento";
+                                    const isAtendimento = apt.status?.toLowerCase() === "atendimento" || apt.status?.toLowerCase() === "presente";
                                     const isRemarcado = apt.status?.toLowerCase() === "remarcado";
+                                    const isFaltaJustificada = apt.status?.toLowerCase() === "falta_justificada" || apt.status?.toLowerCase() === "justificado" || apt.status?.toLowerCase() === "abonado";
+                                    const isFaltaNaoJustificada = apt.status?.toLowerCase() === "falta_nao_justificada" || apt.status?.toLowerCase() === "ausente";
                                     return (
                                       <div className="relative">
                                         <div
@@ -424,17 +426,20 @@ export default function AgendaProfissionais() {
                                           className={cn(
                                             "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
                                             isDesmarcado && "bg-red-950/10 border-red-500/40",
+                                            isFaltaNaoJustificada && "bg-red-950/10 border-red-500/40",
                                             isAtendimento && "bg-green-950/10 border-green-400/40",
                                             isRemarcado && "bg-orange-950/10 border-orange-400/40",
-                                            !isDesmarcado && !isAtendimento && !isRemarcado && "bg-secondary/50 border-border",
+                                            isFaltaJustificada && "border-cyan-500/40",
+                                            !isDesmarcado && !isAtendimento && !isRemarcado && !isFaltaJustificada && !isFaltaNaoJustificada && "bg-secondary/50 border-border",
                                             isMenuOpen && "ring-2 ring-primary/40"
                                           )}
                                           style={{
-                                            boxShadow: isDesmarcado ? "0 0 8px rgba(239,68,68,0.25)" : isAtendimento ? "0 0 8px rgba(34,197,94,0.2)" : isRemarcado ? "0 0 8px rgba(249,115,22,0.2)" : "none",
+                                            boxShadow: isDesmarcado || isFaltaNaoJustificada ? "0 0 8px rgba(239,68,68,0.25)" : isAtendimento ? "0 0 8px rgba(34,197,94,0.2)" : isRemarcado ? "0 0 8px rgba(249,115,22,0.2)" : isFaltaJustificada ? "0 0 8px rgba(6,182,212,0.25)" : "none",
+                                            background: isFaltaJustificada ? "rgba(6,182,212,0.04)" : undefined,
                                           }}
                                         >
                                           <p className="font-bold text-foreground truncate text-xs leading-tight">{apt.patientName || `Paciente #${apt.patientId}`}</p>
-                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{apt.status}</span>
+                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
                                         </div>
                                         {isMenuOpen && (
                                           <div
@@ -505,7 +510,7 @@ export default function AgendaProfissionais() {
                       <span className={apt ? "font-semibold text-foreground" : "text-muted-foreground italic"}>
                         {apt ? (apt.patientName || `Paciente #${apt.patientId}`) : "Livre"}
                       </span>
-                      {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apt.status))}>{apt.status}</span>}
+                      {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>}
                     </div>
                   );
                 })}

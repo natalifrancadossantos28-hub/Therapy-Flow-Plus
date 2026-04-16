@@ -7,7 +7,7 @@ import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle
 } from "lucide-react";
-import { cn, getStatusColor } from "@/lib/utils";
+import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -543,8 +543,10 @@ export default function Agenda() {
                         weekDates.map((date, i) => {
                           const apt = getApt(date, time);
                           const isDesmarcado = apt?.status?.toLowerCase() === "desmarcado";
-                          const isAtendimento = apt?.status?.toLowerCase() === "atendimento";
+                          const isAtendimento = apt?.status?.toLowerCase() === "atendimento" || apt?.status?.toLowerCase() === "presente";
                           const isRemarcado = apt?.status?.toLowerCase() === "remarcado";
+                          const isFaltaJustificada = apt?.status?.toLowerCase() === "falta_justificada" || apt?.status?.toLowerCase() === "justificado" || apt?.status?.toLowerCase() === "abonado";
+                          const isFaltaNaoJustificada = apt?.status?.toLowerCase() === "falta_nao_justificada" || apt?.status?.toLowerCase() === "ausente";
                           const isMenuOpen = apt && actionMenuId === apt.id;
 
                           return (
@@ -557,26 +559,31 @@ export default function Agenda() {
                                     className={cn(
                                       "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
                                       isDesmarcado && "bg-red-950/10 border-red-500/40",
+                                      isFaltaNaoJustificada && "bg-red-950/10 border-red-500/40",
                                       isAtendimento && "bg-green-950/10 border-green-400/40",
                                       isRemarcado && "bg-orange-950/10 border-orange-400/40",
-                                      !isDesmarcado && !isAtendimento && !isRemarcado && "bg-white border-border/50",
+                                      isFaltaJustificada && "border-cyan-500/40",
+                                      !isDesmarcado && !isAtendimento && !isRemarcado && !isFaltaJustificada && !isFaltaNaoJustificada && "bg-white border-border/50",
                                       isMenuOpen && "ring-2 ring-primary/40"
                                     )}
                                     style={{
-                                      boxShadow: isDesmarcado
+                                      boxShadow: isDesmarcado || isFaltaNaoJustificada
                                         ? "0 0 8px rgba(239,68,68,0.25)"
                                         : isAtendimento
                                         ? "0 0 8px rgba(34,197,94,0.2)"
                                         : isRemarcado
                                         ? "0 0 8px rgba(249,115,22,0.2)"
+                                        : isFaltaJustificada
+                                        ? "0 0 8px rgba(6,182,212,0.25)"
                                         : "none",
+                                      background: isFaltaJustificada ? "rgba(6,182,212,0.04)" : undefined,
                                     }}
                                   >
                                     <span className="font-bold text-foreground truncate text-xs leading-tight">
                                       {apt.patientName || `Paciente #${apt.patientId}`}
                                     </span>
                                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
-                                      {apt.status}
+                                      {getStatusLabel(apt.status)}
                                     </span>
                                     {isDesmarcado && (
                                       <span className="text-[9px] text-orange-400 font-semibold">⚠ só esta data</span>

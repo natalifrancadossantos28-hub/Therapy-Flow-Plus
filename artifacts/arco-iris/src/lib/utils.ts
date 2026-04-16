@@ -18,19 +18,29 @@ export function formatDate(dateStr: string | null | undefined, dateFormat = "dd/
 
 export const getStatusColor = (status: string) => {
   const s = status.toLowerCase();
-  if (s === "ativo" || s === "presente") return "badge-neon-green";
-  if (s === "inativo" || s === "ausente" || s === "desmarcado") return "badge-neon-red";
+  if (s === "ativo" || s === "presente" || s === "atendimento") return "badge-neon-green";
+  if (s === "inativo" || s === "ausente" || s === "desmarcado" || s === "falta_nao_justificada") return "badge-neon-red";
   if (s === "alta") return "badge-neon-blue";
   if (s === "agendado") return "badge-neon-blue";
   if (s === "remarcado") return "badge-neon-orange";
   if (s === "aguardando triagem") return "badge-neon-blue";
   if (s === "fila de espera") return "badge-neon-orange";
-  if (s === "atendimento") return "badge-neon-green";
-  if (s === "abonado" || s === "falta_justificada" || s === "justificado") return "badge-neon-yellow";
+  if (s === "abonado" || s === "falta_justificada" || s === "justificado") return "badge-neon-cyan";
   if (s === "pré-cadastro") return "bg-secondary text-muted-foreground border-border";
   if (s === "desistência") return "bg-secondary text-muted-foreground border-border";
   if (s === "óbito") return "bg-secondary text-muted-foreground border-border";
   return "bg-secondary text-muted-foreground border-border";
+};
+
+export const getStatusLabel = (status: string): string => {
+  const s = status.toLowerCase();
+  if (s === "presente" || s === "atendimento") return "Presente";
+  if (s === "ausente" || s === "falta_nao_justificada") return "Ausente";
+  if (s === "falta_justificada" || s === "justificado" || s === "abonado") return "Justificado";
+  if (s === "desmarcado") return "Desmarcado";
+  if (s === "remarcado") return "Remarcado";
+  if (s === "agendado") return "Agendado";
+  return status;
 };
 
 export const getPriorityColor = (priority: string) => {

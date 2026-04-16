@@ -8,11 +8,11 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom";
-import { getStatusColor, cn } from "@/lib/utils";
+import { getStatusColor, getStatusLabel, cn } from "@/lib/utils";
 import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
-  UserPlus, PhoneOff,
+  UserPlus, PhoneOff, FileCheck,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
@@ -139,8 +139,12 @@ function AppointmentRow({
   isUpdating: boolean;
 }) {
   const handleAbsent = async () => {
-    const newCount = await onStatusChange(apt.id, "ausente");
+    const newCount = await onStatusChange(apt.id, "falta_nao_justificada");
     if (newCount >= 3) onDischargeRequest(apt, newCount);
+  };
+
+  const handleJustificada = async () => {
+    await onStatusChange(apt.id, "falta_justificada");
   };
 
   const hasWarning = apt.patientAbsenceCount >= 3;
@@ -192,7 +196,7 @@ function AppointmentRow({
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <Badge className={getStatusColor(apt.status)}>{apt.status}</Badge>
+          <Badge className={getStatusColor(apt.status)}>{getStatusLabel(apt.status)}</Badge>
 
           <div className="flex gap-2 ml-4 pl-4 border-l border-border">
             {/* ✓ Presente */}
@@ -200,17 +204,32 @@ function AppointmentRow({
               className="h-9 w-9 rounded-lg border border-emerald-200 text-emerald-600 hover:bg-emerald-50 flex items-center justify-center transition-colors disabled:opacity-40"
               onClick={() => onStatusChange(apt.id, "presente")}
               disabled={isUpdating}
-              title="Marcar como Presente"
+              title="Presente"
             >
               <Check className="w-4 h-4" />
             </button>
 
-            {/* ✗ Falta */}
+            {/* 📄 Falta Justificada */}
+            <button
+              className="h-9 w-9 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
+              style={{
+                background: "rgba(6,182,212,0.06)",
+                border: "1px solid rgba(6,182,212,0.35)",
+                color: "#22d3ee",
+              }}
+              onClick={handleJustificada}
+              disabled={isUpdating}
+              title="Falta Justificada"
+            >
+              <FileCheck className="w-4 h-4" />
+            </button>
+
+            {/* ✗ Ausente */}
             <button
               className="h-9 w-9 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors disabled:opacity-40"
               onClick={handleAbsent}
               disabled={isUpdating}
-              title="Marcar Falta"
+              title="Ausente (sem justificativa)"
             >
               <X className="w-4 h-4" />
             </button>
@@ -359,18 +378,26 @@ export default function Reception() {
   const handleStatusChange = async (id: number, status: string): Promise<number> => {
     const apt = appointments?.find((a) => a.id === id);
     let newAbsenceCount = apt?.patientAbsenceCount ?? 0;
+    const isAusente = status === "ausente" || status === "falta_nao_justificada";
+    const wasAusente = apt?.status === "ausente" || apt?.status === "falta_nao_justificada";
     try {
       await updateStatus.mutateAsync({ id, data: { status } });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
 
-      if (status === "ausente" && apt?.status !== "ausente") {
+      if (isAusente && !wasAusente) {
         newAbsenceCount = (apt?.patientAbsenceCount ?? 0) + 1;
-      } else if (status !== "ausente" && apt?.status === "ausente") {
+      } else if (!isAusente && wasAusente) {
         newAbsenceCount = Math.max(0, (apt?.patientAbsenceCount ?? 1) - 1);
       }
 
-      toast({ title: "Status Atualizado", description: `Consulta de ${apt?.patientName} marcada como ${status}.` });
+      const label = getStatusLabel(status);
+      const toastTitle = status === "presente" || status === "atendimento"
+        ? "✅ Presente"
+        : status === "falta_justificada"
+        ? "📄 Falta Justificada"
+        : "🔴 Ausente";
+      toast({ title: toastTitle, description: `${apt?.patientName} — ${label}.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
     }
