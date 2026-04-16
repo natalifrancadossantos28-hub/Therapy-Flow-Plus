@@ -39,7 +39,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+    <div className="h-screen bg-background flex flex-col md:flex-row overflow-hidden">
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 bg-card border-b border-border z-20">
         <div className="flex items-center gap-2">
@@ -68,7 +68,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col bg-card border-r border-border min-h-screen p-4 sticky top-0 z-10 shadow-[4px_0_32px_rgba(0,0,0,0.5)]">
+      <aside className="hidden md:flex w-64 flex-col bg-card border-r border-border h-full p-4 z-10 shadow-[4px_0_32px_rgba(0,0,0,0.5)] overflow-y-auto shrink-0">
         <div className="flex items-center gap-3 px-2 mb-8 mt-2">
           <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-10 h-10 rounded-xl shadow-sm" />
           <div className="flex flex-col">
