@@ -433,7 +433,6 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
   const [localAtendimento, setLocalAtendimento] = useState(b?.localAtendimento ?? "");
   const [tipoRegistro, setTipoRegistro] = useState(b?.tipoRegistro ?? "Paciente da Unidade");
   const [profissional, setProfissional] = useState(b?.profissional ?? "");
-  const [especialidade, setEspecialidade] = useState(b?.especialidade ?? "");
   const [areaAtiva, setAreaAtiva] = useState(AREAS[0]);
 
   const perguntasDaArea = PERGUNTAS.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === areaAtiva);
@@ -452,7 +451,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
       medicacaoContinua, alergias, problemasSaude,
       tipoEscola, trabalhoPais, outroAtendimento,
       localAtendimento, tipoRegistro,
-      profissional, especialidade,
+      profissional,
     });
   };
 
@@ -687,11 +686,12 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
           {/* Profissional */}
           <div className="pt-4 border-t border-border">
             <Sec title="Profissional Responsável pela Triagem" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Nome</label>
-                <input value={profissional} onChange={e => setProfissional(e.target.value)} className={fc} placeholder="Nome do profissional" /></div>
-              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Especialidade</label>
-                <input value={especialidade} onChange={e => setEspecialidade(e.target.value)} className={fc} placeholder="Ex.: Psicologia, Fonoaudiologia" /></div>
+            <div>
+              <label className="block text-sm font-semibold text-muted-foreground mb-1">Nome</label>
+              <input value={profissional} onChange={e => setProfissional(e.target.value)} className={fc} placeholder="Nome do profissional" />
+            </div>
+            <div className="mt-3 rounded-xl bg-emerald-950/30 border border-emerald-700/40 px-4 py-3 text-xs text-emerald-300 font-semibold">
+              ✅ As especialidades serão adicionadas automaticamente à fila de espera com base nas áreas pontuadas no Perfil Multidisciplinar. Não é necessário selecionar manualmente.
             </div>
           </div>
         </div>
@@ -808,7 +808,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
-  const [autoLink, setAutoLink] = useState<{ patientName?: string; priority?: string; addedToQueue?: boolean; linkedOnly?: boolean } | null>(null);
+  const [autoLink, setAutoLink] = useState<{ patientName?: string; priority?: string; addedToQueue?: boolean; linkedOnly?: boolean; specialties?: string[]; alreadyQueued?: string[] } | null>(null);
   const [, navigate] = useLocation();
   const data = new Date().toLocaleDateString("pt-BR");
 
@@ -837,7 +837,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
     medicacaoContinua, alergias, problemasSaude,
     tipoEscola, trabalhoPais, outroAtendimento,
     localAtendimento, tipoRegistro,
-    profissional, especialidade, data, resultado: resultadoTexto, respostas,
+    profissional, data, resultado: resultadoTexto, respostas,
   };
 
   const salvarTriagem = async () => {
@@ -1123,8 +1123,19 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
           {!viewOnly && salvo && (
             <div className="flex flex-col items-end gap-2">
               {autoLink?.addedToQueue && (
-                <div className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold max-w-xs text-right">
-                  ✅ {autoLink.patientName} adicionado(a) à fila de espera automaticamente com prioridade <strong>{autoLink.priority}</strong>
+                <div className="px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold max-w-sm text-right space-y-1">
+                  <div>✅ <strong>{autoLink.patientName}</strong> adicionado(a) à fila de espera</div>
+                  <div>Prioridade: <strong>{autoLink.priority}</strong></div>
+                  {autoLink.specialties && autoLink.specialties.length > 0 && (
+                    <div className="flex flex-wrap gap-1 justify-end mt-1">
+                      {autoLink.specialties.map(s => (
+                        <span key={s} className="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 text-[10px] font-bold">{s}</span>
+                      ))}
+                    </div>
+                  )}
+                  {autoLink.alreadyQueued && autoLink.alreadyQueued.length > 0 && (
+                    <div className="text-emerald-600 text-[10px]">Já na fila: {autoLink.alreadyQueued.join(", ")}</div>
+                  )}
                 </div>
               )}
               {autoLink?.linkedOnly && (

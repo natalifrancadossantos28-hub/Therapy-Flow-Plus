@@ -96,27 +96,32 @@ function writeCarlaNotification(patientName: string, priority: string) {
   }
 }
 
+const AREA_FIELDS = [
+  { field: "scorePsicologia",       start: 0,   specialty: "Psicologia"        },
+  { field: "scorePsicomotricidade", start: 15,  specialty: "Psicomotricidade"   },
+  { field: "scoreFisioterapia",     start: 30,  specialty: "Fisioterapia"       },
+  { field: "scoreTO",               start: 45,  specialty: "Terapia Ocupacional"},
+  { field: "scoreFonoaudiologia",   start: 60,  specialty: "Fonoaudiologia"     },
+  { field: "scoreNutricionista",    start: 75,  specialty: "Nutrição"           },
+  { field: "scorePsicopedagogia",   start: 90,  specialty: "Psicopedagogia"     },
+  { field: "scoreEdFisica",         start: 105, specialty: "Educação Física"    },
+];
+
 async function autoLinkTriagem(row: any, companyId: number | null) {
   const respostas: number[] = row.respostas ? JSON.parse(row.respostas) : null;
   if (!Array.isArray(respostas) || respostas.length < 120) return null;
 
   const triagemScore = respostas.reduce((a: number, b: number) => a + b, 0);
 
-  const AREA_FIELDS = [
-    { field: "scorePsicologia",        start: 0   },
-    { field: "scorePsicomotricidade",  start: 15  },
-    { field: "scoreFisioterapia",      start: 30  },
-    { field: "scoreTO",                start: 45  },
-    { field: "scoreFonoaudiologia",    start: 60  },
-    { field: "scoreNutricionista",     start: 75  },
-    { field: "scorePsicopedagogia",    start: 90  },
-    { field: "scoreEdFisica",          start: 105 },
-  ];
-
   const areaScores: Record<string, number> = {};
   for (const { field, start } of AREA_FIELDS) {
     areaScores[field] = respostas.slice(start, start + 15).reduce((a: number, b: number) => a + b, 0);
   }
+
+  // Specialties with at least one point scored → auto-queue entries
+  const scoredSpecialties = AREA_FIELDS
+    .filter(({ field }) => (areaScores[field] ?? 0) > 0)
+    .map(({ specialty }) => specialty);
 
   const escolaPublica = ["Municipal", "Estadual"].includes(row.tipoEscola ?? "");
   const trabalhoNaRoca = ["Informal/Roça", "Desempregado"].includes(row.trabalhoPais ?? "");
@@ -140,22 +145,12 @@ async function autoLinkTriagem(row: any, companyId: number | null) {
 
   if (!patient) return null;
 
-  // Propagate tipoRegistro from triagem record to patient (if not already set)
+  // Propagate tipoRegistro/localAtendimento from triagem to patient
   const triagemTipo = row.tipoRegistro ?? null;
   const patientTipo = patient.tipoRegistro ?? null;
-  const updateFields: Record<string, unknown> = {
-    triagemScore,
-    ...areaScores,
-    escolaPublica,
-    trabalhoNaRoca,
-  };
-  if (triagemTipo && !patientTipo) {
-    updateFields.tipoRegistro = triagemTipo;
-  }
-  if (row.localAtendimento && !patient.localAtendimento) {
-    updateFields.localAtendimento = row.localAtendimento;
-  }
-
+  const updateFields: Record<string, unknown> = { triagemScore, ...areaScores, escolaPublica, trabalhoNaRoca };
+  if (triagemTipo && !patientTipo) updateFields.tipoRegistro = triagemTipo;
+  if (row.localAtendimento && !patient.localAtendimento) updateFields.localAtendimento = row.localAtendimento;
   await db.update(patientsTable).set(updateFields).where(eq(patientsTable.id, patient.id));
 
   // Censo Municipal patients must never enter the waiting list
@@ -164,33 +159,43 @@ async function autoLinkTriagem(row: any, companyId: number | null) {
     return { patientName: patient.name, linkedOnly: true, scoresUpdated: true, censoMunicipal: true };
   }
 
-  const SKIP_STATUSES = new Set(["Alta", "Óbito", "Desistência", "Atendimento", "Fila de Espera"]);
-  if (SKIP_STATUSES.has(patient.status)) {
+  const BLOCK_STATUSES = new Set(["Alta", "Óbito", "Desistência"]);
+  if (BLOCK_STATUSES.has(patient.status)) {
     return { patientName: patient.name, linkedOnly: true, scoresUpdated: true };
   }
 
-  const existing = await db.select({ id: waitingListTable.id })
+  if (scoredSpecialties.length === 0) {
+    return { patientName: patient.name, linkedOnly: true, scoresUpdated: true };
+  }
+
+  // Fetch existing waiting-list entries for this patient to avoid duplicates per specialty
+  const existingEntries = await db
+    .select({ specialty: waitingListTable.specialty })
     .from(waitingListTable)
     .where(eq(waitingListTable.patientId, patient.id));
-
-  if (existing.length > 0) {
-    return { patientName: patient.name, linkedOnly: true, scoresUpdated: true };
-  }
+  const existingSpecialties = new Set(existingEntries.map(e => e.specialty ?? ""));
 
   const semTerapia = (row.localAtendimento === "Sem Atendimento" || row.localAtendimento === "Nenhum");
   const priority = calcPriority(triagemScore, escolaPublica, trabalhoNaRoca, semTerapia);
   const today = new Date().toISOString().split("T")[0];
-  const specialty = row.especialidade ?? null;
 
-  await db.insert(waitingListTable).values({
-    patientId: patient.id,
-    professionalId: null,
-    specialty,
-    priority,
-    notes: null,
-    entryDate: today,
-    ...(companyId ? { companyId } : {}),
-  });
+  const newSpecialties = scoredSpecialties.filter(s => !existingSpecialties.has(s));
+
+  if (newSpecialties.length === 0) {
+    return { patientName: patient.name, linkedOnly: true, scoresUpdated: true, specialties: scoredSpecialties };
+  }
+
+  for (const specialty of newSpecialties) {
+    await db.insert(waitingListTable).values({
+      patientId: patient.id,
+      professionalId: null,
+      specialty,
+      priority,
+      notes: null,
+      entryDate: today,
+      ...(companyId ? { companyId } : {}),
+    });
+  }
 
   await db.update(patientsTable)
     .set({ status: "Fila de Espera" })
@@ -198,7 +203,14 @@ async function autoLinkTriagem(row: any, companyId: number | null) {
 
   writeCarlaNotification(patient.name, priority);
 
-  return { patientName: patient.name, priority, addedToQueue: true, scoresUpdated: true };
+  return {
+    patientName: patient.name,
+    priority,
+    addedToQueue: true,
+    scoresUpdated: true,
+    specialties: newSpecialties,
+    alreadyQueued: scoredSpecialties.filter(s => existingSpecialties.has(s)),
+  };
 }
 
 router.get("/triagens", async (req, res) => {
