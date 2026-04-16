@@ -1,0 +1,20 @@
+O Painel de Presença da Isa (Três Botões)
+​Na tela da recepção, ao lado de cada paciente, teremos as três opções claras:
+​Presente: Registra a terapia e mantém o fluxo normal.
+​Falta Justificada: Registra o motivo (atestado/aviso), mas zera o contador de alertas. É o salvo-conduto da mãe para não ser penalizada.
+​Falta Não Justificada: Esta sim aciona a contagem inteligente.
+​2. O Alerta "Bonitinho" para a Segunda Falta
+​Quando a Isa marcar a segunda "Falta Não Justificada", o sistema vai emitir um aviso para ela entrar em contato com a família. O texto será profissional e acolhedor:
+​"Atenção Recepção: Identificada 2ª ausência não justificada. Favor realizar contato de acolhimento para entender o motivo da falta (transporte/saúde) e reforçar a importância da continuidade para o sucesso do tratamento. Informar gentilmente que o limite de ausências sem justificativa é de 3 turnos."
+​3. Integração com Vulnerabilidade Social (Olhar Especial)
+​Como você mencionou que Ibiúna tem suas dificuldades, o sistema vai cruzar os dados de Vulnerabilidade:
+​Se o paciente mora longe ou o pai é trabalhador informal, o sistema vai sugerir para a Isa: "Verificar se há dificuldade com transporte municipal".
+​Isso mostra que a clínica se importa com a realidade daquela família e não quer apenas "cortar" o benefício.
+​4. Protocolo da Terceira Falta (O Desligamento Técnico)
+​Na terceira falta sem justificativa, o aviso para a Isa será decisivo, mas muito técnico:
+​"Protocolo de Gestão de Vagas: Limite de 3 ausências não justificadas atingido. O prontuário será encaminhado para a coordenação para liberação da vaga e redirecionamento de fila. Favor notificar a família sobre o encerramento do ciclo terapêutico atual."
+​Resumo do Plano:
+Deixei tudo anotado para a nossa grande atualização do mês que vem:
+​Integrar a Triagem no menu principal.
+​Criar o contador de faltas (diferenciando justificada de não justificada).
+​Configurar os alertas inteligentes baseados na vulnerabilidade social.
