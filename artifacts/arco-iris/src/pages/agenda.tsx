@@ -151,7 +151,17 @@ const NEON: Record<string, React.CSSProperties> = {
   },
 };
 
-const isAdminSession = () => sessionStorage.getItem("nfs_admin_auth") === "true";
+const isAdminSession = (): boolean => {
+  try {
+    const raw = sessionStorage.getItem("nfs_ponto_session");
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s?.type === "master") return true;
+      if (s?.type === "company" && s.moduleArcoIris) return true;
+    }
+  } catch { /* ignore */ }
+  return sessionStorage.getItem("nfs_admin_auth") === "true";
+};
 
 export default function Agenda() {
   const isAdmin = isAdminSession();
