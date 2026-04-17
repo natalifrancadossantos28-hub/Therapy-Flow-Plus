@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, Activity, AlertTriangle, RotateCcw, XCircle, CheckCircle } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -178,17 +178,6 @@ export default function AgendaProfissionais() {
     } catch { /* silencioso */ }
   };
 
-  const handleConcluir = async (apt: Appointment) => {
-    setActionMenuId(null);
-    try {
-      await patchStatus(apt, "atendimento");
-      await logNotificacao(apt, "Concluir");
-      toast({ title: "✅ Concluído", description: `${apt.patientName} confirmado na sessão.` });
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível atualizar.", variant: "destructive" });
-    }
-  };
-
   const handleDesmarcar = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
@@ -208,38 +197,6 @@ export default function AgendaProfissionais() {
       toast({ title: "🟠 Remanejar", description: `${apt.patientName} marcado para reagendamento. A recepção será notificada.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível remarcar.", variant: "destructive" });
-    }
-  };
-
-  const handleFaltaJustificada = async (apt: Appointment) => {
-    setActionMenuId(null);
-    try {
-      await patchStatus(apt, "falta_justificada");
-      await logNotificacao(apt, "Falta Justificada");
-      toast({ title: "✅ Falta Justificada registrada", description: `${apt.patientName} — sequência de alertas zerada.` });
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
-    }
-  };
-
-  const handleFaltaNaoJustificada = async (apt: Appointment) => {
-    setActionMenuId(null);
-    try {
-      const result = await patchStatus(apt, "falta_nao_justificada");
-      await logNotificacao(apt, "Falta Não Justificada");
-      const consecutive: number = result?.consecutiveUnjustifiedAbsences ?? 1;
-      if (consecutive >= 2) {
-        setAbsenceAlert({
-          patientName: apt.patientName ?? `Paciente #${apt.patientId}`,
-          consecutive,
-          escolaPublica: result?.escolaPublica ?? false,
-          trabalhoNaRoca: result?.trabalhoNaRoca ?? false,
-        });
-      } else {
-        toast({ title: "⚠️ Falta Não Justificada registrada", description: `${apt.patientName} — 1ª ausência sem justificativa.` });
-      }
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
     }
   };
 
@@ -414,53 +371,69 @@ export default function AgendaProfissionais() {
                                 <td key={i} className={cn("px-4 py-2.5 relative", isToday && "bg-primary/5")}>
                                   {apt ? (() => {
                                     const isMenuOpen = actionMenuId === apt.id;
-                                    const isDesmarcado = apt.status?.toLowerCase() === "desmarcado";
-                                    const isAtendimento = apt.status?.toLowerCase() === "atendimento" || apt.status?.toLowerCase() === "presente";
-                                    const isRemarcado = apt.status?.toLowerCase() === "remarcado";
-                                    const isFaltaJustificada = apt.status?.toLowerCase() === "falta_justificada" || apt.status?.toLowerCase() === "justificado" || apt.status?.toLowerCase() === "abonado";
-                                    const isFaltaNaoJustificada = apt.status?.toLowerCase() === "falta_nao_justificada" || apt.status?.toLowerCase() === "ausente";
+                                    const s = apt.status?.toLowerCase() ?? "";
+                                    const isDesmarcado    = s === "desmarcado";
+                                    const isPresente      = s === "presente";
+                                    const isAtendimento   = s === "atendimento";
+                                    const isRemarcado     = s === "remarcado";
+                                    const isFaltaJust     = s === "falta_justificada" || s === "justificado" || s === "abonado";
+                                    const isFaltaNaoJust  = s === "falta_nao_justificada" || s === "ausente";
+
                                     return (
                                       <div className="relative">
+                                        {/* ── Card do paciente ─────────────────────────────── */}
                                         <div
-                                          onClick={() => setActionMenuId(isMenuOpen ? null : apt.id)}
+                                          onClick={() => {
+                                            if (isPresente) return; // travado — recepção define
+                                            setActionMenuId(isMenuOpen ? null : apt.id);
+                                          }}
                                           className={cn(
-                                            "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
-                                            isDesmarcado && "bg-red-950/10 border-red-500/40",
-                                            isFaltaNaoJustificada && "bg-red-950/10 border-red-500/40",
-                                            isAtendimento && "bg-green-950/10 border-green-400/40",
-                                            isRemarcado && "bg-orange-950/10 border-orange-400/40",
-                                            isFaltaJustificada && "border-cyan-500/40",
-                                            !isDesmarcado && !isAtendimento && !isRemarcado && !isFaltaJustificada && !isFaltaNaoJustificada && "bg-secondary/50 border-border",
-                                            isMenuOpen && "ring-2 ring-primary/40"
+                                            "p-2 rounded-xl border flex flex-col gap-1 transition-all select-none",
+                                            isPresente      && "border-cyan-400/60 bg-cyan-950/15",
+                                            isAtendimento   && "border-green-400/60 bg-green-950/15",
+                                            isDesmarcado    && "border-red-500/40 bg-red-950/10",
+                                            isFaltaNaoJust  && "border-red-500/40 bg-red-950/10",
+                                            isRemarcado     && "border-orange-400/50 bg-orange-950/10",
+                                            isFaltaJust     && "border-cyan-500/40 bg-[rgba(6,182,212,0.04)]",
+                                            !isPresente && !isAtendimento && !isDesmarcado && !isFaltaNaoJust && !isRemarcado && !isFaltaJust && "bg-secondary/50 border-border cursor-pointer hover:border-primary/40",
+                                            !isPresente && "cursor-pointer",
+                                            isPresente && "cursor-default",
+                                            isMenuOpen && "ring-2 ring-primary/40",
                                           )}
                                           style={{
-                                            boxShadow: isDesmarcado || isFaltaNaoJustificada ? "0 0 8px rgba(239,68,68,0.25)" : isAtendimento ? "0 0 8px rgba(34,197,94,0.2)" : isRemarcado ? "0 0 8px rgba(249,115,22,0.2)" : isFaltaJustificada ? "0 0 8px rgba(6,182,212,0.25)" : "none",
-                                            background: isFaltaJustificada ? "rgba(6,182,212,0.04)" : undefined,
+                                            boxShadow: isPresente
+                                              ? "0 0 10px rgba(6,182,212,0.3)"
+                                              : isAtendimento
+                                              ? "0 0 10px rgba(34,197,94,0.3)"
+                                              : isDesmarcado || isFaltaNaoJust
+                                              ? "0 0 8px rgba(239,68,68,0.25)"
+                                              : isRemarcado
+                                              ? "0 0 8px rgba(249,115,22,0.2)"
+                                              : isFaltaJust
+                                              ? "0 0 8px rgba(6,182,212,0.2)"
+                                              : "none",
                                           }}
                                         >
-                                          <p className="font-bold text-foreground truncate text-xs leading-tight">{apt.patientName || `Paciente #${apt.patientId}`}</p>
+                                          <div className="flex items-center justify-between gap-1">
+                                            <p className="font-bold text-foreground truncate text-xs leading-tight">{apt.patientName || `Paciente #${apt.patientId}`}</p>
+                                            {/* Cadeado visível quando Presente — status vem da recepção */}
+                                            {isPresente && (
+                                              <Lock className="w-3 h-3 shrink-0" style={{ color: "#22d3ee", filter: "drop-shadow(0 0 4px rgba(6,182,212,0.7))" }} />
+                                            )}
+                                          </div>
                                           <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
                                         </div>
-                                        {isMenuOpen && (
+
+                                        {/* ── Menu de ações (somente se NÃO for Presente) ── */}
+                                        {isMenuOpen && !isPresente && (
                                           <div
                                             className="absolute z-50 top-full left-0 mt-1 min-w-[180px] rounded-2xl shadow-2xl"
                                             style={{ background: "rgba(2,4,8,0.97)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)", padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}
                                           >
                                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
-                                            <button style={NEON.green} onClick={() => handleConcluir(apt)}>
-                                              <Activity className="w-3.5 h-3.5" /> ✅ Presente
+                                            <button style={NEON.red} onClick={() => handleDesmarcar(apt)}>
+                                              <XCircle className="w-3.5 h-3.5" /> Desmarcar
                                             </button>
-                                            <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
-                                              <CheckCircle className="w-3.5 h-3.5" /> ⚠️ Falta Justificada
-                                            </button>
-                                            <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
-                                              <AlertTriangle className="w-3.5 h-3.5" /> 🔴 Falta N. Justificada
-                                            </button>
-                                            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "4px", paddingTop: "6px" }}>
-                                              <button style={NEON.red} onClick={() => handleDesmarcar(apt)}>
-                                                <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
-                                              </button>
-                                            </div>
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
                                               <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                             </button>

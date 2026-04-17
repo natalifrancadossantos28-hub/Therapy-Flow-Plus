@@ -18,7 +18,8 @@ export function formatDate(dateStr: string | null | undefined, dateFormat = "dd/
 
 export const getStatusColor = (status: string) => {
   const s = status.toLowerCase();
-  if (s === "ativo" || s === "presente" || s === "atendimento") return "badge-neon-green";
+  if (s === "ativo" || s === "atendimento") return "badge-neon-green";
+  if (s === "presente") return "badge-neon-cyan";
   if (s === "inativo" || s === "ausente" || s === "desmarcado" || s === "falta_nao_justificada") return "badge-neon-red";
   if (s === "alta") return "badge-neon-blue";
   if (s === "agendado") return "badge-neon-blue";
@@ -34,7 +35,8 @@ export const getStatusColor = (status: string) => {
 
 export const getStatusLabel = (status: string): string => {
   const s = status.toLowerCase();
-  if (s === "presente" || s === "atendimento") return "Presente";
+  if (s === "atendimento") return "Em Atendimento";
+  if (s === "presente") return "Presente";
   if (s === "ausente" || s === "falta_nao_justificada") return "Ausente";
   if (s === "falta_justificada" || s === "justificado" || s === "abonado") return "Justificado";
   if (s === "desmarcado") return "Desmarcado";
