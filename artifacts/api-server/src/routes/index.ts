@@ -9,6 +9,7 @@ import pontoRouter from "./ponto";
 import errorLogsRouter from "./error-logs";
 import whatsappRouter from "./whatsapp";
 import notificacoesRouter from "./notificacoes";
+import contractorsRouter from "./contractors";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(pontoRouter);
 router.use(errorLogsRouter);
 router.use("/whatsapp", whatsappRouter);
 router.use(notificacoesRouter);
+router.use(contractorsRouter);
 
 export default router;

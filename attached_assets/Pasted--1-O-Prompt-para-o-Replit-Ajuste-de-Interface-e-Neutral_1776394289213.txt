@@ -1,0 +1,25 @@
+:
+​1. O Prompt para o Replit (Ajuste de Interface e Neutralidade)
+​"No menu lateral do NFS Gestão, remova os botões separados de 'Lucratividade' e 'Repasse Prefeitura'. No lugar deles, crie uma única aba chamada 'Gestão de Contratos'.
+​Dentro desta aba:
+​Cadastro de Contratantes: Permita que eu cadastre o nome do cliente (ex: Prefeitura de Ibiúna, Clínica X, etc.) de forma dinâmica. O sistema não deve vir com nomes pré-definidos.
+​Configuração de Repasse: Para cada contrato cadastrado, permita definir o 'Valor por Atendimento' (ex: 30,00).
+​Painel Unificado: Nesta mesma tela, mostre a tabela de lucratividade que já planejamos:
+​Coluna 1: Nome do Profissional (puxado do cadastro).
+​Coluna 2: Carga Horária (20h/30h).
+​Coluna 3: Produção (Total de agendamentos preenchidos × Valor do Repasse).
+​Coluna 4: Custo (Salário cadastrado).
+​Coluna 5: Saldo (Lucro/Prejuízo).
+​Privacidade e Neutralidade: Não exiba o nome 'Zoe' ou 'Prefeitura' fixo no código. Use termos genéricos como 'Contratante' e 'Prestador'. Os nomes específicos só devem aparecer se eu os cadastrar no banco de dados."
+​2. Por que fazer assim é melhor para você?
+​Software mais valioso: Se amanhã você quiser vender esse sistema para outra clínica em outra cidade, você pode, porque ele não fala de "Ibiúna" nem de "Zoe". Ele é um sistema de gestão puro.
+​Organização para a Cláudia: Ela entra em "Gestão de Contratos", seleciona "Prefeitura de Ibiúna" e já vê toda a conta dos R$ 30,00 e dos salários de R$ 5.000,00 ali embaixo.
+​Foco no Lucro: Ter a lucratividade e o repasse na mesma aba força quem está usando o sistema a olhar para o saldo. Se o saldo estiver vermelho (prejuízo), o sistema mostra na hora.
+​3. Como fica o cálculo dos 20h/30h?
+​Como agora está tudo na mesma aba, o sistema vai funcionar assim:
+​O sistema olha o contrato (R$ 30,00).
+​Olha a agenda do profissional (ex: Lucas).
+​Vê que o Lucas fez 120 atendimentos (20h).
+​Faz a conta: 120 \times 30 = 3.600.
+​Compara com o salário que você cadastrou para ele.
+​Dica: Peça para o Replit colocar um botão "Exportar Relatório de Produção" dentro dessa aba. Assim, quando a Cláudia precisar mandar a conta para a prefeitura, ela clica e o sistema gera o papel certinho com os nomes que ela cadastrou.
