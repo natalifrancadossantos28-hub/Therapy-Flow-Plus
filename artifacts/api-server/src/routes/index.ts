@@ -10,6 +10,7 @@ import errorLogsRouter from "./error-logs";
 import whatsappRouter from "./whatsapp";
 import notificacoesRouter from "./notificacoes";
 import contractorsRouter from "./contractors";
+import colaboradoresRouter from "./colaboradores";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(errorLogsRouter);
 router.use("/whatsapp", whatsappRouter);
 router.use(notificacoesRouter);
 router.use(contractorsRouter);
+router.use(colaboradoresRouter);
 
 export default router;

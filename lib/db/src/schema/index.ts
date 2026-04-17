@@ -7,3 +7,4 @@ export * from "./ponto";
 export * from "./error-logs";
 export * from "./notificacoes";
 export * from "./contractors";
+export * from "./colaboradores";

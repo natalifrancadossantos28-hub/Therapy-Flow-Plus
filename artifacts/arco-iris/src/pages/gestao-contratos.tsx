@@ -2,14 +2,16 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { useGetProfessionals } from "@workspace/api-client-react";
 import {
   FileText, Printer, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
-  Building2, LayoutList, CheckCircle2, TrendingUp, TrendingDown, DollarSign, Loader2
+  Building2, LayoutList, CheckCircle2, TrendingUp, TrendingDown, DollarSign,
+  Loader2, Calculator, Wallet, Users
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, Button } from "@/components/ui-custom";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
-type Contractor = { id: number; name: string; valorPorAtendimento: number };
-type Appointment = { id: number; status: string; professionalId: number };
+type Contractor   = { id: number; name: string; valorPorAtendimento: number };
+type Appointment  = { id: number; status: string; professionalId: number };
+type Colaborador  = { id: number; name: string; cargo: string; salario: number };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CANCELLED = new Set(["desmarcado", "remarcado"]);
@@ -43,7 +45,63 @@ function getMonthRange(offset = 0) {
 export default function GestaoContratos() {
   const { data: professionals = [] } = useGetProfessionals({} as any);
 
-  const [view, setView] = useState<"contratantes" | "painel">("contratantes");
+  const [view, setView] = useState<"contratantes" | "painel" | "fechamento">("contratantes");
+
+  // ── Colaboradores state ────────────────────────────────────────────────────
+  const [colaboradores, setColaboradores]     = useState<Colaborador[]>([]);
+  const [loadingColab, setLoadingColab]       = useState(true);
+  const [showColabForm, setShowColabForm]     = useState(false);
+  const [editColabTarget, setEditColabTarget] = useState<Colaborador | null>(null);
+  const [colabName, setColabName]             = useState("");
+  const [colabCargo, setColabCargo]           = useState("ADM");
+  const [colabSalario, setColabSalario]       = useState("0");
+  const [savingColab, setSavingColab]         = useState(false);
+
+  useEffect(() => {
+    setLoadingColab(true);
+    fetch("/api/colaboradores")
+      .then(r => r.json())
+      .then(setColaboradores)
+      .catch(console.error)
+      .finally(() => setLoadingColab(false));
+  }, []);
+
+  function openColabCreate() {
+    setEditColabTarget(null); setColabName(""); setColabCargo("ADM"); setColabSalario("0");
+    setShowColabForm(true);
+  }
+  function openColabEdit(c: Colaborador) {
+    setEditColabTarget(c); setColabName(c.name); setColabCargo(c.cargo); setColabSalario(String(c.salario));
+    setShowColabForm(true);
+  }
+  async function handleSaveColab(e: React.FormEvent) {
+    e.preventDefault();
+    if (!colabName.trim()) return;
+    setSavingColab(true);
+    try {
+      const body = JSON.stringify({ name: colabName.trim(), cargo: colabCargo.trim() || "ADM", salario: Number(colabSalario) || 0 });
+      const headers = { "Content-Type": "application/json" };
+      let res;
+      if (editColabTarget) {
+        res = await fetch(`/api/colaboradores/${editColabTarget.id}`, { method: "PUT", headers, body });
+      } else {
+        res = await fetch("/api/colaboradores", { method: "POST", headers, body });
+      }
+      const row = await res.json();
+      if (editColabTarget) {
+        setColaboradores(cs => cs.map(c => c.id === editColabTarget.id ? row : c));
+      } else {
+        setColaboradores(cs => [...cs, row]);
+      }
+      setShowColabForm(false);
+    } catch { /* ignore */ }
+    finally { setSavingColab(false); }
+  }
+  async function handleDeleteColab(id: number) {
+    if (!confirm("Remover este colaborador?")) return;
+    await fetch(`/api/colaboradores/${id}`, { method: "DELETE" });
+    setColaboradores(cs => cs.filter(c => c.id !== id));
+  }
 
   // ── Contractors state ──────────────────────────────────────────────────────
   const [contractors, setContractors]     = useState<Contractor[]>([]);
@@ -120,7 +178,7 @@ export default function GestaoContratos() {
   );
 
   useEffect(() => {
-    if (view !== "painel") return;
+    if (view !== "painel" && view !== "fechamento") return;
     setLoadingApts(true);
     fetch(`/api/appointments?dateFrom=${range.dateFrom}&dateTo=${range.dateTo}`)
       .then(r => r.json())
@@ -174,6 +232,24 @@ export default function GestaoContratos() {
     return { totalApt, totalRepasse, totalPagamento, totalMargem, comPagamento: comPagamento.length };
   }, [painelRows]);
 
+  // ── Fechamento — cálculos financeiros completos ───────────────────────────
+  const fechamento = useMemo(() => {
+    const totalAtend = appointments.filter(a => !CANCELLED.has(a.status)).length;
+    const valorAte   = selectedContractor?.valorPorAtendimento ?? 0;
+    const repasseBruto = totalAtend * valorAte;
+
+    const custoTerapeutas = (professionals as any[])
+      .reduce((s: number, p: any) => s + (p.salario ?? 0), 0);
+
+    const custoColaboradores = colaboradores
+      .reduce((s, c) => s + c.salario, 0);
+
+    const totalCustos   = custoTerapeutas + custoColaboradores;
+    const lucroLiquido  = repasseBruto - totalCustos;
+
+    return { totalAtend, repasseBruto, custoTerapeutas, custoColaboradores, totalCustos, lucroLiquido };
+  }, [appointments, selectedContractor, professionals, colaboradores]);
+
   const printRef = useRef<HTMLDivElement>(null);
 
   function handlePrint() {
@@ -215,8 +291,9 @@ export default function GestaoContratos() {
       <div className="flex gap-2 p-1 rounded-2xl no-print"
         style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
         {([
-          { key: "contratantes", label: "Contratantes",      icon: Building2  },
-          { key: "painel",       label: "Painel de Produção", icon: LayoutList },
+          { key: "contratantes", label: "Contratantes",        icon: Building2  },
+          { key: "painel",       label: "Painel de Produção",  icon: LayoutList },
+          { key: "fechamento",   label: "Fechamento Mensal",   icon: Calculator },
         ] as const).map(tab => (
           <button
             key={tab.key}
@@ -629,6 +706,289 @@ export default function GestaoContratos() {
                 · Margem da Empresa: Repasse Estimado − Pagamento Real
               </p>
             </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
+          ABA — FECHAMENTO MENSAL
+      ════════════════════════════════════════════════════════════════════ */}
+      {view === "fechamento" && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+
+          {/* ── Toolbar: contratante + mês + imprimir ── */}
+          <div className="flex flex-wrap gap-3 items-end no-print">
+            <div className="flex-1 min-w-[220px]">
+              <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                Contratante (fonte do repasse)
+              </label>
+              <select
+                value={selectedContractorId ?? ""}
+                onChange={e => setSelectedContractorId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full rounded-xl px-4 py-2.5 text-sm font-medium bg-background border border-border focus:outline-none"
+              >
+                <option value="">— Selecione um contratante —</option>
+                {contractors.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} (R$ {c.valorPorAtendimento}/atend.)</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                Mês de referência
+              </label>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setMonthOffset(o => o - 1)}
+                  className="p-2 rounded-xl hover:bg-secondary/80 transition-colors"
+                  style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="px-4 py-2 rounded-xl text-sm font-semibold min-w-[160px] text-center"
+                  style={{ background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.2)", color: NEON_BLUE }}>
+                  {range.label}
+                </span>
+                <button onClick={() => setMonthOffset(o => o + 1)}
+                  className="p-2 rounded-xl hover:bg-secondary/80 transition-colors"
+                  style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            {/* Botão prestação de contas */}
+            {selectedContractor && (
+              <button onClick={() => window.print()}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all self-end"
+                style={{ background: "rgba(0,255,159,0.1)", border: "1px solid rgba(0,255,159,0.3)", color: NEON_GREEN }}>
+                <Printer className="w-4 h-4" />
+                Prestação de Contas
+              </button>
+            )}
+          </div>
+
+          {/* ── Cards financeiros principais ── */}
+          {!selectedContractor ? (
+            <div className="rounded-2xl p-10 text-center"
+              style={{ border: "1px dashed rgba(255,255,255,0.1)" }}>
+              <Calculator className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-muted-foreground text-sm">Selecione o contratante para calcular o fechamento.</p>
+            </div>
+          ) : (
+            <>
+              {/* Repasse Bruto */}
+              <div className="rounded-2xl p-6"
+                style={{ background: "rgba(0,212,255,0.05)", border: "2px solid rgba(0,212,255,0.2)" }}>
+                <div className="flex items-center gap-3 mb-4">
+                  <TrendingUp className="w-6 h-6" style={{ color: NEON_BLUE, filter: `drop-shadow(0 0 8px ${NEON_BLUE})` }} />
+                  <div>
+                    <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Total de Repasse — {selectedContractor.name}</p>
+                    <p className="text-xs text-muted-foreground/60">{fechamento.totalAtend} atendimentos × {fmt(selectedContractor.valorPorAtendimento)}/atend.</p>
+                  </div>
+                </div>
+                <p className="text-5xl font-black font-display" style={{ color: NEON_BLUE, textShadow: `0 0 32px ${NEON_BLUE}66` }}>
+                  {fmt(fechamento.repasseBruto)}
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Este é o valor que o contratante deve depositar referente a <strong className="text-foreground">{fechamento.totalAtend} atendimentos</strong> realizados em {range.label}.
+                </p>
+              </div>
+
+              {/* Grid de custos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Terapeutas */}
+                <div className="rounded-2xl p-5"
+                  style={{ background: "rgba(255,32,96,0.05)", border: "1.5px solid rgba(255,32,96,0.18)" }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users className="w-5 h-5" style={{ color: NEON_RED }} />
+                    <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Folha — Prestadores</p>
+                  </div>
+                  <p className="text-3xl font-bold font-display" style={{ color: NEON_RED }}>
+                    {fmt(fechamento.custoTerapeutas)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Soma dos salários cadastrados em Profissionais
+                  </p>
+                  {/* Mini lista */}
+                  <div className="mt-3 space-y-1 max-h-36 overflow-y-auto">
+                    {(professionals as any[]).filter((p: any) => p.salario).map((p: any) => (
+                      <div key={p.id} className="flex justify-between text-xs">
+                        <span className="text-foreground/70 truncate">{p.name}</span>
+                        <span className="font-semibold text-foreground/80 shrink-0 ml-2">{fmt(p.salario)}</span>
+                      </div>
+                    ))}
+                    {(professionals as any[]).filter((p: any) => p.salario).length === 0 && (
+                      <p className="text-xs text-muted-foreground/50 italic">Nenhum salário cadastrado em Profissionais.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Colaboradores */}
+                <div className="rounded-2xl p-5"
+                  style={{ background: "rgba(255,32,96,0.04)", border: "1.5px solid rgba(255,32,96,0.12)" }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="w-5 h-5" style={{ color: "#f97316" }} />
+                      <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Folha — Colaboradores</p>
+                    </div>
+                    <button onClick={openColabCreate}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all"
+                      style={{ background: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.3)", color: "#f97316" }}>
+                      <Plus className="w-3 h-3" /> Adicionar
+                    </button>
+                  </div>
+                  <p className="text-3xl font-bold font-display" style={{ color: "#f97316" }}>
+                    {fmt(fechamento.custoColaboradores)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">ADM, Motoristas e outros</p>
+
+                  {/* Lista + form colaboradores */}
+                  <AnimatePresence>
+                    {showColabForm && (
+                      <motion.form
+                        initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }} className="overflow-hidden mt-3"
+                        onSubmit={handleSaveColab}
+                      >
+                        <div className="space-y-2 pt-1">
+                          <input
+                            className="w-full rounded-lg px-3 py-1.5 text-xs bg-background border border-border"
+                            placeholder="Nome"
+                            value={colabName} onChange={e => setColabName(e.target.value)} required
+                          />
+                          <div className="flex gap-2">
+                            <select
+                              className="flex-1 rounded-lg px-2 py-1.5 text-xs bg-background border border-border"
+                              value={colabCargo} onChange={e => setColabCargo(e.target.value)}>
+                              <option>ADM</option>
+                              <option>Motorista</option>
+                              <option>Auxiliar</option>
+                              <option>Outro</option>
+                            </select>
+                            <input
+                              type="number" min={0}
+                              className="flex-1 rounded-lg px-3 py-1.5 text-xs bg-background border border-border"
+                              placeholder="Salário R$"
+                              value={colabSalario} onChange={e => setColabSalario(e.target.value)}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setShowColabForm(false)}
+                              className="flex-1 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground transition-colors">
+                              Cancelar
+                            </button>
+                            <button type="submit" disabled={savingColab}
+                              className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
+                              style={{ background: "#f97316", color: "#000", opacity: savingColab ? 0.6 : 1 }}>
+                              {savingColab ? "..." : "Salvar"}
+                            </button>
+                          </div>
+                        </div>
+                      </motion.form>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="mt-3 space-y-1 max-h-36 overflow-y-auto">
+                    {loadingColab ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground mx-auto" />
+                    ) : colaboradores.length === 0 ? (
+                      <p className="text-xs text-muted-foreground/50 italic">Nenhum colaborador cadastrado.</p>
+                    ) : colaboradores.map(c => (
+                      <div key={c.id} className="flex justify-between items-center text-xs group">
+                        <span className="text-foreground/70 truncate">{c.name}
+                          <span className="ml-1 text-muted-foreground/50">({c.cargo})</span>
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          <span className="font-semibold text-foreground/80">{fmt(c.salario)}</span>
+                          <button onClick={() => openColabEdit(c)}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-muted-foreground hover:text-foreground transition-all">
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button onClick={() => handleDeleteColab(c.id)}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-muted-foreground hover:text-red-400 transition-all">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Resultado final — Lucro Líquido */}
+              <div className="rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4"
+                style={{
+                  background: fechamento.lucroLiquido >= 0 ? "rgba(0,255,159,0.05)" : "rgba(255,32,96,0.05)",
+                  border: `2px solid ${fechamento.lucroLiquido >= 0 ? "rgba(0,255,159,0.25)" : "rgba(255,32,96,0.25)"}`,
+                }}>
+                <div>
+                  <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-1">
+                    {fechamento.lucroLiquido >= 0 ? "💰 Lucro Líquido" : "⚠️ Déficit do Período"}
+                  </p>
+                  <p className="text-5xl font-black font-display"
+                    style={{
+                      color: fechamento.lucroLiquido >= 0 ? NEON_GREEN : NEON_RED,
+                      textShadow: `0 0 32px ${fechamento.lucroLiquido >= 0 ? NEON_GREEN : NEON_RED}55`,
+                    }}>
+                    {fechamento.lucroLiquido >= 0 ? "+" : ""}{fmt(fechamento.lucroLiquido)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {fmt(fechamento.repasseBruto)} (repasse) − {fmt(fechamento.totalCustos)} (folha total)
+                  </p>
+                </div>
+                <div className="text-right space-y-1 text-sm">
+                  <div className="flex justify-between gap-8">
+                    <span className="text-muted-foreground">Repasse bruto</span>
+                    <span className="font-bold" style={{ color: NEON_BLUE }}>{fmt(fechamento.repasseBruto)}</span>
+                  </div>
+                  <div className="flex justify-between gap-8">
+                    <span className="text-muted-foreground">Folha prestadores</span>
+                    <span className="font-bold" style={{ color: NEON_RED }}>− {fmt(fechamento.custoTerapeutas)}</span>
+                  </div>
+                  <div className="flex justify-between gap-8">
+                    <span className="text-muted-foreground">Folha colaboradores</span>
+                    <span className="font-bold" style={{ color: "#f97316" }}>− {fmt(fechamento.custoColaboradores)}</span>
+                  </div>
+                  <div className="h-px my-1" style={{ background: "rgba(255,255,255,0.1)" }} />
+                  <div className="flex justify-between gap-8">
+                    <span className="font-bold text-foreground">Resultado</span>
+                    <span className="font-black" style={{ color: fechamento.lucroLiquido >= 0 ? NEON_GREEN : NEON_RED }}>
+                      {fechamento.lucroLiquido >= 0 ? "+" : ""}{fmt(fechamento.lucroLiquido)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── PRINT: Prestação de Contas (apenas repasse, sem salários) ── */}
+              <div className="print-only" style={{ display: "none" }}>
+                <h2 style={{ fontSize: 20, fontWeight: "bold", marginBottom: 4 }}>
+                  Prestação de Contas — {selectedContractor.name}
+                </h2>
+                <p style={{ fontSize: 13, marginBottom: 2 }}>Período: {range.label}</p>
+                <p style={{ fontSize: 11, color: "#666", marginBottom: 16 }}>
+                  Gerado em {new Date().toLocaleDateString("pt-BR")}
+                </p>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <tbody>
+                    <tr style={{ borderBottom: "1px solid #ccc" }}>
+                      <td style={{ padding: "8px 4px", fontWeight: "bold" }}>Total de Atendimentos Realizados</td>
+                      <td style={{ padding: "8px 4px", textAlign: "right", fontWeight: "bold" }}>{fechamento.totalAtend}</td>
+                    </tr>
+                    <tr style={{ borderBottom: "1px solid #ccc" }}>
+                      <td style={{ padding: "8px 4px" }}>Valor por Atendimento</td>
+                      <td style={{ padding: "8px 4px", textAlign: "right" }}>{fmt(selectedContractor.valorPorAtendimento)}</td>
+                    </tr>
+                    <tr style={{ background: "#f5f5f5" }}>
+                      <td style={{ padding: "10px 4px", fontWeight: "bold", fontSize: 15 }}>Total de Repasse</td>
+                      <td style={{ padding: "10px 4px", textAlign: "right", fontWeight: "bold", fontSize: 15 }}>
+                        {fmt(fechamento.repasseBruto)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p style={{ fontSize: 10, color: "#888", marginTop: 16 }}>
+                  Este documento refere-se exclusivamente ao repasse por atendimentos realizados no período indicado.
+                </p>
+              </div>
+            </>
           )}
         </motion.div>
       )}
