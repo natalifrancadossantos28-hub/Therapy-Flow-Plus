@@ -1,0 +1,24 @@
+Para que o NFS Gestão mostre exatamente quanto o prefeito Mário deve pagar ao Claudinho (Zoe), a lógica precisa ser baseada na ocupação daquela agenda que você me mostrou nas fotos.
+​Como você tem 45 horários por semana, o cálculo que o sistema deve apresentar para o prefeito é o seguinte:
+​1. O Cálculo do Repasse Total (O que o Prefeito paga)
+​O sistema vai somar todos os atendimentos feitos no mês. Se cada quadradinho daquele vale R$ 30,00:
+​Capacidade Máxima por Profissional: 180 atendimentos/mês (45 por semana × 4 semanas).
+​Valor Total por Profissional: 180 × R$ 30,00 = R$ 5.400,00.
+​Se a Zoe tiver, por exemplo, 10 profissionais:
+O sistema vai mostrar um relatório final para o prefeito: "Valor total do repasse: R$ 54.000,00".
+​2. O Prompt para o Replit (Para criar essa tela de prestação de contas)
+​Peça ao Replit para criar essa visão de "Faturamento para a Prefeitura" conectada à agenda:
+​"No NFS Gestão, crie uma tela chamada 'Relatório de Repasse (Prefeitura)'.
+​O sistema deve varrer todas as agendas e contar quantos horários foram preenchidos com nomes de pacientes no mês.
+​Multiplique o total de atendimentos por R$ 30,00.
+​Exiba um cabeçalho profissional: 'Fatura Mensal - Prestação de Serviços Zoe'.
+​Liste cada profissional, quantos atendimentos ele fez e o valor individual (ex: Profissional X - 180 atendimentos - R$ 5.400,00).
+​Mostre o Valor Total Geral em destaque com estilo Neon Blue.
+​Use código fixo em JavaScript para que o cálculo seja automático e não gaste créditos de IA."
+​3. Por que isso ajuda o Claudinho com o Prefeito?
+​Com essa tela, o Claudinho chega no Mário e mostra:
+​Transparência: Ele prova que os profissionais realmente trabalharam os 45 horários da semana.
+​Justificativa do Salário: Ele mostra que o repasse (R$ 5.400) cobre o salário que ele paga (R$ 5.000) e sobra uma margem pequena para a empresa.
+​Controle de Demanda: Se o prefeito reclamar do valor, o Claudinho mostra a agenda cheia: "Prefeito, a demanda de Ibiúna está alta, preenchemos todos os quadradinhos!".
+​Dica para o seu software:
+​Adicione um botão "Gerar PDF de Prestação de Contas". Quando a Cláudia clicar, o sistema gera um documento limpo com esse cálculo para ela enviar direto para a prefeitura.

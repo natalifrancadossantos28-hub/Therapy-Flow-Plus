@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, UserRound, Calendar, ClipboardList, ListTodo, Menu, X, DollarSign } from "lucide-react";
+import { LayoutDashboard, Users, UserRound, Calendar, ClipboardList, ListTodo, Menu, X, DollarSign, FileText } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -12,6 +12,7 @@ const navItems = [
   { href: "/waiting-list", label: "Fila de Espera", icon: ListTodo },
   { href: "/agenda", label: "Agenda Geral", icon: Calendar },
   { href: "/lucratividade", label: "Lucratividade", icon: DollarSign },
+  { href: "/relatorio-repasse", label: "Repasse Prefeitura", icon: FileText },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

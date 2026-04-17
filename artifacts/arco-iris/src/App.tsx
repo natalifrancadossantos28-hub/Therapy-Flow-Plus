@@ -16,6 +16,7 @@ import WaitingList from "@/pages/waiting-list";
 import Agenda from "@/pages/agenda";
 import AgendaProfissionais from "@/pages/agenda-profissionais";
 import Lucratividade from "@/pages/lucratividade";
+import RelatorioRepasse from "@/pages/relatorio-repasse";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ function Router() {
             <Route path="/waiting-list">{() => <AdminGuard><WaitingList /></AdminGuard>}</Route>
             <Route path="/agenda" component={Agenda} />
             <Route path="/lucratividade">{() => <AdminGuard><Lucratividade /></AdminGuard>}</Route>
+            <Route path="/relatorio-repasse">{() => <AdminGuard><RelatorioRepasse /></AdminGuard>}</Route>
             <Route component={NotFound} />
           </Switch>
         </Layout>
