@@ -49,7 +49,6 @@ const FREQUENCY_OPTIONS = [
 
 export default function BookingModal({ date, time, professionalId, professionalName, professionalSpecialty = "", onClose, onSuccess }: Props) {
   const [waitingList, setWaitingList] = useState<WaitingEntry[]>([]);
-  const [selectedEntryId, setSelectedEntryId] = useState("");
   const [frequency, setFrequency] = useState<"semanal" | "quinzenal" | "mensal">("semanal");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -63,11 +62,11 @@ export default function BookingModal({ date, time, professionalId, professionalN
   }, []);
 
   const filteredList = waitingList.filter(e => matchesSpecialty(e.specialty, professionalSpecialty));
-  const hiddenCount = waitingList.length - filteredList.length;
-  const selectedEntry = waitingList.find(e => String(e.id) === selectedEntryId);
+  // Apenas o primeiro da fila é exibido — impede escolha por perfil do paciente
+  const nextPatient = filteredList[0] ?? null;
 
   const handleSave = async () => {
-    if (!selectedEntry) return;
+    if (!nextPatient) return;
     setLoading(true);
     setError("");
     try {
@@ -75,7 +74,7 @@ export default function BookingModal({ date, time, professionalId, professionalN
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          patientId: selectedEntry.patientId,
+          patientId: nextPatient.patientId,
           professionalId,
           date,
           time,
@@ -142,28 +141,24 @@ export default function BookingModal({ date, time, professionalId, professionalN
         {/* ── Corpo com rolagem ────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
-          {/* Fila de Espera */}
+          {/* Próximo da Fila — exibição somente do #1, sem escolha */}
           <div>
             <Label className="mb-2 block font-semibold">
-              Fila de Espera — Selecione o Paciente{" "}
-              <span className="font-normal text-muted-foreground text-xs">(ordenada por prioridade)</span>
+              Próximo da Fila de Espera
+              {filteredList.length > 1 && (
+                <span className="ml-2 font-normal text-muted-foreground text-xs">
+                  ({filteredList.length} pacientes aguardando)
+                </span>
+              )}
             </Label>
-            {professionalSpecialty && (
-              <div className="mb-3 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground flex items-center gap-2">
-                <span className="font-bold text-primary">Filtro ativo:</span>
-                <span>{professionalSpecialty}</span>
-                {hiddenCount > 0 && (
-                  <span className="ml-auto text-amber-600 font-semibold">
-                    {hiddenCount} paciente{hiddenCount > 1 ? "s" : ""} de outra especialidade ocultado{hiddenCount > 1 ? "s" : ""}
-                  </span>
-                )}
-              </div>
-            )}
-            {filteredList.length === 0 ? (
+
+            {!nextPatient ? (
               <div className="text-center py-8 bg-secondary/30 rounded-xl border border-border flex flex-col items-center gap-2">
                 <AlertCircle className="w-8 h-8 text-muted-foreground" />
                 <p className="text-muted-foreground font-semibold">
-                  {waitingList.length === 0 ? "Fila de espera vazia" : `Nenhum paciente de ${professionalSpecialty} na fila`}
+                  {waitingList.length === 0
+                    ? "Fila de espera vazia"
+                    : `Nenhum paciente de ${professionalSpecialty} na fila`}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {waitingList.length === 0
@@ -172,35 +167,25 @@ export default function BookingModal({ date, time, professionalId, professionalN
                 </p>
               </div>
             ) : (
-              /* Lista de pacientes — scroll próprio dentro do corpo já rolável */
-              <div className="space-y-2">
-                {filteredList.map((e, idx) => (
-                  <button
-                    key={e.id}
-                    onClick={() => setSelectedEntryId(String(e.id))}
-                    className={cn(
-                      "w-full text-left p-3 rounded-xl border-2 transition-all",
-                      selectedEntryId === String(e.id)
-                        ? "border-primary bg-primary/5"
-                        : "border-border bg-secondary/30 hover:border-primary/40 hover:bg-secondary/50"
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">#{idx + 1}</span>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm text-foreground truncate">{e.patientName}</p>
-                          {e.patientProntuario && (
-                            <p className="text-xs text-muted-foreground font-mono">{e.patientProntuario}</p>
-                          )}
-                        </div>
-                      </div>
-                      <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0", PRIORITY_COLORS[e.priority])}>
-                        {PRIORITY_LABELS[e.priority] || e.priority.toUpperCase()}
-                      </span>
+              /* Card do único paciente exibido — não é clicável, não há escolha */
+              <div className="w-full p-4 rounded-xl border-2 border-primary bg-primary/5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Badge de posição na fila */}
+                    <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-black text-primary">#1</span>
                     </div>
-                  </button>
-                ))}
+                    <div className="min-w-0">
+                      <p className="font-bold text-base text-foreground truncate">{nextPatient.patientName}</p>
+                      {nextPatient.patientProntuario && (
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5">{nextPatient.patientProntuario}</p>
+                      )}
+                    </div>
+                  </div>
+                  <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-bold border shrink-0", PRIORITY_COLORS[nextPatient.priority])}>
+                    {PRIORITY_LABELS[nextPatient.priority] || nextPatient.priority.toUpperCase()}
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -239,16 +224,10 @@ export default function BookingModal({ date, time, professionalId, professionalN
             )}
           </div>
 
-          {selectedEntry && (
-            <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-sm">
-              <p className="font-bold text-foreground">{selectedEntry.patientName}</p>
-              {selectedEntry.patientProntuario && (
-                <p className="text-xs text-muted-foreground font-mono">{selectedEntry.patientProntuario}</p>
-              )}
-              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                Ao confirmar: o paciente é <strong>removido da fila</strong>, status muda para <strong>Atendimento</strong>, profissional <strong>{professionalName}</strong> vinculado.
-                {frequency !== "semanal" && <span className="ml-1">Frequência: <strong>{FREQUENCY_OPTIONS.find(o => o.value === frequency)?.label}</strong>.</span>}
-              </p>
+          {nextPatient && (
+            <div className="p-3 rounded-xl bg-secondary/40 border border-border text-xs text-muted-foreground leading-relaxed">
+              Ao confirmar: <strong className="text-foreground">{nextPatient.patientName}</strong> é <strong>removido da fila</strong>, status muda para <strong>Atendimento</strong>, profissional <strong>{professionalName}</strong> vinculado.
+              {frequency !== "semanal" && <span className="ml-1">Frequência: <strong>{FREQUENCY_OPTIONS.find(o => o.value === frequency)?.label}</strong>.</span>}
             </div>
           )}
 
@@ -258,7 +237,7 @@ export default function BookingModal({ date, time, professionalId, professionalN
         {/* ── Rodapé fixo (não rola) com botões sempre visíveis ───── */}
         <div className="shrink-0 flex justify-end gap-3 px-6 py-4 border-t border-border bg-card">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={!selectedEntry || loading}>
+          <Button onClick={handleSave} disabled={!nextPatient || loading}>
             {loading ? "Agendando..." : "Confirmar Agendamento"}
           </Button>
         </div>
