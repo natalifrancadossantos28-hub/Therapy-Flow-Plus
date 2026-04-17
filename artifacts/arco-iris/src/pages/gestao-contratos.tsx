@@ -234,8 +234,19 @@ export default function GestaoContratos() {
 
   // ── Fechamento — cálculos financeiros completos ───────────────────────────
   const fechamento = useMemo(() => {
-    const totalAtend = appointments.filter(a => !CANCELLED.has(a.status)).length;
-    const valorAte   = selectedContractor?.valorPorAtendimento ?? 0;
+    const valorAte = selectedContractor?.valorPorAtendimento ?? 0;
+
+    const profBreakdown = painelRows
+      .filter(r => r.atendimentos > 0)
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        specialty: r.specialty,
+        atendimentos: r.atendimentos,
+        valor: r.atendimentos * valorAte,
+      }));
+
+    const totalAtend   = profBreakdown.reduce((s, r) => s + r.atendimentos, 0);
     const repasseBruto = totalAtend * valorAte;
 
     const custoTerapeutas = (professionals as any[])
@@ -244,11 +255,11 @@ export default function GestaoContratos() {
     const custoColaboradores = colaboradores
       .reduce((s, c) => s + c.salario, 0);
 
-    const totalCustos   = custoTerapeutas + custoColaboradores;
-    const lucroLiquido  = repasseBruto - totalCustos;
+    const totalCustos  = custoTerapeutas + custoColaboradores;
+    const lucroLiquido = repasseBruto - totalCustos;
 
-    return { totalAtend, repasseBruto, custoTerapeutas, custoColaboradores, totalCustos, lucroLiquido };
-  }, [appointments, selectedContractor, professionals, colaboradores]);
+    return { totalAtend, repasseBruto, custoTerapeutas, custoColaboradores, totalCustos, lucroLiquido, profBreakdown };
+  }, [painelRows, selectedContractor, professionals, colaboradores]);
 
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -261,14 +272,22 @@ export default function GestaoContratos() {
       {/* ── Print CSS ── */}
       <style>{`
         @media print {
+          @page { size: A4; margin: 20mm 18mm 20mm 18mm; }
+          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          body { background: white !important; color: #111 !important; font-family: Arial, sans-serif; }
           body > *:not(#print-root) { display: none !important; }
-          #print-root * { display: block !important; }
+          #print-root { display: block !important; }
           .no-print { display: none !important; }
           .print-only { display: block !important; }
-          body { background: white !important; color: black !important; }
-          table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #ccc; padding: 6px 10px; font-size: 12px; }
-          th { background: #f0f0f0; }
+          .print-table { width: 100%; border-collapse: collapse; font-size: 11pt; }
+          .print-table th { background: #222 !important; color: #fff !important; padding: 8px 10px; text-align: left; font-weight: bold; font-size: 10pt; }
+          .print-table td { padding: 7px 10px; border-bottom: 1px solid #ddd; font-size: 10pt; }
+          .print-table tr:nth-child(even) td { background: #f8f8f8 !important; }
+          .print-table .td-right { text-align: right; }
+          .print-table .td-center { text-align: center; }
+          .print-total-row td { background: #111 !important; color: #fff !important; font-weight: bold; font-size: 11pt; padding: 9px 10px; }
+          .print-section { margin-bottom: 14mm; }
+          .print-header-line { border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 10px; }
         }
         .print-only { display: none; }
       `}</style>
@@ -754,13 +773,13 @@ export default function GestaoContratos() {
                 </button>
               </div>
             </div>
-            {/* Botão prestação de contas */}
+            {/* Botão Gerar Relatório de Repasse */}
             {selectedContractor && (
               <button onClick={() => window.print()}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all self-end"
-                style={{ background: "rgba(0,255,159,0.1)", border: "1px solid rgba(0,255,159,0.3)", color: NEON_GREEN }}>
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all self-end shadow-lg"
+                style={{ background: "linear-gradient(135deg,rgba(0,255,159,0.18),rgba(0,212,255,0.12))", border: "1.5px solid rgba(0,255,159,0.4)", color: NEON_GREEN, boxShadow: `0 0 18px rgba(0,255,159,0.18)` }}>
                 <Printer className="w-4 h-4" />
-                Prestação de Contas
+                Gerar Relatório de Repasse
               </button>
             )}
           </div>
@@ -913,80 +932,202 @@ export default function GestaoContratos() {
                 </div>
               </div>
 
-              {/* Resultado final — Lucro Líquido */}
-              <div className="rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4"
-                style={{
-                  background: fechamento.lucroLiquido >= 0 ? "rgba(0,255,159,0.05)" : "rgba(255,32,96,0.05)",
-                  border: `2px solid ${fechamento.lucroLiquido >= 0 ? "rgba(0,255,159,0.25)" : "rgba(255,32,96,0.25)"}`,
-                }}>
-                <div>
-                  <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-1">
-                    {fechamento.lucroLiquido >= 0 ? "💰 Lucro Líquido" : "⚠️ Déficit do Período"}
-                  </p>
-                  <p className="text-5xl font-black font-display"
-                    style={{
-                      color: fechamento.lucroLiquido >= 0 ? NEON_GREEN : NEON_RED,
-                      textShadow: `0 0 32px ${fechamento.lucroLiquido >= 0 ? NEON_GREEN : NEON_RED}55`,
-                    }}>
-                    {fechamento.lucroLiquido >= 0 ? "+" : ""}{fmt(fechamento.lucroLiquido)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {fmt(fechamento.repasseBruto)} (repasse) − {fmt(fechamento.totalCustos)} (folha total)
+              {/* ── Resumo de Caixa — visão interna do Claudinho ── */}
+              <div className="rounded-2xl overflow-hidden"
+                style={{ border: `2px solid ${fechamento.lucroLiquido >= 0 ? "rgba(0,255,159,0.2)" : "rgba(255,32,96,0.2)"}` }}>
+                <div className="px-6 py-4"
+                  style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  <p className="text-xs font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                    <Calculator className="w-4 h-4" />
+                    Resumo de Caixa — {range.label}
                   </p>
                 </div>
-                <div className="text-right space-y-1 text-sm">
-                  <div className="flex justify-between gap-8">
-                    <span className="text-muted-foreground">Repasse bruto</span>
-                    <span className="font-bold" style={{ color: NEON_BLUE }}>{fmt(fechamento.repasseBruto)}</span>
+
+                <div className="divide-y divide-white/5">
+                  {/* (+) Faturamento Bruto */}
+                  <div className="flex items-center justify-between px-6 py-4 group">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black shrink-0"
+                        style={{ background: "rgba(0,212,255,0.12)", color: NEON_BLUE }}>+</span>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Faturamento Bruto</p>
+                        <p className="text-xs text-muted-foreground">
+                          {fechamento.totalAtend} atendimentos × {fmt(selectedContractor.valorPorAtendimento)} ({selectedContractor.name})
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xl font-bold font-display" style={{ color: NEON_BLUE }}>
+                      {fmt(fechamento.repasseBruto)}
+                    </p>
                   </div>
-                  <div className="flex justify-between gap-8">
-                    <span className="text-muted-foreground">Folha prestadores</span>
-                    <span className="font-bold" style={{ color: NEON_RED }}>− {fmt(fechamento.custoTerapeutas)}</span>
+
+                  {/* (−) Folha Terapeutas */}
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black shrink-0"
+                        style={{ background: "rgba(255,32,96,0.12)", color: NEON_RED }}>−</span>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Folha de Pagamento — Terapeutas</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(professionals as any[]).filter((p:any)=>p.salario).length} prestadores com salário cadastrado
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xl font-bold font-display" style={{ color: NEON_RED }}>
+                      − {fmt(fechamento.custoTerapeutas)}
+                    </p>
                   </div>
-                  <div className="flex justify-between gap-8">
-                    <span className="text-muted-foreground">Folha colaboradores</span>
-                    <span className="font-bold" style={{ color: "#f97316" }}>− {fmt(fechamento.custoColaboradores)}</span>
+
+                  {/* (−) Folha Colaboradores */}
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black shrink-0"
+                        style={{ background: "rgba(249,115,22,0.12)", color: "#f97316" }}>−</span>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Folha de Pagamento — ADM / Motoristas</p>
+                        <p className="text-xs text-muted-foreground">
+                          {colaboradores.length} colaborador{colaboradores.length !== 1 ? "es" : ""} cadastrado{colaboradores.length !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xl font-bold font-display" style={{ color: "#f97316" }}>
+                      − {fmt(fechamento.custoColaboradores)}
+                    </p>
                   </div>
-                  <div className="h-px my-1" style={{ background: "rgba(255,255,255,0.1)" }} />
-                  <div className="flex justify-between gap-8">
-                    <span className="font-bold text-foreground">Resultado</span>
-                    <span className="font-black" style={{ color: fechamento.lucroLiquido >= 0 ? NEON_GREEN : NEON_RED }}>
+
+                  {/* (=) Lucro Real */}
+                  <div className="flex items-center justify-between px-6 py-5"
+                    style={{ background: fechamento.lucroLiquido >= 0 ? "rgba(0,255,159,0.05)" : "rgba(255,32,96,0.05)" }}>
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black shrink-0"
+                        style={{
+                          background: fechamento.lucroLiquido >= 0 ? "rgba(0,255,159,0.2)" : "rgba(255,32,96,0.2)",
+                          color: fechamento.lucroLiquido >= 0 ? NEON_GREEN : NEON_RED,
+                        }}>=</span>
+                      <div>
+                        <p className="text-base font-black text-foreground">
+                          {fechamento.lucroLiquido >= 0 ? "Lucro Real da Empresa" : "Déficit do Período"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Folha total: {fmt(fechamento.totalCustos)} | Receita: {fmt(fechamento.repasseBruto)}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-4xl font-black font-display"
+                      style={{
+                        color: fechamento.lucroLiquido >= 0 ? NEON_GREEN : NEON_RED,
+                        textShadow: `0 0 24px ${fechamento.lucroLiquido >= 0 ? NEON_GREEN : NEON_RED}55`,
+                      }}>
                       {fechamento.lucroLiquido >= 0 ? "+" : ""}{fmt(fechamento.lucroLiquido)}
-                    </span>
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* ── PRINT: Prestação de Contas (apenas repasse, sem salários) ── */}
+              {/* ═══════════════════════════════════════════════════════════
+                  DOCUMENTO IMPRESSO — Relatório de Produção Mensal
+                  Visível apenas ao imprimir. SEM salários, SEM custos internos.
+              ═══════════════════════════════════════════════════════════ */}
               <div className="print-only" style={{ display: "none" }}>
-                <h2 style={{ fontSize: 20, fontWeight: "bold", marginBottom: 4 }}>
-                  Prestação de Contas — {selectedContractor.name}
-                </h2>
-                <p style={{ fontSize: 13, marginBottom: 2 }}>Período: {range.label}</p>
-                <p style={{ fontSize: 11, color: "#666", marginBottom: 16 }}>
-                  Gerado em {new Date().toLocaleDateString("pt-BR")}
-                </p>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <tbody>
-                    <tr style={{ borderBottom: "1px solid #ccc" }}>
-                      <td style={{ padding: "8px 4px", fontWeight: "bold" }}>Total de Atendimentos Realizados</td>
-                      <td style={{ padding: "8px 4px", textAlign: "right", fontWeight: "bold" }}>{fechamento.totalAtend}</td>
-                    </tr>
-                    <tr style={{ borderBottom: "1px solid #ccc" }}>
-                      <td style={{ padding: "8px 4px" }}>Valor por Atendimento</td>
-                      <td style={{ padding: "8px 4px", textAlign: "right" }}>{fmt(selectedContractor.valorPorAtendimento)}</td>
-                    </tr>
-                    <tr style={{ background: "#f5f5f5" }}>
-                      <td style={{ padding: "10px 4px", fontWeight: "bold", fontSize: 15 }}>Total de Repasse</td>
-                      <td style={{ padding: "10px 4px", textAlign: "right", fontWeight: "bold", fontSize: 15 }}>
-                        {fmt(fechamento.repasseBruto)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p style={{ fontSize: 10, color: "#888", marginTop: 16 }}>
-                  Este documento refere-se exclusivamente ao repasse por atendimentos realizados no período indicado.
-                </p>
+                {/* Cabeçalho formal */}
+                <div className="print-section print-header-line">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <p style={{ fontSize: "9pt", color: "#555", marginBottom: 2 }}>NFS — Gestão Terapêutica</p>
+                      <h1 style={{ fontSize: "16pt", fontWeight: "bold", margin: "0 0 2px" }}>
+                        Relatório de Produção Mensal
+                      </h1>
+                      <h2 style={{ fontSize: "12pt", fontWeight: "normal", color: "#333", margin: 0 }}>
+                        Prestação de Serviços — {selectedContractor.name}
+                      </h2>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <p style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 2px" }}>Período de Referência</p>
+                      <p style={{ fontSize: "11pt", color: "#222", margin: 0 }}>{range.label}</p>
+                      <p style={{ fontSize: "8pt", color: "#888", marginTop: 4 }}>
+                        Emitido em {new Date().toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabela por profissional */}
+                <div className="print-section">
+                  <p style={{ fontSize: "10pt", fontWeight: "bold", marginBottom: 6, color: "#333", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Detalhamento por Profissional
+                  </p>
+                  <table className="print-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: "5%" }}>#</th>
+                        <th style={{ width: "40%" }}>Nome do Profissional</th>
+                        <th style={{ width: "25%" }}>Especialidade</th>
+                        <th className="td-center" style={{ width: "15%" }}>Atendimentos</th>
+                        <th className="td-right" style={{ width: "15%" }}>Valor Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fechamento.profBreakdown.map((r, i) => (
+                        <tr key={r.id}>
+                          <td className="td-center" style={{ color: "#888" }}>{i + 1}</td>
+                          <td style={{ fontWeight: "500" }}>{r.name}</td>
+                          <td style={{ color: "#555" }}>{r.specialty}</td>
+                          <td className="td-center" style={{ fontWeight: "bold" }}>{r.atendimentos}</td>
+                          <td className="td-right" style={{ fontWeight: "bold" }}>{fmt(r.valor)}</td>
+                        </tr>
+                      ))}
+                      {fechamento.profBreakdown.length === 0 && (
+                        <tr><td colSpan={5} style={{ textAlign: "center", color: "#888", padding: "14px" }}>
+                          Nenhum atendimento registrado no período.
+                        </td></tr>
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="print-total-row">
+                        <td colSpan={3} style={{ fontWeight: "bold" }}>TOTAL GERAL</td>
+                        <td className="td-center">{fechamento.totalAtend}</td>
+                        <td className="td-right">{fmt(fechamento.repasseBruto)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Resumo de valores */}
+                <div className="print-section" style={{ display: "flex", gap: "12mm", justifyContent: "flex-end" }}>
+                  <table style={{ borderCollapse: "collapse", fontSize: "10pt", minWidth: "220pt" }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: "5px 8px", color: "#555" }}>Valor por Atendimento</td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: "500" }}>
+                          {fmt(selectedContractor.valorPorAtendimento)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: "5px 8px", color: "#555" }}>Total de Atendimentos</td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: "500" }}>
+                          {fechamento.totalAtend}
+                        </td>
+                      </tr>
+                      <tr style={{ borderTop: "2px solid #111" }}>
+                        <td style={{ padding: "8px 8px", fontWeight: "bold", fontSize: "12pt" }}>
+                          Total a Repassar
+                        </td>
+                        <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: "bold", fontSize: "12pt" }}>
+                          {fmt(fechamento.repasseBruto)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Rodapé legal */}
+                <div style={{ borderTop: "1px solid #ccc", paddingTop: 8, marginTop: 8 }}>
+                  <p style={{ fontSize: "8pt", color: "#888", lineHeight: 1.5 }}>
+                    Este documento apresenta exclusivamente a produção de atendimentos realizados no período indicado e o respectivo valor de repasse por serviços prestados.
+                    Não contém informações sobre estrutura de custos, salários ou margens internas da empresa prestadora.
+                    Gerado automaticamente pelo sistema NFS — Gestão Terapêutica.
+                  </p>
+                </div>
               </div>
             </>
           )}
