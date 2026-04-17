@@ -103,15 +103,20 @@ function PinManager({ prof }: { prof: any }) {
     if (newPin.length !== 4) return;
     setSaving(true);
     try {
-      await fetch(`/api/professionals/${prof.id}`, {
+      const res = await fetch(`/api/professionals/${prof.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...prof, pin: newPin }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Erro ${res.status}`);
+      }
       toast({ title: "PIN atualizado", description: `PIN de ${prof.name} salvo com sucesso.` });
       setNewPin(""); setShow(false);
-    } catch { toast({ title: "Erro", variant: "destructive", description: "Falha ao salvar o PIN." }); }
-    finally { setSaving(false); }
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar PIN", variant: "destructive", description: err?.message || "Falha ao salvar o PIN." });
+    } finally { setSaving(false); }
   };
 
   return (
@@ -146,7 +151,7 @@ function PinManager({ prof }: { prof: any }) {
           <input
             type="password" maxLength={4}
             value={newPin}
-            onChange={e => setNewPin(e.target.value.replace(/\D/, ""))}
+            onChange={e => setNewPin(e.target.value.replace(/\D/g, ""))}
             onKeyDown={e => e.key === "Enter" && handleSave()}
             placeholder="Novo PIN"
             className="border border-border rounded-lg px-2 py-1.5 w-24 text-center font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground transition-all"
@@ -353,7 +358,7 @@ export default function Professionals() {
                   type="password"
                   maxLength={4}
                   value={formData.pin}
-                  onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/, "") })}
+                  onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, "") })}
                   placeholder="••••"
                   className="tracking-widest font-mono"
                 />

@@ -94,8 +94,16 @@ router.get("/professionals/:id", async (req, res) => {
 router.put("/professionals/:id", async (req, res) => {
   const id = Number(req.params.id);
   const { name, specialty, email, phone, pin, cargaHoraria } = req.body;
+
+  if (pin !== undefined && pin !== null && pin !== "") {
+    const pinStr = String(pin).trim();
+    if (!/^\d{4}$/.test(pinStr)) {
+      return res.status(400).json({ error: "PIN inválido — deve conter exatamente 4 dígitos numéricos." });
+    }
+  }
+
   const updateData: Record<string, unknown> = { name, specialty, email, phone };
-  if (pin !== undefined) updateData.pin = pin || null;
+  if (pin !== undefined) updateData.pin = (pin === null || pin === "") ? null : String(pin).trim();
   if (cargaHoraria !== undefined) updateData.cargaHoraria = cargaHoraria;
   const [row] = await db.update(professionalsTable).set(updateData).where(eq(professionalsTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Professional not found" });

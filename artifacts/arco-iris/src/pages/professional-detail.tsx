@@ -24,15 +24,19 @@ export default function ProfessionalDetail() {
     if (pinValue.length !== 4) return;
     setPinSaving(true);
     try {
-      await fetch(`/api/professionals/${profId}`, {
+      const res = await fetch(`/api/professionals/${profId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...professional, pin: pinValue }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Erro ${res.status}`);
+      }
       toast({ title: "PIN atualizado", description: "O PIN de acesso foi salvo com sucesso." });
       setPinValue("");
-    } catch {
-      toast({ title: "Erro", description: "Falha ao salvar o PIN.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar PIN", variant: "destructive", description: err?.message || "Falha ao salvar o PIN." });
     } finally { setPinSaving(false); }
   };
 
@@ -89,7 +93,7 @@ export default function ProfessionalDetail() {
               <Input
                 type="password" maxLength={4}
                 value={pinValue}
-                onChange={e => setPinValue(e.target.value.replace(/\D/, ""))}
+                onChange={e => setPinValue(e.target.value.replace(/\D/g, ""))}
                 placeholder="Novo PIN (4 dígitos)"
                 className="font-mono tracking-widest flex-1"
               />
