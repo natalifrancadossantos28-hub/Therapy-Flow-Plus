@@ -68,7 +68,6 @@ export default function Dashboard() {
   }, []);
 
   const totalPatients = patients?.length || 0;
-  const preCadastros = patients?.filter(p => p.status === "pré-cadastro").length || 0;
   const totalProfessionals = professionals?.length || 0;
   const todayCount = todayAppointments?.length || 0;
   const waitingCount = waitingList?.length || 0;
@@ -174,10 +173,9 @@ export default function Dashboard() {
   const anos = [2023, 2024, 2025, 2026];
 
   const topCards = [
-    { title: "Total de Pacientes", value: totalPatients, icon: Users, color: "text-[#00d4ff]", bg: "bg-[#00d4ff]/10" },
-    { title: "Pré-Cadastros", value: preCadastros, icon: ClipboardList, color: "text-[#00ff88]", bg: "bg-[#00ff88]/10" },
-    { title: "Profissionais", value: totalProfessionals, icon: UserRound, color: "text-primary", bg: "bg-primary/10" },
+    { title: "Pacientes Ativos", value: totalPatients, icon: Users, color: "text-[#00d4ff]", bg: "bg-[#00d4ff]/10" },
     { title: "Fila de Espera", value: waitingCount, icon: ListTodo, color: "text-[#ff9f20]", bg: "bg-[#ff9f20]/10" },
+    { title: "Profissionais", value: totalProfessionals, icon: UserRound, color: "text-primary", bg: "bg-primary/10" },
   ];
 
   const periodCards = [
@@ -196,7 +194,7 @@ export default function Dashboard() {
       </div>
 
       {/* Top Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         {topCards.map((stat, i) => (
           <MotionCard key={i} className="p-6 relative overflow-hidden" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
             <div className="flex items-center justify-between">
