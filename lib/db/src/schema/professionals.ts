@@ -11,6 +11,7 @@ export const professionalsTable = pgTable("professionals", {
   phone: text("phone"),
   pin: text("pin"),
   cargaHoraria: text("carga_horaria").notNull().default("30h"),
+  salario: integer("salario"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

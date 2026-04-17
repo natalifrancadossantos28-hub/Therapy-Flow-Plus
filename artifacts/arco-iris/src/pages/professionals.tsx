@@ -181,16 +181,23 @@ export default function Professionals() {
     phone: "",
     pin: "",
     cargaHoraria: "30h",
+    salario: "",
   });
+
+  // Teto de faturamento baseado na carga horária (JS puro)
+  const TETO = { "20h": 3600, "30h": 5400 };
+  const tetoForm = TETO[formData.cargaHoraria as "20h" | "30h"] ?? 5400;
+  const salarioNum = parseInt(formData.salario) || 0;
+  const prejuizoForm = salarioNum > tetoForm ? salarioNum - tetoForm : 0;
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createMutation.mutateAsync({ data: formData });
+      await createMutation.mutateAsync({ data: { ...formData, salario: salarioNum || null } });
       queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
       toast({ title: "Sucesso", description: "Profissional cadastrado." });
       setIsDialogOpen(false);
-      setFormData({ name: "", specialty: "", email: "", phone: "", pin: "", cargaHoraria: "30h" });
+      setFormData({ name: "", specialty: "", email: "", phone: "", pin: "", cargaHoraria: "30h", salario: "" });
     } catch {
       toast({
         title: "Erro",
@@ -352,6 +359,36 @@ export default function Professionals() {
                   />
                 </div>
               </div>
+              {/* Salário */}
+              <div>
+                <Label>Custo Mensal (R$)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={formData.salario}
+                  onChange={(e) => setFormData({ ...formData, salario: e.target.value })}
+                  placeholder={`Ex: ${tetoForm.toLocaleString("pt-BR")}`}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Teto de faturamento para {formData.cargaHoraria}:{" "}
+                  <strong className="text-foreground">
+                    R$ {tetoForm.toLocaleString("pt-BR")}
+                  </strong>
+                </p>
+              </div>
+              {/* Alerta de inconsistência */}
+              {prejuizoForm > 0 && (
+                <div className="rounded-xl px-4 py-3 flex items-start gap-2"
+                  style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}>
+                  <span className="text-red-400 text-sm mt-0.5">⚠️</span>
+                  <p className="text-sm" style={{ color: "#f87171" }}>
+                    <strong>Atenção:</strong> Este custo excede o faturamento máximo de {formData.cargaHoraria}{" "}
+                    (R$ {tetoForm.toLocaleString("pt-BR")}). Gerando prejuízo de{" "}
+                    <strong>R$ {prejuizoForm.toLocaleString("pt-BR")}</strong>.
+                  </p>
+                </div>
+              )}
               <div>
                 <Label>PIN de Acesso à Agenda (4 dígitos)</Label>
                 <Input

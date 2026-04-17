@@ -1,17 +1,17 @@
 import { useEffect, useState, useMemo } from "react";
 import { useGetProfessionals } from "@workspace/api-client-react";
-import { TrendingUp, DollarSign, Users, AlertTriangle, ChevronDown, Sparkles, Target, BarChart3 } from "lucide-react";
+import { TrendingUp, DollarSign, Users, AlertTriangle, ChevronDown, Sparkles, Target, BarChart3, LayoutList, Search } from "lucide-react";
 import { Card, Button } from "@/components/ui-custom";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ── Constantes fixas ─────────────────────────────────────────────────────────
 const VALOR_REPASSE = 30;         // R$ por sessão (Prefeitura)
-const CUSTO_FIXO    = 5000;       // R$ custo fixo mensal por profissional
 const VALOR_GRUPO   = 60;         // R$ por sessão em grupo (2 crianças)
 const DIAS_UTEIS    = 20;         // dias úteis por mês (referência)
 
-const BREAK_EVEN_MES = Math.ceil(CUSTO_FIXO / VALOR_REPASSE);            // 167
-const BREAK_EVEN_DIA = (BREAK_EVEN_MES / DIAS_UTEIS).toFixed(1);          // 8.4
+// Teto de faturamento por carga horária (JS puro)
+const TETO: Record<string, number> = { "20h": 3600, "30h": 5400 };
+const getTeto = (carga: string) => TETO[carga] ?? 5400;
 
 type Appointment = { id: number; status: string; date: string };
 
@@ -35,6 +35,7 @@ const CANCELLED_STATUSES = new Set(["desmarcado", "remarcado"]);
 
 export default function Lucratividade() {
   const { data: professionals = [] } = useGetProfessionals({} as any);
+  const [view, setView] = useState<"analise" | "painel">("analise");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,6 +59,12 @@ export default function Lucratividade() {
     [professionals, selectedId]
   );
 
+  // Custo e teto do profissional selecionado (usa salário individual ou teto de carga)
+  const tetoSelecionado  = selectedProfessional ? getTeto(selectedProfessional.cargaHoraria ?? "30h") : 5400;
+  const custoSelecionado = selectedProfessional?.salario ?? tetoSelecionado;
+  const breakEvenMes     = Math.ceil(custoSelecionado / VALOR_REPASSE);
+  const breakEvenDia     = (breakEvenMes / DIAS_UTEIS).toFixed(1);
+
   const totalPacientesMes = useMemo(
     () => appointments.filter(a => !CANCELLED_STATUSES.has(a.status)).length,
     [appointments]
@@ -69,13 +76,36 @@ export default function Lucratividade() {
   );
 
   const faturamento      = totalPacientesMes * VALOR_REPASSE;
-  const saldo            = faturamento - CUSTO_FIXO;
+  const saldo            = faturamento - custoSelecionado;
   const isPositive       = saldo >= 0;
-  const pctMeta          = Math.min(100, Math.round((totalPacientesMes / BREAK_EVEN_MES) * 100));
-  const faltam           = Math.max(0, BREAK_EVEN_MES - totalPacientesMes);
+  const pctMeta          = Math.min(100, Math.round((totalPacientesMes / breakEvenMes) * 100));
+  const faltam           = Math.max(0, breakEvenMes - totalPacientesMes);
 
   const faturamentoGrupo = totalPacientesMes * VALOR_GRUPO;
-  const saldoGrupo       = faturamentoGrupo - CUSTO_FIXO;
+  const saldoGrupo       = faturamentoGrupo - custoSelecionado;
+
+  // Painel de Gestão — dados de todos os profissionais (JS puro)
+  const painelRows = useMemo(() => {
+    return (professionals as any[]).map((p: any) => {
+      const teto  = getTeto(p.cargaHoraria ?? "30h");
+      const custo = p.salario ?? null;
+      const saldoContratual = custo != null ? teto - custo : null;
+      return { ...p, teto, custo, saldoContratual };
+    }).sort((a: any, b: any) => {
+      // Primeiro os com prejuízo (saldo negativo), depois os sem salário, depois positivos
+      if (a.saldoContratual == null && b.saldoContratual == null) return 0;
+      if (a.saldoContratual == null) return 1;
+      if (b.saldoContratual == null) return -1;
+      return a.saldoContratual - b.saldoContratual;
+    });
+  }, [professionals]);
+
+  const painelTotais = useMemo(() => {
+    const comSalario = painelRows.filter((r: any) => r.custo != null);
+    const totalCusto = comSalario.reduce((s: number, r: any) => s + r.custo, 0);
+    const totalTeto  = comSalario.reduce((s: number, r: any) => s + r.teto, 0);
+    return { totalCusto, totalTeto, saldoGeral: totalTeto - totalCusto, count: comSalario.length };
+  }, [painelRows]);
 
   const NEON_BLUE  = "#00d4ff";
   const NEON_RED   = "#ff2060";
@@ -99,10 +129,140 @@ export default function Lucratividade() {
         </div>
         <div className="px-3 py-1.5 rounded-full text-xs font-bold border"
           style={{ background: "rgba(0,212,255,0.08)", borderColor: "rgba(0,212,255,0.25)", color: NEON_BLUE }}>
-          Repasse: {fmt(VALOR_REPASSE)}/sessão · Custo fixo: {fmt(CUSTO_FIXO)}
+          Repasse: {fmt(VALOR_REPASSE)}/sessão · 20h = {fmt(3600)} · 30h = {fmt(5400)}
         </div>
       </div>
 
+      {/* Abas */}
+      <div className="flex gap-2 p-1 rounded-2xl"
+        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+        {([
+          { key: "analise", label: "Por Profissional", icon: BarChart3 },
+          { key: "painel",  label: "Painel de Gestão",  icon: LayoutList },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setView(tab.key)}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            style={{
+              background: view === tab.key ? "rgba(0,212,255,0.12)" : "transparent",
+              border: view === tab.key ? "1px solid rgba(0,212,255,0.3)" : "1px solid transparent",
+              color: view === tab.key ? NEON_BLUE : "rgba(255,255,255,0.4)",
+              boxShadow: view === tab.key ? `0 0 16px rgba(0,212,255,0.08)` : "none",
+            }}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ═══ ABA: PAINEL DE GESTÃO ═══════════════════════════════════════════ */}
+      {view === "painel" && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          {/* Sumário geral */}
+          {painelTotais.count > 0 && (
+            <div className="rounded-2xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4"
+              style={{ background: "rgba(0,212,255,0.05)", border: "1.5px solid rgba(0,212,255,0.18)" }}>
+              {[
+                { label: "Total de custo mensal", value: fmt(painelTotais.totalCusto), color: NEON_RED },
+                { label: "Total de faturamento teto", value: fmt(painelTotais.totalTeto), color: NEON_BLUE },
+                { label: "Saldo Geral Contratual", value: fmt(Math.abs(painelTotais.saldoGeral)),
+                  color: painelTotais.saldoGeral >= 0 ? NEON_GREEN : NEON_RED,
+                  sub: painelTotais.saldoGeral >= 0 ? "SUPERÁVIT" : "DÉFICIT" },
+                { label: "Profissionais com custo", value: `${painelTotais.count} / ${professionals.length}`, color: NEON_BLUE },
+              ].map(item => (
+                <div key={item.label} className="text-center">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">{item.label}</p>
+                  <p className="text-2xl font-bold font-display" style={{ color: item.color, textShadow: `0 0 16px ${item.color}55` }}>
+                    {item.value}
+                  </p>
+                  {(item as any).sub && (
+                    <span className="text-[10px] font-black tracking-widest px-2 py-0.5 rounded-full"
+                      style={{ background: `${item.color}18`, color: item.color }}>{(item as any).sub}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tabela de profissionais */}
+          <div className="rounded-2xl overflow-hidden"
+            style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+            {/* Cabeçalho */}
+            <div className="grid grid-cols-12 px-5 py-3 text-[11px] font-black uppercase tracking-wider text-muted-foreground"
+              style={{ background: "rgba(0,212,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <span className="col-span-4">Profissional</span>
+              <span className="col-span-2 text-center">Carga</span>
+              <span className="col-span-2 text-right">Teto</span>
+              <span className="col-span-2 text-right">Custo</span>
+              <span className="col-span-2 text-right">Saldo Real</span>
+            </div>
+
+            {painelRows.map((row: any, i: number) => {
+              const isRed   = row.saldoContratual != null && row.saldoContratual < 0;
+              const isGreen = row.saldoContratual != null && row.saldoContratual >= 0;
+              const corRow  = isRed ? NEON_RED : isGreen ? NEON_GREEN : "rgba(255,255,255,0.3)";
+              return (
+                <div key={row.id}
+                  className="grid grid-cols-12 px-5 py-4 items-center"
+                  style={{
+                    borderBottom: i < painelRows.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                    background: isRed ? "rgba(255,32,96,0.03)" : "transparent",
+                  }}
+                >
+                  <div className="col-span-4">
+                    <p className="font-bold text-sm">{row.name}</p>
+                    <p className="text-xs text-muted-foreground">{row.specialty}</p>
+                  </div>
+                  <div className="col-span-2 flex justify-center">
+                    <span className="text-xs font-black px-2 py-0.5 rounded-full"
+                      style={{
+                        background: row.cargaHoraria === "20h" ? "rgba(249,115,22,0.12)" : "rgba(0,212,255,0.1)",
+                        color: row.cargaHoraria === "20h" ? "#f97316" : NEON_BLUE,
+                        border: `1px solid ${row.cargaHoraria === "20h" ? "rgba(249,115,22,0.3)" : "rgba(0,212,255,0.25)"}`,
+                      }}>
+                      {row.cargaHoraria ?? "30h"}
+                    </span>
+                  </div>
+                  <div className="col-span-2 text-right">
+                    <span className="text-sm font-semibold" style={{ color: NEON_BLUE }}>{fmt(row.teto)}</span>
+                  </div>
+                  <div className="col-span-2 text-right">
+                    {row.custo != null
+                      ? <span className="text-sm font-semibold text-foreground">{fmt(row.custo)}</span>
+                      : <span className="text-xs text-muted-foreground/50 italic">não definido</span>
+                    }
+                  </div>
+                  <div className="col-span-2 text-right">
+                    {row.saldoContratual != null ? (
+                      <div>
+                        <span className="text-sm font-bold" style={{ color: corRow, textShadow: `0 0 8px ${corRow}66` }}>
+                          {row.saldoContratual >= 0 ? "+" : ""}{fmt(row.saldoContratual)}
+                        </span>
+                        {isRed && (
+                          <p className="text-[10px] font-bold" style={{ color: NEON_RED }}>PREJUÍZO</p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/40">—</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Dica */}
+          <div className="text-xs text-muted-foreground px-1">
+            <Search className="inline w-3 h-3 mr-1" />
+            Cadastre o custo mensal de cada profissional na tela de Profissionais para ver o Saldo Real aqui.
+          </div>
+        </motion.div>
+      )}
+
+      {/* ═══ ABA: ANÁLISE POR PROFISSIONAL ══════════════════════════════════ */}
+      {view === "analise" && <>
       {/* Seletor de profissional */}
       <div className="relative">
         <button
@@ -220,7 +380,7 @@ export default function Lucratividade() {
               {[
                 { label: "Sessões na agenda", value: totalPacientesMes, sub: `${totalAtendidos} realizadas`, color: NEON_BLUE },
                 { label: "Faturamento bruto", value: fmt(faturamento), sub: `${VALOR_REPASSE}×${totalPacientesMes} sess.`, color: NEON_BLUE },
-                { label: "Custo fixo", value: fmt(CUSTO_FIXO), sub: "mensal", color: "rgba(255,255,255,0.4)" },
+                { label: "Custo mensal", value: fmt(custoSelecionado), sub: selectedProfessional?.salario ? "definido" : "teto estimado", color: "rgba(255,255,255,0.4)" },
               ].map(card => (
                 <div key={card.label} className="rounded-2xl p-4 text-center"
                   style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.07)" }}>
@@ -241,8 +401,8 @@ export default function Lucratividade() {
                 <p className="font-bold text-sm" style={{ color: NEON_BLUE }}>Ponto de Equilíbrio</p>
                 <p className="text-sm text-foreground/80 mt-0.5">
                   Para este profissional se pagar, ele precisa atender{" "}
-                  <strong className="text-white">{BREAK_EVEN_DIA} pacientes/dia</strong>
-                  {" "}({BREAK_EVEN_MES}/mês)
+                  <strong className="text-white">{breakEvenDia} pacientes/dia</strong>
+                  {" "}({breakEvenMes}/mês)
                 </p>
               </div>
             </div>
@@ -251,7 +411,7 @@ export default function Lucratividade() {
             <div className="mb-2 flex items-center justify-between text-xs font-semibold">
               <span className="text-muted-foreground">Progresso do mês</span>
               <span style={{ color: pctMeta >= 100 ? NEON_GREEN : NEON_BLUE }}>
-                {totalPacientesMes} / {BREAK_EVEN_MES} sessões ({pctMeta}%)
+                {totalPacientesMes} / {breakEvenMes} sessões ({pctMeta}%)
               </span>
             </div>
             <div className="h-3 rounded-full overflow-hidden"
@@ -349,6 +509,7 @@ export default function Lucratividade() {
           </AnimatePresence>
         </motion.div>
       )}
+      </>}
     </div>
   );
 }

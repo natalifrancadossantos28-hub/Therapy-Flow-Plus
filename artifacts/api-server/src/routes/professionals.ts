@@ -24,11 +24,12 @@ router.get("/professionals", async (req, res) => {
 
 router.post("/professionals", async (req, res) => {
   const companyId = getCompanyId(req);
-  const { name, specialty, email, phone, pin, cargaHoraria } = req.body;
+  const { name, specialty, email, phone, pin, cargaHoraria, salario } = req.body;
   const [row] = await db.insert(professionalsTable).values({
     name, specialty, email, phone,
     pin: pin ?? null,
     cargaHoraria: cargaHoraria ?? "30h",
+    salario: salario != null ? Number(salario) : null,
     ...(companyId ? { companyId } : {}),
   }).returning();
   res.status(201).json(row);
@@ -102,9 +103,11 @@ router.put("/professionals/:id", async (req, res) => {
     }
   }
 
+  const { salario } = req.body;
   const updateData: Record<string, unknown> = { name, specialty, email, phone };
   if (pin !== undefined) updateData.pin = (pin === null || pin === "") ? null : String(pin).trim();
   if (cargaHoraria !== undefined) updateData.cargaHoraria = cargaHoraria;
+  if (salario !== undefined) updateData.salario = salario != null ? Number(salario) : null;
   const [row] = await db.update(professionalsTable).set(updateData).where(eq(professionalsTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Professional not found" });
   res.json(row);
