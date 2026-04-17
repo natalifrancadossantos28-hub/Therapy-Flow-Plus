@@ -133,8 +133,11 @@ export default function GestaoContratos() {
 
   type PainelRow = {
     id: number; name: string; specialty: string;
-    cargaHoraria: string; teto: number; salario: number | null;
-    atendimentos: number; producao: number; saldo: number | null;
+    cargaHoraria: string;
+    atendimentos: number;
+    repasseEstimado: number;   // teto por carga horária (fixo)
+    pagamentoReal: number | null; // salário cadastrado
+    margem: number | null;     // repasseEstimado − pagamentoReal
   };
 
   const painelRows: PainelRow[] = useMemo(() => {
@@ -144,31 +147,31 @@ export default function GestaoContratos() {
       countMap[a.professionalId] = (countMap[a.professionalId] ?? 0) + 1;
     }
     return (professionals as any[]).map((p: any) => {
-      const atendimentos = countMap[p.id] ?? 0;
-      const producao     = atendimentos * valor;
-      const custo        = p.salario ?? null;
-      const saldo        = custo != null ? producao - custo : null;
+      const carga            = p.cargaHoraria ?? "30h";
+      const atendimentos     = countMap[p.id] ?? 0;
+      const repasseEstimado  = getTeto(carga);
+      const pagamentoReal    = p.salario ?? null;
+      const margem           = pagamentoReal != null ? repasseEstimado - pagamentoReal : null;
       return {
-        id:          p.id,
-        name:        p.name,
-        specialty:   p.specialty ?? "—",
-        cargaHoraria: p.cargaHoraria ?? "30h",
-        teto:        getTeto(p.cargaHoraria ?? "30h"),
-        salario:     custo,
+        id: p.id,
+        name: p.name,
+        specialty: p.specialty ?? "—",
+        cargaHoraria: carga,
         atendimentos,
-        producao,
-        saldo,
+        repasseEstimado,
+        pagamentoReal,
+        margem,
       };
     }).sort((a, b) => b.atendimentos - a.atendimentos);
-  }, [professionals, appointments, valor]);
+  }, [professionals, appointments]);
 
   const totais = useMemo(() => {
-    const totalApt  = painelRows.reduce((s, r) => s + r.atendimentos, 0);
-    const totalProd = painelRows.reduce((s, r) => s + r.producao, 0);
-    const comCusto  = painelRows.filter(r => r.salario != null);
-    const totalCusto = comCusto.reduce((s, r) => s + (r.salario ?? 0), 0);
-    const totalSaldo = comCusto.reduce((s, r) => s + (r.saldo ?? 0), 0);
-    return { totalApt, totalProd, totalCusto, totalSaldo, comCusto: comCusto.length };
+    const totalApt     = painelRows.reduce((s, r) => s + r.atendimentos, 0);
+    const comPagamento = painelRows.filter(r => r.pagamentoReal != null);
+    const totalRepasse  = comPagamento.reduce((s, r) => s + r.repasseEstimado, 0);
+    const totalPagamento = comPagamento.reduce((s, r) => s + (r.pagamentoReal ?? 0), 0);
+    const totalMargem   = comPagamento.reduce((s, r) => s + (r.margem ?? 0), 0);
+    return { totalApt, totalRepasse, totalPagamento, totalMargem, comPagamento: comPagamento.length };
   }, [painelRows]);
 
   const printRef = useRef<HTMLDivElement>(null);
@@ -444,15 +447,15 @@ export default function GestaoContratos() {
               {/* Cards sumário */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 no-print">
                 {[
-                  { label: "Total de Atendimentos", value: totais.totalApt.toString(), icon: CheckCircle2, color: NEON_BLUE },
-                  { label: "Produção Total",   value: fmt(totais.totalProd),  icon: TrendingUp,   color: NEON_BLUE },
-                  { label: "Custo Total",      value: fmt(totais.totalCusto), icon: DollarSign,   color: "rgba(255,255,255,0.5)" },
+                  { label: "Total de Atendimentos",    value: totais.totalApt.toString(),          icon: CheckCircle2,  color: NEON_BLUE },
+                  { label: "Repasse Estimado (soma)",  value: fmt(totais.totalRepasse),             icon: TrendingUp,    color: NEON_BLUE },
+                  { label: "Pagamento Real (soma)",    value: fmt(totais.totalPagamento),           icon: DollarSign,    color: "rgba(255,255,255,0.5)" },
                   {
-                    label: "Saldo Consolidado",
-                    value: fmt(Math.abs(totais.totalSaldo)),
-                    icon:  totais.totalSaldo >= 0 ? TrendingUp : TrendingDown,
-                    color: totais.totalSaldo >= 0 ? NEON_GREEN : NEON_RED,
-                    sub:   totais.totalSaldo >= 0 ? "SUPERÁVIT" : "DÉFICIT",
+                    label: "Margem da Empresa",
+                    value: fmt(Math.abs(totais.totalMargem)),
+                    icon:  totais.totalMargem >= 0 ? TrendingUp : TrendingDown,
+                    color: totais.totalMargem >= 0 ? NEON_GREEN : NEON_RED,
+                    sub:   totais.totalMargem >= 0 ? "SUPERÁVIT" : "DÉFICIT",
                   },
                 ].map(item => (
                   <div key={item.label} className="rounded-2xl p-4"
@@ -479,19 +482,26 @@ export default function GestaoContratos() {
                   <div className="rounded-2xl overflow-hidden no-print"
                     style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
                     {/* Header */}
-                    <div className="grid grid-cols-12 px-5 py-3 text-[11px] font-black uppercase tracking-wider text-muted-foreground"
+                    <div className="grid grid-cols-12 px-5 py-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground"
                       style={{ background: "rgba(0,212,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                       <span className="col-span-3">Prestador</span>
-                      <span className="col-span-2 text-center">Carga</span>
-                      <span className="col-span-2 text-right">Atend.</span>
-                      <span className="col-span-2 text-right">Produção</span>
-                      <span className="col-span-1 text-right">Custo</span>
-                      <span className="col-span-2 text-right">Saldo</span>
+                      <span className="col-span-1 text-center">Carga</span>
+                      <span className="col-span-1 text-right">Atend.</span>
+                      <span className="col-span-3 text-right" title="Faturamento máximo da agenda cheia (por carga horária)">
+                        Repasse Estimado
+                      </span>
+                      <span className="col-span-2 text-right" title="Salário cadastrado do prestador">
+                        Pagamento Real
+                      </span>
+                      <span className="col-span-2 text-right" title="Repasse Estimado − Pagamento Real">
+                        Margem da Empresa
+                      </span>
                     </div>
+
                     {painelRows.map((row, i) => {
-                      const isPos = row.saldo != null && row.saldo >= 0;
-                      const isNeg = row.saldo != null && row.saldo < 0;
-                      const corSaldo = isPos ? NEON_GREEN : isNeg ? NEON_RED : "rgba(255,255,255,0.3)";
+                      const isPos = row.margem != null && row.margem >= 0;
+                      const isNeg = row.margem != null && row.margem < 0;
+                      const corMargem = isPos ? NEON_GREEN : isNeg ? NEON_RED : "rgba(255,255,255,0.3)";
                       return (
                         <div key={row.id}
                           className="grid grid-cols-12 px-5 py-3.5 items-center"
@@ -500,12 +510,15 @@ export default function GestaoContratos() {
                             background: isNeg ? "rgba(255,32,96,0.03)" : "transparent",
                           }}
                         >
+                          {/* Prestador */}
                           <div className="col-span-3">
                             <p className="font-bold text-sm">{row.name}</p>
                             <p className="text-xs text-muted-foreground">{row.specialty}</p>
                           </div>
-                          <div className="col-span-2 flex justify-center">
-                            <span className="text-xs font-black px-2 py-0.5 rounded-full"
+
+                          {/* Carga */}
+                          <div className="col-span-1 flex justify-center">
+                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full"
                               style={{
                                 background: row.cargaHoraria === "20h" ? "rgba(249,115,22,0.12)" : "rgba(0,212,255,0.1)",
                                 color: row.cargaHoraria === "20h" ? "#f97316" : NEON_BLUE,
@@ -514,25 +527,45 @@ export default function GestaoContratos() {
                               {row.cargaHoraria}
                             </span>
                           </div>
-                          <div className="col-span-2 text-right">
-                            <span className="text-sm font-semibold" style={{ color: row.atendimentos > 0 ? NEON_BLUE : "rgba(255,255,255,0.3)" }}>
+
+                          {/* Atendimentos */}
+                          <div className="col-span-1 text-right">
+                            <span className="text-sm font-semibold"
+                              style={{ color: row.atendimentos > 0 ? NEON_BLUE : "rgba(255,255,255,0.25)" }}>
                               {row.atendimentos}
                             </span>
                           </div>
-                          <div className="col-span-2 text-right">
-                            <span className="text-sm font-semibold">{fmt(row.producao)}</span>
+
+                          {/* Repasse Estimado */}
+                          <div className="col-span-3 text-right">
+                            <span className="text-sm font-semibold" style={{ color: NEON_BLUE }}>
+                              {fmt(row.repasseEstimado)}
+                            </span>
+                            <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+                              agenda cheia · {row.cargaHoraria}
+                            </p>
                           </div>
-                          <div className="col-span-1 text-right">
-                            {row.salario != null
-                              ? <span className="text-xs font-semibold text-foreground/70">{fmt(row.salario)}</span>
-                              : <span className="text-xs text-muted-foreground/40 italic">—</span>
+
+                          {/* Pagamento Real */}
+                          <div className="col-span-2 text-right">
+                            {row.pagamentoReal != null
+                              ? <span className="text-sm font-semibold text-foreground/80">{fmt(row.pagamentoReal)}</span>
+                              : <span className="text-xs text-muted-foreground/40 italic">não definido</span>
                             }
                           </div>
+
+                          {/* Margem da Empresa */}
                           <div className="col-span-2 text-right">
-                            {row.saldo != null ? (
-                              <span className="text-sm font-bold" style={{ color: corSaldo, textShadow: `0 0 8px ${corSaldo}55` }}>
-                                {row.saldo >= 0 ? "+" : ""}{fmt(row.saldo)}
-                              </span>
+                            {row.margem != null ? (
+                              <div>
+                                <span className="text-sm font-bold"
+                                  style={{ color: corMargem, textShadow: `0 0 8px ${corMargem}55` }}>
+                                  {row.margem >= 0 ? "+" : ""}{fmt(row.margem)}
+                                </span>
+                                {isNeg && (
+                                  <p className="text-[10px] font-black" style={{ color: NEON_RED }}>PREJUÍZO</p>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-xs text-muted-foreground/40">—</span>
                             )}
@@ -545,13 +578,13 @@ export default function GestaoContratos() {
                     <div className="grid grid-cols-12 px-5 py-3 text-sm font-black"
                       style={{ background: "rgba(0,212,255,0.06)", borderTop: "1px solid rgba(0,212,255,0.15)" }}>
                       <span className="col-span-3" style={{ color: NEON_BLUE }}>TOTAL</span>
-                      <span className="col-span-2" />
-                      <span className="col-span-2 text-right" style={{ color: NEON_BLUE }}>{totais.totalApt}</span>
-                      <span className="col-span-2 text-right" style={{ color: NEON_BLUE }}>{fmt(totais.totalProd)}</span>
-                      <span className="col-span-1 text-right text-foreground/60">{fmt(totais.totalCusto)}</span>
+                      <span className="col-span-1" />
+                      <span className="col-span-1 text-right" style={{ color: NEON_BLUE }}>{totais.totalApt}</span>
+                      <span className="col-span-3 text-right" style={{ color: NEON_BLUE }}>{fmt(totais.totalRepasse)}</span>
+                      <span className="col-span-2 text-right text-foreground/60">{fmt(totais.totalPagamento)}</span>
                       <span className="col-span-2 text-right"
-                        style={{ color: totais.totalSaldo >= 0 ? NEON_GREEN : NEON_RED }}>
-                        {totais.totalSaldo >= 0 ? "+" : ""}{fmt(totais.totalSaldo)}
+                        style={{ color: totais.totalMargem >= 0 ? NEON_GREEN : NEON_RED }}>
+                        {totais.totalMargem >= 0 ? "+" : ""}{fmt(totais.totalMargem)}
                       </span>
                     </div>
                   </div>
@@ -561,7 +594,7 @@ export default function GestaoContratos() {
                     <thead>
                       <tr>
                         <th>Prestador</th><th>Especialidade</th><th>Carga</th>
-                        <th>Atend.</th><th>Produção</th><th>Custo</th><th>Saldo</th>
+                        <th>Atend.</th><th>Repasse Estimado</th><th>Pagamento Real</th><th>Margem da Empresa</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -571,17 +604,17 @@ export default function GestaoContratos() {
                           <td>{r.specialty}</td>
                           <td style={{ textAlign: "center" }}>{r.cargaHoraria}</td>
                           <td style={{ textAlign: "right" }}>{r.atendimentos}</td>
-                          <td style={{ textAlign: "right" }}>{fmt(r.producao)}</td>
-                          <td style={{ textAlign: "right" }}>{r.salario != null ? fmt(r.salario) : "—"}</td>
-                          <td style={{ textAlign: "right" }}>{r.saldo != null ? (r.saldo >= 0 ? "+" : "") + fmt(r.saldo) : "—"}</td>
+                          <td style={{ textAlign: "right" }}>{fmt(r.repasseEstimado)}</td>
+                          <td style={{ textAlign: "right" }}>{r.pagamentoReal != null ? fmt(r.pagamentoReal) : "—"}</td>
+                          <td style={{ textAlign: "right" }}>{r.margem != null ? (r.margem >= 0 ? "+" : "") + fmt(r.margem) : "—"}</td>
                         </tr>
                       ))}
                       <tr style={{ fontWeight: "bold" }}>
                         <td colSpan={3}>TOTAL</td>
                         <td style={{ textAlign: "right" }}>{totais.totalApt}</td>
-                        <td style={{ textAlign: "right" }}>{fmt(totais.totalProd)}</td>
-                        <td style={{ textAlign: "right" }}>{fmt(totais.totalCusto)}</td>
-                        <td style={{ textAlign: "right" }}>{totais.totalSaldo >= 0 ? "+" : ""}{fmt(totais.totalSaldo)}</td>
+                        <td style={{ textAlign: "right" }}>{fmt(totais.totalRepasse)}</td>
+                        <td style={{ textAlign: "right" }}>{fmt(totais.totalPagamento)}</td>
+                        <td style={{ textAlign: "right" }}>{totais.totalMargem >= 0 ? "+" : ""}{fmt(totais.totalMargem)}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -590,8 +623,10 @@ export default function GestaoContratos() {
 
               {/* Rodapé do relatório */}
               <p className="print-only" style={{ display: "none", marginTop: 12, fontSize: 10, color: "#888" }}>
-                Contratante: {selectedContractor.name} · Valor por atendimento: R$ {selectedContractor.valorPorAtendimento}
-                · Custo: salário cadastrado por prestador · Saldo: Produção − Custo
+                Contratante: {selectedContractor.name}
+                · Repasse Estimado: faturamento máximo baseado na carga horária (20h = R$ 3.600 / 30h = R$ 5.400)
+                · Pagamento Real: salário cadastrado por prestador
+                · Margem da Empresa: Repasse Estimado − Pagamento Real
               </p>
             </div>
           )}
