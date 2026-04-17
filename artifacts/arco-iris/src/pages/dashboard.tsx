@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { useGetPatients, useGetProfessionals, useGetTodayAppointments, useGetWaitingList } from "@workspace/api-client-react";
 import type { Patient } from "@workspace/api-zod";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, Baby, MapPin } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor } from "@/lib/utils";
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from "recharts";
 
 // ── Faixas Etárias ────────────────────────────────────────────────────────────
 const FAIXAS = [
@@ -74,65 +74,6 @@ export default function Dashboard() {
 
   const absentPatients = patients?.filter(p => p.absenceCount >= 3) || [];
 
-  // ── Censo por faixa etária ────────────────────────────────────────────────
-  const censo = useMemo(() => {
-    const ativos = (patients || []).filter(p =>
-      !["Alta", "Óbito", "Desistência"].includes(p.status)
-    );
-    const counts: Record<string, number> = {};
-    const redeCounts: Record<string, number> = {};
-    for (const f of FAIXAS) { counts[f.key] = 0; redeCounts[f.key] = 0; }
-    for (const p of ativos) {
-      const faixa = faixaDeIdade(p.dateOfBirth);
-      counts[faixa] = (counts[faixa] || 0) + 1;
-      if (p.escolaPublica) redeCounts[faixa] = (redeCounts[faixa] || 0) + 1;
-    }
-    const totalAtivos = ativos.length;
-    const totalRede = ativos.filter(p => p.escolaPublica).length;
-    const comData = ativos.filter(p => p.dateOfBirth).length;
-    return { counts, redeCounts, totalAtivos, totalRede, comData };
-  }, [patients]);
-
-  // Pie chart data (só faixas com pacientes)
-  const pieData = FAIXAS
-    .filter(f => f.key !== "sem_data" && censo.counts[f.key] > 0)
-    .map(f => ({ name: f.label, value: censo.counts[f.key], cor: f.cor }));
-
-  // ── Contador PCD – Ibiúna ─────────────────────────────────────────────────
-  const pcdStats = useMemo(() => {
-    const all = (patients || []);
-    const censoMunicipal = all.filter(p => p.tipoRegistro === "Registro Censo Municipal");
-    const unidade = all.filter(p => p.tipoRegistro !== "Registro Censo Municipal");
-    const localCounts: Record<string, number> = {};
-    for (const p of censoMunicipal) {
-      const rawLoc = p.localAtendimento || "Não informado";
-      const loc = rawLoc === "Nenhum" ? "Sem Atendimento" : rawLoc;
-      localCounts[loc] = (localCounts[loc] || 0) + 1;
-    }
-    // Disability type breakdown from diagnosis field (all patients)
-    const diagCounts: Record<string, number> = {
-      "TEA / Autismo": 0,
-      "Paralisia Cerebral": 0,
-      "Síndrome de Down": 0,
-      "Def. Intelectual": 0,
-      "Def. Auditiva": 0,
-      "Cadeira de Rodas": 0,
-      "Outros / Sem CID": 0,
-    };
-    for (const p of all) {
-      const d = (p.diagnosis || "").toLowerCase();
-      if (!d) { diagCounts["Outros / Sem CID"]++; continue; }
-      const hasCadeira = /cadeira.?de.?rodas|cadeirante|mobilidade.?reduzida/.test(d);
-      if (hasCadeira) diagCounts["Cadeira de Rodas"]++;
-      if (/tea|autis|espectro/.test(d)) { diagCounts["TEA / Autismo"]++; }
-      else if (/paralisia cerebral|\bpc\b|disfun/.test(d)) { diagCounts["Paralisia Cerebral"]++; }
-      else if (/down|trissomia/.test(d)) { diagCounts["Síndrome de Down"]++; }
-      else if (/intelectual|\bdi\b/.test(d)) { diagCounts["Def. Intelectual"]++; }
-      else if (/audit|surdez|surdo/.test(d)) { diagCounts["Def. Auditiva"]++; }
-      else if (!hasCadeira) { diagCounts["Outros / Sem CID"]++; }
-    }
-    return { total: all.length, censoMunicipal: censoMunicipal.length, unidade: unidade.length, localCounts, diagCounts };
-  }, [patients]);
 
   // ── Perfil de pacientes por profissional ──────────────────────────────────
   const profPerfil = useMemo(() => {
@@ -211,165 +152,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Contador PCD – Ibiúna */}
-      <Card className="p-6 border-violet-500/30" style={{ background: "rgba(139,92,246,0.04)" }}>
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <h2 className="text-xl font-bold font-display flex items-center gap-2" style={{ color: "#a78bfa" }}>
-            <MapPin className="w-5 h-5" />
-            Contador PCD – Ibiúna
-          </h2>
-          <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.3)", color: "#a78bfa" }}>
-            Busca Ativa Municipal
-          </span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-          <div className="p-4 rounded-2xl text-center" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
-            <p className="text-3xl font-bold font-display" style={{ color: "#a78bfa", textShadow: "0 0 20px rgba(139,92,246,0.5)" }}>{pcdStats.total}</p>
-            <p className="text-xs font-semibold text-muted-foreground mt-1">Total Cadastrados</p>
-          </div>
-          <div className="p-4 rounded-2xl text-center" style={{ background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.2)" }}>
-            <p className="text-3xl font-bold font-display" style={{ color: "#00d4ff" }}>{pcdStats.unidade}</p>
-            <p className="text-xs font-semibold text-muted-foreground mt-1">🏥 Pacientes da Unidade</p>
-          </div>
-          <div className="p-4 rounded-2xl text-center" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.3)" }}>
-            <p className="text-3xl font-bold font-display" style={{ color: "#c084fc" }}>{pcdStats.censoMunicipal}</p>
-            <p className="text-xs font-semibold text-muted-foreground mt-1">🏛️ Censo Municipal</p>
-          </div>
-        </div>
-        <div className="mb-4">
-          <p className="text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wider">Tipos de Deficiência (todos os cadastros)</p>
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-            {Object.entries(pcdStats.diagCounts).map(([label, count]) => (
-              <div key={label} className="p-2 rounded-xl text-center" style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.2)" }}>
-                <p className="text-xl font-bold font-display" style={{ color: "#a78bfa" }}>{count}</p>
-                <p className="text-[10px] font-semibold text-muted-foreground mt-0.5 leading-tight">{label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <p className="text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wider">Onde estão sendo atendidos (Censo Municipal)</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { key: "Sem Atendimento", label: "🚨 Sem Atendimento", color: "#ef4444", bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.3)" },
-              { key: "CAPS",         label: "💙 CAPS",            color: "#60a5fa", bg: "rgba(96,165,250,0.08)",  border: "rgba(96,165,250,0.3)" },
-              { key: "Reabilitação", label: "💚 Reabilitação",    color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.3)" },
-              { key: "Particular",   label: "💛 Particular",      color: "#fbbf24", bg: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.3)" },
-            ].map(({ key, label, color, bg, border }) => (
-              <div key={key} className="p-3 rounded-xl text-center" style={{ background: bg, border: `1px solid ${border}` }}>
-                <p className="text-2xl font-bold font-display" style={{ color }}>{pcdStats.localCounts[key] ?? 0}</p>
-                <p className="text-[11px] font-semibold mt-0.5" style={{ color }}>{label}</p>
-              </div>
-            ))}
-          </div>
-          {pcdStats.censoMunicipal === 0 && (
-            <p className="text-xs text-muted-foreground mt-2">Nenhum registro do Censo Municipal cadastrado ainda.</p>
-          )}
-        </div>
-      </Card>
 
-      {/* Censo por Faixa Etária */}
-      <Card className="p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <h2 className="text-xl font-bold font-display flex items-center gap-2">
-            <Baby className="w-5 h-5 text-primary" />
-            Censo por Faixa Etária
-          </h2>
-          <div className="flex gap-3 flex-wrap text-xs font-semibold">
-            <span className="px-3 py-1.5 rounded-xl bg-secondary border border-border text-muted-foreground">
-              🏥 <strong className="text-foreground">{censo.totalAtivos}</strong> ativos
-            </span>
-            <span className="px-3 py-1.5 rounded-xl border" style={{ background: "rgba(52,211,153,0.07)", borderColor: "rgba(52,211,153,0.25)", color: "#34d399" }}>
-              🏫 <strong>{censo.totalRede}</strong> Rede Municipal
-            </span>
-            <span className="px-3 py-1.5 rounded-xl bg-secondary border border-border text-muted-foreground">
-              📅 {censo.comData} com data nascimento
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          {/* Barras neon */}
-          <div className="space-y-3">
-            {FAIXAS.map(f => {
-              const n = censo.counts[f.key] || 0;
-              const rede = censo.redeCounts[f.key] || 0;
-              const pct = censo.totalAtivos > 0 ? Math.round((n / censo.totalAtivos) * 100) : 0;
-              if (n === 0 && f.key === "sem_data") return null;
-              return (
-                <div key={f.key} className="group">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base leading-none">{f.emoji}</span>
-                      <span className="text-sm font-semibold text-foreground">{f.label}</span>
-                      <span className="text-xs text-muted-foreground">({f.range})</span>
-                      {(f as any).alerta && n > 0 && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                          style={{ background: "rgba(249,115,22,0.12)", color: "#f97316", border: "1px solid rgba(249,115,22,0.3)" }}>
-                          ⚠️ Limite
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <span className="text-lg font-bold font-display" style={{ color: f.cor, textShadow: `0 0 12px ${f.cor}66` }}>{n}</span>
-                      {rede > 0 && <span className="text-xs text-muted-foreground ml-1">({rede} mun.)</span>}
-                    </div>
-                  </div>
-                  <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700" style={{
-                      width: `${pct}%`,
-                      background: `linear-gradient(90deg, ${f.cor}88, ${f.cor})`,
-                      boxShadow: `0 0 10px ${f.cor}66`,
-                    }} />
-                  </div>
-                  {rede > 0 && (
-                    <div className="h-1 bg-secondary rounded-full overflow-hidden mt-0.5 opacity-50">
-                      <div className="h-full rounded-full" style={{
-                        width: `${Math.round((rede / (n || 1)) * 100)}%`,
-                        background: "#34d399",
-                      }} />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Pizza */}
-          {pieData.length > 0 ? (
-            <div className="flex flex-col items-center">
-              <div className="h-56 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={90}
-                      dataKey="value" nameKey="name" paddingAngle={3}>
-                      {pieData.map((entry, i) => (
-                        <Cell key={i} fill={entry.cor}
-                          style={{ filter: `drop-shadow(0 0 8px ${entry.cor}88)` }} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(v: any, name: any) => [`${v} pacientes`, name]}
-                      contentStyle={{ background: "hsl(222 50% 8%)", border: "1px solid rgba(0,240,255,0.2)", borderRadius: 12, color: "#e0f0ff" }}
-                    />
-                    <Legend formatter={(v) => <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>{v}</span>} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              {censo.totalRede > 0 && (
-                <p className="text-xs text-center text-muted-foreground mt-1">
-                  <span style={{ color: "#34d399" }}>●</span> {censo.totalRede} da Rede Municipal Ibiúna ({Math.round((censo.totalRede / (censo.totalAtivos || 1)) * 100)}% do total)
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-56 text-center">
-              <Baby className="w-10 h-10 text-muted-foreground/30 mb-2" />
-              <p className="text-sm text-muted-foreground">Preencha as datas de nascimento<br/>dos pacientes para ver o gráfico.</p>
-            </div>
-          )}
-        </div>
-      </Card>
 
       {/* Atendimentos Terapêuticos por período */}
       <Card className="p-6">
