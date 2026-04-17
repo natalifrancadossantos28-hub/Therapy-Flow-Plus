@@ -250,6 +250,7 @@ export default function GestaoContratos() {
     const repasseBruto = totalAtend * valorAte;
 
     const custoTerapeutas = (professionals as any[])
+      .filter((p: any) => (p.tipoContrato ?? "Contratado") !== "Concursado")
       .reduce((s: number, p: any) => s + (p.salario ?? 0), 0);
 
     const custoColaboradores = colaboradores

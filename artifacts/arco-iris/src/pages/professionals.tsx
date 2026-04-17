@@ -181,6 +181,7 @@ export default function Professionals() {
     phone: "",
     pin: "",
     cargaHoraria: "30h",
+    tipoContrato: "Contratado",
     salario: "",
   });
 
@@ -197,7 +198,7 @@ export default function Professionals() {
       queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
       toast({ title: "Sucesso", description: "Profissional cadastrado." });
       setIsDialogOpen(false);
-      setFormData({ name: "", specialty: "", email: "", phone: "", pin: "", cargaHoraria: "30h", salario: "" });
+      setFormData({ name: "", specialty: "", email: "", phone: "", pin: "", cargaHoraria: "30h", tipoContrato: "Contratado", salario: "" });
     } catch {
       toast({
         title: "Erro",
@@ -262,16 +263,29 @@ export default function Professionals() {
                     </div>
                   </div>
                 </div>
-                <Badge className={cn(
-                  "text-xs font-bold px-2.5 py-1 flex items-center gap-1 shrink-0",
-                  prof.cargaHoraria === "20h" ? "badge-neon-orange" : "badge-neon-blue"
-                )}>
-                  <Clock className="w-3 h-3" />
-                  {prof.cargaHoraria ?? "30h"}
-                  <span className="text-[10px] font-semibold opacity-80">
-                    · {prof.cargaHoraria === "20h" ? "20" : "30"} pac.
-                  </span>
-                </Badge>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <Badge className={cn(
+                    "text-xs font-bold px-2.5 py-1 flex items-center gap-1",
+                    prof.cargaHoraria === "20h" ? "badge-neon-orange" : "badge-neon-blue"
+                  )}>
+                    <Clock className="w-3 h-3" />
+                    {prof.cargaHoraria ?? "30h"}
+                    <span className="text-[10px] font-semibold opacity-80">
+                      · {prof.cargaHoraria === "20h" ? "20" : "30"} pac.
+                    </span>
+                  </Badge>
+                  {(prof.tipoContrato ?? "Contratado") === "Concursado" ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(0,212,255,0.1)", border: "1px solid rgba(0,212,255,0.25)", color: "#7dd3fc" }}>
+                      Concursado
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(0,255,159,0.08)", border: "1px solid rgba(0,255,159,0.2)", color: "#86efac" }}>
+                      Contratado
+                    </span>
+                  )}
+                </div>
               </div>
 
               <ProfessionalCapacityCard id={prof.id} />
@@ -328,6 +342,22 @@ export default function Professionals() {
                 />
               </div>
               <div>
+                <Label>Tipo de Vínculo</Label>
+                <Select
+                  value={formData.tipoContrato}
+                  onChange={(e) => setFormData({ ...formData, tipoContrato: e.target.value, salario: e.target.value === "Concursado" ? "" : formData.salario })}
+                >
+                  <option value="Contratado">Contratado — CLT / RPA (custo gerenciado pela empresa)</option>
+                  <option value="Concursado">Concursado — Servidor público (sem custo para a empresa)</option>
+                </Select>
+                {formData.tipoContrato === "Concursado" && (
+                  <p className="text-xs mt-1.5 px-3 py-1.5 rounded-lg"
+                    style={{ background: "rgba(0,212,255,0.07)", border: "1px solid rgba(0,212,255,0.2)", color: "#7dd3fc" }}>
+                    O custo mensal não é aplicável para servidores concursados. Eles aparecem na agenda e nos relatórios de atendimento, mas não entram na folha de pagamento da empresa.
+                  </p>
+                )}
+              </div>
+              <div>
                 <Label>Carga Horária</Label>
                 <Select
                   value={formData.cargaHoraria}
@@ -359,24 +389,26 @@ export default function Professionals() {
                   />
                 </div>
               </div>
-              {/* Salário */}
-              <div>
-                <Label>Custo Mensal (R$)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={100}
-                  value={formData.salario}
-                  onChange={(e) => setFormData({ ...formData, salario: e.target.value })}
-                  placeholder={`Ex: ${tetoForm.toLocaleString("pt-BR")}`}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Teto de faturamento para {formData.cargaHoraria}:{" "}
-                  <strong className="text-foreground">
-                    R$ {tetoForm.toLocaleString("pt-BR")}
-                  </strong>
-                </p>
-              </div>
+              {/* Salário — apenas para Contratados */}
+              {formData.tipoContrato !== "Concursado" && (
+                <div>
+                  <Label>Custo Mensal (R$)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={formData.salario}
+                    onChange={(e) => setFormData({ ...formData, salario: e.target.value })}
+                    placeholder={`Ex: ${tetoForm.toLocaleString("pt-BR")}`}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Teto de faturamento para {formData.cargaHoraria}:{" "}
+                    <strong className="text-foreground">
+                      R$ {tetoForm.toLocaleString("pt-BR")}
+                    </strong>
+                  </p>
+                </div>
+              )}
               {/* Alerta de inconsistência */}
               {prejuizoForm > 0 && (
                 <div className="rounded-xl px-4 py-3 flex items-start gap-2"
