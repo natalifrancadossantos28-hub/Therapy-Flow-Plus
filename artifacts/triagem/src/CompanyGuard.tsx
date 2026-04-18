@@ -90,8 +90,10 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
         p_password: password,
       });
       if (rpcError) { setError(describeAuthError(rpcError)); return; }
+      // Wrong credentials: function returns null, which PostgREST may expose
+      // as a literal null OR a row of all-NULL columns. Treat both as invalid.
       const company = Array.isArray(data) ? data[0] : data;
-      if (!company) { setError("Empresa ou senha incorretos."); return; }
+      if (!company?.id) { setError("Empresa ou senha incorretos."); return; }
       // RPC returns snake_case columns; check the requested module by matching
       // on the camelCase prop the caller passed in ("moduleTriagem", etc.).
       const moduleCol = module.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);

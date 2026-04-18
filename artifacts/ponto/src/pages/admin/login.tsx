@@ -57,11 +57,11 @@ export default function AdminLogin() {
         toast({ title: "Erro", description: describeAuthError(error), variant: "destructive" });
         return;
       }
-      // RPC returns a single row or null. PostgREST normalises that to
-      // either an object or null depending on the function signature; handle
-      // both defensively.
+      // RPC returns a single row. On wrong credentials the function returns
+      // `null`, which PostgREST may surface either as a literal null or as a
+      // row of all-NULL columns — both must be treated as "not authenticated".
       const company = Array.isArray(data) ? data[0] : data;
-      if (!company) {
+      if (!company?.id) {
         toast({ title: "Acesso negado", description: "Empresa ou senha incorretos.", variant: "destructive" });
         return;
       }
