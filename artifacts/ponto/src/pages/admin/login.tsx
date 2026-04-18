@@ -5,10 +5,34 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, Building2, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase";
 
 type LoginMode = "company" | "master";
+
+/**
+ * Converts any exception from a Supabase call into a human-readable message
+ * that actually tells the user what to fix. Replaces the old generic
+ * "Verifique sua internet" / "Falha ao conectar".
+ */
+function describeAuthError(err: unknown): string {
+  if (!isSupabaseConfigured) {
+    return (
+      "Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY " +
+      "no painel da Vercel (Settings → Environment Variables) e refaça o deploy."
+    );
+  }
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "Sem conexão com a internet. Verifique sua rede e tente de novo.";
+  }
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+    return (
+      "Não foi possível alcançar o Supabase. Confirme que VITE_SUPABASE_URL está " +
+      "correta e que o projeto Supabase está ativo."
+    );
+  }
+  return msg || "Erro inesperado ao autenticar.";
+}
 
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
@@ -24,31 +48,37 @@ export default function AdminLogin() {
     if (!slug.trim() || !password.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/ponto/auth/company`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: slug.trim().toLowerCase(), password }),
+      const supabase = requireSupabase();
+      const { data, error } = await supabase.rpc("authenticate_company", {
+        p_slug: slug.trim().toLowerCase(),
+        p_password: password,
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast({ title: "Acesso negado", description: err.error || "Empresa ou senha incorretos.", variant: "destructive" });
+      if (error) {
+        toast({ title: "Erro", description: describeAuthError(error), variant: "destructive" });
         return;
       }
-      const company = await res.json();
+      // RPC returns a single row or null. PostgREST normalises that to
+      // either an object or null depending on the function signature; handle
+      // both defensively.
+      const company = Array.isArray(data) ? data[0] : data;
+      if (!company) {
+        toast({ title: "Acesso negado", description: "Empresa ou senha incorretos.", variant: "destructive" });
+        return;
+      }
       sessionStorage.setItem("nfs_ponto_session", JSON.stringify({
         type: "company",
         companyId: company.id,
         companyName: company.name,
         companySlug: company.slug,
         adminToken: password,
-        modulePonto: company.modulePonto,
-        moduleTriagem: company.moduleTriagem,
-        moduleArcoIris: company.moduleArcoIris,
+        modulePonto: company.module_ponto,
+        moduleTriagem: company.module_triagem,
+        moduleArcoIris: company.module_arco_iris,
       }));
       sessionStorage.setItem("nfs_ponto_admin", "true");
       setLocation("/admin/dashboard");
-    } catch {
-      toast({ title: "Erro", description: "Falha ao conectar. Tente novamente.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Erro", description: describeAuthError(err), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -59,12 +89,15 @@ export default function AdminLogin() {
     if (!password.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/ponto/auth/master`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+      const supabase = requireSupabase();
+      const { data, error } = await supabase.rpc("authenticate_master", {
+        p_password: password,
       });
-      if (!res.ok) {
+      if (error) {
+        toast({ title: "Erro", description: describeAuthError(error), variant: "destructive" });
+        return;
+      }
+      if (data !== true) {
         toast({ title: "Acesso negado", description: "Senha master incorreta.", variant: "destructive" });
         return;
       }
@@ -74,8 +107,8 @@ export default function AdminLogin() {
       }));
       sessionStorage.setItem("nfs_ponto_admin", "true");
       setLocation("/admin/companies");
-    } catch {
-      toast({ title: "Erro", description: "Falha ao conectar. Tente novamente.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Erro", description: describeAuthError(err), variant: "destructive" });
     } finally {
       setLoading(false);
     }

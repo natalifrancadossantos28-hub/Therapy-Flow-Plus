@@ -1,8 +1,27 @@
 import { useState, useEffect, useCallback, type ReactNode, type FormEvent } from "react";
 import { processOfflineQueue, getOfflineQueueCount } from "./lib/offline-queue";
+import { isSupabaseConfigured, requireSupabase } from "./lib/supabase";
 
-import { API_BASE } from "./lib/api";
 const SESSION_KEY = "nfs_ponto_session";
+
+function describeAuthError(err: unknown): string {
+  if (!isSupabaseConfigured) {
+    return (
+      "Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY " +
+      "no painel da Vercel (Settings → Environment Variables) e refaça o deploy."
+    );
+  }
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "Sem conexão com a internet. Verifique sua rede e tente de novo.";
+  }
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+    return (
+      "Não foi possível alcançar o Supabase. Confirme VITE_SUPABASE_URL e que o projeto Supabase está ativo."
+    );
+  }
+  return msg || "Erro inesperado ao autenticar.";
+}
 
 type Session = {
   type: "company" | "master";
@@ -65,31 +84,35 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/ponto/auth/company`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, password }),
+      const supabase = requireSupabase();
+      const { data, error: rpcError } = await supabase.rpc("authenticate_company", {
+        p_slug: slug.trim().toLowerCase(),
+        p_password: password,
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Credenciais inválidas."); return; }
-      if (!data[module]) {
+      if (rpcError) { setError(describeAuthError(rpcError)); return; }
+      const company = Array.isArray(data) ? data[0] : data;
+      if (!company) { setError("Empresa ou senha incorretos."); return; }
+      // RPC returns snake_case columns; check the requested module by matching
+      // on the camelCase prop the caller passed in ("moduleTriagem", etc.).
+      const moduleCol = module.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+      if (!company[moduleCol]) {
         setError("Esta empresa não tem acesso a este módulo. Contate o suporte.");
         return;
       }
       const s: Session = {
         type: "company",
-        companyId: data.id,
-        companyName: data.name,
-        companySlug: data.slug,
+        companyId: company.id,
+        companyName: company.name,
+        companySlug: company.slug,
         adminToken: password,
-        moduleTriagem: data.moduleTriagem,
-        moduleArcoIris: data.moduleArcoIris,
-        modulePonto: data.modulePonto,
+        moduleTriagem: company.module_triagem,
+        moduleArcoIris: company.module_arco_iris,
+        modulePonto: company.module_ponto,
       };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
       setSession(s);
-    } catch {
-      setError("Erro de conexão. Verifique sua internet.");
+    } catch (err) {
+      setError(describeAuthError(err));
     } finally {
       setLoading(false);
     }
