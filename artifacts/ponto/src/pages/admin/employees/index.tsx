@@ -1,4 +1,4 @@
-import { useGetPontoEmployees } from "@workspace/api-client-react";
+import { useGetPontoEmployees } from "@/lib/ponto-hooks";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";

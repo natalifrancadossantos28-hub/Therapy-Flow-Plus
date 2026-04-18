@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetPontoRecords, useGetPontoEmployees } from "@workspace/api-client-react";
+import { useGetPontoRecords, useGetPontoEmployees } from "@/lib/ponto-hooks";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

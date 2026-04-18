@@ -6,63 +6,44 @@ import { Switch } from "@/components/ui/switch";
 import { Settings, Clock, ShieldOff, Coffee, Lock, Save, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getSession } from "@/components/AdminGuard";
+import { getCompanySettings, updateCompanySettings, type PontoCompanySettings } from "@/lib/ponto-rpc";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
-
-type Settings = {
-  id: number; name: string; slug: string;
-  toleranceMinutes: number; overtimeBlockEnabled: boolean;
-  defaultBreakMinutes: number; logoUrl: string | null; active: boolean;
-};
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const session = getSession();
   const companyId = session?.type === "company" ? session.companyId : null;
 
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [settings, setSettings] = useState<PontoCompanySettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
     if (!companyId) return;
-    fetch(`/api/ponto/companies/${companyId}/settings`, {
-      headers: {
-        "x-company-id": String(companyId),
-        "x-company-auth": session?.type === "company" ? session.adminToken : "",
-      },
-    })
-      .then(r => r.json())
-      .then(setSettings)
-      .catch(() => toast({ title: "Erro ao carregar configurações", variant: "destructive" }));
+    getCompanySettings()
+      .then(s => {
+        if (s) setSettings(s);
+        else toast({ title: "Erro ao carregar configurações", variant: "destructive" });
+      })
+      .catch((e: Error) => toast({ title: "Erro ao carregar configurações", description: e.message, variant: "destructive" }));
   }, [companyId]);
 
   const handleSave = async () => {
-    if (!companyId || !settings) return;
+    if (!settings) return;
     setSaving(true);
     try {
-      const payload: any = {
+      const updated = await updateCompanySettings({
         name: settings.name,
         toleranceMinutes: settings.toleranceMinutes,
         overtimeBlockEnabled: settings.overtimeBlockEnabled,
         defaultBreakMinutes: settings.defaultBreakMinutes,
         logoUrl: settings.logoUrl,
-      };
-      if (newPassword.trim()) payload.adminPassword = newPassword;
-      const res = await fetch(`/api/ponto/companies/${companyId}/settings`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "x-company-id": String(companyId),
-          "x-company-auth": session?.type === "company" ? session.adminToken : "",
-        },
-        body: JSON.stringify(payload),
+        newAdminPassword: newPassword.trim() || undefined,
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-      const updated = await res.json();
       setSettings(updated);
       if (newPassword.trim()) {
-        // Update session with new password
+        // Update session with new password so subsequent RPC calls authenticate.
         sessionStorage.setItem("nfs_ponto_session", JSON.stringify({
           ...(session as any),
           adminToken: newPassword,
@@ -71,7 +52,7 @@ export default function SettingsPage() {
       }
       toast({ title: "Configurações salvas com sucesso!" });
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast({ title: "Erro", description: e?.message ?? "Falha ao salvar", variant: "destructive" });
     } finally {
       setSaving(false);
     }

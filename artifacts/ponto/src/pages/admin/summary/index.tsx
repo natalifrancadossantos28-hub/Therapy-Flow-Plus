@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetPontoSummary } from "@workspace/api-client-react";
+import { useGetPontoSummary } from "@/lib/ponto-hooks";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,7 @@ import { Calendar as CalendarIcon, Clock } from "lucide-react";
 export default function SummaryList() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
-  const { data: summaries = [], isLoading } = useGetPontoSummary({
-    date: date || undefined
-  });
+  const { data: summaries = [], isLoading } = useGetPontoSummary({ date });
 
   return (
     <div className="space-y-6">

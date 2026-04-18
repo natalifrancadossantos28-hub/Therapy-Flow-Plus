@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetPontoEmployees, useGetPontoRecords } from "@workspace/api-client-react";
+import { useGetPontoEmployees, useGetPontoRecords } from "@/lib/ponto-hooks";
 import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
