@@ -1,8 +1,8 @@
-import { API_BASE } from "./api";
+import { upsertTriagem, type TriagemInput } from "./triagem-rpc";
 
 const OFFLINE_QUEUE_KEY = "nfs_triagem_offline_queue";
 
-type OfflineItem = { id: string; data: object; createdAt: string; attempts: number };
+type OfflineItem = { id: string; data: TriagemInput; createdAt: string; attempts: number };
 
 export async function processOfflineQueue(): Promise<number> {
   try {
@@ -15,23 +15,20 @@ export async function processOfflineQueue(): Promise<number> {
     let synced = 0;
     for (const item of queue) {
       try {
-        const res = await fetch(`${API_BASE}/triagens`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(item.data),
-        });
-        if (res.ok) { synced++; }
-        else remaining.push({ ...item, attempts: item.attempts + 1 });
+        await upsertTriagem(null, item.data);
+        synced++;
       } catch {
         remaining.push({ ...item, attempts: item.attempts + 1 });
       }
     }
     localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
     return synced;
-  } catch { return 0; }
+  } catch {
+    return 0;
+  }
 }
 
-export function addToOfflineQueue(data: object): void {
+export function addToOfflineQueue(data: TriagemInput): void {
   try {
     const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
     const queue: OfflineItem[] = raw ? JSON.parse(raw) : [];

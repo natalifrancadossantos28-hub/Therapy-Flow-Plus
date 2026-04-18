@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { API_BASE as API } from "@/lib/api";
+import { listTriagens, getTriagem, upsertTriagem, deleteTriagem } from "@/lib/triagem-rpc";
 
 // ─── WHITE LABEL CONFIG ──────────────────────────────────────────────────────
 export const CLINIC_CONFIG = {
@@ -818,7 +818,6 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
-  const [autoLink, setAutoLink] = useState<{ patientName?: string; priority?: string; addedToQueue?: boolean; linkedOnly?: boolean; specialties?: string[]; alreadyQueued?: string[] } | null>(null);
   const [, navigate] = useLocation();
   const data = new Date().toLocaleDateString("pt-BR");
   const isCenso = tipoRegistro === "Registro Censo Municipal";
@@ -853,33 +852,28 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
   const salvarTriagem = async () => {
     setSalvando(true);
+    const payload = {
+      ...bodyParaSalvar,
+      respostas: JSON.stringify(respostas),
+    };
     try {
       if (!navigator.onLine && !editId) {
         const { addToOfflineQueue } = await import("./lib/offline-queue");
-        addToOfflineQueue(bodyParaSalvar);
+        addToOfflineQueue(payload);
         setSalvo(true);
         return;
       }
-      const res = await fetch(editId ? `${API}/triagens/${editId}` : `${API}/triagens`, {
-        method: editId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bodyParaSalvar),
-      });
-      if (!res.ok && !editId) {
-        const { addToOfflineQueue } = await import("./lib/offline-queue");
-        addToOfflineQueue(bodyParaSalvar);
-      } else if (res.ok) {
-        const json = await res.json().catch(() => null);
-        if (json?._autoLink) setAutoLink(json._autoLink);
-      }
+      await upsertTriagem(editId ?? null, payload);
       setSalvo(true);
     } catch {
       if (!editId) {
         const { addToOfflineQueue } = await import("./lib/offline-queue");
-        addToOfflineQueue(bodyParaSalvar);
+        addToOfflineQueue(payload);
         setSalvo(true);
       }
-    } finally { setSalvando(false); }
+    } finally {
+      setSalvando(false);
+    }
   };
 
   // Auto-save for Censo registros – no need to show the full report
@@ -1263,27 +1257,6 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
           )}
           {!viewOnly && salvo && (
             <div className="flex flex-col items-end gap-2">
-              {autoLink?.addedToQueue && (
-                <div className="px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold max-w-sm text-right space-y-1">
-                  <div>✅ <strong>{autoLink.patientName}</strong> adicionado(a) à fila de espera</div>
-                  <div>Prioridade: <strong>{autoLink.priority}</strong></div>
-                  {autoLink.specialties && autoLink.specialties.length > 0 && (
-                    <div className="flex flex-wrap gap-1 justify-end mt-1">
-                      {autoLink.specialties.map(s => (
-                        <span key={s} className="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 text-[10px] font-bold">{s}</span>
-                      ))}
-                    </div>
-                  )}
-                  {autoLink.alreadyQueued && autoLink.alreadyQueued.length > 0 && (
-                    <div className="text-emerald-600 text-[10px]">Já na fila: {autoLink.alreadyQueued.join(", ")}</div>
-                  )}
-                </div>
-              )}
-              {autoLink?.linkedOnly && (
-                <div className="px-4 py-2 rounded-xl bg-blue-50 border border-blue-300 text-blue-800 text-xs font-semibold max-w-xs text-right">
-                  🔗 Scores atualizados no prontuário de {autoLink.patientName}
-                </div>
-              )}
               <button onClick={() => navigate("/lista")}
                 className="px-6 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
                 ✓ {editId ? "Atualizado!" : "Salvo!"} Ver Pacientes →
@@ -1321,12 +1294,12 @@ function ListaPacientes() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    fetch(`${API}/triagens`).then(r => r.json()).then(setTriagens).catch(console.error).finally(() => setCarregando(false));
+    listTriagens().then(setTriagens).catch(console.error).finally(() => setCarregando(false));
   }, []);
 
   const excluir = async (id: number) => {
     if (!confirm("Excluir esta triagem permanentemente?")) return;
-    await fetch(`${API}/triagens/${id}`, { method: "DELETE" });
+    await deleteTriagem(id);
     setTriagens(prev => prev.filter(t => t.id !== id));
   };
 
@@ -1474,7 +1447,7 @@ function Dashboard() {
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/triagens`).then(r => r.json()).then(setTriagens).catch(console.error).finally(() => setCarregando(false));
+    listTriagens().then(setTriagens).catch(console.error).finally(() => setCarregando(false));
   }, []);
 
   if (carregando) {
@@ -1799,9 +1772,11 @@ function RelatorioView() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    fetch(`${API}/triagens/${id}`)
-      .then(r => { if (!r.ok) throw new Error("Não encontrado"); return r.json(); })
-      .then((t: TriagemSalva) => setFormData(triSalvaToFormData(t)))
+    getTriagem(id)
+      .then(t => {
+        if (!t) throw new Error("Não encontrado");
+        setFormData(triSalvaToFormData(t as TriagemSalva));
+      })
       .catch(() => setErro("Triagem não encontrada."))
       .finally(() => setLoading(false));
   }, [id]);
@@ -1836,9 +1811,11 @@ function EditarTriagem() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    fetch(`${API}/triagens/${id}`)
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((t: TriagemSalva) => setFormData(triSalvaToFormData(t)))
+    getTriagem(id)
+      .then(t => {
+        if (!t) throw new Error();
+        setFormData(triSalvaToFormData(t as TriagemSalva));
+      })
       .catch(() => setErro("Triagem não encontrada."))
       .finally(() => setLoading(false));
   }, [id]);
