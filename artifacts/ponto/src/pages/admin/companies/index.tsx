@@ -7,17 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Building2, Trash2, Users, Edit, X, Check, Copy, Clock, Stethoscope, LayoutDashboard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getSession } from "@/components/AdminGuard";
+import {
+  masterListCompanies,
+  masterUpsertCompany,
+  masterDeleteCompany,
+  type PontoMasterCompany,
+  type MasterCompanyInput,
+} from "@/lib/ponto-rpc";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type Company = {
-  id: number; name: string; slug: string; active: boolean;
-  toleranceMinutes: number; overtimeBlockEnabled: boolean;
-  defaultBreakMinutes: number; logoUrl: string | null;
-  modulePonto: boolean; moduleTriagem: boolean; moduleArcoIris: boolean;
-  employeeCount: number; createdAt: string;
-};
+type Company = PontoMasterCompany;
 
 type FormData = {
   name: string; slug: string; adminPassword: string;
@@ -25,22 +25,13 @@ type FormData = {
   modulePonto: boolean; moduleTriagem: boolean; moduleArcoIris: boolean;
 };
 
-function authHeaders() {
-  const s = getSession();
-  if (!s || s.type !== "master") return {};
-  return { "x-master-auth": s.masterToken };
-}
-
-async function fetchCompanies(): Promise<Company[]> {
-  const res = await fetch(`/api/ponto/companies`, { headers: authHeaders() });
-  if (!res.ok) throw new Error("Falha ao carregar empresas.");
-  return res.json();
-}
-
 export default function CompaniesPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: companies = [], isLoading } = useQuery({ queryKey: ["ponto-companies"], queryFn: fetchCompanies });
+  const { data: companies = [], isLoading } = useQuery<Company[]>({
+    queryKey: ["ponto-companies"],
+    queryFn: masterListCompanies,
+  });
 
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -51,15 +42,7 @@ export default function CompaniesPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      const res = await fetch(`/api/ponto/companies`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-      return res.json();
-    },
+    mutationFn: (data: FormData) => masterUpsertCompany(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ponto-companies"] });
       toast({ title: "Empresa criada com sucesso!" });
@@ -70,15 +53,8 @@ export default function CompaniesPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<FormData> }) => {
-      const res = await fetch(`/api/ponto/companies/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-      return res.json();
-    },
+    mutationFn: ({ id, data }: { id: number; data: Partial<FormData> }) =>
+      masterUpsertCompany({ id, ...(data as MasterCompanyInput) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ponto-companies"] });
       toast({ title: "Empresa atualizada." });
@@ -88,12 +64,7 @@ export default function CompaniesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`/api/ponto/companies/${id}`, {
-        method: "DELETE", headers: authHeaders(),
-      });
-      if (!res.ok && res.status !== 204) throw new Error("Falha ao excluir.");
-    },
+    mutationFn: (id: number) => masterDeleteCompany(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["ponto-companies"] }); toast({ title: "Empresa excluída." }); },
     onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { Html5Qrcode } from "html5-qrcode";
-import { useGetPontoEmployeeByCpf, useCreatePontoRecord } from "@workspace/api-client-react";
+import { useGetPontoEmployeeByCpf, useCreatePontoRecord } from "@/lib/ponto-hooks";
+import { getCompanyBySlug } from "@/lib/ponto-rpc";
 import { format } from "date-fns";
 import { CheckCircle2, XCircle, Zap, Building2, LogIn, Coffee, Utensils, LogOut, Camera, RefreshCw } from "lucide-react";
 import {
@@ -59,15 +60,15 @@ const PUNCH_COLORS: Record<string, { bg: string; text: string; border: string }>
 
 async function initCompanyContext(slug: string): Promise<{ id: number; name: string } | null> {
   try {
-    const res = await fetch(`/api/ponto/companies/slug/${slug}`);
-    if (!res.ok) return null;
-    const company = await res.json();
+    const company = await getCompanyBySlug(slug);
+    if (!company) return null;
     sessionStorage.setItem("nfs_ponto_session", JSON.stringify({
       type: "kiosk",
       companyId: company.id,
       companyName: company.name,
+      companySlug: slug.toLowerCase().trim(),
     }));
-    return company;
+    return { id: company.id, name: company.name };
   } catch { return null; }
 }
 
@@ -116,10 +117,10 @@ export default function KioskPage() {
   const createRecord = useCreatePontoRecord();
 
   const pauseScanner = useCallback(() => {
-    try { scannerRef.current?.pause(true); } catch (_) {}
+    try { (scannerRef.current as unknown as { pause: (b?: boolean) => void } | null)?.pause(true); } catch (_) {}
   }, []);
   const resumeScanner = useCallback(() => {
-    try { scannerRef.current?.resume(true); } catch (_) {}
+    try { (scannerRef.current as unknown as { resume: (b?: boolean) => void } | null)?.resume(true); } catch (_) {}
   }, []);
 
   const scheduleReset = useCallback((delay = RESET_DELAY_MS) => {

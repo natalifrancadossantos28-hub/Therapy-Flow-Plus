@@ -1,4 +1,4 @@
-import { useGetPontoEmployees, useGetPontoRecords, useGetPontoSummary } from "@workspace/api-client-react";
+import { useGetPontoEmployees, useGetPontoRecords, useGetPontoSummary } from "@/lib/ponto-hooks";
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

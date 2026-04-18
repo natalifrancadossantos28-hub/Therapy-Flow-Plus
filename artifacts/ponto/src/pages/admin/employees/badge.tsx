@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetPontoEmployee } from "@workspace/api-client-react";
+import { useGetPontoEmployee } from "@/lib/ponto-hooks";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer } from "lucide-react";
