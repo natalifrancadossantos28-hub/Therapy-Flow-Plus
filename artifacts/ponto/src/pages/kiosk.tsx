@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
-import { Html5QrcodeScanner, Html5QrcodeScanType } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { useGetPontoEmployeeByCpf, useCreatePontoRecord } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { CheckCircle2, XCircle, Zap, Building2, LogIn, Coffee, Utensils, LogOut } from "lucide-react";
+import { CheckCircle2, XCircle, Zap, Building2, LogIn, Coffee, Utensils, LogOut, Camera, RefreshCw } from "lucide-react";
+import {
+  type CameraInfo,
+  describeCameraError,
+  isGetUserMediaSupported,
+  isSecureContextOk,
+  listCameras,
+  pickPreferredCamera,
+  requestCameraPermission,
+} from "@/lib/camera";
 
 // Play beep instantly — called at moment of QR detection, not after DB save
 const playBeep = () => {
@@ -62,8 +71,10 @@ async function initCompanyContext(slug: string): Promise<{ id: number; name: str
   } catch { return null; }
 }
 
+type CameraState = "checking" | "blocked" | "missing" | "ready";
+
 export default function KioskPage() {
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const processingRef = useRef(false);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -74,6 +85,12 @@ export default function KioskPage() {
   const [companyLoading, setCompanyLoading] = useState(false);
   const [companyError, setCompanyError] = useState<string | null>(null);
   const [punchResult, setPunchResult] = useState<PunchResult | null>(null);
+
+  const [cameraState, setCameraState] = useState<CameraState>("checking");
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameras, setCameras] = useState<CameraInfo[]>([]);
+  const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
+  const [permissionAttempt, setPermissionAttempt] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -98,8 +115,12 @@ export default function KioskPage() {
 
   const createRecord = useCreatePontoRecord();
 
-  const pauseScanner = useCallback(() => { try { scannerRef.current?.pause(true); } catch (_) {} }, []);
-  const resumeScanner = useCallback(() => { try { scannerRef.current?.resume(); } catch (_) {} }, []);
+  const pauseScanner = useCallback(() => {
+    try { scannerRef.current?.pause(true); } catch (_) {}
+  }, []);
+  const resumeScanner = useCallback(() => {
+    try { scannerRef.current?.resume(true); } catch (_) {}
+  }, []);
 
   const scheduleReset = useCallback((delay = RESET_DELAY_MS) => {
     if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
@@ -156,23 +177,96 @@ export default function KioskPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scannedCpf, scanState, isLoadingEmployee, employee]);
 
+  // 1) Ask for camera permission up-front, then list cameras and pick the best
+  //    one (prefer USB webcam). Re-runs when the user clicks "Tentar novamente".
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!document.getElementById("reader")) return;
-      const scanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1, supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA], videoConstraints: { facingMode: { ideal: "environment" }, width: { ideal: 640 }, height: { ideal: 480 } } },
-        false
-      );
-      scanner.render(text => handleScan(text), () => {});
-      scannerRef.current = scanner;
-    }, 100);
+    let cancelled = false;
+    async function init() {
+      setCameraState("checking");
+      setCameraError(null);
+
+      if (!isGetUserMediaSupported()) {
+        if (!cancelled) {
+          setCameraState("blocked");
+          setCameraError("Seu navegador não suporta acesso à câmera. Use Chrome, Edge ou Firefox atualizados.");
+        }
+        return;
+      }
+      if (!isSecureContextOk()) {
+        if (!cancelled) {
+          setCameraState("blocked");
+          setCameraError("Abra o site por HTTPS. A câmera não funciona em HTTP fora de localhost.");
+        }
+        return;
+      }
+
+      const perm = await requestCameraPermission();
+      if (cancelled) return;
+      if (!perm.granted) {
+        setCameraState("blocked");
+        setCameraError(perm.error ?? "Permissão de câmera negada.");
+        return;
+      }
+
+      const list = await listCameras();
+      if (cancelled) return;
+      if (list.length === 0) {
+        setCameraState("missing");
+        setCameraError("Nenhuma câmera detectada. Conecte uma webcam USB e clique em 'Tentar novamente'.");
+        return;
+      }
+
+      setCameras(list);
+      setActiveCameraId((current) => current ?? pickPreferredCamera(list)?.deviceId ?? list[0].deviceId);
+      setCameraState("ready");
+    }
+    init();
+    return () => { cancelled = true; };
+  }, [permissionAttempt]);
+
+  // 2) Start / restart the Html5Qrcode scanner against the active camera.
+  //    Keep this isolated from permission/listing so switching cameras is cheap.
+  useEffect(() => {
+    if (cameraState !== "ready" || !activeCameraId) return;
+
+    let cancelled = false;
+    const container = document.getElementById("reader");
+    if (!container) return;
+
+    const scanner = new Html5Qrcode("reader", /* verbose */ false);
+    scannerRef.current = scanner;
+
+    scanner
+      .start(
+        { deviceId: { exact: activeCameraId } },
+        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
+        (decodedText) => handleScan(decodedText),
+        () => { /* ignore per-frame scan misses */ }
+      )
+      .catch((err) => {
+        if (cancelled) return;
+        setCameraState("blocked");
+        setCameraError(describeCameraError(err));
+      });
+
     return () => {
-      clearTimeout(timer);
-      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-      try { scannerRef.current?.clear(); } catch (_) {}
+      cancelled = true;
+      const s = scannerRef.current;
+      scannerRef.current = null;
+      if (!s) return;
+      // stop() may reject if the camera never actually started; swallow.
+      Promise.resolve()
+        .then(() => s.stop())
+        .catch(() => {})
+        .finally(() => { try { s.clear(); } catch (_) {} });
     };
-  }, [handleScan]);
+  }, [cameraState, activeCameraId, handleScan]);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    };
+  }, []);
 
   const isIdle    = scanState === "idle";
   const isDetect  = scanState === "detected";
@@ -217,7 +311,55 @@ export default function KioskPage() {
               <div className="absolute top-0 left-0 w-full h-1 bg-primary/80 shadow-[0_0_20px_rgba(var(--primary),0.8)] animate-[scan_2s_ease-in-out_infinite]" />
             </div>
           </div>
+
+          {/* Camera state overlays — keep same dark-neon glass look */}
+          {cameraState === "checking" && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm text-center px-6">
+              <Camera className="w-12 h-12 text-primary/70 mb-4 animate-pulse" />
+              <p className="text-muted-foreground">Iniciando câmera…</p>
+            </div>
+          )}
+          {(cameraState === "blocked" || cameraState === "missing") && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm text-center px-6">
+              <XCircle className="w-14 h-14 text-destructive mb-4" />
+              <h3 className="text-lg font-bold text-foreground mb-2">
+                {cameraState === "blocked" ? "Câmera bloqueada" : "Câmera não encontrada"}
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-sm mb-5">
+                {cameraError ?? "Libere o acesso à câmera para registrar o ponto."}
+              </p>
+              <button
+                type="button"
+                onClick={() => setPermissionAttempt((n) => n + 1)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition"
+              >
+                <RefreshCw className="w-4 h-4" /> Tentar novamente
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Camera picker — shown only when 2+ cameras are available */}
+        {cameraState === "ready" && cameras.length > 1 && (
+          <div className="mt-4 flex items-center gap-2 text-sm">
+            <Camera className="w-4 h-4 text-muted-foreground" />
+            <label htmlFor="kiosk-camera-picker" className="text-muted-foreground">
+              Câmera:
+            </label>
+            <select
+              id="kiosk-camera-picker"
+              value={activeCameraId ?? ""}
+              onChange={(e) => setActiveCameraId(e.target.value)}
+              className="bg-background/60 border border-white/10 rounded-md px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary/60"
+            >
+              {cameras.map((c) => (
+                <option key={c.deviceId} value={c.deviceId} className="bg-background text-foreground">
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Detected */}
         <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-200 z-20 bg-background/95 backdrop-blur-xl ${isDetect ? "opacity-100 scale-100" : "opacity-0 scale-105 pointer-events-none"}`}>

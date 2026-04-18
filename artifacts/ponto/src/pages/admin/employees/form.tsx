@@ -14,6 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Camera, Upload, Trash2, ArrowLeft, CalendarDays, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import {
+  type CameraInfo,
+  describeCameraError,
+  isGetUserMediaSupported,
+  isSecureContextOk,
+  listCameras,
+  pickPreferredCamera,
+} from "@/lib/camera";
 
 const compressImage = (dataUrl: string, maxPx = 500, quality = 0.72): Promise<string> =>
   new Promise((resolve) => {
@@ -161,6 +169,8 @@ export default function EmployeeForm() {
   const [useWebcam, setUseWebcam] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [cameras, setCameras] = useState<CameraInfo[]>([]);
+  const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<Schedule>(DEFAULT_SCHEDULE);
 
   const form = useForm<FormValues>({
@@ -189,13 +199,59 @@ export default function EmployeeForm() {
 
   useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
 
+  const openStream = async (deviceId?: string): Promise<MediaStream> => {
+    const constraints: MediaStreamConstraints = deviceId
+      ? { video: { deviceId: { exact: deviceId } }, audio: false }
+      : { video: true, audio: false };
+    return navigator.mediaDevices.getUserMedia(constraints);
+  };
+
   const startWebcam = async () => {
+    if (!isGetUserMediaSupported()) {
+      toast({ title: "Câmera indisponível", description: "Navegador sem suporte a câmera.", variant: "destructive" });
+      return;
+    }
+    if (!isSecureContextOk()) {
+      toast({ title: "Câmera bloqueada", description: "Abra o site por HTTPS para usar a câmera.", variant: "destructive" });
+      return;
+    }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      streamRef.current = stream;
+      // First call grants permission AND gives us labels for enumerateDevices.
+      const initialStream = await openStream();
+      const list = await listCameras();
+      setCameras(list);
+
+      // Pick preferred camera (USB webcam > external > last in list).
+      const preferred = pickPreferredCamera(list);
+      let chosenStream = initialStream;
+      let chosenId = initialStream.getVideoTracks()[0]?.getSettings().deviceId ?? null;
+
+      if (preferred && chosenId && preferred.deviceId && preferred.deviceId !== chosenId) {
+        // Switch to the preferred device.
+        initialStream.getTracks().forEach((t) => t.stop());
+        chosenStream = await openStream(preferred.deviceId);
+        chosenId = preferred.deviceId;
+      }
+
+      streamRef.current = chosenStream;
+      setActiveCameraId(chosenId ?? preferred?.deviceId ?? null);
+      if (videoRef.current) videoRef.current.srcObject = chosenStream;
       setUseWebcam(true);
-    } catch { toast({ title: "Câmera indisponível", variant: "destructive" }); }
+    } catch (err) {
+      toast({ title: "Câmera indisponível", description: describeCameraError(err), variant: "destructive" });
+    }
+  };
+
+  const switchCamera = async (deviceId: string) => {
+    try {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      const stream = await openStream(deviceId);
+      streamRef.current = stream;
+      setActiveCameraId(deviceId);
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch (err) {
+      toast({ title: "Não foi possível trocar a câmera", description: describeCameraError(err), variant: "destructive" });
+    }
   };
 
   const stopWebcam = () => { streamRef.current?.getTracks().forEach(t => t.stop()); streamRef.current = null; setUseWebcam(false); };
@@ -287,6 +343,24 @@ export default function EmployeeForm() {
                     </div>
                   )}
                 </div>
+                {useWebcam && cameras.length > 1 && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Camera className="w-4 h-4 text-muted-foreground" />
+                    <label htmlFor="form-camera-picker" className="text-muted-foreground">Câmera:</label>
+                    <select
+                      id="form-camera-picker"
+                      value={activeCameraId ?? ""}
+                      onChange={(e) => switchCamera(e.target.value)}
+                      className="bg-background/50 border border-white/10 rounded-md px-2 py-1 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary/60"
+                    >
+                      {cameras.map((c) => (
+                        <option key={c.deviceId} value={c.deviceId} className="bg-background text-foreground">
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   {useWebcam ? (
                     <><Button type="button" onClick={capturePhoto}>Capturar</Button><Button type="button" variant="outline" onClick={stopWebcam}>Cancelar</Button></>
