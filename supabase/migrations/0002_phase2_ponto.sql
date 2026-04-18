@@ -1,9 +1,6 @@
--- ─────────────────────────────────────────────────────────────────────────────
--- Phase 2 — Ponto: employees + records
---
+-- Phase 2 - Ponto: employees + records
 -- Adds the two operational tables for the ponto (time-clock) module plus the
 -- SECURITY DEFINER RPCs the front-end calls via PostgREST.
---
 -- Security model (matches Phase 1):
 --   * Admin operations (CRUD employees, list records, summary) require the
 --     caller to pass the company slug + the admin password. The RPC verifies
@@ -11,17 +8,15 @@
 --   * Kiosk operations (register_punch, get_employee_by_cpf) take only the
 --     slug: the kiosk device is physically trusted, as in the previous
 --     Express version.
---
 -- RLS is enabled on every table without any policy, which blocks direct
--- access from the anon / authenticated roles — every read/write MUST go
+-- access from the anon / authenticated roles - every read/write MUST go
 -- through the RPCs below.
--- ─────────────────────────────────────────────────────────────────────────────
 
 -- Phase 1 already installed pgcrypto in the "extensions" schema; this is a
 -- safety net if this migration is ever run on a fresh project.
 create extension if not exists pgcrypto with schema extensions;
 
--- ─── Tables ─────────────────────────────────────────────────────────────────
+-- --- Tables -----------------------------------------------------------------
 create table if not exists public.ponto_employees (
   id              bigserial primary key,
   company_id      bigint      not null references public.ponto_companies(id) on delete cascade,
@@ -62,11 +57,11 @@ create index if not exists ponto_records_employee_date_idx on public.ponto_recor
 create index if not exists ponto_records_company_date_idx  on public.ponto_records (company_id, "date");
 create index if not exists ponto_records_punched_idx       on public.ponto_records (punched_at desc);
 
--- ─── RLS: enabled, no policy → must use the RPCs below ──────────────────────
+-- --- RLS: enabled, no policy → must use the RPCs below ----------------------
 alter table public.ponto_employees enable row level security;
 alter table public.ponto_records   enable row level security;
 
--- ─── Private helper: verify admin credentials, return company id ────────────
+-- --- Private helper: verify admin credentials, return company id ------------
 create or replace function public._verify_company_admin(p_slug text, p_password text)
 returns bigint
 language plpgsql
@@ -96,7 +91,7 @@ $$;
 revoke all on function public._verify_company_admin(text, text) from public;
 -- only other SECURITY DEFINER functions (in same schema) can call this
 
--- ─── Private helper: resolve active company id from slug (kiosk flows) ──────
+-- --- Private helper: resolve active company id from slug (kiosk flows) ------
 create or replace function public._active_company_id(p_slug text)
 returns bigint
 language sql
@@ -111,7 +106,7 @@ $$;
 
 revoke all on function public._active_company_id(text) from public;
 
--- ─── Composite return types ─────────────────────────────────────────────────
+-- --- Composite return types -------------------------------------------------
 drop type if exists public.ponto_employee_row cascade;
 create type public.ponto_employee_row as (
   id              bigint,
@@ -168,7 +163,7 @@ create type public.ponto_punch_result as (
   punch_type_label  text
 );
 
--- ─── RPC: list_employees (admin) ────────────────────────────────────────────
+-- --- RPC: list_employees (admin) --------------------------------------------
 create or replace function public.list_employees(p_slug text, p_password text)
 returns setof public.ponto_employee_row
 language plpgsql
@@ -190,7 +185,7 @@ $$;
 revoke all on function public.list_employees(text, text) from public;
 grant execute on function public.list_employees(text, text) to anon, authenticated;
 
--- ─── RPC: get_employee (admin) ──────────────────────────────────────────────
+-- --- RPC: get_employee (admin) ----------------------------------------------
 create or replace function public.get_employee(
   p_slug     text,
   p_password text,
@@ -219,7 +214,7 @@ $$;
 revoke all on function public.get_employee(text, text, bigint) from public;
 grant execute on function public.get_employee(text, text, bigint) to anon, authenticated;
 
--- ─── RPC: upsert_employee (admin) ──────────────────────────────────────────
+-- --- RPC: upsert_employee (admin) ------------------------------------------
 -- If p_id is null → insert; otherwise → update. Returns the resulting row.
 create or replace function public.upsert_employee(
   p_slug          text,
@@ -304,7 +299,7 @@ $$;
 revoke all on function public.upsert_employee(text, text, bigint, text, text, text, text, integer, boolean, text, text, integer, jsonb) from public;
 grant execute on function public.upsert_employee(text, text, bigint, text, text, text, text, integer, boolean, text, text, integer, jsonb) to anon, authenticated;
 
--- ─── RPC: delete_employee (admin) ───────────────────────────────────────────
+-- --- RPC: delete_employee (admin) -------------------------------------------
 create or replace function public.delete_employee(
   p_slug     text,
   p_password text,
@@ -327,7 +322,7 @@ $$;
 revoke all on function public.delete_employee(text, text, bigint) from public;
 grant execute on function public.delete_employee(text, text, bigint) to anon, authenticated;
 
--- ─── RPC: list_records (admin) ──────────────────────────────────────────────
+-- --- RPC: list_records (admin) ----------------------------------------------
 create or replace function public.list_records(
   p_slug        text,
   p_password    text,
@@ -358,7 +353,7 @@ $$;
 revoke all on function public.list_records(text, text, bigint, date) from public;
 grant execute on function public.list_records(text, text, bigint, date) to anon, authenticated;
 
--- ─── RPC: records_summary (admin) ───────────────────────────────────────────
+-- --- RPC: records_summary (admin) -------------------------------------------
 -- Returns one row per employee with nested records + total hours string.
 create or replace function public.records_summary(
   p_slug        text,
@@ -439,7 +434,7 @@ $$;
 revoke all on function public.records_summary(text, text, date, bigint) from public;
 grant execute on function public.records_summary(text, text, date, bigint) to anon, authenticated;
 
--- ─── Private helper: verify master password ────────────────────────────────
+-- --- Private helper: verify master password --------------------------------
 create or replace function public._verify_master(p_password text)
 returns void
 language plpgsql
@@ -460,7 +455,7 @@ $$;
 
 revoke all on function public._verify_master(text) from public;
 
--- ─── RPC: update_company_settings (company admin) ──────────────────────────
+-- --- RPC: update_company_settings (company admin) --------------------------
 create or replace function public.update_company_settings(
   p_slug                    text,
   p_password                text,
@@ -507,7 +502,7 @@ $$;
 revoke all on function public.update_company_settings(text, text, text, integer, boolean, integer, text, text) from public;
 grant execute on function public.update_company_settings(text, text, text, integer, boolean, integer, text, text) to anon, authenticated;
 
--- ─── RPC: master_list_companies ─────────────────────────────────────────────
+-- --- RPC: master_list_companies ---------------------------------------------
 drop type if exists public.ponto_master_company_row cascade;
 create type public.ponto_master_company_row as (
   id                      bigint,
@@ -548,7 +543,7 @@ $$;
 revoke all on function public.master_list_companies(text) from public;
 grant execute on function public.master_list_companies(text) to anon, authenticated;
 
--- ─── RPC: master_upsert_company ─────────────────────────────────────────────
+-- --- RPC: master_upsert_company ---------------------------------------------
 create or replace function public.master_upsert_company(
   p_master_password        text,
   p_id                     bigint  default null,
@@ -631,7 +626,7 @@ $$;
 revoke all on function public.master_upsert_company(text, bigint, text, text, text, integer, boolean, integer, boolean, boolean, boolean, text, boolean) from public;
 grant execute on function public.master_upsert_company(text, bigint, text, text, text, integer, boolean, integer, boolean, boolean, boolean, text, boolean) to anon, authenticated;
 
--- ─── RPC: master_delete_company ─────────────────────────────────────────────
+-- --- RPC: master_delete_company ---------------------------------------------
 create or replace function public.master_delete_company(p_master_password text, p_id bigint)
 returns void
 language plpgsql
@@ -647,7 +642,7 @@ $$;
 revoke all on function public.master_delete_company(text, bigint) from public;
 grant execute on function public.master_delete_company(text, bigint) to anon, authenticated;
 
--- ─── RPC: lookup_company (public, kiosk-only resolves slug → id/name) ─────
+-- --- RPC: lookup_company (public, kiosk-only resolves slug → id/name) -----
 drop type if exists public.ponto_company_lookup cascade;
 create type public.ponto_company_lookup as (
   id bigint,
@@ -677,7 +672,7 @@ $$;
 revoke all on function public.lookup_company(text) from public;
 grant execute on function public.lookup_company(text) to anon, authenticated;
 
--- ─── RPC: get_employee_by_cpf (kiosk) ──────────────────────────────────────
+-- --- RPC: get_employee_by_cpf (kiosk) --------------------------------------
 create or replace function public.get_employee_by_cpf(p_slug text, p_cpf text)
 returns public.ponto_kiosk_employee
 language plpgsql
@@ -706,7 +701,7 @@ $$;
 revoke all on function public.get_employee_by_cpf(text, text) from public;
 grant execute on function public.get_employee_by_cpf(text, text) to anon, authenticated;
 
--- ─── RPC: register_punch (kiosk) ────────────────────────────────────────────
+-- --- RPC: register_punch (kiosk) --------------------------------------------
 -- Auto-determines next punch type; validates schedule (tolerance, overtime
 -- block, 4-punch limit, 1-min duplicate lock). Raises on invalid state.
 create or replace function public.register_punch(p_slug text, p_employee_id bigint)
