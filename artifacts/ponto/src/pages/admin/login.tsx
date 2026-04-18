@@ -19,6 +19,21 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Distinguish network / CORS / misconfig failures from wrong-password so
+  // the user sees the real reason instead of a generic "Verifique sua internet".
+  const describeNetworkError = (err: unknown): string => {
+    const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+    if (!apiUrl) {
+      return "Servidor indisponível: variável VITE_API_URL não configurada no Vercel. Peça ao administrador para definir a URL do backend.";
+    }
+    const e = err as { name?: string; message?: string } | null;
+    const msg = e?.message || "";
+    if (msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("networkerror")) {
+      return `Não foi possível alcançar o backend em ${apiUrl}. Verifique se o servidor está online e se o CORS libera este domínio.`;
+    }
+    return msg || "Falha ao conectar. Tente novamente.";
+  };
+
   const handleCompanyLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!slug.trim() || !password.trim()) return;
@@ -47,8 +62,8 @@ export default function AdminLogin() {
       }));
       sessionStorage.setItem("nfs_ponto_admin", "true");
       setLocation("/admin/dashboard");
-    } catch {
-      toast({ title: "Erro", description: "Falha ao conectar. Tente novamente.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Falha de conexão", description: describeNetworkError(err), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -74,8 +89,8 @@ export default function AdminLogin() {
       }));
       sessionStorage.setItem("nfs_ponto_admin", "true");
       setLocation("/admin/companies");
-    } catch {
-      toast({ title: "Erro", description: "Falha ao conectar. Tente novamente.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Falha de conexão", description: describeNetworkError(err), variant: "destructive" });
     } finally {
       setLoading(false);
     }

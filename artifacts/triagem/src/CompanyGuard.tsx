@@ -70,7 +70,7 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug, password }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error || "Credenciais inválidas."); return; }
       if (!data[module]) {
         setError("Esta empresa não tem acesso a este módulo. Contate o suporte.");
@@ -88,8 +88,22 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
       };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
       setSession(s);
-    } catch {
-      setError("Erro de conexão. Verifique sua internet.");
+    } catch (err) {
+      // Distinguish "backend misconfigured" from "internet offline" so the
+      // admin knows whether to check Wi-Fi or Vercel env vars / CORS.
+      const rawApi = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+      if (!rawApi) {
+        setError(
+          "Servidor indisponível: variável VITE_API_URL não configurada no Vercel. Peça ao administrador para definir a URL do backend."
+        );
+      } else if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        setError("Você está sem internet. Reconecte e tente novamente.");
+      } else {
+        const msg = (err as { message?: string } | null)?.message ?? "";
+        setError(
+          `Não foi possível alcançar o backend em ${rawApi}. Verifique se o servidor está online e se o CORS libera este domínio.${msg ? ` (${msg})` : ""}`
+        );
+      }
     } finally {
       setLoading(false);
     }
