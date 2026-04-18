@@ -75,6 +75,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.103.3",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7"
   }

@@ -1,13 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "wouter";
-import {
-  useGetProfessionals,
-  useGetProfessionalCapacity,
-  useCreateProfessional,
-  useDeleteProfessional,
-} from "@workspace/api-client-react";
-import { Card, MotionCard, Button, Input, Label, Select, Badge } from "@/components/ui-custom";
-import { useQueryClient } from "@tanstack/react-query";
+import { MotionCard, Button, Input, Label, Select, Badge } from "@/components/ui-custom";
 import {
   UserRound,
   Plus,
@@ -20,79 +13,23 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
-  Users,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import {
+  listProfessionals,
+  upsertProfessional,
+  deleteProfessional,
+  type Professional,
+} from "@/lib/arco-rpc";
 
-function ProfessionalCapacityCard({ id }: { id: number }) {
-  const { data: capacity } = useGetProfessionalCapacity(id);
-
-  if (!capacity) {
-    return <div className="h-2 w-full bg-secondary rounded-full animate-pulse mt-4" />;
-  }
-
-  const { activePatients, maxCapacity, availableSlots } = capacity;
-  const percentage = Math.min(100, (activePatients / maxCapacity) * 100);
-  const isFull = availableSlots === 0;
-  const isAlmostFull = !isFull && availableSlots <= 3;
-
-  return (
-    <div className="mt-4 pt-4 border-t border-border space-y-3">
-      {isFull ? (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold badge-neon-green">
-          <Users className="w-3.5 h-3.5 shrink-0" />
-          <span>Agenda completa — {maxCapacity} pacientes ativos</span>
-        </div>
-      ) : isAlmostFull ? (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold badge-neon-orange">
-          <Users className="w-3.5 h-3.5 shrink-0" />
-          <span>
-            {availableSlots === 1 ? "Apenas 1 vaga disponível!" : `Apenas ${availableSlots} vagas restantes!`}
-          </span>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-primary/8 border border-primary/20 text-primary">
-          <Users className="w-3.5 h-3.5 shrink-0" />
-          <span>
-            {availableSlots === 1
-              ? "1 vaga disponível"
-              : `${availableSlots} vagas disponíveis`}
-          </span>
-        </div>
-      )}
-
-      <div>
-        <div className="flex justify-between text-xs font-semibold mb-1.5">
-          <span className="text-muted-foreground">Pacientes Ativos</span>
-          <span className="text-foreground font-bold">
-            {activePatients} / {maxCapacity}
-          </span>
-        </div>
-        <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${percentage}%`,
-              background: isFull
-                ? "linear-gradient(90deg, #00c866, #00ff88)"
-                : isAlmostFull
-                ? "linear-gradient(90deg, #ff7000, #ff9f20)"
-                : "linear-gradient(90deg, #00b4d8, #00f0ff)",
-              boxShadow: isFull
-                ? "0 0 8px rgba(0,255,136,0.5)"
-                : isAlmostFull
-                ? "0 0 8px rgba(255,140,0,0.5)"
-                : "0 0 8px rgba(0,240,255,0.4)",
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PinManager({ prof }: { prof: any }) {
+function PinManager({
+  prof,
+  onUpdated,
+}: {
+  prof: Professional;
+  onUpdated: (p: Professional) => void;
+}) {
   const [show, setShow] = useState(false);
   const [newPin, setNewPin] = useState("");
   const [saving, setSaving] = useState(false);
@@ -103,19 +40,25 @@ function PinManager({ prof }: { prof: any }) {
     if (newPin.length !== 4) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/professionals/${prof.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...prof, pin: newPin }),
+      const updated = await upsertProfessional(prof.id, {
+        name: prof.name,
+        specialty: prof.specialty,
+        email: prof.email,
+        phone: prof.phone,
+        pin: newPin,
+        cargaHoraria: prof.cargaHoraria,
+        tipoContrato: prof.tipoContrato,
+        salario: prof.salario,
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Erro ${res.status}`);
-      }
+      onUpdated(updated);
       toast({ title: "PIN atualizado", description: `PIN de ${prof.name} salvo com sucesso.` });
       setNewPin(""); setShow(false);
     } catch (err: any) {
-      toast({ title: "Erro ao salvar PIN", variant: "destructive", description: err?.message || "Falha ao salvar o PIN." });
+      toast({
+        title: "Erro ao salvar PIN",
+        variant: "destructive",
+        description: err?.message || "Falha ao salvar o PIN.",
+      });
     } finally { setSaving(false); }
   };
 
@@ -167,11 +110,10 @@ function PinManager({ prof }: { prof: any }) {
 }
 
 export default function Professionals() {
-  const { data: professionals, isLoading } = useGetProfessionals();
-  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const createMutation = useCreateProfessional();
-  const deleteMutation = useDeleteProfessional();
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -185,6 +127,24 @@ export default function Professionals() {
     salario: "",
   });
 
+  const loadProfessionals = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const rows = await listProfessionals();
+      setProfessionals(rows);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao carregar profissionais",
+        description: err?.message || "Falha inesperada.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { void loadProfessionals(); }, [loadProfessionals]);
+
   // Teto de faturamento baseado na carga horária (JS puro)
   const TETO = { "20h": 3600, "30h": 5400 };
   const tetoForm = TETO[formData.cargaHoraria as "20h" | "30h"] ?? 5400;
@@ -193,30 +153,50 @@ export default function Professionals() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
-      await createMutation.mutateAsync({ data: { ...formData, salario: salarioNum || null } });
-      queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
+      const created = await upsertProfessional(null, {
+        name: formData.name,
+        specialty: formData.specialty || null,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        pin: formData.pin || null,
+        cargaHoraria: formData.cargaHoraria,
+        tipoContrato: formData.tipoContrato,
+        salario: salarioNum || null,
+      });
+      setProfessionals(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
       toast({ title: "Sucesso", description: "Profissional cadastrado." });
       setIsDialogOpen(false);
       setFormData({ name: "", specialty: "", email: "", phone: "", pin: "", cargaHoraria: "30h", tipoContrato: "Contratado", salario: "" });
-    } catch {
+    } catch (err: any) {
       toast({
         title: "Erro",
-        description: "Falha ao criar profissional.",
+        description: err?.message || "Falha ao criar profissional.",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm("Tem certeza que deseja excluir este profissional?")) return;
     try {
-      await deleteMutation.mutateAsync({ id });
-      queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
+      await deleteProfessional(id);
+      setProfessionals(prev => prev.filter(p => p.id !== id));
       toast({ title: "Sucesso", description: "Profissional excluído." });
-    } catch {
-      toast({ title: "Erro", description: "Falha ao excluir.", variant: "destructive" });
+    } catch (err: any) {
+      toast({
+        title: "Erro",
+        description: err?.message || "Falha ao excluir.",
+        variant: "destructive",
+      });
     }
+  };
+
+  const updateProfessionalInList = (updated: Professional) => {
+    setProfessionals(prev => prev.map(p => (p.id === updated.id ? updated : p)));
   };
 
   return (
@@ -236,12 +216,12 @@ export default function Professionals() {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="h-52 animate-pulse bg-secondary/50" />
+            <MotionCard key={i} className="h-52 animate-pulse bg-secondary/50" />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {professionals?.map((prof: any, i: number) => (
+          {professionals.map((prof, i) => (
             <MotionCard
               key={prof.id}
               className="p-6 relative overflow-visible group"
@@ -259,7 +239,7 @@ export default function Professionals() {
                       {prof.name}
                     </h3>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                      <Stethoscope className="w-3 h-3" /> {prof.specialty}
+                      <Stethoscope className="w-3 h-3" /> {prof.specialty || "—"}
                     </div>
                   </div>
                 </div>
@@ -288,8 +268,7 @@ export default function Professionals() {
                 </div>
               </div>
 
-              <ProfessionalCapacityCard id={prof.id} />
-              <PinManager prof={prof} />
+              <PinManager prof={prof} onUpdated={updateProfessionalInList} />
 
               <div className="mt-5 flex gap-2">
                 <Link href={`/professionals/${prof.id}`} className="flex-1">
@@ -389,7 +368,6 @@ export default function Professionals() {
                   />
                 </div>
               </div>
-              {/* Salário — apenas para Contratados */}
               {formData.tipoContrato !== "Concursado" && (
                 <div>
                   <Label>Custo Mensal (R$)</Label>
@@ -409,7 +387,6 @@ export default function Professionals() {
                   </p>
                 </div>
               )}
-              {/* Alerta de inconsistência */}
               {prejuizoForm > 0 && (
                 <div className="rounded-xl px-4 py-3 flex items-start gap-2"
                   style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}>
@@ -441,8 +418,8 @@ export default function Professionals() {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "Salvando..." : "Salvar"}
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Salvando..." : "Salvar"}
                 </Button>
               </div>
             </form>

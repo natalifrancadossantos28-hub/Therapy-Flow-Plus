@@ -1,9 +1,9 @@
 import { useState, useCallback } from "react";
 import { Lock, ShieldCheck, Eye, EyeOff, Building2 } from "lucide-react";
+import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase";
 
 const SESSION_KEY = "nfs_ponto_session";
 const LEGACY_KEY = "nfs_admin_auth";
-const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 type Session = {
   type: "company" | "master";
@@ -13,13 +13,17 @@ type Session = {
   adminToken?: string;
   masterToken?: string;
   moduleArcoIris?: boolean;
+  moduleTriagem?: boolean;
+  modulePonto?: boolean;
 };
 
 function getSession(): Session | null {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export function isAuthenticated(): boolean {
@@ -34,6 +38,23 @@ export function getCompanyId(): number | null {
   return session?.companyId ?? null;
 }
 
+function describeAuthError(err: unknown): string {
+  if (!isSupabaseConfigured) {
+    return (
+      "Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY " +
+      "no painel da Vercel (Settings → Environment Variables) e refaça o deploy."
+    );
+  }
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "Sem conexão com a internet. Verifique sua rede e tente de novo.";
+  }
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+    return "Não foi possível alcançar o Supabase. Confirme VITE_SUPABASE_URL e que o projeto Supabase está ativo.";
+  }
+  return msg || "Erro inesperado ao autenticar.";
+}
+
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState(isAuthenticated);
   const [slug, setSlug] = useState("");
@@ -43,44 +64,52 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   const [error, setError] = useState("");
   const [shaking, setShaking] = useState(false);
 
-  const shake = () => { setShaking(true); setTimeout(() => setShaking(false), 500); };
+  const shake = () => {
+    setShaking(true);
+    setTimeout(() => setShaking(false), 500);
+  };
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/ponto/auth/company`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, password }),
+      const supabase = requireSupabase();
+      const { data, error: rpcError } = await supabase.rpc("authenticate_company", {
+        p_slug: slug.trim().toLowerCase(),
+        p_password: password,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Empresa ou senha incorretos.");
+      if (rpcError) {
+        setError(describeAuthError(rpcError));
         shake();
         return;
       }
-      if (!data.moduleArcoIris) {
+      const company = Array.isArray(data) ? data[0] : data;
+      if (!company?.id) {
+        setError("Empresa ou senha incorretos.");
+        shake();
+        return;
+      }
+      if (!company.module_arco_iris) {
         setError("Esta empresa não tem acesso ao módulo Gestão Terapêutica.");
         shake();
         return;
       }
       const session: Session = {
         type: "company",
-        companyId: data.id,
-        companyName: data.name,
-        companySlug: data.slug,
+        companyId: Number(company.id),
+        companyName: company.name,
+        companySlug: company.slug,
         adminToken: password,
-        moduleArcoIris: true,
-        moduleTriagem: data.moduleTriagem,
-        modulePonto: data.modulePonto,
+        moduleArcoIris: Boolean(company.module_arco_iris),
+        moduleTriagem: Boolean(company.module_triagem),
+        modulePonto: Boolean(company.module_ponto),
       };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
       sessionStorage.setItem(LEGACY_KEY, "true");
       setAuthed(true);
-    } catch {
-      setError("Erro de conexão. Tente novamente.");
+    } catch (err) {
+      setError(describeAuthError(err));
       shake();
     } finally {
       setLoading(false);

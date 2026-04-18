@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { useGetProfessionals } from "@workspace/api-client-react";
 import {
   FileText, Printer, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   Building2, LayoutList, CheckCircle2, TrendingUp, TrendingDown, DollarSign,
@@ -7,11 +6,24 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, Button } from "@/components/ui-custom";
+import {
+  listProfessionals,
+  listContractors,
+  upsertContractor,
+  deleteContractor,
+  listColaboradores,
+  upsertColaborador,
+  deleteColaborador,
+  type Professional,
+  type Contractor as ContractorRpc,
+  type Colaborador as ColaboradorRpc,
+} from "@/lib/arco-rpc";
+import { useToast } from "@/hooks/use-toast";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
-type Contractor   = { id: number; name: string; valorPorAtendimento: number };
+type Contractor   = ContractorRpc;
 type Appointment  = { id: number; status: string; professionalId: number };
-type Colaborador  = { id: number; name: string; cargo: string; salario: number };
+type Colaborador  = ColaboradorRpc;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CANCELLED = new Set(["desmarcado", "remarcado"]);
@@ -43,7 +55,21 @@ function getMonthRange(offset = 0) {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function GestaoContratos() {
-  const { data: professionals = [] } = useGetProfessionals({} as any);
+  const { toast } = useToast();
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+
+  useEffect(() => {
+    listProfessionals()
+      .then(setProfessionals)
+      .catch(err => {
+        console.error(err);
+        toast({
+          title: "Erro ao carregar profissionais",
+          description: err?.message || "Falha inesperada.",
+          variant: "destructive",
+        });
+      });
+  }, [toast]);
 
   const [view, setView] = useState<"contratantes" | "painel" | "fechamento">("contratantes");
 
@@ -59,12 +85,18 @@ export default function GestaoContratos() {
 
   useEffect(() => {
     setLoadingColab(true);
-    fetch("/api/colaboradores")
-      .then(r => r.json())
+    listColaboradores()
       .then(setColaboradores)
-      .catch(console.error)
+      .catch(err => {
+        console.error(err);
+        toast({
+          title: "Erro ao carregar colaboradores",
+          description: err?.message || "Falha inesperada.",
+          variant: "destructive",
+        });
+      })
       .finally(() => setLoadingColab(false));
-  }, []);
+  }, [toast]);
 
   function openColabCreate() {
     setEditColabTarget(null); setColabName(""); setColabCargo("ADM"); setColabSalario("0");
@@ -79,28 +111,38 @@ export default function GestaoContratos() {
     if (!colabName.trim()) return;
     setSavingColab(true);
     try {
-      const body = JSON.stringify({ name: colabName.trim(), cargo: colabCargo.trim() || "ADM", salario: Number(colabSalario) || 0 });
-      const headers = { "Content-Type": "application/json" };
-      let res;
-      if (editColabTarget) {
-        res = await fetch(`/api/colaboradores/${editColabTarget.id}`, { method: "PUT", headers, body });
-      } else {
-        res = await fetch("/api/colaboradores", { method: "POST", headers, body });
-      }
-      const row = await res.json();
+      const payload = {
+        name: colabName.trim(),
+        cargo: colabCargo.trim() || "ADM",
+        salario: Number(colabSalario) || 0,
+      };
+      const row = await upsertColaborador(editColabTarget ? editColabTarget.id : null, payload);
       if (editColabTarget) {
         setColaboradores(cs => cs.map(c => c.id === editColabTarget.id ? row : c));
       } else {
         setColaboradores(cs => [...cs, row]);
       }
       setShowColabForm(false);
-    } catch { /* ignore */ }
-    finally { setSavingColab(false); }
+    } catch (err: any) {
+      toast({
+        title: "Erro ao salvar colaborador",
+        description: err?.message || "Falha inesperada.",
+        variant: "destructive",
+      });
+    } finally { setSavingColab(false); }
   }
   async function handleDeleteColab(id: number) {
     if (!confirm("Remover este colaborador?")) return;
-    await fetch(`/api/colaboradores/${id}`, { method: "DELETE" });
-    setColaboradores(cs => cs.filter(c => c.id !== id));
+    try {
+      await deleteColaborador(id);
+      setColaboradores(cs => cs.filter(c => c.id !== id));
+    } catch (err: any) {
+      toast({
+        title: "Erro ao remover colaborador",
+        description: err?.message || "Falha inesperada.",
+        variant: "destructive",
+      });
+    }
   }
 
   // ── Contractors state ──────────────────────────────────────────────────────
@@ -114,12 +156,18 @@ export default function GestaoContratos() {
 
   useEffect(() => {
     setLoadingCtrs(true);
-    fetch("/api/contractors")
-      .then(r => r.json())
+    listContractors()
       .then(setContractors)
-      .catch(console.error)
+      .catch(err => {
+        console.error(err);
+        toast({
+          title: "Erro ao carregar contratantes",
+          description: err?.message || "Falha inesperada.",
+          variant: "destructive",
+        });
+      })
       .finally(() => setLoadingCtrs(false));
-  }, []);
+  }, [toast]);
 
   function openCreate() {
     setEditTarget(null);
@@ -140,29 +188,38 @@ export default function GestaoContratos() {
     if (!formName.trim()) return;
     setSavingCtrs(true);
     try {
-      const body = JSON.stringify({ name: formName.trim(), valorPorAtendimento: Number(formValor) || 30 });
-      const headers = { "Content-Type": "application/json" };
-      let res;
-      if (editTarget) {
-        res = await fetch(`/api/contractors/${editTarget.id}`, { method: "PUT", headers, body });
-      } else {
-        res = await fetch("/api/contractors", { method: "POST", headers, body });
-      }
-      const row = await res.json();
+      const payload = {
+        name: formName.trim(),
+        valorPorAtendimento: Number(formValor) || 30,
+      };
+      const row = await upsertContractor(editTarget ? editTarget.id : null, payload);
       if (editTarget) {
         setContractors(cs => cs.map(c => c.id === editTarget.id ? row : c));
       } else {
         setContractors(cs => [...cs, row]);
       }
       setShowForm(false);
-    } catch { /* silently ignore */ }
-    finally { setSavingCtrs(false); }
+    } catch (err: any) {
+      toast({
+        title: "Erro ao salvar contratante",
+        description: err?.message || "Falha inesperada.",
+        variant: "destructive",
+      });
+    } finally { setSavingCtrs(false); }
   }
 
   async function handleDeleteContractor(id: number) {
     if (!confirm("Remover este contratante?")) return;
-    await fetch(`/api/contractors/${id}`, { method: "DELETE" });
-    setContractors(cs => cs.filter(c => c.id !== id));
+    try {
+      await deleteContractor(id);
+      setContractors(cs => cs.filter(c => c.id !== id));
+    } catch (err: any) {
+      toast({
+        title: "Erro ao remover contratante",
+        description: err?.message || "Falha inesperada.",
+        variant: "destructive",
+      });
+    }
   }
 
   // ── Painel state ──────────────────────────────────────────────────────────
@@ -179,12 +236,10 @@ export default function GestaoContratos() {
 
   useEffect(() => {
     if (view !== "painel" && view !== "fechamento") return;
-    setLoadingApts(true);
-    fetch(`/api/appointments?dateFrom=${range.dateFrom}&dateTo=${range.dateTo}`)
-      .then(r => r.json())
-      .then((data: Appointment[]) => setAppointments(data))
-      .catch(console.error)
-      .finally(() => setLoadingApts(false));
+    // Appointments só existirão na Fase 4C. Mantemos vazio por enquanto para
+    // não quebrar a tela — os totais aparecerão como zero.
+    setLoadingApts(false);
+    setAppointments([]);
   }, [view, range.dateFrom, range.dateTo]);
 
   const valor = selectedContractor?.valorPorAtendimento ?? 0;
