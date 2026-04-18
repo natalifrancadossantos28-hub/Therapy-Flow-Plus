@@ -16,7 +16,10 @@
 --   bcrypt-hashed. A SECURITY DEFINER RPC verifies it. No env var needed.
 -- ─────────────────────────────────────────────────────────────────────────────
 
-create extension if not exists pgcrypto;
+-- Supabase installs extensions in the "extensions" schema by default. We
+-- include it in every SECURITY DEFINER function's search_path below so that
+-- crypt() / gen_salt() resolve regardless of which schema pgcrypto lives in.
+create extension if not exists pgcrypto with schema extensions;
 
 -- ─── Tables ──────────────────────────────────────────────────────────────────
 create table if not exists public.ponto_companies (
@@ -88,7 +91,7 @@ create or replace function public.authenticate_company(
 returns public.ponto_companies_safe
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = public, extensions, pg_temp
 as $$
 declare
   v_row public.ponto_companies%rowtype;
@@ -135,7 +138,7 @@ create or replace function public.authenticate_master(
 returns boolean
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = public, extensions, pg_temp
 as $$
 declare
   v_hash text;
@@ -167,7 +170,7 @@ create or replace function public.set_master_password(p_password text)
 returns void
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = public, extensions, pg_temp
 as $$
 begin
   if p_password is null or length(p_password) < 6 then
@@ -200,7 +203,7 @@ create or replace function public.upsert_company(
 returns public.ponto_companies_safe
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = public, extensions, pg_temp
 as $$
 declare
   v_id bigint;
