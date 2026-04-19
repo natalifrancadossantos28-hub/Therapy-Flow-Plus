@@ -123,8 +123,8 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
       <div className={`w-full max-w-sm ${shaking ? "animate-[shake_0.4s_ease]" : ""}`}>
         <div className="bg-card rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.6)] border border-primary/20 overflow-hidden" style={{ boxShadow: "0 0 60px rgba(0,0,0,0.6), 0 0 30px rgba(0,240,255,0.06)" }}>
           <div className="bg-gradient-to-br from-primary/80 to-primary/40 p-8 text-center text-primary-foreground" style={{ borderBottom: "1px solid rgba(0,240,255,0.2)" }}>
-            <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ boxShadow: "0 0 20px rgba(0,240,255,0.3)" }}>
-              <Lock className="w-8 h-8" />
+            <div className="bg-white/95 rounded-2xl p-3 inline-flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <img src="/nfs-logo.png" alt="NFs systems" className="h-16 w-auto" />
             </div>
             <h2 className="text-xl font-bold">Área Restrita</h2>
             <p className="text-sm opacity-80 mt-1">Acesse com as credenciais da sua empresa</p>

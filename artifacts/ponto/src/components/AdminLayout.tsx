@@ -37,13 +37,14 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-[100dvh] flex bg-background">
       <aside className="w-64 flex-shrink-0 border-r border-border/50 bg-card/30 backdrop-blur-xl flex flex-col">
-        <div className="h-16 flex items-center px-6 border-b border-border/50 gap-2">
+        <div className="h-16 flex items-center px-4 border-b border-border/50 gap-2">
+          <img src="/nfs-logo.png" alt="NFs systems" className="h-9 w-auto shrink-0" />
           {isMaster
-            ? <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0" />
-            : <Building2 className="w-5 h-5 text-primary shrink-0" />}
+            ? <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            : <Building2 className="w-4 h-4 text-primary shrink-0" />}
           <div className="min-w-0">
             <p className="font-display font-bold text-sm text-primary truncate">
-              {isMaster ? "Painel Master" : (companyName ?? "NFs – Bater Ponto")}
+              {isMaster ? "Painel Master" : (companyName ?? "NFs – Ponto")}
             </p>
             {isMaster && <p className="text-[10px] text-amber-400/80 truncate">Controle geral</p>}
             {!isMaster && session?.type === "company" && (

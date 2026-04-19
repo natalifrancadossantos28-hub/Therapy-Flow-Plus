@@ -116,9 +116,10 @@ export default function AdminLogin() {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-background">
-      <div className="mb-8 text-center">
-        <h1 className="font-display text-4xl font-bold text-primary mb-2">NFs – Bater Ponto</h1>
-        <p className="text-muted-foreground">Sistema de Gestão de Ponto</p>
+      <div className="mb-8 flex flex-col items-center text-center">
+        <img src="/nfs-logo.png" alt="NFs systems" className="h-28 w-auto mb-4 drop-shadow-xl" />
+        <h1 className="font-display text-2xl font-bold text-primary">NFs – Bater Ponto</h1>
+        <p className="text-muted-foreground text-sm">Sistema de Gestão de Ponto</p>
       </div>
 
       {/* Mode tabs */}
