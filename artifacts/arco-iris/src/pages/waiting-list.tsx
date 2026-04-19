@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-custom";
 import { Trash2, ListTodo, ListPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import {
   listWaitingList,
   deleteWaitingListEntry,
@@ -63,9 +64,38 @@ export default function WaitingList() {
 
   useEffect(() => {
     void load();
-    const id = setInterval(() => { void load(); }, 20_000);
-    return () => clearInterval(id);
   }, [load]);
+
+  // Realtime: atualiza a fila instantaneamente quando uma nova triagem for salva
+  // (trigger `tg_triagens_autolink` insere em `waiting_list`) ou quando algum
+  // paciente tem `triagem_score`/`status` atualizados. Debounce 400ms evita
+  // re-render em rajadas (ex.: varias especialidades inseridas em sequencia).
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => { void load(); }, 400);
+  }, [load]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel("arco-fila-espera")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "waiting_list" },
+        () => scheduleReload()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "patients" },
+        () => scheduleReload()
+      )
+      .subscribe();
+    return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [scheduleReload]);
 
   const eligiblePatients = patients.filter((p) => {
     const score = p.triagemScore;
