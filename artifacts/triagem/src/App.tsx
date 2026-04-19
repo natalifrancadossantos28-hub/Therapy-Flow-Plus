@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { listTriagens, getTriagem, upsertTriagem, deleteTriagem } from "@/lib/triagem-rpc";
+import { listTriagens, getTriagem, upsertTriagem, deleteTriagem, autolinkTriagem } from "@/lib/triagem-rpc";
 
 // ─── WHITE LABEL CONFIG ──────────────────────────────────────────────────────
 export const CLINIC_CONFIG = {
@@ -818,6 +818,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
+  const [autolinkMsg, setAutolinkMsg] = useState<string | null>(null);
   const [, navigate] = useLocation();
   const data = new Date().toLocaleDateString("pt-BR");
   const isCenso = tipoRegistro === "Registro Censo Municipal";
@@ -863,8 +864,19 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
         setSalvo(true);
         return;
       }
-      await upsertTriagem(editId ?? null, payload);
+      const saved = await upsertTriagem(editId ?? null, payload);
       setSalvo(true);
+      // Auto-link triagem to patient + waiting list (best-effort, non-blocking).
+      // Only runs for non-Censo registros (server also guards on that).
+      if (!isCenso && saved?.id) {
+        const result = await autolinkTriagem(saved.id);
+        if (result?.addedToQueue && result.addedSpecialties?.length) {
+          const specs = result.addedSpecialties.join(", ");
+          setAutolinkMsg(`✅ Paciente adicionado à fila de espera: ${specs}.`);
+        } else if (result?.linkedOnly && result.patientName) {
+          setAutolinkMsg(`✅ Vinculado ao paciente ${result.patientName}.`);
+        }
+      }
     } catch {
       if (!editId) {
         const { addToOfflineQueue } = await import("./lib/offline-queue");
@@ -1261,6 +1273,11 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
                 className="px-6 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
                 ✓ {editId ? "Atualizado!" : "Salvo!"} Ver Pacientes →
               </button>
+              {autolinkMsg && (
+                <p className="text-xs font-semibold text-emerald-600 max-w-sm text-right leading-snug">
+                  {autolinkMsg}
+                </p>
+              )}
             </div>
           )}
           {viewOnly && (

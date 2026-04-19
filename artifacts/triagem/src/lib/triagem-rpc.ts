@@ -298,3 +298,38 @@ export async function deleteTriagem(id: number): Promise<void> {
   });
   if (error) handleError(error);
 }
+
+export type AutolinkResult = {
+  linkedOnly: boolean;
+  addedToQueue: boolean;
+  reason?: string;
+  patientId?: number;
+  patientName?: string;
+  patientCreated?: boolean;
+  triagemScore?: number;
+  priority?: string;
+  addedSpecialties?: string[];
+  existingSpecialties?: string[];
+  skippedSpecialties?: string[];
+};
+
+/**
+ * Auto-links a saved triagem to a patient and adds it to the waiting list
+ * (one row per scored specialty). Best-effort: any failure is swallowed so
+ * it never blocks the save flow.
+ */
+export async function autolinkTriagem(triagemId: number): Promise<AutolinkResult | null> {
+  try {
+    const { slug, password } = requireCompanyCredentials();
+    const sb = requireSupabase();
+    const { data, error } = await sb.rpc("autolink_triagem", {
+      p_slug: slug,
+      p_password: password,
+      p_triagem_id: triagemId,
+    });
+    if (error) return null;
+    return (data as AutolinkResult) ?? null;
+  } catch {
+    return null;
+  }
+}

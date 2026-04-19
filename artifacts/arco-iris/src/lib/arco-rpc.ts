@@ -339,3 +339,382 @@ export async function deleteColaborador(id: number): Promise<void> {
   });
   if (error) throw error;
 }
+
+// ── Patients ────────────────────────────────────────────────────────────────
+
+export type Patient = {
+  id: number;
+  companyId: number;
+  prontuario: string | null;
+  name: string;
+  dateOfBirth: string | null;
+  cpf: string | null;
+  cns: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  guardianName: string | null;
+  guardianPhone: string | null;
+  motherName: string | null;
+  diagnosis: string | null;
+  notes: string | null;
+  professionalId: number | null;
+  status: string;
+  entryDate: string | null;
+  absenceCount: number;
+  consecutiveUnjustifiedAbsences: number;
+  triagemScore: number | null;
+  scorePsicologia: number | null;
+  scorePsicomotricidade: number | null;
+  scoreFisioterapia: number | null;
+  scorePsicopedagogia: number | null;
+  scoreEdFisica: number | null;
+  scoreFonoaudiologia: number | null;
+  scoreTO: number | null;
+  scoreNutricionista: number | null;
+  escolaPublica: boolean | null;
+  trabalhoNaRoca: boolean | null;
+  tipoRegistro: string | null;
+  localAtendimento: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type PatientRow = {
+  id: number | string;
+  company_id: number | string;
+  prontuario: string | null;
+  name: string;
+  date_of_birth: string | null;
+  cpf: string | null;
+  cns: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  mother_name: string | null;
+  diagnosis: string | null;
+  notes: string | null;
+  professional_id: number | string | null;
+  status: string;
+  entry_date: string | null;
+  absence_count: number | string;
+  consecutive_unjustified_absences: number | string;
+  triagem_score: number | string | null;
+  score_psicologia: number | string | null;
+  score_psicomotricidade: number | string | null;
+  score_fisioterapia: number | string | null;
+  score_psicopedagogia: number | string | null;
+  score_ed_fisica: number | string | null;
+  score_fonoaudiologia: number | string | null;
+  score_to: number | string | null;
+  score_nutricionista: number | string | null;
+  escola_publica: boolean | null;
+  trabalho_na_roca: boolean | null;
+  tipo_registro: string | null;
+  local_atendimento: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function num(v: number | string | null | undefined): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function mapPatient(r: PatientRow): Patient {
+  return {
+    id: Number(r.id),
+    companyId: Number(r.company_id),
+    prontuario: r.prontuario,
+    name: r.name,
+    dateOfBirth: r.date_of_birth,
+    cpf: r.cpf,
+    cns: r.cns,
+    phone: r.phone,
+    email: r.email,
+    address: r.address,
+    guardianName: r.guardian_name,
+    guardianPhone: r.guardian_phone,
+    motherName: r.mother_name,
+    diagnosis: r.diagnosis,
+    notes: r.notes,
+    professionalId: num(r.professional_id),
+    status: r.status,
+    entryDate: r.entry_date,
+    absenceCount: Number(r.absence_count ?? 0),
+    consecutiveUnjustifiedAbsences: Number(r.consecutive_unjustified_absences ?? 0),
+    triagemScore: num(r.triagem_score),
+    scorePsicologia: num(r.score_psicologia),
+    scorePsicomotricidade: num(r.score_psicomotricidade),
+    scoreFisioterapia: num(r.score_fisioterapia),
+    scorePsicopedagogia: num(r.score_psicopedagogia),
+    scoreEdFisica: num(r.score_ed_fisica),
+    scoreFonoaudiologia: num(r.score_fonoaudiologia),
+    scoreTO: num(r.score_to),
+    scoreNutricionista: num(r.score_nutricionista),
+    escolaPublica: r.escola_publica,
+    trabalhoNaRoca: r.trabalho_na_roca,
+    tipoRegistro: r.tipo_registro,
+    localAtendimento: r.local_atendimento,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export type PatientPayload = Partial<Omit<Patient, "id" | "companyId" | "createdAt" | "updatedAt">>;
+
+export async function listPatients(opts?: {
+  status?: string | null;
+  professionalId?: number | null;
+}): Promise<Patient[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_patients", {
+    p_slug: slug,
+    p_password: password,
+    p_status: opts?.status ?? null,
+    p_professional_id: opts?.professionalId ?? null,
+  });
+  if (error) throw error;
+  return ((data ?? []) as PatientRow[]).map(mapPatient);
+}
+
+export async function getPatient(id: number): Promise<Patient | null> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("get_patient", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+  if (!data) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || row.id == null) return null;
+  return mapPatient(row as PatientRow);
+}
+
+export async function upsertPatient(
+  id: number | null,
+  payload: PatientPayload
+): Promise<Patient> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("upsert_patient", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_payload: payload,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("Falha ao salvar paciente.");
+  return mapPatient(row as PatientRow);
+}
+
+export async function deletePatient(id: number): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("delete_patient", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+}
+
+export type NextProntuarioInfo = {
+  nextProntuario: string;
+  ultimo: string | null;
+};
+
+export async function nextProntuario(): Promise<NextProntuarioInfo> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("next_prontuario", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return data as NextProntuarioInfo;
+}
+
+export type CheckProntuarioInfo = {
+  existe: boolean;
+  paciente?: { id: number; name: string };
+};
+
+export async function checkProntuario(prontuario: string): Promise<CheckProntuarioInfo> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("check_prontuario", {
+    p_slug: slug,
+    p_password: password,
+    p_prontuario: prontuario,
+  });
+  if (error) throw error;
+  return data as CheckProntuarioInfo;
+}
+
+export type AddToFilaResult = {
+  id: number;
+  companyId: number;
+  patientId: number;
+  professionalId: number | null;
+  specialty: string | null;
+  priority: string;
+  notes: string | null;
+  entryDate: string;
+  createdAt: string;
+  updatedAt: string;
+  patientName: string;
+  calculatedFrom: {
+    triagemScore: number;
+    escolaPublica: boolean | null;
+    trabalhoNaRoca: boolean | null;
+  };
+};
+
+export async function addPatientToFila(
+  patientId: number,
+  specialty: string | null,
+  notes?: string | null
+): Promise<AddToFilaResult> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("add_patient_to_waiting_list", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId,
+    p_specialty: specialty,
+    p_notes: notes ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return data as AddToFilaResult;
+}
+
+export type PatientAbsencesInfo = {
+  patientId: number;
+  patientName: string;
+  absenceCount: number;
+  hasWarning: boolean;
+  absences: unknown[];
+};
+
+export async function getPatientAbsences(id: number): Promise<PatientAbsencesInfo> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("get_patient_absences", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+  return data as PatientAbsencesInfo;
+}
+
+export type PatientPdfData = {
+  patient: Patient;
+  professional: Professional | null;
+  absenceCount: number;
+  totalAppointments: number;
+  lastAppointmentDate: string | null;
+};
+
+export async function getPatientPdf(id: number): Promise<PatientPdfData> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("get_patient_pdf", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+  const raw = data as {
+    patient: PatientRow;
+    professional: ProfessionalRow | null;
+    absenceCount: number;
+    totalAppointments: number;
+    lastAppointmentDate: string | null;
+  };
+  return {
+    patient: mapPatient(raw.patient),
+    professional: raw.professional ? mapProfessional(raw.professional) : null,
+    absenceCount: raw.absenceCount,
+    totalAppointments: raw.totalAppointments,
+    lastAppointmentDate: raw.lastAppointmentDate,
+  };
+}
+
+// ── Waiting list ────────────────────────────────────────────────────────────
+
+export type WaitingListEntry = {
+  id: number;
+  companyId: number;
+  patientId: number;
+  patientName: string;
+  patientPhone: string | null;
+  patientProntuario: string | null;
+  professionalId: number | null;
+  professionalName: string | null;
+  professionalSpecialty: string | null;
+  specialty: string | null;
+  priority: string;
+  notes: string | null;
+  entryDate: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listWaitingList(opts?: {
+  professionalId?: number | null;
+}): Promise<WaitingListEntry[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_waiting_list", {
+    p_slug: slug,
+    p_password: password,
+    p_professional_id: opts?.professionalId ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as WaitingListEntry[];
+}
+
+export type WaitingListPayload = {
+  patientId?: number;
+  professionalId?: number | null;
+  specialty?: string | null;
+  priority?: string | null;
+  notes?: string | null;
+  entryDate?: string | null;
+};
+
+export async function upsertWaitingListEntry(
+  id: number | null,
+  payload: WaitingListPayload
+): Promise<WaitingListEntry> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("upsert_waiting_list", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_payload: payload,
+  });
+  if (error) throw error;
+  return data as WaitingListEntry;
+}
+
+export async function deleteWaitingListEntry(id: number): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("delete_waiting_list", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+}
