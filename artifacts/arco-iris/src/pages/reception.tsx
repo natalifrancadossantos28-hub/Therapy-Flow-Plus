@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   listAppointmentsToday,
   listProfessionals,
@@ -7,12 +7,13 @@ import {
   type Professional as ArcoProfessional,
   type AppointmentToday,
 } from "@/lib/arco-rpc";
+import { supabase } from "@/lib/supabase";
 import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom";
 import { getStatusColor, getStatusLabel, cn } from "@/lib/utils";
 import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
-  UserPlus, PhoneOff, FileCheck,
+  UserPlus, PhoneOff, FileCheck, Bell,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
@@ -285,6 +286,43 @@ export default function Reception() {
     return () => clearInterval(id);
   }, [reloadAppointments]);
 
+  // Fase 5D: Realtime — recebe INSERTs em notificacoes_recepcao (remanejar/desmarcar/falta)
+  // e dispara um alerta visual pulsante + refetch da agenda.
+  const [realtimeAlert, setRealtimeAlert] = useState<{
+    patientName: string;
+    professionalName: string;
+    acao: string;
+    at: number;
+  } | null>(null);
+  const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel("recepcao-notificacoes")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notificacoes_recepcao" },
+        (payload: { new: Record<string, unknown> }) => {
+          const row = payload.new ?? {};
+          setRealtimeAlert({
+            patientName:      String(row.patient_name      ?? "Paciente"),
+            professionalName: String(row.professional_name ?? "—"),
+            acao:             String(row.acao              ?? "Ação"),
+            at:               Date.now(),
+          });
+          if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+          alertTimerRef.current = setTimeout(() => setRealtimeAlert(null), 12_000);
+          void reloadAppointments();
+        }
+      )
+      .subscribe();
+    return () => {
+      if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [reloadAppointments]);
+
   const [, navigate] = useLocation();
   const [dischargeAlert, setDischargeAlert] = useState<DischargeAlert | null>(null);
   const [vacancyAlert, setVacancyAlert] = useState<VacancyAlert | null>(null);
@@ -504,6 +542,47 @@ export default function Reception() {
           )}
         </p>
       </div>
+
+      {/* Fase 5D: alerta em tempo real quando um profissional remaneja/desmarca/falta */}
+      {realtimeAlert && (
+        <div
+          key={realtimeAlert.at}
+          className="flex items-start gap-3 rounded-2xl p-4 border animate-pulse"
+          style={{
+            background: "linear-gradient(135deg, rgba(249,115,22,0.10), rgba(6,182,212,0.06))",
+            borderColor: "rgba(249,115,22,0.45)",
+            boxShadow: "0 0 24px rgba(249,115,22,0.25)",
+          }}
+          role="alert"
+        >
+          <div
+            className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center"
+            style={{ background: "rgba(249,115,22,0.18)", color: "#f97316" }}
+          >
+            <Bell className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-foreground">
+              Ação em tempo real: <span className="text-orange-600">{realtimeAlert.acao}</span>
+            </p>
+            <p className="text-sm text-foreground mt-0.5">
+              <span className="font-semibold">{realtimeAlert.patientName}</span>
+              <span className="text-muted-foreground"> — </span>
+              <span className="text-muted-foreground">{realtimeAlert.professionalName}</span>
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Recebido agora. A agenda foi atualizada automaticamente.
+            </p>
+          </div>
+          <button
+            onClick={() => setRealtimeAlert(null)}
+            className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            title="Dispensar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ── Alertas Carla: Números Desconhecidos ── */}
       {desconhecidos.length > 0 && (
