@@ -471,12 +471,15 @@ export default function Agenda() {
     }
   };
 
-  const getApt = (date: string, time: string) => appointments.find(a => a.date === date && a.time === time);
+  // Fase 5A: slots em grupo — um mesmo (date,time,profissional) pode ter varios pacientes.
+  const getApts = (date: string, time: string) =>
+    appointments.filter(a => a.date === date && a.time === time);
   const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
 
-  // Available slots for remanejar (no appointment in that slot)
+  // Slots disponiveis para remanejar = sem qualquer paciente (vazio de verdade).
   const availableSlots = weekDates.flatMap(date =>
-    TIME_SLOTS.filter(t => t !== "12:10" && !getApt(date, t)).map(time => ({ date, time }))
+    TIME_SLOTS.filter(t => t !== "12:10" && getApts(date, t).length === 0)
+              .map(time => ({ date, time }))
   );
 
   return (
@@ -574,18 +577,26 @@ export default function Agenda() {
                         <td colSpan={5} className="px-4 py-3 bg-slate-50/50 text-center text-muted-foreground italic font-medium">Almoço — Pausa</td>
                       ) : (
                         weekDates.map((date, i) => {
-                          const apt = getApt(date, time);
-                          const isDesmarcado = apt?.status?.toLowerCase() === "desmarcado";
-                          const isAtendimento = apt?.status?.toLowerCase() === "atendimento" || apt?.status?.toLowerCase() === "presente";
-                          const isRemarcado = apt?.status?.toLowerCase() === "remarcado";
-                          const isFaltaJustificada = apt?.status?.toLowerCase() === "falta_justificada" || apt?.status?.toLowerCase() === "justificado" || apt?.status?.toLowerCase() === "abonado";
-                          const isFaltaNaoJustificada = apt?.status?.toLowerCase() === "falta_nao_justificada" || apt?.status?.toLowerCase() === "ausente";
-                          const isMenuOpen = apt && actionMenuId === apt.id;
-
+                          const apts = getApts(date, time);
+                          const isGroup = apts.length > 1;
                           return (
-                            <td key={i} className="px-3 py-2 relative">
-                              {apt ? (
-                                <div className="relative" ref={isMenuOpen ? menuRef : null}>
+                            <td key={i} className="px-3 py-2 relative align-top">
+                              {apts.length > 0 ? (
+                                <div className="flex flex-col gap-1.5">
+                                  {isGroup && (
+                                    <span className="text-[9px] uppercase font-bold text-cyan-400 tracking-wider">
+                                      · grupo ({apts.length})
+                                    </span>
+                                  )}
+                                  {apts.map(apt => {
+                                    const isDesmarcado = apt.status?.toLowerCase() === "desmarcado";
+                                    const isAtendimento = apt.status?.toLowerCase() === "atendimento" || apt.status?.toLowerCase() === "presente";
+                                    const isRemarcado = apt.status?.toLowerCase() === "remarcado";
+                                    const isFaltaJustificada = apt.status?.toLowerCase() === "falta_justificada" || apt.status?.toLowerCase() === "justificado" || apt.status?.toLowerCase() === "abonado";
+                                    const isFaltaNaoJustificada = apt.status?.toLowerCase() === "falta_nao_justificada" || apt.status?.toLowerCase() === "ausente";
+                                    const isMenuOpen = actionMenuId === apt.id;
+                                    return (
+                                <div key={apt.id} className="relative" ref={isMenuOpen ? menuRef : null}>
                                   {/* Appointment block */}
                                   <div
                                     onClick={() => setActionMenuId(isMenuOpen ? null : apt.id)}
@@ -647,23 +658,26 @@ export default function Agenda() {
                                     >
                                       <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
 
+                                      {/* Fase 5A: "Presente" habilitado apenas para dono (PIN) ou Admin. */}
                                       <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
                                         <Activity className="w-3.5 h-3.5" /> ✅ Presente
                                       </button>
 
-                                      <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
-                                        <CheckCircle className="w-3.5 h-3.5" /> ⚠️ Falta Justificada
-                                      </button>
-
-                                      <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
-                                        <AlertTriangle className="w-3.5 h-3.5" /> 🔴 Falta N. Justificada
-                                      </button>
-
-                                      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
-
-                                      <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
-                                        <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
-                                      </button>
+                                      {/* Fase 5A: Falta/Desmarcar centralizados na Recepção. Visao do profissional nao exibe. */}
+                                      {isAdmin && (
+                                        <>
+                                          <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
+                                            <CheckCircle className="w-3.5 h-3.5" /> ⚠️ Falta Justificada
+                                          </button>
+                                          <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
+                                            <AlertTriangle className="w-3.5 h-3.5" /> 🔴 Falta N. Justificada
+                                          </button>
+                                          <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                          <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
+                                            <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
+                                          </button>
+                                        </>
+                                      )}
 
                                       <button style={NEON.orange} onClick={() => handleStartRemanejar(apt)}>
                                         <RotateCcw className="w-3.5 h-3.5" /> Remanejar
@@ -672,7 +686,25 @@ export default function Agenda() {
                                       <button style={NEON.red} onClick={() => handleDarAlta(apt)}>
                                         <LogOut className="w-3.5 h-3.5" /> Dar Alta
                                       </button>
+
+                                      {!isAdmin && (
+                                        <p className="text-[9px] text-white/30 px-1 mt-1 italic leading-tight">
+                                          Faltas e desmarcações ficam na Recepção.
+                                        </p>
+                                      )}
                                     </div>
+                                  )}
+                                </div>
+                                    );
+                                  })}
+                                  {/* Admin pode empilhar outro paciente no mesmo slot (atendimento em grupo). */}
+                                  {isAdmin && (
+                                    <button
+                                      onClick={() => setBookingSlot({ date, time })}
+                                      className="w-full text-[10px] font-semibold py-1.5 rounded-lg border border-dashed border-cyan-500/30 text-cyan-400/70 hover:text-cyan-300 hover:border-cyan-400/60 hover:bg-cyan-500/5 transition-colors"
+                                    >
+                                      + adicionar ao grupo
+                                    </button>
                                   )}
                                 </div>
                               ) : (
@@ -704,11 +736,12 @@ export default function Agenda() {
           professionalId={Number(selectedProfId)}
           professionalName={selectedProf?.name || ""}
           professionalSpecialty={selectedProf?.specialty || ""}
+          adminMode={isAdmin}
           onClose={() => setBookingSlot(null)}
           onSuccess={() => {
             setBookingSlot(null);
             fetchAppointments();
-            toast({ title: "Agendado!", description: "Sessões semanais criadas automaticamente para as próximas 52 semanas." });
+            toast({ title: "Agendado!", description: "Sessão(ões) criada(s) com sucesso." });
           }}
         />
       )}
