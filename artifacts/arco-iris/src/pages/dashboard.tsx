@@ -1,6 +1,15 @@
 import { useEffect, useState, useMemo } from "react";
-import { useGetPatients, useGetProfessionals, useGetTodayAppointments, useGetWaitingList } from "@workspace/api-client-react";
-import type { Patient } from "@workspace/api-zod";
+import {
+  listPatients,
+  listProfessionals,
+  listAppointmentsToday,
+  listWaitingList,
+  getAppointmentsStats,
+  type Patient,
+  type Professional as ArcoProfessional,
+  type AppointmentToday,
+  type WaitingListEntry,
+} from "@/lib/arco-rpc";
 import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
@@ -47,22 +56,27 @@ type Ocupacao = {
 const POLL_MS = 30_000; // 30 s
 
 export default function Dashboard() {
-  const { data: patients } = useGetPatients({} as any, { refetchInterval: POLL_MS } as any);
-  const { data: professionals } = useGetProfessionals({} as any, { refetchInterval: POLL_MS } as any);
-  const { data: todayAppointments } = useGetTodayAppointments({} as any, { refetchInterval: POLL_MS } as any);
-  const { data: waitingList } = useGetWaitingList({} as any, { refetchInterval: POLL_MS } as any);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
+  const [todayAppointments, setTodayAppointments] = useState<AppointmentToday[]>([]);
+  const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
   const [aptStats, setAptStats] = useState<Stats | null>(null);
   const [ocupacao, setOcupacao] = useState<Ocupacao[]>([]);
 
-  const fetchStats = () =>
-    fetch("/api/appointments/stats").then(r => r.json()).then(setAptStats).catch(console.error);
+  const fetchAll = () => {
+    listPatients().then(setPatients).catch(console.error);
+    listProfessionals().then(setProfessionals).catch(console.error);
+    listAppointmentsToday().then(setTodayAppointments).catch(console.error);
+    listWaitingList().then(setWaitingList).catch(console.error);
+    getAppointmentsStats().then(setAptStats).catch(console.error);
+  };
   const fetchOcupacao = () =>
-    fetch("/api/professionals/ocupacao").then(r => r.json()).then(setOcupacao).catch(console.error);
+    fetch("/api/professionals/ocupacao").then(r => r.json()).then(setOcupacao).catch(() => setOcupacao([]));
 
   useEffect(() => {
-    fetchStats();
+    fetchAll();
     fetchOcupacao();
-    const id1 = setInterval(fetchStats, POLL_MS);
+    const id1 = setInterval(fetchAll, POLL_MS);
     const id2 = setInterval(fetchOcupacao, POLL_MS);
     return () => { clearInterval(id1); clearInterval(id2); };
   }, []);

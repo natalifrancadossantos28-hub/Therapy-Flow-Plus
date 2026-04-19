@@ -5,6 +5,14 @@ import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, Al
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
+import {
+  listProfessionals,
+  verifyProfessionalPin,
+  listAppointments,
+  updateAppointment,
+  deleteAppointmentAlta,
+  createNotificacao,
+} from "@/lib/arco-rpc";
 
 const TIME_SLOTS = [
   "08:00", "08:50", "09:40", "10:30", "11:20",
@@ -50,13 +58,25 @@ export default function AgendaProfissionais() {
   const selectedProf = professionals.find(p => String(p.id) === selectedProfId);
 
   useEffect(() => {
-    fetch("/api/professionals").then(r => r.json()).then(setProfessionals).catch(console.error);
+    listProfessionals()
+      .then((list) =>
+        setProfessionals(
+          list.map((p) => ({
+            id: p.id,
+            name: p.name,
+            specialty: p.specialty ?? "",
+            pin: p.pin ?? undefined,
+          }))
+        )
+      )
+      .catch(console.error);
   }, []);
 
   const fetchAppointments = () => {
     if (!selectedProfId) return;
-    fetch(`/api/appointments?professionalId=${selectedProfId}`)
-      .then(r => r.json()).then(setAppointments).catch(console.error);
+    listAppointments({ professionalId: parseInt(selectedProfId) })
+      .then(setAppointments)
+      .catch(console.error);
   };
 
   useEffect(() => { if (pinVerified) fetchAppointments(); }, [selectedProfId, pinVerified]);
@@ -69,15 +89,10 @@ export default function AgendaProfissionais() {
     if (!selectedProfId || pinInput.length !== 4) return;
     setPinLoading(true); setPinError("");
     try {
-      const res = await fetch(`/api/professionals/${selectedProfId}/verify-pin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: pinInput }),
-      });
-      if (res.ok) { setPinVerified(true); }
+      const prof = await verifyProfessionalPin(parseInt(selectedProfId), pinInput);
+      if (prof) { setPinVerified(true); }
       else {
-        const data = await res.json();
-        setPinError(data.error || "PIN incorreto"); setPinInput("");
+        setPinError("PIN incorreto"); setPinInput("");
       }
     } catch { setPinError("Erro ao verificar PIN."); }
     finally { setPinLoading(false); }
@@ -151,29 +166,20 @@ export default function AgendaProfissionais() {
   };
 
   const patchStatus = async (apt: Appointment, status: string) => {
-    const res = await fetch(`/api/appointments/${apt.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    const data = await res.json();
+    const data = await updateAppointment(apt.id, { status });
     setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
     return data;
   };
 
   const logNotificacao = async (apt: Appointment, acao: string) => {
     try {
-      await fetch("/api/notificacoes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appointmentId: apt.id,
-          patientName: apt.patientName || `Paciente #${apt.patientId}`,
-          professionalName: selectedProf?.name || "—",
-          acao,
-          dataConsulta: apt.date,
-          horaConsulta: apt.time,
-        }),
+      await createNotificacao({
+        appointmentId: apt.id,
+        patientName: apt.patientName || `Paciente #${apt.patientId}`,
+        professionalName: selectedProf?.name || "—",
+        acao,
+        dataConsulta: apt.date,
+        horaConsulta: apt.time,
       });
     } catch { /* silencioso */ }
   };
@@ -208,7 +214,7 @@ export default function AgendaProfissionais() {
   const confirmDarAlta = async () => {
     if (!altaConfirm) return;
     try {
-      await fetch(`/api/appointments/${altaConfirm.id}/alta`, { method: "DELETE" });
+      await deleteAppointmentAlta(altaConfirm.id);
       setAppointments(prev => prev.filter(a => a.id !== altaConfirm.id));
       setAltaConfirm(null);
       toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado.` });
