@@ -294,9 +294,9 @@ export default function Professionals() {
       )}
 
       {isDialogOpen && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <MotionCard
-            className="w-full max-w-md p-6"
+            className="w-full max-w-md p-6 max-h-[calc(100vh-2rem)] overflow-y-auto my-auto"
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
           >
