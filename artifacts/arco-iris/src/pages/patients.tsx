@@ -380,9 +380,14 @@ export default function Patients() {
                       if (e.target.value.trim().length >= 2) checkProntuario(e.target.value);
                       else setProntuarioAlerta(null);
                     }}
-                    placeholder="Ex.: 401"
+                    placeholder="Ex.: 501 (novo) ou 1, 10 (antigo)"
                     className={prontuarioAlerta ? "border-rose-400" : ""}
                   />
+                  {!prontuarioAlerta && !prontuarioChecking && (
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                      Pode digitar manualmente (ex: <strong>1</strong>, <strong>10</strong>) para pacientes antigos. Novos cadastros sugerem a partir de <strong>500</strong>.
+                    </p>
+                  )}
                   {prontuarioAlerta && (
                     <p className="text-xs text-rose-600 mt-1 font-medium">{prontuarioAlerta}</p>
                   )}
