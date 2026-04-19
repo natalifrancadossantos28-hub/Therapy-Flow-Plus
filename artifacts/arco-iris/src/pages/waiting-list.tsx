@@ -22,13 +22,6 @@ const PRIORITY_LABEL: Record<string, string> = {
   baixa: "VERDE – Baixo",
 };
 
-const PRIORITY_ORDER: Record<string, number> = {
-  elevado: 0, alta: 0,
-  moderado: 1, media: 1,
-  leve: 2,
-  baixo: 3, baixa: 3,
-};
-
 const SCORE_SPECIALTY_MAP: Array<{ field: keyof Patient; specialty: string }> = [
   { field: "scorePsicologia",       specialty: "Psicologia"         },
   { field: "scorePsicomotricidade", specialty: "Psicomotricidade"   },
@@ -136,22 +129,18 @@ export default function WaitingList() {
     }
   };
 
+  // Server ja retorna ORDER BY (score_clinico_100 + score_social) DESC (Fase 5C).
+  // Aqui so calculamos a posicao dentro de cada especialidade preservando a ordem recebida.
   const perSpecialtyPosition = new Map<number, number>();
   const specialtyOptions: string[] = [];
   {
-    const grouped = new Map<string, WaitingListEntry[]>();
+    const counters = new Map<string, number>();
     for (const entry of waitingList) {
       const sp: string = entry.specialty ?? "__null__";
-      if (!grouped.has(sp)) { grouped.set(sp, []); specialtyOptions.push(sp); }
-      grouped.get(sp)!.push(entry);
-    }
-    for (const [, entries] of grouped) {
-      const sorted = [...entries].sort((a, b) => {
-        const pa = PRIORITY_ORDER[a.priority ?? ""] ?? 99;
-        const pb = PRIORITY_ORDER[b.priority ?? ""] ?? 99;
-        return pa - pb;
-      });
-      sorted.forEach((entry, i) => perSpecialtyPosition.set(entry.id, i + 1));
+      if (!counters.has(sp)) { counters.set(sp, 0); specialtyOptions.push(sp); }
+      const next = (counters.get(sp) ?? 0) + 1;
+      counters.set(sp, next);
+      perSpecialtyPosition.set(entry.id, next);
     }
   }
 
@@ -220,16 +209,17 @@ export default function WaitingList() {
                 <th className="px-6 py-4">Paciente</th>
                 <th className="px-6 py-4">Especialidade</th>
                 <th className="px-6 py-4">Prioridade</th>
+                <th className="px-6 py-4">Score</th>
                 <th className="px-6 py-4">Entrada</th>
                 <th className="px-6 py-4 text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-12 animate-pulse">Carregando fila...</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 animate-pulse">Carregando fila...</td></tr>
               ) : waitingList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-16">
+                  <td colSpan={7} className="text-center py-16">
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                       <ListTodo className="w-8 h-8 text-muted-foreground" />
                     </div>
@@ -239,7 +229,7 @@ export default function WaitingList() {
                 </tr>
               ) : displayList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
                     Nenhum paciente nesta especialidade.
                   </td>
                 </tr>
@@ -265,6 +255,20 @@ export default function WaitingList() {
                         <Badge className={getPriorityColor(entry.priority)}>
                           {PRIORITY_LABEL[entry.priority] ?? entry.priority}
                         </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-baseline gap-1 font-mono">
+                          <span className="font-bold text-foreground">{entry.scoreClinico ?? 0}</span>
+                          <span className="text-xs text-muted-foreground">/100</span>
+                          {!!entry.scoreSocial && entry.scoreSocial > 0 && (
+                            <span
+                              title="Score social (desempate)"
+                              className="ml-2 text-xs font-semibold text-amber-500"
+                            >
+                              +{entry.scoreSocial}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
                       <td className="px-6 py-4 text-right">
@@ -298,10 +302,11 @@ export default function WaitingList() {
                 <Select required value={formPatientId} onChange={e => setFormPatientId(e.target.value)}>
                   <option value="">Selecione um paciente triado...</option>
                   {eligiblePatients.map(p => {
-                    const score = p.triagemScore;
+                    const raw = p.triagemScore ?? 0;
+                    const scoreClinico = Math.round((raw * 100) / 360);
                     return (
                       <option key={p.id} value={p.id}>
-                        {p.name} — Score: {score}/360
+                        {p.name} — Score clínico: {scoreClinico}/100
                       </option>
                     );
                   })}
