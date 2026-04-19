@@ -24,8 +24,8 @@ create table if not exists public.appointments (
   company_id           bigint      not null references public.ponto_companies(id) on delete cascade,
   patient_id           bigint      not null references public.patients(id)        on delete cascade,
   professional_id      bigint      not null references public.professionals(id)   on delete cascade,
-  date                 text        not null,
-  time                 text        not null,
+  "date"               text        not null,
+  "time"               text        not null,
   status               text        not null default 'agendado',
   notes                text,
   rescheduled_to       text,
@@ -36,8 +36,8 @@ create table if not exists public.appointments (
 );
 
 create index if not exists appointments_company_idx       on public.appointments(company_id);
-create index if not exists appointments_date_idx          on public.appointments(company_id, date);
-create index if not exists appointments_prof_date_idx     on public.appointments(company_id, professional_id, date);
+create index if not exists appointments_date_idx          on public.appointments(company_id, "date");
+create index if not exists appointments_prof_date_idx     on public.appointments(company_id, professional_id, "date");
 create index if not exists appointments_patient_idx       on public.appointments(company_id, patient_id);
 create index if not exists appointments_group_idx         on public.appointments(recurrence_group_id);
 
@@ -283,11 +283,11 @@ declare
 begin
   v_company_id := public._verify_company_admin(p_slug, p_password);
   return jsonb_build_object(
-    'semanal',    (select count(*) from public.appointments where company_id = v_company_id and status = 'atendimento' and date >= v_week_start),
-    'mensal',     (select count(*) from public.appointments where company_id = v_company_id and status = 'atendimento' and date >= v_month_start),
-    'trimestral', (select count(*) from public.appointments where company_id = v_company_id and status = 'atendimento' and date >= v_trim_start),
-    'semestral',  (select count(*) from public.appointments where company_id = v_company_id and status = 'atendimento' and date >= v_sem_start),
-    'anual',      (select count(*) from public.appointments where company_id = v_company_id and status = 'atendimento' and date >= v_year_start)
+    'semanal',    (select count(*) from public.appointments where company_id = v_company_id and status = 'atendimento' and "date" >= v_week_start),
+    'mensal',     (select count(*) from public.appointments where company_id = v_company_id and status = 'atendimento' and "date" >= v_month_start),
+    'trimestral', (select count(*) from public.appointments where company_id = v_company_id and status = 'atendimento' and "date" >= v_trim_start),
+    'semestral',  (select count(*) from public.appointments where company_id = v_company_id and status = 'atendimento' and "date" >= v_sem_start),
+    'anual',      (select count(*) from public.appointments where company_id = v_company_id and status = 'atendimento' and "date" >= v_year_start)
   );
 end;
 $$;
@@ -339,7 +339,7 @@ begin
 
   if coalesce(p_no_recurrence, false) then
     insert into public.appointments (
-      company_id, patient_id, professional_id, date, time, status, notes,
+      company_id, patient_id, professional_id, "date", "time", status, notes,
       recurrence_group_id, frequency
     ) values (
       v_company_id, p_patient_id, p_professional_id, p_date, p_time, 'agendado', p_notes,
@@ -353,7 +353,7 @@ begin
     v_total := case v_frequency when 'quinzenal' then 26 when 'mensal' then 13 else 52 end;
 
     insert into public.appointments (
-      company_id, patient_id, professional_id, date, time, status, notes,
+      company_id, patient_id, professional_id, "date", "time", status, notes,
       recurrence_group_id, frequency
     )
     select
@@ -368,7 +368,7 @@ begin
       from public.appointments
      where company_id = v_company_id
        and recurrence_group_id = v_group_id
-     order by date, time
+     order by "date", "time"
      limit 1;
   end if;
 
@@ -435,8 +435,8 @@ begin
     status         = coalesce(p_status,         status),
     rescheduled_to = coalesce(p_rescheduled_to, rescheduled_to),
     notes          = coalesce(p_notes,          notes),
-    date           = coalesce(p_date,           date),
-    time           = coalesce(p_time,           time),
+    "date"         = coalesce(p_date,           "date"),
+    "time"         = coalesce(p_time,           "time"),
     updated_at     = now()
   where id = p_id and company_id = v_company_id
   returning * into v_updated;
@@ -523,7 +523,7 @@ begin
     delete from public.appointments
      where company_id = v_company_id
        and recurrence_group_id = v_existing.recurrence_group_id
-       and date >= v_existing.date;
+       and "date" >= v_existing."date";
     get diagnostics v_deleted_count = row_count;
   else
     delete from public.appointments
