@@ -138,9 +138,11 @@ export default function PatientDetail() {
       return;
     }
     const total = scores.reduce((a, b) => a + b, 0);
+    if (!patient) return;
     setSavingTriagem(true);
     try {
       const updated = await upsertPatient(patientId, {
+        name: patient.name,
         triagemScore: total,
         scorePsicologia: scores[0],
         scorePsicomotricidade: scores[1],
