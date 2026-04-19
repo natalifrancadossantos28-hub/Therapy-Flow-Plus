@@ -667,6 +667,10 @@ export type WaitingListEntry = {
   entryDate: string;
   createdAt: string;
   updatedAt: string;
+  /** Score clinico escalado para 0..100 (Fase 5C). */
+  scoreClinico?: number | null;
+  /** Score social (0..4): +2 escola municipal/estadual, +2 trabalho informal/roca. Desempate apenas. */
+  scoreSocial?: number | null;
 };
 
 export async function listWaitingList(opts?: {
