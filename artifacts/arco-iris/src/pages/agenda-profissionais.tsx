@@ -223,7 +223,9 @@ export default function AgendaProfissionais() {
     }
   };
 
-  const getApt = (date: string, time: string) => appointments.find(a => a.date === date && a.time === time);
+  // Fase 5A: slots em grupo — o mesmo horario pode ter varios pacientes.
+  const getApts = (date: string, time: string) =>
+    appointments.filter(a => a.date === date && a.time === time);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
@@ -371,11 +373,26 @@ export default function AgendaProfissionais() {
                             </td>
                           ) : (
                             weekDates.map((date, i) => {
-                              const apt = getApt(date, time);
+                              const apts = getApts(date, time);
                               const isToday = date === today;
+                              const isGroup = apts.length > 1;
                               return (
-                                <td key={i} className={cn("px-4 py-2.5 relative", isToday && "bg-primary/5")}>
-                                  {apt ? (() => {
+                                <td key={i} className={cn("px-4 py-2.5 relative align-top", isToday && "bg-primary/5")}>
+                                  {apts.length === 0 ? (
+                                    <button
+                                      onClick={() => setBookingSlot({ date, time })}
+                                      className="w-full min-h-[50px] flex items-center justify-center border-2 border-dashed border-border/50 rounded-xl text-muted-foreground/40 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all text-[10px] font-semibold cursor-pointer"
+                                    >
+                                      + Agendar
+                                    </button>
+                                  ) : (
+                                    <div className="flex flex-col gap-1.5">
+                                      {isGroup && (
+                                        <span className="text-[9px] uppercase font-bold text-cyan-400 tracking-wider">
+                                          · grupo ({apts.length})
+                                        </span>
+                                      )}
+                                      {apts.map(apt => (() => {
                                     const isMenuOpen = actionMenuId === apt.id;
                                     const s = apt.status?.toLowerCase() ?? "";
                                     const isDesmarcado    = s === "desmarcado";
@@ -430,16 +447,13 @@ export default function AgendaProfissionais() {
                                           <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
                                         </div>
 
-                                        {/* ── Menu de ações (somente se NÃO for Presente) ── */}
+                                        {/* Fase 5A: visao do profissional — Desmarcar/Falta ficam apenas na Recepção. */}
                                         {isMenuOpen && !isPresente && (
                                           <div
                                             className="absolute z-50 top-full left-0 mt-1 min-w-[180px] rounded-2xl shadow-2xl"
                                             style={{ background: "rgba(2,4,8,0.97)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)", padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}
                                           >
                                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
-                                            <button style={NEON.red} onClick={() => handleDesmarcar(apt)}>
-                                              <XCircle className="w-3.5 h-3.5" /> Desmarcar
-                                            </button>
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
                                               <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                             </button>
@@ -448,6 +462,9 @@ export default function AgendaProfissionais() {
                                                 <LogOut className="w-3.5 h-3.5" /> Dar Alta
                                               </button>
                                             </div>
+                                            <p className="text-[9px] text-white/30 italic leading-tight px-1 mt-1">
+                                              Faltas e desmarcações ficam no painel da Recepção.
+                                            </p>
                                             <button onClick={() => setActionMenuId(null)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.3)", fontSize: "10px", cursor: "pointer", marginTop: "2px", textAlign: "center" }}>
                                               <XCircle className="w-3 h-3 inline mr-1" />Fechar
                                             </button>
@@ -455,13 +472,8 @@ export default function AgendaProfissionais() {
                                         )}
                                       </div>
                                     );
-                                  })() : (
-                                    <button
-                                      onClick={() => setBookingSlot({ date, time })}
-                                      className="w-full min-h-[50px] flex items-center justify-center border-2 border-dashed border-border/50 rounded-xl text-muted-foreground/40 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all text-[10px] font-semibold cursor-pointer"
-                                    >
-                                      + Agendar
-                                    </button>
+                                  })())}
+                                    </div>
                                   )}
                                 </td>
                               );
@@ -482,7 +494,8 @@ export default function AgendaProfissionais() {
               </h3>
               <div className="space-y-2">
                 {TIME_SLOTS.filter(t => t !== "12:10").map(time => {
-                  const apt = getApt(today, time);
+                  const apts = getApts(today, time);
+                  const apt = apts[0] ?? null;
                   return (
                     <div key={time} className={cn("flex items-center gap-4 px-4 py-3 rounded-xl text-sm", apt ? "bg-primary/8 border border-primary/20" : "bg-secondary/50 border border-border/50")}>
                       <span className="font-bold text-primary w-14 shrink-0">{time}</span>
