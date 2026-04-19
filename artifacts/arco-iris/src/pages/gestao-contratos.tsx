@@ -22,16 +22,31 @@ import { useToast } from "@/hooks/use-toast";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type Contractor   = ContractorRpc;
-type Appointment  = { id: number; status: string; professionalId: number };
 type Colaborador  = ColaboradorRpc;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const CANCELLED = new Set(["desmarcado", "remarcado"]);
 const NEON_BLUE  = "#00d4ff";
 const NEON_GREEN = "#00ff9f";
 const NEON_RED   = "#ff2060";
-const TETO: Record<string, number> = { "20h": 3600, "30h": 5400 };
-const getTeto = (carga: string) => TETO[carga] ?? 5400;
+
+// Input manual de atend. por (contratante, profissional, mês).
+// Persistido em localStorage pra evitar chamadas à API.
+const MANUAL_ATEND_KEY = "arco.gestao.manualAtend.v1";
+type ManualAtendMap = Record<string, number>;
+function manualKey(contractorId: number, profId: number, ym: string): string {
+  return `${contractorId}:${profId}:${ym}`;
+}
+function loadManualAtend(): ManualAtendMap {
+  try {
+    const raw = localStorage.getItem(MANUAL_ATEND_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed ? parsed : {};
+  } catch { return {}; }
+}
+function saveManualAtend(map: ManualAtendMap) {
+  try { localStorage.setItem(MANUAL_ATEND_KEY, JSON.stringify(map)); } catch { /* silencioso */ }
+}
 
 function fmt(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -225,22 +240,30 @@ export default function GestaoContratos() {
   // ── Painel state ──────────────────────────────────────────────────────────
   const [selectedContractorId, setSelectedContractorId] = useState<number | null>(null);
   const [monthOffset, setMonthOffset]                   = useState(0);
-  const [appointments, setAppointments]                 = useState<Appointment[]>([]);
-  const [loadingApts, setLoadingApts]                   = useState(false);
+  const [manualAtend, setManualAtend]                   = useState<ManualAtendMap>(() => loadManualAtend());
 
   const range             = useMemo(() => getMonthRange(monthOffset), [monthOffset]);
   const selectedContractor = useMemo(
     () => contractors.find(c => c.id === selectedContractorId) ?? null,
     [contractors, selectedContractorId]
   );
+  const yearMonth = range.dateFrom.slice(0, 7); // "YYYY-MM"
 
-  useEffect(() => {
-    if (view !== "painel" && view !== "fechamento") return;
-    // Appointments só existirão na Fase 4C. Mantemos vazio por enquanto para
-    // não quebrar a tela — os totais aparecerão como zero.
-    setLoadingApts(false);
-    setAppointments([]);
-  }, [view, range.dateFrom, range.dateTo]);
+  function setAtendFor(profId: number, value: number) {
+    if (!selectedContractorId) return;
+    const k = manualKey(selectedContractorId, profId, yearMonth);
+    setManualAtend(prev => {
+      const next = { ...prev };
+      if (!Number.isFinite(value) || value <= 0) delete next[k];
+      else next[k] = Math.max(0, Math.floor(value));
+      saveManualAtend(next);
+      return next;
+    });
+  }
+  function getAtendFor(profId: number): number {
+    if (!selectedContractorId) return 0;
+    return manualAtend[manualKey(selectedContractorId, profId, yearMonth)] ?? 0;
+  }
 
   const valor = selectedContractor?.valorPorAtendimento ?? 0;
 
@@ -253,16 +276,16 @@ export default function GestaoContratos() {
     margem: number | null;     // repasseEstimado − pagamentoReal
   };
 
+  // Repasse Estimado = valor_contratante × atendimentos_manuais
+  // Margem = Repasse − Pagamento Real do profissional
+  // Recalcula reativamente ao trocar contratante, mês ou atualizar qualquer input.
   const painelRows: PainelRow[] = useMemo(() => {
-    const countMap: Record<number, number> = {};
-    for (const a of appointments) {
-      if (CANCELLED.has(a.status)) continue;
-      countMap[a.professionalId] = (countMap[a.professionalId] ?? 0) + 1;
-    }
     return (professionals as any[]).map((p: any) => {
       const carga            = p.cargaHoraria ?? "30h";
-      const atendimentos     = countMap[p.id] ?? 0;
-      const repasseEstimado  = getTeto(carga);
+      const atendimentos     = selectedContractorId
+        ? (manualAtend[manualKey(selectedContractorId, p.id, yearMonth)] ?? 0)
+        : 0;
+      const repasseEstimado  = atendimentos * valor;
       const pagamentoReal    = p.salario ?? null;
       const margem           = pagamentoReal != null ? repasseEstimado - pagamentoReal : null;
       return {
@@ -276,14 +299,14 @@ export default function GestaoContratos() {
         margem,
       };
     }).sort((a, b) => b.atendimentos - a.atendimentos);
-  }, [professionals, appointments]);
+  }, [professionals, manualAtend, selectedContractorId, yearMonth, valor]);
 
   const totais = useMemo(() => {
-    const totalApt     = painelRows.reduce((s, r) => s + r.atendimentos, 0);
-    const comPagamento = painelRows.filter(r => r.pagamentoReal != null);
-    const totalRepasse  = comPagamento.reduce((s, r) => s + r.repasseEstimado, 0);
+    const totalApt       = painelRows.reduce((s, r) => s + r.atendimentos, 0);
+    const totalRepasse   = painelRows.reduce((s, r) => s + r.repasseEstimado, 0);
+    const comPagamento   = painelRows.filter(r => r.pagamentoReal != null);
     const totalPagamento = comPagamento.reduce((s, r) => s + (r.pagamentoReal ?? 0), 0);
-    const totalMargem   = comPagamento.reduce((s, r) => s + (r.margem ?? 0), 0);
+    const totalMargem    = totalRepasse - totalPagamento;
     return { totalApt, totalRepasse, totalPagamento, totalMargem, comPagamento: comPagamento.length };
   }, [painelRows]);
 
@@ -624,13 +647,8 @@ export default function GestaoContratos() {
               </div>
 
               {/* Tabela */}
-              {loadingApts ? (
-                <div className="flex justify-center py-10 no-print">
-                  <Loader2 className="w-7 h-7 animate-spin" style={{ color: NEON_BLUE }} />
-                </div>
-              ) : (
-                <>
-                  {/* Screen table */}
+              <>
+                {/* Screen table */}
                   <div className="rounded-2xl overflow-hidden no-print"
                     style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
                     {/* Header */}
@@ -638,8 +656,8 @@ export default function GestaoContratos() {
                       style={{ background: "rgba(0,212,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                       <span className="col-span-3">Prestador</span>
                       <span className="col-span-1 text-center">Carga</span>
-                      <span className="col-span-1 text-right">Atend.</span>
-                      <span className="col-span-3 text-right" title="Faturamento máximo da agenda cheia (por carga horária)">
+                      <span className="col-span-1 text-center" title="Digite a quantidade de atendimentos realizados">Atend.</span>
+                      <span className="col-span-3 text-right" title={`Valor do contratante (${fmt(valor)}) × atend. manual`}>
                         Repasse Estimado
                       </span>
                       <span className="col-span-2 text-right" title="Salário cadastrado do prestador">
@@ -680,12 +698,23 @@ export default function GestaoContratos() {
                             </span>
                           </div>
 
-                          {/* Atendimentos */}
-                          <div className="col-span-1 text-right">
-                            <span className="text-sm font-semibold"
-                              style={{ color: row.atendimentos > 0 ? NEON_BLUE : "rgba(255,255,255,0.25)" }}>
-                              {row.atendimentos}
-                            </span>
+                          {/* Atendimentos — input manual */}
+                          <div className="col-span-1 flex justify-center">
+                            <input
+                              type="number"
+                              min={0}
+                              inputMode="numeric"
+                              value={row.atendimentos || ""}
+                              onChange={e => setAtendFor(row.id, Number(e.target.value))}
+                              placeholder="0"
+                              aria-label={`Atendimentos de ${row.name}`}
+                              className="w-14 text-center text-sm font-bold rounded-md px-1 py-1 bg-transparent outline-none transition"
+                              style={{
+                                color: row.atendimentos > 0 ? NEON_BLUE : "rgba(255,255,255,0.55)",
+                                border: `1px solid ${row.atendimentos > 0 ? "rgba(0,212,255,0.35)" : "rgba(255,255,255,0.1)"}`,
+                                background: row.atendimentos > 0 ? "rgba(0,212,255,0.06)" : "rgba(255,255,255,0.02)",
+                              }}
+                            />
                           </div>
 
                           {/* Repasse Estimado */}
@@ -694,7 +723,7 @@ export default function GestaoContratos() {
                               {fmt(row.repasseEstimado)}
                             </span>
                             <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                              agenda cheia · {row.cargaHoraria}
+                              {row.atendimentos} × {fmt(valor)}
                             </p>
                           </div>
 
@@ -770,13 +799,12 @@ export default function GestaoContratos() {
                       </tr>
                     </tbody>
                   </table>
-                </>
-              )}
+              </>
 
               {/* Rodapé do relatório */}
               <p className="print-only" style={{ display: "none", marginTop: 12, fontSize: 10, color: "#888" }}>
                 Contratante: {selectedContractor.name}
-                · Repasse Estimado: faturamento máximo baseado na carga horária (20h = R$ 3.600 / 30h = R$ 5.400)
+                · Repasse Estimado = valor por atendimento × atend. manualmente informado
                 · Pagamento Real: salário cadastrado por prestador
                 · Margem da Empresa: Repasse Estimado − Pagamento Real
               </p>
