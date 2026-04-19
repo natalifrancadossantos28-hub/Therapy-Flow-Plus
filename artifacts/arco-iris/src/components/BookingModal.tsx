@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { X, Calendar, Clock, AlertCircle } from "lucide-react";
 import { MotionCard, Button, Label } from "@/components/ui-custom";
-import { useQueryClient } from "@tanstack/react-query";
+import { listWaitingList, createAppointments } from "@/lib/arco-rpc";
 import { cn } from "@/lib/utils";
 
 type WaitingEntry = {
@@ -52,12 +52,17 @@ export default function BookingModal({ date, time, professionalId, professionalN
   const [frequency, setFrequency] = useState<"semanal" | "quinzenal" | "mensal">("semanal");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const queryClient = useQueryClient();
 
   useEffect(() => {
-    fetch("/api/waiting-list")
-      .then(r => r.json())
-      .then(setWaitingList)
+    listWaitingList()
+      .then((list) => setWaitingList(list.map(e => ({
+        id: e.id,
+        patientId: e.patientId,
+        patientName: e.patientName,
+        patientProntuario: e.patientProntuario ?? null,
+        priority: e.priority,
+        specialty: e.specialty ?? null,
+      }))))
       .catch(console.error);
   }, []);
 
@@ -70,28 +75,17 @@ export default function BookingModal({ date, time, professionalId, professionalN
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patientId: nextPatient.patientId,
-          professionalId,
-          date,
-          time,
-          frequency,
-          fromWaitingList: true,
-        }),
+      await createAppointments({
+        patientId: nextPatient.patientId,
+        professionalId,
+        date,
+        time,
+        frequency,
+        fromWaitingList: true,
       });
-      if (!res.ok) throw new Error("Falha ao criar agendamento");
-
-      await queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
-
       onSuccess();
     } catch (e: any) {
-      setError(e.message || "Erro inesperado");
+      setError(e?.message || "Erro inesperado");
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { useGetProfessionals } from "@workspace/api-client-react";
 import { Card, Select, Button, Label } from "@/components/ui-custom";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -11,6 +10,15 @@ import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
+import {
+  listProfessionals,
+  verifyProfessionalPin,
+  listAppointments,
+  updateAppointment,
+  deleteAppointmentAlta,
+  createNotificacao,
+  type Professional as ArcoProfessional,
+} from "@/lib/arco-rpc";
 
 const TIME_SLOTS = [
   "08:00", "08:50", "09:40", "10:30", "11:20",
@@ -21,6 +29,29 @@ const TIME_SLOTS = [
 function getWeekDays(ref: Date): Date[] {
   const monday = startOfWeek(ref, { weekStartsOn: 1 });
   return Array.from({ length: 5 }, (_, i) => addDays(monday, i));
+}
+
+function isoWeekNumber(dateStr: string): number {
+  const d = new Date(dateStr + "T12:00:00");
+  const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = target.getUTCDay() || 7;
+  target.setUTCDate(target.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+  return Math.ceil((((+target - +yearStart) / 86_400_000) + 1) / 7);
+}
+
+function computeCiclo(frequency: string | null | undefined, date: string): "A" | "B" | "M" | null {
+  if (frequency === "quinzenal") {
+    return isoWeekNumber(date) % 2 === 1 ? "A" : "B";
+  }
+  if (frequency === "mensal") return "M";
+  return null;
+}
+
+function withCiclo<T extends { frequency?: string | null; date: string }>(
+  items: T[]
+): (T & { ciclo: "A" | "B" | "M" | null })[] {
+  return items.map((a) => ({ ...a, ciclo: computeCiclo(a.frequency ?? null, a.date) }));
 }
 
 type Appointment = {
@@ -183,8 +214,12 @@ export default function Agenda() {
   const [remanejSending, setRemanejSending] = useState(false);
   const [remanejDone, setRemanejDone] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { data: professionals } = useGetProfessionals();
+  const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    listProfessionals().then(setProfessionals).catch(console.error);
+  }, []);
 
   const canView = isAdmin || pinVerified;
   const weekDays = getWeekDays(weekRef);
@@ -194,8 +229,13 @@ export default function Agenda() {
     if (!selectedProfId) return;
     const from = weekDates[0];
     const to = weekDates[4];
-    fetch(`/api/appointments?professionalId=${selectedProfId}&dateFrom=${from}&dateTo=${to}`)
-      .then(r => r.json()).then(setAppointments).catch(console.error);
+    listAppointments({
+      professionalId: parseInt(selectedProfId),
+      dateFrom: from,
+      dateTo: to,
+    })
+      .then((list) => setAppointments(withCiclo(list) as Appointment[]))
+      .catch(console.error);
   };
 
   useEffect(() => {
@@ -222,25 +262,16 @@ export default function Agenda() {
     if (!selectedProfId || pinInput.length !== 4) return;
     setPinLoading(true); setPinError("");
     try {
-      const res = await fetch(`/api/professionals/${selectedProfId}/verify-pin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: pinInput }),
-      });
-      if (res.ok) { setPinVerified(true); }
-      else { const d = await res.json(); setPinError(d.error || "PIN incorreto"); setPinInput(""); }
+      const prof = await verifyProfessionalPin(parseInt(selectedProfId), pinInput);
+      if (prof) { setPinVerified(true); }
+      else { setPinError("PIN incorreto"); setPinInput(""); }
     } catch { setPinError("Erro ao verificar PIN."); }
     finally { setPinLoading(false); }
   };
 
   // ── Patch status (single occurrence) ──
   const patchStatus = async (apt: Appointment, status: string) => {
-    const res = await fetch(`/api/appointments/${apt.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    const data = await res.json();
+    const data = await updateAppointment(apt.id, { status });
     setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
     return data;
   };
@@ -248,17 +279,13 @@ export default function Agenda() {
   // ── Log na tabela Notificações_Recepção ──
   const logNotificacao = async (apt: Appointment, acao: string) => {
     try {
-      await fetch("/api/notificacoes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appointmentId: apt.id,
-          patientName: apt.patientName || `Paciente #${apt.patientId}`,
-          professionalName: apt.professionalName || selectedProf?.name || "—",
-          acao,
-          dataConsulta: apt.date,
-          horaConsulta: apt.time,
-        }),
+      await createNotificacao({
+        appointmentId: apt.id,
+        patientName: apt.patientName || `Paciente #${apt.patientId}`,
+        professionalName: apt.professionalName || selectedProf?.name || "—",
+        acao,
+        dataConsulta: apt.date,
+        horaConsulta: apt.time,
       });
     } catch { /* silencioso — log não crítico */ }
   };
@@ -293,11 +320,7 @@ export default function Agenda() {
   const handleRevertClick = async (apt: Appointment) => {
     const revertTo = cancelDialog?.originalStatus || "agendado";
     try {
-      await fetch(`/api/appointments/${apt.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: revertTo }),
-      });
+      await updateAppointment(apt.id, { status: revertTo });
       setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: revertTo } : a));
       setCancelDialog(null);
       toast({ title: "Revertido", description: `Agendamento voltou para "${revertTo}".` });
@@ -349,7 +372,7 @@ export default function Agenda() {
   const confirmDarAlta = async () => {
     if (!altaConfirm) return;
     try {
-      await fetch(`/api/appointments/${altaConfirm.id}/alta`, { method: "DELETE" });
+      await deleteAppointmentAlta(altaConfirm.id);
       setAppointments(prev => prev.filter(a =>
         a.id !== altaConfirm.id &&
         !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.date >= altaConfirm.date)
@@ -377,10 +400,10 @@ export default function Agenda() {
     if (!remanejFlow?.newDate || !remanejFlow?.newTime) return;
     setRemanejSending(true);
     try {
-      await fetch(`/api/appointments/${remanejFlow.apt.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: remanejFlow.newDate, time: remanejFlow.newTime, status: "remarcado" }),
+      await updateAppointment(remanejFlow.apt.id, {
+        date: remanejFlow.newDate,
+        time: remanejFlow.newTime,
+        status: "remarcado",
       });
       setAppointments(prev => prev.map(a =>
         a.id === remanejFlow.apt.id

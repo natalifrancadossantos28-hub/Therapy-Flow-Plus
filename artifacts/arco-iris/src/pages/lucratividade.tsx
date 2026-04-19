@@ -1,5 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
-import { useGetProfessionals } from "@workspace/api-client-react";
+import {
+  listProfessionals,
+  listAppointments,
+  type Professional as ArcoProfessional,
+} from "@/lib/arco-rpc";
 import { TrendingUp, DollarSign, Users, AlertTriangle, ChevronDown, Sparkles, Target, BarChart3, LayoutList, Search } from "lucide-react";
 import { Card, Button } from "@/components/ui-custom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -34,7 +38,7 @@ function getCurrentMonthRange() {
 const CANCELLED_STATUSES = new Set(["desmarcado", "remarcado"]);
 
 export default function Lucratividade() {
-  const { data: professionals = [] } = useGetProfessionals({} as any);
+  const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [view, setView] = useState<"analise" | "painel">("analise");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -45,11 +49,14 @@ export default function Lucratividade() {
   const { dateFrom, dateTo, label: mesLabel } = getCurrentMonthRange();
 
   useEffect(() => {
+    listProfessionals().then(setProfessionals).catch(console.error);
+  }, []);
+
+  useEffect(() => {
     if (!selectedId) { setAppointments([]); return; }
     setLoading(true);
-    fetch(`/api/appointments?professionalId=${selectedId}&dateFrom=${dateFrom}&dateTo=${dateTo}`)
-      .then(r => r.json())
-      .then((data: Appointment[]) => setAppointments(data))
+    listAppointments({ professionalId: selectedId, dateFrom, dateTo })
+      .then((data) => setAppointments(data))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [selectedId, dateFrom, dateTo]);
