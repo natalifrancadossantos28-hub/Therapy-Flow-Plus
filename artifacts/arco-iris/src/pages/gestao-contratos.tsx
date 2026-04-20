@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, Button } from "@/components/ui-custom";
 import {
   listProfessionals,
+  upsertProfessional,
   listContractors,
   upsertContractor,
   deleteContractor,
@@ -22,16 +23,32 @@ import { useToast } from "@/hooks/use-toast";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type Contractor   = ContractorRpc;
-type Appointment  = { id: number; status: string; professionalId: number };
 type Colaborador  = ColaboradorRpc;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const CANCELLED = new Set(["desmarcado", "remarcado"]);
 const NEON_BLUE  = "#00d4ff";
 const NEON_GREEN = "#00ff9f";
 const NEON_RED   = "#ff2060";
-const TETO: Record<string, number> = { "20h": 3600, "30h": 5400 };
-const getTeto = (carga: string) => TETO[carga] ?? 5400;
+
+// Chave de localStorage para os atendimentos manuais, por contratante+mes.
+// A Fase 5B desacoplou a Gestao de Contratos da agenda; aqui persistimos o
+// numero digitado pela recepcao/admin em cada linha.
+function atendStorageKey(contractorId: number, yearMonth: string) {
+  return `nfs:contratos:atend:${contractorId}:${yearMonth}`;
+}
+function loadAtendMap(contractorId: number, yearMonth: string): Record<number, number> {
+  try {
+    const raw = localStorage.getItem(atendStorageKey(contractorId, yearMonth));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === "object") ? parsed : {};
+  } catch { return {}; }
+}
+function saveAtendMap(contractorId: number, yearMonth: string, map: Record<number, number>) {
+  try {
+    localStorage.setItem(atendStorageKey(contractorId, yearMonth), JSON.stringify(map));
+  } catch { /* quota / modo privado: ignora, a tela segue funcionando */ }
+}
 
 function fmt(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -46,10 +63,11 @@ function getMonthRange(offset = 0) {
   const pad = String(m + 1).padStart(2, "0");
   const last = new Date(y, m + 1, 0).getDate();
   return {
-    dateFrom: `${y}-${pad}-01`,
-    dateTo:   `${y}-${pad}-${last}`,
-    label:    now.toLocaleString("pt-BR", { month: "long", year: "numeric" })
-              .replace(/^\w/, c => c.toUpperCase()),
+    dateFrom:  `${y}-${pad}-01`,
+    dateTo:    `${y}-${pad}-${last}`,
+    yearMonth: `${y}-${pad}`,
+    label:     now.toLocaleString("pt-BR", { month: "long", year: "numeric" })
+               .replace(/^\w/, c => c.toUpperCase()),
   };
 }
 
@@ -225,8 +243,6 @@ export default function GestaoContratos() {
   // ── Painel state ──────────────────────────────────────────────────────────
   const [selectedContractorId, setSelectedContractorId] = useState<number | null>(null);
   const [monthOffset, setMonthOffset]                   = useState(0);
-  const [appointments, setAppointments]                 = useState<Appointment[]>([]);
-  const [loadingApts, setLoadingApts]                   = useState(false);
 
   const range             = useMemo(() => getMonthRange(monthOffset), [monthOffset]);
   const selectedContractor = useMemo(
@@ -234,13 +250,68 @@ export default function GestaoContratos() {
     [contractors, selectedContractorId]
   );
 
+  // Atendimentos manuais persistidos no localStorage (por contratante+mes).
+  // Ao trocar contratante ou mes recarregamos o mapa; valor do contratante e
+  // aplicado dinamicamente no calculo do repasse, entao mudancas refletem na
+  // mesma hora sem precisar reabrir a tela.
+  const [atendMap, setAtendMap] = useState<Record<number, number>>({});
   useEffect(() => {
-    if (view !== "painel" && view !== "fechamento") return;
-    // Appointments só existirão na Fase 4C. Mantemos vazio por enquanto para
-    // não quebrar a tela — os totais aparecerão como zero.
-    setLoadingApts(false);
-    setAppointments([]);
-  }, [view, range.dateFrom, range.dateTo]);
+    if (selectedContractorId == null) { setAtendMap({}); return; }
+    setAtendMap(loadAtendMap(selectedContractorId, range.yearMonth));
+  }, [selectedContractorId, range.yearMonth]);
+
+  function updateAtend(professionalId: number, raw: string) {
+    if (selectedContractorId == null) return;
+    const n = Math.max(0, Math.floor(Number(raw) || 0));
+    setAtendMap(prev => {
+      const next = { ...prev };
+      if (n > 0) next[professionalId] = n;
+      else delete next[professionalId];
+      saveAtendMap(selectedContractorId, range.yearMonth, next);
+      return next;
+    });
+  }
+
+  // Novo Profissional inline (desacoplado do /professionals). Mesmo RPC, so
+  // que acessivel direto da tela de Gestao de Contratos.
+  const [showProfForm, setShowProfForm] = useState(false);
+  const [profFormData, setProfFormData] = useState({
+    name: "",
+    specialty: "",
+    cargaHoraria: "30h",
+    tipoContrato: "Contratado",
+    salario: "",
+  });
+  const [savingProf, setSavingProf] = useState(false);
+
+  function openProfCreate() {
+    setProfFormData({ name: "", specialty: "", cargaHoraria: "30h", tipoContrato: "Contratado", salario: "" });
+    setShowProfForm(true);
+  }
+  async function handleSaveProf(e: React.FormEvent) {
+    e.preventDefault();
+    if (!profFormData.name.trim()) return;
+    setSavingProf(true);
+    try {
+      const created = await upsertProfessional(null, {
+        name: profFormData.name.trim(),
+        specialty: profFormData.specialty.trim() || null,
+        cargaHoraria: profFormData.cargaHoraria,
+        tipoContrato: profFormData.tipoContrato,
+        salario: profFormData.tipoContrato === "Concursado"
+          ? null
+          : (parseInt(profFormData.salario) || null),
+      });
+      setProfessionals(ps => [...ps, created]);
+      setShowProfForm(false);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao salvar profissional",
+        description: err?.message || "Falha inesperada.",
+        variant: "destructive",
+      });
+    } finally { setSavingProf(false); }
+  }
 
   const valor = selectedContractor?.valorPorAtendimento ?? 0;
 
@@ -248,21 +319,16 @@ export default function GestaoContratos() {
     id: number; name: string; specialty: string;
     cargaHoraria: string;
     atendimentos: number;
-    repasseEstimado: number;   // teto por carga horária (fixo)
-    pagamentoReal: number | null; // salário cadastrado
-    margem: number | null;     // repasseEstimado − pagamentoReal
+    repasseEstimado: number;   // valor_contratante * atendimentos manuais
+    pagamentoReal: number | null; // salario cadastrado
+    margem: number | null;     // repasseEstimado - pagamentoReal
   };
 
   const painelRows: PainelRow[] = useMemo(() => {
-    const countMap: Record<number, number> = {};
-    for (const a of appointments) {
-      if (CANCELLED.has(a.status)) continue;
-      countMap[a.professionalId] = (countMap[a.professionalId] ?? 0) + 1;
-    }
     return (professionals as any[]).map((p: any) => {
       const carga            = p.cargaHoraria ?? "30h";
-      const atendimentos     = countMap[p.id] ?? 0;
-      const repasseEstimado  = getTeto(carga);
+      const atendimentos     = atendMap[p.id] ?? 0;
+      const repasseEstimado  = atendimentos * valor;
       const pagamentoReal    = p.salario ?? null;
       const margem           = pagamentoReal != null ? repasseEstimado - pagamentoReal : null;
       return {
@@ -276,7 +342,7 @@ export default function GestaoContratos() {
         margem,
       };
     }).sort((a, b) => b.atendimentos - a.atendimentos);
-  }, [professionals, appointments]);
+  }, [professionals, atendMap, valor]);
 
   const totais = useMemo(() => {
     const totalApt     = painelRows.reduce((s, r) => s + r.atendimentos, 0);
@@ -561,6 +627,16 @@ export default function GestaoContratos() {
               </div>
             </div>
 
+            {/* Botão novo profissional (inline, desacoplado) */}
+            <div className="self-end">
+              <button onClick={openProfCreate}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
+                style={{ background: "rgba(0,255,159,0.08)", border: "1px solid rgba(0,255,159,0.3)", color: NEON_GREEN }}>
+                <Plus className="w-4 h-4" />
+                Novo Profissional
+              </button>
+            </div>
+
             {/* Botão imprimir */}
             {selectedContractor && (
               <div className="self-end">
@@ -573,6 +649,98 @@ export default function GestaoContratos() {
               </div>
             )}
           </div>
+
+          {/* Modal — Novo Profissional (inline) */}
+          <AnimatePresence>
+            {showProfForm && (
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+                onClick={() => setShowProfForm(false)}
+              >
+                <motion.form
+                  initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
+                  onClick={e => e.stopPropagation()}
+                  onSubmit={handleSaveProf}
+                  className="w-full max-w-md rounded-2xl p-6 space-y-4"
+                  style={{ background: "#0f1115", border: "1px solid rgba(0,255,159,0.25)" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" style={{ color: NEON_GREEN }} />
+                    <h3 className="text-lg font-bold" style={{ color: NEON_GREEN }}>Novo Profissional</h3>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-muted-foreground mb-1">Nome *</label>
+                      <input
+                        required autoFocus
+                        className="w-full rounded-lg px-3 py-2 text-sm bg-background border border-border focus:outline-none"
+                        value={profFormData.name}
+                        onChange={e => setProfFormData({ ...profFormData, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-muted-foreground mb-1">Especialidade</label>
+                      <input
+                        className="w-full rounded-lg px-3 py-2 text-sm bg-background border border-border focus:outline-none"
+                        value={profFormData.specialty}
+                        onChange={e => setProfFormData({ ...profFormData, specialty: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-muted-foreground mb-1">Carga</label>
+                        <select
+                          className="w-full rounded-lg px-3 py-2 text-sm bg-background border border-border"
+                          value={profFormData.cargaHoraria}
+                          onChange={e => setProfFormData({ ...profFormData, cargaHoraria: e.target.value })}
+                        >
+                          <option value="20h">20h</option>
+                          <option value="30h">30h</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-muted-foreground mb-1">Tipo</label>
+                        <select
+                          className="w-full rounded-lg px-3 py-2 text-sm bg-background border border-border"
+                          value={profFormData.tipoContrato}
+                          onChange={e => setProfFormData({ ...profFormData, tipoContrato: e.target.value, salario: e.target.value === "Concursado" ? "" : profFormData.salario })}
+                        >
+                          <option>Contratado</option>
+                          <option>Concursado</option>
+                        </select>
+                      </div>
+                    </div>
+                    {profFormData.tipoContrato !== "Concursado" && (
+                      <div>
+                        <label className="block text-xs font-bold text-muted-foreground mb-1">Pagamento real (R$)</label>
+                        <input
+                          type="number" min={0}
+                          className="w-full rounded-lg px-3 py-2 text-sm bg-background border border-border focus:outline-none"
+                          value={profFormData.salario}
+                          onChange={e => setProfFormData({ ...profFormData, salario: e.target.value })}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button type="button" onClick={() => setShowProfForm(false)}
+                      className="flex-1 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      Cancelar
+                    </button>
+                    <button type="submit" disabled={savingProf}
+                      className="flex-1 py-2 rounded-lg text-sm font-bold transition-all"
+                      style={{ background: NEON_GREEN, color: "#000", opacity: savingProf ? 0.6 : 1 }}>
+                      {savingProf ? "Salvando..." : "Salvar"}
+                    </button>
+                  </div>
+                </motion.form>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Sem contratante selecionado */}
           {!selectedContractor ? (
@@ -624,7 +792,7 @@ export default function GestaoContratos() {
               </div>
 
               {/* Tabela */}
-              {loadingApts ? (
+              {false ? (
                 <div className="flex justify-center py-10 no-print">
                   <Loader2 className="w-7 h-7 animate-spin" style={{ color: NEON_BLUE }} />
                 </div>
@@ -638,8 +806,8 @@ export default function GestaoContratos() {
                       style={{ background: "rgba(0,212,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                       <span className="col-span-3">Prestador</span>
                       <span className="col-span-1 text-center">Carga</span>
-                      <span className="col-span-1 text-right">Atend.</span>
-                      <span className="col-span-3 text-right" title="Faturamento máximo da agenda cheia (por carga horária)">
+                      <span className="col-span-1 text-right" title="Quantidade de atendimentos informada manualmente">Atend.</span>
+                      <span className="col-span-3 text-right" title="Valor do contratante × atendimentos manuais">
                         Repasse Estimado
                       </span>
                       <span className="col-span-2 text-right" title="Salário cadastrado do prestador">
@@ -680,21 +848,30 @@ export default function GestaoContratos() {
                             </span>
                           </div>
 
-                          {/* Atendimentos */}
+                          {/* Atendimentos (input manual) */}
                           <div className="col-span-1 text-right">
-                            <span className="text-sm font-semibold"
-                              style={{ color: row.atendimentos > 0 ? NEON_BLUE : "rgba(255,255,255,0.25)" }}>
-                              {row.atendimentos}
-                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={row.atendimentos || ""}
+                              onChange={e => updateAtend(row.id, e.target.value)}
+                              placeholder="0"
+                              className="w-16 rounded-lg px-2 py-1 text-right text-sm font-semibold bg-background border focus:outline-none"
+                              style={{
+                                borderColor: row.atendimentos > 0 ? "rgba(0,212,255,0.4)" : "rgba(255,255,255,0.08)",
+                                color: row.atendimentos > 0 ? NEON_BLUE : "rgba(255,255,255,0.6)",
+                              }}
+                            />
                           </div>
 
-                          {/* Repasse Estimado */}
+                          {/* Repasse Estimado = valor_contratante × atend. manual */}
                           <div className="col-span-3 text-right">
                             <span className="text-sm font-semibold" style={{ color: NEON_BLUE }}>
                               {fmt(row.repasseEstimado)}
                             </span>
                             <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                              agenda cheia · {row.cargaHoraria}
+                              {row.atendimentos} × {fmt(valor)}
                             </p>
                           </div>
 
@@ -776,7 +953,7 @@ export default function GestaoContratos() {
               {/* Rodapé do relatório */}
               <p className="print-only" style={{ display: "none", marginTop: 12, fontSize: 10, color: "#888" }}>
                 Contratante: {selectedContractor.name}
-                · Repasse Estimado: faturamento máximo baseado na carga horária (20h = R$ 3.600 / 30h = R$ 5.400)
+                · Repasse Estimado: valor do contratante × atendimentos informados
                 · Pagamento Real: salário cadastrado por prestador
                 · Margem da Empresa: Repasse Estimado − Pagamento Real
               </p>
