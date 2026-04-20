@@ -230,6 +230,7 @@ export default function AgendaProfissionais() {
       await createNotificacao({
         appointmentId: apt.id,
         patientName: apt.patientName || `Paciente #${apt.patientId}`,
+        patientPhone: (apt as { patientPhone?: string | null }).patientPhone ?? null,
         professionalName: selectedProf?.name || "—",
         acao,
         dataConsulta: apt.date,
@@ -301,9 +302,10 @@ export default function AgendaProfissionais() {
     if (!altaConfirm) return;
     try {
       await deleteAppointmentAlta(altaConfirm.id);
+      await logNotificacao(altaConfirm, "Dar Alta");
       setAppointments(prev => prev.filter(a => a.id !== altaConfirm.id));
       setAltaConfirm(null);
-      toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado.` });
+      toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado. Recepção notificada.` });
     } catch (err: any) {
       toast({ title: "Erro ao dar alta", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }

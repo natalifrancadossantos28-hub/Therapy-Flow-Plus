@@ -18,6 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "wouter";
+import NotificationBell from "@/components/NotificationBell";
 
 type Appointment = {
   id: number;
@@ -530,17 +531,20 @@ export default function Reception() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Recepção</h1>
-        <p className="text-muted-foreground mt-1">
-          Gestão diária de presenças e faltas.
-          {atestadoCount > 0 && (
-            <span className="ml-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold"
-              style={{ background: "rgba(255,220,0,0.12)", border: "1px solid rgba(255,220,0,0.35)", color: "#ffd700" }}>
-              ⚠️ {atestadoCount} atestado{atestadoCount > 1 ? "s" : ""} pendente{atestadoCount > 1 ? "s" : ""}
-            </span>
-          )}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Recepção</h1>
+          <p className="text-muted-foreground mt-1">
+            Gestão diária de presenças e faltas.
+            {atestadoCount > 0 && (
+              <span className="ml-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold"
+                style={{ background: "rgba(255,220,0,0.12)", border: "1px solid rgba(255,220,0,0.35)", color: "#ffd700" }}>
+                ⚠️ {atestadoCount} atestado{atestadoCount > 1 ? "s" : ""} pendente{atestadoCount > 1 ? "s" : ""}
+              </span>
+            )}
+          </p>
+        </div>
+        <NotificationBell />
       </div>
 
       {/* Fase 5D: alerta em tempo real quando um profissional remaneja/desmarca/falta */}
