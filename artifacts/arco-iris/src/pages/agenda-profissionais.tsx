@@ -243,10 +243,21 @@ export default function AgendaProfissionais() {
     setActionMenuId(null);
     try {
       await patchStatus(apt, "desmarcado");
-      await logNotificacao(apt, "Desmarcar");
-      toast({ title: "🔴 Desmarcado", description: `${apt.patientName} removido da sessão.` });
+      await logNotificacao(apt, "Desmarcado");
+      toast({ title: "🔴 Desmarcado", description: `${apt.patientName} removido da sessão. Recepção notificada.` });
     } catch (err: any) {
       toast({ title: "Erro ao desmarcar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
+    }
+  };
+
+  const handleRemarcar = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "remarcado");
+      await logNotificacao(apt, "Remarcado");
+      toast({ title: "🟡 Remarcado", description: `${apt.patientName} sinalizado para reagendamento. Recepção notificada.` });
+    } catch (err: any) {
+      toast({ title: "Erro ao remarcar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }
   };
 
@@ -271,7 +282,7 @@ export default function AgendaProfissionais() {
       ));
       await logNotificacao(
         { ...remanejFlow.apt, date: newDate, time: newTime },
-        "Remanejar"
+        "Remanejado"
       );
       setRemanejFlow({ ...remanejFlow, newDate, newTime, done: true });
       toast({ title: "🟠 Remanejado", description: `${remanejFlow.apt.patientName} movido para ${newDate} às ${newTime}. Recepção notificada.` });
@@ -565,7 +576,6 @@ export default function AgendaProfissionais() {
                                           <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
                                         </div>
 
-                                        {/* Fase 5A: visao do profissional — Desmarcar/Falta ficam apenas na Recepção. */}
                                         {isMenuOpen && !isPresente && (
                                           <div
                                             className="absolute z-50 top-full left-0 mt-1 min-w-[180px] rounded-2xl shadow-2xl"
@@ -580,13 +590,19 @@ export default function AgendaProfissionais() {
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
                                               <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                             </button>
+                                            <button style={NEON.yellow} onClick={() => handleRemarcar(apt)}>
+                                              <CalendarIcon className="w-3.5 h-3.5" /> Remarcar
+                                            </button>
+                                            <button style={NEON.red} onClick={() => handleDesmarcar(apt)}>
+                                              <XCircle className="w-3.5 h-3.5" /> Desmarcar
+                                            </button>
                                             <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "4px", paddingTop: "6px" }}>
                                               <button style={NEON.red} onClick={() => handleDarAlta(apt)}>
                                                 <LogOut className="w-3.5 h-3.5" /> Dar Alta
                                               </button>
                                             </div>
                                             <p className="text-[9px] text-white/30 italic leading-tight px-1 mt-1">
-                                              Faltas e desmarcações ficam no painel da Recepção.
+                                              Recepção é notificada automaticamente a cada ação.
                                             </p>
                                             <button onClick={() => setActionMenuId(null)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.3)", fontSize: "10px", cursor: "pointer", marginTop: "2px", textAlign: "center" }}>
                                               <XCircle className="w-3 h-3 inline mr-1" />Fechar

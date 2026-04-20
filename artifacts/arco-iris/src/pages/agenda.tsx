@@ -316,7 +316,7 @@ export default function Agenda() {
     const originalStatus = apt.status;
     try {
       await patchStatus(apt, "desmarcado");
-      await logNotificacao(apt, "Desmarcar");
+      await logNotificacao(apt, "Desmarcado");
       setNotifyDone(false);
       setCancelDialog({ apt: { ...apt, status: "desmarcado" }, profName, originalStatus });
     } catch {
@@ -436,7 +436,7 @@ export default function Agenda() {
       }
       await logNotificacao(
         { ...remanejFlow.apt, date: remanejFlow.newDate, time: remanejFlow.newTime },
-        "Remanejar"
+        "Remanejado"
       );
       setRemanejDone(true);
     } catch {
