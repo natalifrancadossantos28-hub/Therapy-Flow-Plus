@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -235,6 +235,17 @@ export default function AgendaProfissionais() {
       toast({ title: "🟠 Remanejar", description: `${apt.patientName} marcado para reagendamento. A recepção será notificada.` });
     } catch (err: any) {
       toast({ title: "Erro ao remarcar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
+    }
+  };
+
+  const handleAtendimento = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "atendimento");
+      await logNotificacao(apt, "Em Atendimento");
+      toast({ title: "✅ Em Atendimento", description: `${apt.patientName} marcado como em atendimento.` });
+    } catch (err: any) {
+      toast({ title: "Erro ao iniciar atendimento", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }
   };
 
@@ -486,6 +497,11 @@ export default function AgendaProfissionais() {
                                             style={{ background: "rgba(2,4,8,0.97)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)", padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}
                                           >
                                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
+                                            {!isAtendimento && (
+                                              <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
+                                                <Activity className="w-3.5 h-3.5" /> ✅ Em Atendimento
+                                              </button>
+                                            )}
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
                                               <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                             </button>
