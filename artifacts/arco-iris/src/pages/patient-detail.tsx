@@ -1,20 +1,21 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
-import {
-  useGetPatient,
-  useGetPatientPdf,
-  useDeletePatient,
-  useGetProfessionalVacancyAlert,
-  useGetPatientAbsences,
-} from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Card, Button, Badge, MotionCard, Input, Label } from "@/components/ui-custom";
 import { generatePatientPdf } from "@/hooks/use-pdf";
 import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
-import { AnimatePresence } from "framer-motion";
-import { format } from "date-fns";
+import {
+  getPatient,
+  getPatientPdf,
+  getPatientAbsences,
+  upsertPatient,
+  deletePatient,
+  addPatientToFila,
+  type Patient,
+  type PatientPdfData,
+  type PatientAbsencesInfo,
+} from "@/lib/arco-rpc";
 
 function calcPriority(score: number, escolaPublica: boolean, trabalhoNaRoca: boolean, semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
@@ -36,42 +37,16 @@ const PRIORITY_LABEL: Record<string, string> = {
   baixo: "VERDE – Baixo",
 };
 
-const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
-
-async function apiPatch(path: string, body: object) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-async function apiAddToFila(patientId: number, body: object) {
-  const res = await fetch(`${BASE_URL}/api/patients/${patientId}/add-to-fila`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.message ?? json.error ?? "Erro ao adicionar à fila");
-  return json;
-}
-
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
   const patientId = parseInt(id || "0");
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data: patient, isLoading, refetch } = useGetPatient(patientId);
-  const { data: pdfData } = useGetPatientPdf(patientId);
-  const { data: absenceInfo } = useGetPatientAbsences(patientId);
-  const deleteMutation = useDeletePatient();
-
-  const [showVacancyAlert, setShowVacancyAlert] = useState<{ show: boolean; data: any }>({ show: false, data: null });
-  const { refetch: checkVacancy } = useGetProfessionalVacancyAlert(patient?.professionalId || 0, { query: { enabled: false } });
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [pdfData, setPdfData] = useState<PatientPdfData | null>(null);
+  const [absenceInfo, setAbsenceInfo] = useState<PatientAbsencesInfo | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   const [triagemEdit, setTriagemEdit] = useState(false);
   const [sPsicologia, setSPsicologia] = useState("");
@@ -89,29 +64,52 @@ export default function PatientDetail() {
   const [addingToFila, setAddingToFila] = useState(false);
   const [, navigate] = useLocation();
 
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [p, pdf, abs] = await Promise.all([
+        getPatient(patientId),
+        getPatientPdf(patientId).catch(() => null),
+        getPatientAbsences(patientId).catch(() => null),
+      ]);
+      setPatient(p);
+      setPdfData(pdf);
+      setAbsenceInfo(abs);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao carregar paciente",
+        description: err?.message || "Falha inesperada.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [patientId, toast]);
+
+  useEffect(() => { void load(); }, [load]);
+
   const handleDownloadPdf = () => {
     if (pdfData) {
-      generatePatientPdf(pdfData);
+      generatePatientPdf(pdfData as any);
       toast({ title: "PDF Gerado", description: "O download iniciará em instantes." });
     }
   };
 
   const handleDischarge = async () => {
     if (!confirm("Tem certeza que deseja dar alta para este paciente? O status mudará e a vaga será liberada.")) return;
+    setDeleting(true);
     try {
-      const profId = patient?.professionalId;
-      await deleteMutation.mutateAsync({ id: patientId });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
+      await deletePatient(patientId);
       toast({ title: "Alta Realizada", description: "Paciente liberado com sucesso." });
-      if (profId) {
-        const { data: alertData } = await checkVacancy();
-        if (alertData?.hasVacancy && alertData?.nextWaitingPatient) {
-          setShowVacancyAlert({ show: true, data: alertData.nextWaitingPatient });
-        }
-      }
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
+      navigate("/patients");
+    } catch (err: any) {
+      toast({
+        title: "Erro",
+        description: err?.message || "Não foi possível dar alta.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -140,9 +138,11 @@ export default function PatientDetail() {
       return;
     }
     const total = scores.reduce((a, b) => a + b, 0);
+    if (!patient) return;
     setSavingTriagem(true);
     try {
-      await apiPatch(`/api/patients/${patientId}`, {
+      const updated = await upsertPatient(patientId, {
+        name: patient.name,
         triagemScore: total,
         scorePsicologia: scores[0],
         scorePsicomotricidade: scores[1],
@@ -155,18 +155,21 @@ export default function PatientDetail() {
         escolaPublica: escolaPublica ?? false,
         trabalhoNaRoca: trabalhoNaRoca ?? false,
       });
-      await refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      setPatient(updated);
       setTriagemEdit(false);
       toast({ title: "Triagem registrada!", description: `Score total: ${total}/360. Paciente apto para a fila.` });
-    } catch {
-      toast({ title: "Erro", description: "Falha ao salvar triagem.", variant: "destructive" });
+    } catch (err: any) {
+      toast({
+        title: "Erro",
+        description: err?.message || "Falha ao salvar triagem.",
+        variant: "destructive",
+      });
     } finally {
       setSavingTriagem(false);
     }
   };
 
-  const SCORE_SPECIALTY_MAP: Array<{ field: keyof typeof patient & string; specialty: string }> = [
+  const SCORE_SPECIALTY_MAP: Array<{ field: keyof Patient; specialty: string }> = [
     { field: "scorePsicologia",       specialty: "Psicologia"         },
     { field: "scorePsicomotricidade", specialty: "Psicomotricidade"   },
     { field: "scoreFisioterapia",     specialty: "Fisioterapia"       },
@@ -181,9 +184,8 @@ export default function PatientDetail() {
     if (!patient) return;
     setAddingToFila(true);
 
-    // Auto-detect: only specialties with score > 0
     const scoredSpecialties = SCORE_SPECIALTY_MAP
-      .filter(({ field }) => ((patient as any)[field] ?? 0) > 0)
+      .filter(({ field }) => ((patient[field] as number | null) ?? 0) > 0)
       .map(({ specialty }) => specialty);
 
     const targets: (string | null)[] = scoredSpecialties.length > 0 ? scoredSpecialties : [null];
@@ -193,15 +195,13 @@ export default function PatientDetail() {
     try {
       for (const sp of targets) {
         try {
-          await apiAddToFila(patientId, { specialty: sp });
+          await addPatientToFila(patientId, sp);
           added.push(sp ?? "Geral");
         } catch (err: any) {
           if (err.message?.toLowerCase().includes("fila")) skipped.push(sp ?? "Geral");
           else throw err;
         }
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
       if (added.length > 0) {
         toast({
           title: added.length === 1 ? "✅ Adicionado à fila!" : `✅ ${added.length} filas adicionadas!`,
@@ -218,7 +218,7 @@ export default function PatientDetail() {
     }
   };
 
-  if (isLoading || !patient) return <div className="p-8 text-center animate-pulse">Carregando prontuário...</div>;
+  if (isLoading || !patient || !p) return <div className="p-8 text-center animate-pulse">Carregando prontuário...</div>;
 
   const hasWarning = patient.absenceCount >= 3;
   const triagemFeita = patient.triagemScore != null;
@@ -236,25 +236,6 @@ export default function PatientDetail() {
 
   return (
     <div className="space-y-8">
-      <AnimatePresence>
-        {showVacancyAlert.show && (
-          <MotionCard className="p-6 bg-emerald-50 border-emerald-200 shadow-lg relative mb-8" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-            <h3 className="text-emerald-800 font-bold text-xl mb-2">Vaga Liberada!</h3>
-            <p className="text-emerald-700 mb-4">Com a alta, há uma nova vaga. A fila de espera sugere chamar:</p>
-            <div className="bg-white p-4 rounded-xl border border-emerald-100 flex justify-between items-center">
-              <div>
-                <p className="font-bold text-lg">{showVacancyAlert.data?.patientName}</p>
-                <p className="text-sm text-muted-foreground">Prioridade: {showVacancyAlert.data?.priority}</p>
-              </div>
-              <Link href="/waiting-list">
-                <Button variant="outline" className="text-emerald-700 border-emerald-300">Ir para Fila</Button>
-              </Link>
-            </div>
-            <button onClick={() => setShowVacancyAlert({ show: false, data: null })} className="absolute top-4 right-4 text-emerald-800/50 hover:text-emerald-800">✕</button>
-          </MotionCard>
-        )}
-      </AnimatePresence>
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -288,7 +269,7 @@ export default function PatientDetail() {
               <Clock className="w-4 h-4" /> Na Fila de Espera
             </Button>
           )}
-          <Button variant="destructive" onClick={handleDischarge} disabled={deleteMutation.isPending || patient.status === "Alta"} className="gap-2">
+          <Button variant="destructive" onClick={handleDischarge} disabled={deleting || patient.status === "Alta"} className="gap-2">
             <UserMinus className="w-4 h-4" /> Dar Alta
           </Button>
         </div>
@@ -296,8 +277,6 @@ export default function PatientDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-
-          {/* Dados pessoais */}
           <Card className="p-8 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-5">
               <FileText className="w-32 h-32" />
@@ -356,7 +335,6 @@ export default function PatientDetail() {
             </div>
           </Card>
 
-          {/* ── Triagem ── */}
           <Card className={cn("p-6 border-2 transition-colors", triagemFeita ? "border-emerald-400/40" : "border-amber-400/40 bg-amber-50/5")}>
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
@@ -399,7 +377,7 @@ export default function PatientDetail() {
                   <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
                     <p className="text-muted-foreground font-semibold mb-1">Score Total</p>
                     <p className="text-2xl font-bold text-primary">{p.triagemScore}<span className="text-sm text-muted-foreground font-normal">/360</span></p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round((p.triagemScore / 360) * 100)}% do máximo</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round(((p.triagemScore ?? 0) / 360) * 100)}% do máximo</p>
                   </div>
                   <div className="p-3 bg-secondary/30 rounded-xl">
                     <p className="text-muted-foreground font-semibold mb-1">Escola Pública</p>
@@ -427,7 +405,6 @@ export default function PatientDetail() {
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
           <Card className={cn("p-6 border-2 transition-colors", hasWarning ? "border-rose-400 bg-rose-50/10" : "border-transparent")}>
             <div className="flex items-center gap-3 mb-6">
@@ -462,7 +439,6 @@ export default function PatientDetail() {
         </div>
       </div>
 
-      {/* Modal: Registrar/Editar Triagem */}
       {triagemEdit && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <MotionCard className="w-full max-w-lg p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>

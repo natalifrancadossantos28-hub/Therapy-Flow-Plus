@@ -1,18 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  useGetTodayAppointments,
-  useUpdateAppointmentStatus,
-  useGetProfessionals,
-  useDeletePatient,
-  useGetProfessionalVacancyAlert,
-} from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+  listAppointmentsToday,
+  listProfessionals,
+  updateAppointment,
+  deletePatient,
+  type Professional as ArcoProfessional,
+  type AppointmentToday,
+} from "@/lib/arco-rpc";
+import { supabase } from "@/lib/supabase";
 import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom";
 import { getStatusColor, getStatusLabel, cn } from "@/lib/utils";
 import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
-  UserPlus, PhoneOff, FileCheck,
+  UserPlus, PhoneOff, FileCheck, Bell,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
@@ -261,15 +262,66 @@ function AppointmentRow({
 
 export default function Reception() {
   const [profIdFilter, setProfIdFilter] = useState<string>("");
-  const { data: professionals } = useGetProfessionals();
-  const { data: appointments, isLoading } = useGetTodayAppointments(
-    profIdFilter ? { professionalId: parseInt(profIdFilter) } : undefined,
-    { refetchInterval: 20_000 } as any
-  );
-  const updateStatus = useUpdateAppointmentStatus();
-  const deleteMutation = useDeletePatient();
-  const queryClient = useQueryClient();
+  const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentToday[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isMutating, setIsMutating] = useState<boolean>(false);
   const { toast } = useToast();
+
+  const reloadAppointments = useCallback(() => {
+    const opts = profIdFilter ? { professionalId: parseInt(profIdFilter) } : undefined;
+    return listAppointmentsToday(opts)
+      .then((data) => { setAppointments(data); setIsLoading(false); })
+      .catch((e) => { console.error(e); setIsLoading(false); });
+  }, [profIdFilter]);
+
+  useEffect(() => {
+    listProfessionals().then(setProfessionals).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    setIsLoading(true);
+    reloadAppointments();
+    const id = setInterval(reloadAppointments, 20_000);
+    return () => clearInterval(id);
+  }, [reloadAppointments]);
+
+  // Fase 5D: Realtime — recebe INSERTs em notificacoes_recepcao (remanejar/desmarcar/falta)
+  // e dispara um alerta visual pulsante + refetch da agenda.
+  const [realtimeAlert, setRealtimeAlert] = useState<{
+    patientName: string;
+    professionalName: string;
+    acao: string;
+    at: number;
+  } | null>(null);
+  const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel("recepcao-notificacoes")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notificacoes_recepcao" },
+        (payload: { new: Record<string, unknown> }) => {
+          const row = payload.new ?? {};
+          setRealtimeAlert({
+            patientName:      String(row.patient_name      ?? "Paciente"),
+            professionalName: String(row.professional_name ?? "—"),
+            acao:             String(row.acao              ?? "Ação"),
+            at:               Date.now(),
+          });
+          if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+          alertTimerRef.current = setTimeout(() => setRealtimeAlert(null), 12_000);
+          void reloadAppointments();
+        }
+      )
+      .subscribe();
+    return () => {
+      if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [reloadAppointments]);
 
   const [, navigate] = useLocation();
   const [dischargeAlert, setDischargeAlert] = useState<DischargeAlert | null>(null);
@@ -281,9 +333,14 @@ export default function Reception() {
   const [abonarSending, setAbonarSending] = useState(false);
   const [abonarDone, setAbonarDone] = useState(false);
 
-  const { refetch: checkVacancy } = useGetProfessionalVacancyAlert(vacancyProfId, {
-    query: { enabled: false },
-  });
+  const checkVacancy = async () => {
+    if (!vacancyProfId) return { data: null as null | { hasVacancy: boolean; nextWaitingPatient: { patientName: string; priority: string } | null } };
+    try {
+      const res = await fetch(`/api/professionals/${vacancyProfId}/vacancy-alert`);
+      if (!res.ok) return { data: null };
+      return { data: await res.json() };
+    } catch { return { data: null }; }
+  };
 
   // Poll atestados e contatos desconhecidos
   useEffect(() => {
@@ -380,10 +437,10 @@ export default function Reception() {
     let newAbsenceCount = apt?.patientAbsenceCount ?? 0;
     const isAusente = status === "ausente" || status === "falta_nao_justificada";
     const wasAusente = apt?.status === "ausente" || apt?.status === "falta_nao_justificada";
+    setIsMutating(true);
     try {
-      await updateStatus.mutateAsync({ id, data: { status } });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      await updateAppointment(id, { status });
+      await reloadAppointments();
 
       if (isAusente && !wasAusente) {
         newAbsenceCount = (apt?.patientAbsenceCount ?? 0) + 1;
@@ -400,6 +457,8 @@ export default function Reception() {
       toast({ title: toastTitle, description: `${apt?.patientName} — ${label}.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
+    } finally {
+      setIsMutating(false);
     }
     return newAbsenceCount;
   };
@@ -412,11 +471,10 @@ export default function Reception() {
   const handleConfirmDischarge = async () => {
     if (!dischargeAlert) return;
     const { appointment } = dischargeAlert;
+    setIsMutating(true);
     try {
-      await deleteMutation.mutateAsync({ id: appointment.patientId });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
+      await deletePatient(appointment.patientId);
+      await reloadAppointments();
       setDischargeAlert(null);
       toast({ title: "Alta Realizada", description: `${appointment.patientName} recebeu alta.` });
 
@@ -430,6 +488,8 @@ export default function Reception() {
       }
     } catch {
       toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
+    } finally {
+      setIsMutating(false);
     }
   };
 
@@ -444,8 +504,8 @@ export default function Reception() {
     const { apt } = abonarDialog;
     try {
       // 1. Marcar como abonado
-      await updateStatus.mutateAsync({ id: apt.id, data: { status: "abonado" } });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments/today"] });
+      await updateAppointment(apt.id, { status: "abonado" });
+      await reloadAppointments();
 
       // 2. Carla notifica profissional
       await fetch("/api/whatsapp/abonar-notify", {
@@ -482,6 +542,47 @@ export default function Reception() {
           )}
         </p>
       </div>
+
+      {/* Fase 5D: alerta em tempo real quando um profissional remaneja/desmarca/falta */}
+      {realtimeAlert && (
+        <div
+          key={realtimeAlert.at}
+          className="flex items-start gap-3 rounded-2xl p-4 border animate-pulse"
+          style={{
+            background: "linear-gradient(135deg, rgba(249,115,22,0.10), rgba(6,182,212,0.06))",
+            borderColor: "rgba(249,115,22,0.45)",
+            boxShadow: "0 0 24px rgba(249,115,22,0.25)",
+          }}
+          role="alert"
+        >
+          <div
+            className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center"
+            style={{ background: "rgba(249,115,22,0.18)", color: "#f97316" }}
+          >
+            <Bell className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-foreground">
+              Ação em tempo real: <span className="text-orange-600">{realtimeAlert.acao}</span>
+            </p>
+            <p className="text-sm text-foreground mt-0.5">
+              <span className="font-semibold">{realtimeAlert.patientName}</span>
+              <span className="text-muted-foreground"> — </span>
+              <span className="text-muted-foreground">{realtimeAlert.professionalName}</span>
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Recebido agora. A agenda foi atualizada automaticamente.
+            </p>
+          </div>
+          <button
+            onClick={() => setRealtimeAlert(null)}
+            className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            title="Dispensar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ── Alertas Carla: Números Desconhecidos ── */}
       {desconhecidos.length > 0 && (
@@ -576,7 +677,7 @@ export default function Reception() {
                 onStatusChange={handleStatusChange}
                 onDischargeRequest={handleDischargeRequest}
                 onAbonarClick={handleAbonarClick}
-                isUpdating={updateStatus.isPending || deleteMutation.isPending}
+                isUpdating={isMutating}
               />
             ))
           )}
@@ -585,7 +686,7 @@ export default function Reception() {
 
       <AnimatePresence>
         {dischargeAlert && (
-          <DischargeModal alert={dischargeAlert} onDischarge={handleConfirmDischarge} onClose={() => setDischargeAlert(null)} isLoading={deleteMutation.isPending} />
+          <DischargeModal alert={dischargeAlert} onDischarge={handleConfirmDischarge} onClose={() => setDischargeAlert(null)} isLoading={isMutating} />
         )}
         {vacancyAlert && (
           <VacancyModal alert={vacancyAlert} onClose={() => setVacancyAlert(null)} />

@@ -1,11 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
-import { useGetPatients, useCreatePatient, useGetProfessionals } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
-import { Users, Plus, Search, AlertCircle, MessageCircle, Download } from "lucide-react";
+import { Users, Plus, Search, AlertCircle, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getStatusColor, cn } from "@/lib/utils";
-import { Link } from "wouter";
+import {
+  listPatients,
+  upsertPatient,
+  listProfessionals,
+  nextProntuario as fetchNextProntuarioRpc,
+  checkProntuario as checkProntuarioRpc,
+  type Patient,
+  type Professional,
+} from "@/lib/arco-rpc";
 
 const STATUS_OPTIONS = [
   { value: "Aguardando Triagem", label: "Aguardando Triagem" },
@@ -18,7 +24,6 @@ const STATUS_OPTIONS = [
 
 const today = () => new Date().toISOString().split("T")[0];
 
-// ── Cálculo de idade ──────────────────────────────────────────────────────────
 function calcIdade(dateOfBirth: string): number {
   const dob = new Date(dateOfBirth + "T00:00:00");
   const hoje = new Date();
@@ -69,11 +74,10 @@ export default function Patients() {
   const [redeFilter, setRedeFilter] = useState(false);
   const [idadeAlertaFilter, setIdadeAlertaFilter] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isMigrating, setIsMigrating] = useState(false);
-  const { data: patients, isLoading } = useGetPatients();
-  const { data: professionals } = useGetProfessionals();
-  const createMutation = useCreatePatient();
-  const queryClient = useQueryClient();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -98,24 +102,39 @@ export default function Patients() {
   const [prontuarioChecking, setProntuarioChecking] = useState(false);
   const [fromWhatsapp, setFromWhatsapp] = useState(false);
 
-  // Busca próximo prontuário disponível
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [ps, pros] = await Promise.all([listPatients(), listProfessionals()]);
+      setPatients(ps);
+      setProfessionals(pros);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao carregar pacientes",
+        description: err?.message || "Falha inesperada.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { void load(); }, [load]);
+
   const fetchNextProntuario = useCallback(async () => {
     try {
-      const r = await fetch("/api/patients/next-prontuario");
-      const d = await r.json();
+      const d = await fetchNextProntuarioRpc();
       setNextProntuario(d.nextProntuario);
-      return d.nextProntuario as string;
+      return d.nextProntuario;
     } catch { return ""; }
   }, []);
 
-  // Verificação de duplicidade de prontuário
   const checkProntuario = useCallback(async (pron: string) => {
     if (!pron || !pron.trim()) { setProntuarioAlerta(null); return; }
     setProntuarioChecking(true);
     try {
-      const r = await fetch(`/api/patients/check-prontuario/${encodeURIComponent(pron.trim())}`);
-      const d = await r.json();
-      if (d.existe) {
+      const d = await checkProntuarioRpc(pron.trim());
+      if (d.existe && d.paciente) {
         setProntuarioAlerta(`⚠️ Prontuário ${pron} já cadastrado para: ${d.paciente.name}`);
       } else {
         setProntuarioAlerta(null);
@@ -124,7 +143,6 @@ export default function Patients() {
     finally { setProntuarioChecking(false); }
   }, []);
 
-  // Pré-preencher telefone do responsável via query param (alerta da Carla)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const telefone = params.get("guardianPhone");
@@ -169,13 +187,13 @@ export default function Patients() {
     });
   };
 
-  const filteredPatients = (patients || []).filter(p => {
+  const filteredPatients = patients.filter(p => {
     const matchName = p.name.toLowerCase().includes(search.toLowerCase()) ||
-      ((p as any).prontuario || "").toLowerCase().includes(search.toLowerCase());
+      (p.prontuario || "").toLowerCase().includes(search.toLowerCase());
     const matchStatus = !statusFilter || p.status === statusFilter;
-    const matchRede = !redeFilter || (p as any).escolaPublica === true;
+    const matchRede = !redeFilter || p.escolaPublica === true;
     const matchIdade = !idadeAlertaFilter || (() => {
-      const a = alertaIdade((p as any).dateOfBirth);
+      const a = alertaIdade(p.dateOfBirth);
       return a && a.tipo !== "ok";
     })();
     return matchName && matchStatus && matchRede && matchIdade;
@@ -187,41 +205,24 @@ export default function Patients() {
       toast({ title: "Prontuário duplicado", description: prontuarioAlerta, variant: "destructive" });
       return;
     }
+    setSaving(true);
     try {
-      await createMutation.mutateAsync({
-        data: {
-          ...formData,
-          escolaPublica: formData.escolaPublica,
-          status: "Aguardando Triagem",
-        },
+      const created = await upsertPatient(null, {
+        ...formData,
+        status: "Aguardando Triagem",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      setPatients(prev => [created, ...prev]);
       toast({ title: "Paciente cadastrado!", description: `Prontuário ${formData.prontuario || "—"} • Aguardando Triagem.` });
       setIsDialogOpen(false);
       resetForm();
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível cadastrar o paciente.", variant: "destructive" });
-    }
-  };
-
-  const handleMigrarContatos = async () => {
-    setIsMigrating(true);
-    try {
-      const r = await fetch("/api/whatsapp/migrar-contatos", { method: "POST" });
-      const d = await r.json();
-      if (d.ok) {
-        queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-        toast({
-          title: "Migração concluída!",
-          description: `${d.criados} pré-cadastros criados, ${d.duplicados} já existiam.`,
-        });
-      } else {
-        toast({ title: "Aviso", description: d.mensagem || d.erro || "Erro na migração." });
-      }
-    } catch {
-      toast({ title: "Erro", description: "Bot indisponível para migração.", variant: "destructive" });
+    } catch (err: any) {
+      toast({
+        title: "Erro",
+        description: err?.message || "Não foi possível cadastrar o paciente.",
+        variant: "destructive",
+      });
     } finally {
-      setIsMigrating(false);
+      setSaving(false);
     }
   };
 
@@ -233,29 +234,18 @@ export default function Patients() {
       </div>
 
       <Card className="p-6">
-        {/* Toolbar */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-border pb-6">
           <div className="flex items-center gap-2 flex-wrap">
             <Users className="w-5 h-5 text-primary" />
             <span className="font-bold text-lg">{filteredPatients.length} paciente{filteredPatients.length !== 1 ? "s" : ""}</span>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:bg-secondary transition-colors disabled:opacity-50"
-              onClick={handleMigrarContatos}
-              disabled={isMigrating}
-              title="Importar contatos do WhatsApp (padrão 402 - Maria Oliveira)"
-            >
-              <Download className="w-3.5 h-3.5" />
-              {isMigrating ? "Importando..." : "Importar do WhatsApp"}
-            </button>
             <Button className="gap-2" onClick={openNewForm}>
               <Plus className="w-4 h-4" /> Novo Paciente
             </Button>
           </div>
         </div>
 
-        {/* Filtros */}
         <div className="flex flex-wrap gap-3 mb-6">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -285,7 +275,6 @@ export default function Patients() {
           </button>
         </div>
 
-        {/* Tabela */}
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full text-sm">
             <thead className="bg-secondary/50 border-b border-border">
@@ -306,10 +295,10 @@ export default function Patients() {
                 <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum paciente encontrado.</td></tr>
               ) : (
                 filteredPatients.map((patient) => {
-                  const prof = professionals?.find(p => p.id === patient.professionalId);
+                  const prof = professionals.find(p => p.id === patient.professionalId);
                   const hasWarning = patient.absenceCount >= 3;
-                  const idAlerta = alertaIdade((patient as any).dateOfBirth);
-                  const isRede = (patient as any).escolaPublica;
+                  const idAlerta = alertaIdade(patient.dateOfBirth);
+                  const isRede = patient.escolaPublica;
                   return (
                     <tr key={patient.id}
                       className={cn(
@@ -320,7 +309,7 @@ export default function Patients() {
                       onClick={() => window.location.href = `/patients/${patient.id}`}
                     >
                       <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
-                        {(patient as any).prontuario || `#${String(patient.id).padStart(4, "0")}`}
+                        {patient.prontuario || `#${String(patient.id).padStart(4, "0")}`}
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-semibold text-foreground">{patient.name}</span>
@@ -328,9 +317,9 @@ export default function Patients() {
                           <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">🏫 Mun.</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{(patient as any).motherName || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{patient.motherName || "—"}</td>
                       <td className="px-4 py-3">
-                        <IdadeBadge dateOfBirth={(patient as any).dateOfBirth} />
+                        <IdadeBadge dateOfBirth={patient.dateOfBirth} />
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{prof?.name || "—"}</td>
                       <td className="px-4 py-3">
@@ -354,12 +343,9 @@ export default function Patients() {
         </div>
       </Card>
 
-      {/* Modal de Novo Paciente */}
       {isDialogOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <MotionCard className="w-full max-w-lg p-6 overflow-y-auto max-h-[90vh]" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-
-            {/* Banner WhatsApp */}
             {fromWhatsapp && (
               <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl text-xs font-medium"
                 style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", color: "#7c3aed" }}>
@@ -368,7 +354,6 @@ export default function Patients() {
               </div>
             )}
 
-            {/* Próximo prontuário hint */}
             {nextProntuario && (
               <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl text-xs font-medium bg-secondary border border-border text-muted-foreground">
                 📋 Próximo prontuário sugerido: <strong className="text-foreground ml-1">{nextProntuario}</strong>
@@ -395,9 +380,14 @@ export default function Patients() {
                       if (e.target.value.trim().length >= 2) checkProntuario(e.target.value);
                       else setProntuarioAlerta(null);
                     }}
-                    placeholder="Ex.: 401"
+                    placeholder="Ex.: 501 (novo) ou 1, 10 (antigo)"
                     className={prontuarioAlerta ? "border-rose-400" : ""}
                   />
+                  {!prontuarioAlerta && !prontuarioChecking && (
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                      Pode digitar manualmente (ex: <strong>1</strong>, <strong>10</strong>) para pacientes antigos. Novos cadastros sugerem a partir de <strong>500</strong>.
+                    </p>
+                  )}
                   {prontuarioAlerta && (
                     <p className="text-xs text-rose-600 mt-1 font-medium">{prontuarioAlerta}</p>
                   )}
@@ -448,7 +438,6 @@ export default function Patients() {
                   <Input value={formData.diagnosis} onChange={e => setFormData({ ...formData, diagnosis: e.target.value })} placeholder="Ex.: TEA, TDAH, sem diagnóstico" />
                 </div>
 
-                {/* Tipo de Registro */}
                 <div className="col-span-2">
                   <Label>Tipo de Registro</Label>
                   <div className="flex flex-col sm:flex-row gap-2 mt-1">
@@ -472,7 +461,6 @@ export default function Patients() {
                   )}
                 </div>
 
-                {/* Local de Atendimento */}
                 <div className="col-span-2">
                   <Label>Onde realiza atendimento atualmente?</Label>
                   <select
@@ -485,7 +473,6 @@ export default function Patients() {
                   </select>
                 </div>
 
-                {/* Rede Municipal Ibiúna */}
                 <div className="col-span-2">
                   <label className="flex items-center gap-3 cursor-pointer group">
                     <div className={cn(
@@ -511,8 +498,8 @@ export default function Patients() {
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <Button type="button" variant="ghost" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>
-                <Button type="submit" disabled={createMutation.isPending || !!prontuarioAlerta}>
-                  {createMutation.isPending ? "Salvando..." : "Cadastrar"}
+                <Button type="submit" disabled={saving || !!prontuarioAlerta}>
+                  {saving ? "Salvando..." : "Cadastrar"}
                 </Button>
               </div>
             </form>

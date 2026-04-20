@@ -1,33 +1,50 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, UserRound, Calendar, ClipboardList, ListTodo, Menu, X, Building2 } from "lucide-react";
+import { LayoutDashboard, Users, UserRound, Calendar, ClipboardList, ListTodo, Menu, X, Building2, LogOut } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
 
-const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/professionals", label: "Profissionais", icon: UserRound },
-  { href: "/patients", label: "Pacientes", icon: Users },
-  { href: "/reception", label: "Recepção", icon: ClipboardList },
-  { href: "/waiting-list", label: "Fila de Espera", icon: ListTodo },
-  { href: "/agenda", label: "Agenda Geral", icon: Calendar },
-  { href: "/gestao-contratos", label: "Gestão de Contratos", icon: Building2 },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  scopes: Array<"admin" | "reception">;
+};
+
+const navItems: NavItem[] = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, scopes: ["admin"] },
+  { href: "/professionals", label: "Profissionais", icon: UserRound, scopes: ["admin"] },
+  { href: "/patients", label: "Pacientes", icon: Users, scopes: ["admin"] },
+  { href: "/reception", label: "Recepção", icon: ClipboardList, scopes: ["admin", "reception"] },
+  { href: "/waiting-list", label: "Fila de Espera", icon: ListTodo, scopes: ["admin", "reception"] },
+  { href: "/agenda", label: "Agenda Geral", icon: Calendar, scopes: ["admin", "reception"] },
+  { href: "/gestao-contratos", label: "Gestão de Contratos", icon: Building2, scopes: ["admin"] },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const scope = getCurrentScope();
+  // Recepcao/admin compartilham o mesmo Layout; profissional tem tela propria.
+  const effectiveScope: "admin" | "reception" = scope === "reception" ? "reception" : "admin";
+  const visibleItems = navItems.filter((i) => i.scopes.includes(effectiveScope));
+
+  const handleLogout = () => {
+    clearAllSessions();
+    setLocation("/portal");
+  };
 
   const NavLinks = () => (
     <>
-      {navItems.map((item) => {
+      {visibleItems.map((item) => {
         const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
         return (
           <Link key={item.href} href={item.href} onClick={() => setIsMobileOpen(false)}
             className={cn(
               "flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group",
-              isActive 
-                ? "nav-active-neon font-semibold" 
+              isActive
+                ? "nav-active-neon font-semibold"
                 : "text-foreground/60 hover:bg-secondary/80 hover:text-foreground"
             )}
           >
@@ -36,6 +53,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
         );
       })}
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 text-foreground/60 hover:bg-destructive/10 hover:text-destructive mt-2"
+      >
+        <LogOut className="w-5 h-5" />
+        Sair
+      </button>
     </>
   );
 
@@ -55,7 +79,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Menu */}
       <AnimatePresence>
         {isMobileOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
@@ -74,7 +98,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-10 h-10 rounded-xl shadow-sm" />
           <div className="flex flex-col">
             <span className="font-display font-bold text-xl leading-tight text-primary">NFS</span>
-            <span className="text-xs text-muted-foreground font-medium">Gestão Terapêutica</span>
+            <span className="text-xs text-muted-foreground font-medium">
+              {effectiveScope === "reception" ? "Recepção" : "Gestão Terapêutica"}
+            </span>
           </div>
         </div>
         <nav className="flex flex-col gap-2 flex-1">
@@ -87,7 +113,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full max-w-[1600px] mx-auto relative">
-        {/* Decorative background blur */}
         <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-primary/5 to-transparent -z-10 pointer-events-none" />
         <motion.div
           initial={{ opacity: 0, y: 10 }}

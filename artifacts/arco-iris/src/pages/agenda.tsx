@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { useGetProfessionals } from "@workspace/api-client-react";
 import { Card, Select, Button, Label } from "@/components/ui-custom";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -11,6 +10,15 @@ import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
+import {
+  listProfessionals,
+  verifyProfessionalPin,
+  listAppointments,
+  updateAppointment,
+  deleteAppointmentAlta,
+  createNotificacao,
+  type Professional as ArcoProfessional,
+} from "@/lib/arco-rpc";
 
 const TIME_SLOTS = [
   "08:00", "08:50", "09:40", "10:30", "11:20",
@@ -21,6 +29,29 @@ const TIME_SLOTS = [
 function getWeekDays(ref: Date): Date[] {
   const monday = startOfWeek(ref, { weekStartsOn: 1 });
   return Array.from({ length: 5 }, (_, i) => addDays(monday, i));
+}
+
+function isoWeekNumber(dateStr: string): number {
+  const d = new Date(dateStr + "T12:00:00");
+  const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = target.getUTCDay() || 7;
+  target.setUTCDate(target.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+  return Math.ceil((((+target - +yearStart) / 86_400_000) + 1) / 7);
+}
+
+function computeCiclo(frequency: string | null | undefined, date: string): "A" | "B" | "M" | null {
+  if (frequency === "quinzenal") {
+    return isoWeekNumber(date) % 2 === 1 ? "A" : "B";
+  }
+  if (frequency === "mensal") return "M";
+  return null;
+}
+
+function withCiclo<T extends { frequency?: string | null; date: string }>(
+  items: T[]
+): (T & { ciclo: "A" | "B" | "M" | null })[] {
+  return items.map((a) => ({ ...a, ciclo: computeCiclo(a.frequency ?? null, a.date) }));
 }
 
 type Appointment = {
@@ -170,7 +201,14 @@ export default function Agenda() {
   const [pinVerified, setPinVerified] = useState(false);
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
-  const [weekRef] = useState(new Date());
+  // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
+  const [weekRef] = useState(() => {
+    const d = new Date();
+    const dow = d.getDay(); // 0 = domingo, 6 = sabado
+    if (dow === 0) d.setDate(d.getDate() + 1);
+    else if (dow === 6) d.setDate(d.getDate() + 2);
+    return d;
+  });
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [cancelDialog, setCancelDialog] = useState<CancelDialog | null>(null);
@@ -183,8 +221,12 @@ export default function Agenda() {
   const [remanejSending, setRemanejSending] = useState(false);
   const [remanejDone, setRemanejDone] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { data: professionals } = useGetProfessionals();
+  const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    listProfessionals().then(setProfessionals).catch(console.error);
+  }, []);
 
   const canView = isAdmin || pinVerified;
   const weekDays = getWeekDays(weekRef);
@@ -194,8 +236,13 @@ export default function Agenda() {
     if (!selectedProfId) return;
     const from = weekDates[0];
     const to = weekDates[4];
-    fetch(`/api/appointments?professionalId=${selectedProfId}&dateFrom=${from}&dateTo=${to}`)
-      .then(r => r.json()).then(setAppointments).catch(console.error);
+    listAppointments({
+      professionalId: parseInt(selectedProfId),
+      dateFrom: from,
+      dateTo: to,
+    })
+      .then((list) => setAppointments(withCiclo(list) as Appointment[]))
+      .catch(console.error);
   };
 
   useEffect(() => {
@@ -222,25 +269,16 @@ export default function Agenda() {
     if (!selectedProfId || pinInput.length !== 4) return;
     setPinLoading(true); setPinError("");
     try {
-      const res = await fetch(`/api/professionals/${selectedProfId}/verify-pin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: pinInput }),
-      });
-      if (res.ok) { setPinVerified(true); }
-      else { const d = await res.json(); setPinError(d.error || "PIN incorreto"); setPinInput(""); }
+      const prof = await verifyProfessionalPin(parseInt(selectedProfId), pinInput);
+      if (prof) { setPinVerified(true); }
+      else { setPinError("PIN incorreto"); setPinInput(""); }
     } catch { setPinError("Erro ao verificar PIN."); }
     finally { setPinLoading(false); }
   };
 
   // ── Patch status (single occurrence) ──
   const patchStatus = async (apt: Appointment, status: string) => {
-    const res = await fetch(`/api/appointments/${apt.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    const data = await res.json();
+    const data = await updateAppointment(apt.id, { status });
     setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
     return data;
   };
@@ -248,17 +286,13 @@ export default function Agenda() {
   // ── Log na tabela Notificações_Recepção ──
   const logNotificacao = async (apt: Appointment, acao: string) => {
     try {
-      await fetch("/api/notificacoes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appointmentId: apt.id,
-          patientName: apt.patientName || `Paciente #${apt.patientId}`,
-          professionalName: apt.professionalName || selectedProf?.name || "—",
-          acao,
-          dataConsulta: apt.date,
-          horaConsulta: apt.time,
-        }),
+      await createNotificacao({
+        appointmentId: apt.id,
+        patientName: apt.patientName || `Paciente #${apt.patientId}`,
+        professionalName: apt.professionalName || selectedProf?.name || "—",
+        acao,
+        dataConsulta: apt.date,
+        horaConsulta: apt.time,
       });
     } catch { /* silencioso — log não crítico */ }
   };
@@ -293,11 +327,7 @@ export default function Agenda() {
   const handleRevertClick = async (apt: Appointment) => {
     const revertTo = cancelDialog?.originalStatus || "agendado";
     try {
-      await fetch(`/api/appointments/${apt.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: revertTo }),
-      });
+      await updateAppointment(apt.id, { status: revertTo });
       setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: revertTo } : a));
       setCancelDialog(null);
       toast({ title: "Revertido", description: `Agendamento voltou para "${revertTo}".` });
@@ -349,7 +379,7 @@ export default function Agenda() {
   const confirmDarAlta = async () => {
     if (!altaConfirm) return;
     try {
-      await fetch(`/api/appointments/${altaConfirm.id}/alta`, { method: "DELETE" });
+      await deleteAppointmentAlta(altaConfirm.id);
       setAppointments(prev => prev.filter(a =>
         a.id !== altaConfirm.id &&
         !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.date >= altaConfirm.date)
@@ -377,10 +407,10 @@ export default function Agenda() {
     if (!remanejFlow?.newDate || !remanejFlow?.newTime) return;
     setRemanejSending(true);
     try {
-      await fetch(`/api/appointments/${remanejFlow.apt.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: remanejFlow.newDate, time: remanejFlow.newTime, status: "remarcado" }),
+      await updateAppointment(remanejFlow.apt.id, {
+        date: remanejFlow.newDate,
+        time: remanejFlow.newTime,
+        status: "remarcado",
       });
       setAppointments(prev => prev.map(a =>
         a.id === remanejFlow.apt.id
@@ -448,12 +478,15 @@ export default function Agenda() {
     }
   };
 
-  const getApt = (date: string, time: string) => appointments.find(a => a.date === date && a.time === time);
+  // Fase 5A: slots em grupo — um mesmo (date,time,profissional) pode ter varios pacientes.
+  const getApts = (date: string, time: string) =>
+    appointments.filter(a => a.date === date && a.time === time);
   const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
 
-  // Available slots for remanejar (no appointment in that slot)
+  // Slots disponiveis para remanejar = sem qualquer paciente (vazio de verdade).
   const availableSlots = weekDates.flatMap(date =>
-    TIME_SLOTS.filter(t => t !== "12:10" && !getApt(date, t)).map(time => ({ date, time }))
+    TIME_SLOTS.filter(t => t !== "12:10" && getApts(date, t).length === 0)
+              .map(time => ({ date, time }))
   );
 
   return (
@@ -551,18 +584,26 @@ export default function Agenda() {
                         <td colSpan={5} className="px-4 py-3 bg-slate-50/50 text-center text-muted-foreground italic font-medium">Almoço — Pausa</td>
                       ) : (
                         weekDates.map((date, i) => {
-                          const apt = getApt(date, time);
-                          const isDesmarcado = apt?.status?.toLowerCase() === "desmarcado";
-                          const isAtendimento = apt?.status?.toLowerCase() === "atendimento" || apt?.status?.toLowerCase() === "presente";
-                          const isRemarcado = apt?.status?.toLowerCase() === "remarcado";
-                          const isFaltaJustificada = apt?.status?.toLowerCase() === "falta_justificada" || apt?.status?.toLowerCase() === "justificado" || apt?.status?.toLowerCase() === "abonado";
-                          const isFaltaNaoJustificada = apt?.status?.toLowerCase() === "falta_nao_justificada" || apt?.status?.toLowerCase() === "ausente";
-                          const isMenuOpen = apt && actionMenuId === apt.id;
-
+                          const apts = getApts(date, time);
+                          const isGroup = apts.length > 1;
                           return (
-                            <td key={i} className="px-3 py-2 relative">
-                              {apt ? (
-                                <div className="relative" ref={isMenuOpen ? menuRef : null}>
+                            <td key={i} className="px-3 py-2 relative align-top">
+                              {apts.length > 0 ? (
+                                <div className="flex flex-col gap-1.5">
+                                  {isGroup && (
+                                    <span className="text-[9px] uppercase font-bold text-cyan-400 tracking-wider">
+                                      · grupo ({apts.length})
+                                    </span>
+                                  )}
+                                  {apts.map(apt => {
+                                    const isDesmarcado = apt.status?.toLowerCase() === "desmarcado";
+                                    const isAtendimento = apt.status?.toLowerCase() === "atendimento" || apt.status?.toLowerCase() === "presente";
+                                    const isRemarcado = apt.status?.toLowerCase() === "remarcado";
+                                    const isFaltaJustificada = apt.status?.toLowerCase() === "falta_justificada" || apt.status?.toLowerCase() === "justificado" || apt.status?.toLowerCase() === "abonado";
+                                    const isFaltaNaoJustificada = apt.status?.toLowerCase() === "falta_nao_justificada" || apt.status?.toLowerCase() === "ausente";
+                                    const isMenuOpen = actionMenuId === apt.id;
+                                    return (
+                                <div key={apt.id} className="relative" ref={isMenuOpen ? menuRef : null}>
                                   {/* Appointment block */}
                                   <div
                                     onClick={() => setActionMenuId(isMenuOpen ? null : apt.id)}
@@ -624,23 +665,26 @@ export default function Agenda() {
                                     >
                                       <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
 
+                                      {/* Fase 5A: "Presente" habilitado apenas para dono (PIN) ou Admin. */}
                                       <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
                                         <Activity className="w-3.5 h-3.5" /> ✅ Presente
                                       </button>
 
-                                      <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
-                                        <CheckCircle className="w-3.5 h-3.5" /> ⚠️ Falta Justificada
-                                      </button>
-
-                                      <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
-                                        <AlertTriangle className="w-3.5 h-3.5" /> 🔴 Falta N. Justificada
-                                      </button>
-
-                                      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
-
-                                      <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
-                                        <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
-                                      </button>
+                                      {/* Fase 5A: Falta/Desmarcar centralizados na Recepção. Visao do profissional nao exibe. */}
+                                      {isAdmin && (
+                                        <>
+                                          <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
+                                            <CheckCircle className="w-3.5 h-3.5" /> ⚠️ Falta Justificada
+                                          </button>
+                                          <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
+                                            <AlertTriangle className="w-3.5 h-3.5" /> 🔴 Falta N. Justificada
+                                          </button>
+                                          <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                          <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
+                                            <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
+                                          </button>
+                                        </>
+                                      )}
 
                                       <button style={NEON.orange} onClick={() => handleStartRemanejar(apt)}>
                                         <RotateCcw className="w-3.5 h-3.5" /> Remanejar
@@ -649,7 +693,25 @@ export default function Agenda() {
                                       <button style={NEON.red} onClick={() => handleDarAlta(apt)}>
                                         <LogOut className="w-3.5 h-3.5" /> Dar Alta
                                       </button>
+
+                                      {!isAdmin && (
+                                        <p className="text-[9px] text-white/30 px-1 mt-1 italic leading-tight">
+                                          Faltas e desmarcações ficam na Recepção.
+                                        </p>
+                                      )}
                                     </div>
+                                  )}
+                                </div>
+                                    );
+                                  })}
+                                  {/* Admin pode empilhar outro paciente no mesmo slot (atendimento em grupo). */}
+                                  {isAdmin && (
+                                    <button
+                                      onClick={() => setBookingSlot({ date, time })}
+                                      className="w-full text-[10px] font-semibold py-1.5 rounded-lg border border-dashed border-cyan-500/30 text-cyan-400/70 hover:text-cyan-300 hover:border-cyan-400/60 hover:bg-cyan-500/5 transition-colors"
+                                    >
+                                      + adicionar ao grupo
+                                    </button>
                                   )}
                                 </div>
                               ) : (
@@ -681,11 +743,12 @@ export default function Agenda() {
           professionalId={Number(selectedProfId)}
           professionalName={selectedProf?.name || ""}
           professionalSpecialty={selectedProf?.specialty || ""}
+          adminMode={isAdmin}
           onClose={() => setBookingSlot(null)}
           onSuccess={() => {
             setBookingSlot(null);
             fetchAppointments();
-            toast({ title: "Agendado!", description: "Sessões semanais criadas automaticamente para as próximas 52 semanas." });
+            toast({ title: "Agendado!", description: "Sessão(ões) criada(s) com sucesso." });
           }}
         />
       )}

@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { listTriagens, getTriagem, upsertTriagem, deleteTriagem } from "@/lib/triagem-rpc";
+import { listTriagens, getTriagem, upsertTriagem, deleteTriagem, autolinkTriagem } from "@/lib/triagem-rpc";
 
 // ─── WHITE LABEL CONFIG ──────────────────────────────────────────────────────
 export const CLINIC_CONFIG = {
@@ -298,23 +298,31 @@ function parsePontosTotal(resultado: string | null): number {
   }, 0);
 }
 
+// Social: +2 Escola Municipal/Estadual, +2 Trabalho Informal/Roça/Desempregado.
+// Serve apenas como desempate; nao sobrepoe a gravidade clinica.
 function calcVulnScore(t: {
   tipoEscola?: string | null; trabalhoPais?: string | null;
   bpc?: boolean | null; bolsaFamilia?: boolean | null; outroAtendimento?: boolean | null;
 }): number {
   let score = 0;
-  if (t.tipoEscola === "Municipal" || t.tipoEscola === "Estadual") score += 3;
-  if (t.trabalhoPais === "Informal/Roça" || t.trabalhoPais === "Desempregado") score += 3;
-  if (t.bpc || t.bolsaFamilia) score += 5;
-  if (t.outroAtendimento === false) score += 5;
+  if (t.tipoEscola === "Municipal" || t.tipoEscola === "Estadual") score += 2;
+  if (t.trabalhoPais === "Informal/Roça" || t.trabalhoPais === "Desempregado") score += 2;
   return score;
 }
 
+// Total raw clinico maximo = 360 (8 areas x 15 perguntas x 3 pts).
+// Escala para 0..100 pra compor com social.
+const CLINICAL_MAX_RAW = 8 * 15 * 3;
+function toScoreClinico100(clinicalPts: number): number {
+  return Math.round((clinicalPts * 100) / CLINICAL_MAX_RAW);
+}
+
 function getPrioridadeBadge(vulnScore: number, clinicalPts: number) {
-  const total = vulnScore + Math.round(clinicalPts / 8);
-  if (total >= 35 || vulnScore >= 16) return { label: "Prioridade Máxima", cls: "bg-red-100 text-red-800 border-red-300", icon: "🔴" };
-  if (total >= 20) return { label: "Alta Prioridade", cls: "bg-orange-100 text-orange-800 border-orange-300", icon: "🟠" };
-  if (vulnScore >= 10) return { label: "Vulnerabilidade Social", cls: "bg-yellow-100 text-yellow-800 border-yellow-300", icon: "🟡" };
+  const clinico = toScoreClinico100(clinicalPts);
+  if (clinico >= 75) return { label: "Prioridade Máxima", cls: "bg-red-100 text-red-800 border-red-300", icon: "🔴" };
+  if (clinico >= 50) return { label: "Alta Prioridade",    cls: "bg-orange-100 text-orange-800 border-orange-300", icon: "🟠" };
+  if (clinico >= 25) return { label: "Média Prioridade",   cls: "bg-amber-100 text-amber-800 border-amber-300",    icon: "🟡" };
+  if (vulnScore >= 2) return { label: "Vulnerabilidade Social", cls: "bg-yellow-100 text-yellow-800 border-yellow-300", icon: "🟡" };
   return null;
 }
 
@@ -817,6 +825,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
+  const [autolinkMsg, setAutolinkMsg] = useState<string | null>(null);
   const [, navigate] = useLocation();
   const data = new Date().toLocaleDateString("pt-BR");
   const isCenso = tipoRegistro === "Registro Censo Municipal";
@@ -862,8 +871,19 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
         setSalvo(true);
         return;
       }
-      await upsertTriagem(editId ?? null, payload);
+      const saved = await upsertTriagem(editId ?? null, payload);
       setSalvo(true);
+      // Auto-link triagem to patient + waiting list (best-effort, non-blocking).
+      // Only runs for non-Censo registros (server also guards on that).
+      if (!isCenso && saved?.id) {
+        const result = await autolinkTriagem(saved.id);
+        if (result?.addedToQueue && result.addedSpecialties?.length) {
+          const specs = result.addedSpecialties.join(", ");
+          setAutolinkMsg(`✅ Paciente adicionado à fila de espera: ${specs}.`);
+        } else if (result?.linkedOnly && result.patientName) {
+          setAutolinkMsg(`✅ Vinculado ao paciente ${result.patientName}.`);
+        }
+      }
     } catch {
       if (!editId) {
         const { addToOfflineQueue } = await import("./lib/offline-queue");
@@ -1265,6 +1285,11 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
                 className="px-6 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
                 ✓ {editId ? "Atualizado!" : "Salvo!"} Ver Pacientes →
               </button>
+              {autolinkMsg && (
+                <p className="text-xs font-semibold text-emerald-600 max-w-sm text-right leading-snug">
+                  {autolinkMsg}
+                </p>
+              )}
             </div>
           )}
           {viewOnly && (
@@ -1323,8 +1348,9 @@ function ListaPacientes() {
       (t.cid ?? "").toLowerCase().includes(busca.toLowerCase())
     )
     .sort((a, b) => {
-      const scoreA = calcVulnScore(a) * 3 + parsePontosTotal(a.resultado);
-      const scoreB = calcVulnScore(b) * 3 + parsePontosTotal(b.resultado);
+      // ORDER BY (score_clinico_100 + score_social) DESC.
+      const scoreA = toScoreClinico100(parsePontosTotal(a.resultado)) + calcVulnScore(a);
+      const scoreB = toScoreClinico100(parsePontosTotal(b.resultado)) + calcVulnScore(b);
       return scoreB - scoreA;
     });
 
@@ -1482,7 +1508,7 @@ function Dashboard() {
     aparelhoAuditivo: triagens.filter(t => t.aparelhoAuditivo).length,
     comAlergias: triagens.filter(t => t.alergias && t.alergias.trim()).length,
     comMedicacao: triagens.filter(t => t.medicacaoContinua && t.medicacaoContinua.trim()).length,
-    vulnAguardando: triagens.filter(t => calcVulnScore(t) >= 8).length,
+    vulnAguardando: triagens.filter(t => calcVulnScore(t) >= 2).length,
     redePublica: triagens.filter(t => t.tipoEscola === "Municipal" || t.tipoEscola === "Estadual").length,
     semOutroAtend: triagens.filter(t => t.outroAtendimento === false).length,
     prioridadeMaxima: triagens.filter(t => {

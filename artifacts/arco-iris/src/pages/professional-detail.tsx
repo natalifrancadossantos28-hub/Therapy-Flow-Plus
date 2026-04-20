@@ -5,7 +5,14 @@ import { format } from "date-fns";
 import { Calendar as CalendarIcon, Clock, ArrowLeft, Lock, ShieldCheck } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { getProfessional, upsertProfessional, type Professional } from "@/lib/arco-rpc";
+import {
+  getProfessional,
+  upsertProfessional,
+  listAppointments,
+  type Professional,
+  type AppointmentListItem,
+} from "@/lib/arco-rpc";
+import { getStatusColor, getStatusLabel } from "@/lib/utils";
 
 export default function ProfessionalDetail() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +23,8 @@ export default function ProfessionalDetail() {
   const [pinSaving, setPinSaving] = useState(false);
   const [professional, setProfessional] = useState<Professional | null>(null);
   const [loading, setLoading] = useState(true);
+  const [appointments, setAppointments] = useState<AppointmentListItem[]>([]);
+  const [apptLoading, setApptLoading] = useState(false);
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -36,6 +45,15 @@ export default function ProfessionalDetail() {
   }, [profId, toast]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!profId || !date) return;
+    setApptLoading(true);
+    listAppointments({ professionalId: profId, date })
+      .then(setAppointments)
+      .catch(() => setAppointments([]))
+      .finally(() => setApptLoading(false));
+  }, [profId, date]);
 
   const savePin = async () => {
     if (!professional || pinValue.length !== 4) return;
@@ -146,15 +164,34 @@ export default function ProfessionalDetail() {
               </h2>
             </div>
 
-            <div className="p-12 text-center text-muted-foreground">
-              <p className="text-sm">
-                A visualização da agenda diária será reativada na Fase 4C
-                (Agenda + Appointments).
-              </p>
-              <p className="text-xs mt-2 opacity-70">
-                Data selecionada: <strong>{date}</strong>
-              </p>
-            </div>
+            {apptLoading ? (
+              <div className="p-12 text-center text-muted-foreground animate-pulse text-sm">
+                Carregando agenda...
+              </div>
+            ) : appointments.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground">
+                <p className="text-sm">Nenhum atendimento em {date}.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {appointments
+                  .slice()
+                  .sort((a, b) => a.time.localeCompare(b.time))
+                  .map((a) => (
+                    <div key={a.id} className="flex items-center gap-4 px-6 py-4">
+                      <div className="font-mono text-sm font-bold text-primary w-16">{a.time}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate">{a.patientName ?? `Paciente #${a.patientId}`}</p>
+                      </div>
+                      <span
+                        className={`text-xs font-semibold px-2 py-1 rounded ${getStatusColor(a.status)}`}
+                      >
+                        {getStatusLabel(a.status)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            )}
           </Card>
         </div>
       </div>

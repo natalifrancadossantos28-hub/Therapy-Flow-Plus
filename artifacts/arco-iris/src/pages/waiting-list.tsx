@@ -1,23 +1,17 @@
-import { useState } from "react";
-import { useGetWaitingList, useDeleteWaitingListEntry, useGetPatients, useGetProfessionals } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-custom";
 import { Trash2, ListTodo, ListPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate } from "@/lib/utils";
-
-const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
-
-async function apiAddToFila(patientId: number, specialty: string | null) {
-  const res = await fetch(`${BASE_URL}/api/patients/${patientId}/add-to-fila`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ specialty }),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.message ?? json.error ?? "Erro ao adicionar à fila");
-  return json;
-}
+import { supabase } from "@/lib/supabase";
+import {
+  listWaitingList,
+  deleteWaitingListEntry,
+  addPatientToFila,
+  listPatients,
+  type WaitingListEntry,
+  type Patient,
+} from "@/lib/arco-rpc";
 
 const PRIORITY_LABEL: Record<string, string> = {
   elevado: "VERMELHO – Elevado",
@@ -29,42 +23,86 @@ const PRIORITY_LABEL: Record<string, string> = {
   baixa: "VERDE – Baixo",
 };
 
-const PRIORITY_ORDER: Record<string, number> = {
-  elevado: 0, alta: 0,
-  moderado: 1, media: 1,
-  leve: 2,
-  baixo: 3, baixa: 3,
-};
+const SCORE_SPECIALTY_MAP: Array<{ field: keyof Patient; specialty: string }> = [
+  { field: "scorePsicologia",       specialty: "Psicologia"         },
+  { field: "scorePsicomotricidade", specialty: "Psicomotricidade"   },
+  { field: "scoreFisioterapia",     specialty: "Fisioterapia"       },
+  { field: "scoreTO",               specialty: "Terapia Ocupacional"},
+  { field: "scoreFonoaudiologia",   specialty: "Fonoaudiologia"     },
+  { field: "scoreNutricionista",    specialty: "Nutrição"           },
+  { field: "scorePsicopedagogia",   specialty: "Psicopedagogia"     },
+  { field: "scoreEdFisica",         specialty: "Educação Física"    },
+];
 
 export default function WaitingList() {
+  const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [formPatientId, setFormPatientId] = useState("");
   const [filterSpecialty, setFilterSpecialty] = useState<string>("__all__");
-  const { data: waitingList, isLoading } = useGetWaitingList({} as any, { refetchInterval: 20_000 } as any);
-  const { data: patients } = useGetPatients();
-  const { data: professionals } = useGetProfessionals();
-  const deleteMutation = useDeleteWaitingListEntry();
-  const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const eligiblePatients = (patients ?? []).filter((p) => {
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [wl, ps] = await Promise.all([listWaitingList(), listPatients()]);
+      setWaitingList(wl);
+      setPatients(ps);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao carregar fila",
+        description: err?.message || "Falha inesperada.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Realtime: atualiza a fila instantaneamente quando uma nova triagem for salva
+  // (trigger `tg_triagens_autolink` insere em `waiting_list`) ou quando algum
+  // paciente tem `triagem_score`/`status` atualizados. Debounce 400ms evita
+  // re-render em rajadas (ex.: varias especialidades inseridas em sequencia).
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => { void load(); }, 400);
+  }, [load]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel("arco-fila-espera")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "waiting_list" },
+        () => scheduleReload()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "patients" },
+        () => scheduleReload()
+      )
+      .subscribe();
+    return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [scheduleReload]);
+
+  const eligiblePatients = patients.filter((p) => {
     const score = p.triagemScore;
     const inactiveStatus = ["Alta", "Óbito", "Desistência", "Atendimento"].includes(p.status ?? "");
     const isCenso = p.tipoRegistro === "Registro Censo Municipal";
     return score != null && !inactiveStatus && !isCenso;
   });
-
-  const SCORE_SPECIALTY_MAP = [
-    { field: "scorePsicologia",       specialty: "Psicologia"         },
-    { field: "scorePsicomotricidade", specialty: "Psicomotricidade"   },
-    { field: "scoreFisioterapia",     specialty: "Fisioterapia"       },
-    { field: "scoreTO",               specialty: "Terapia Ocupacional"},
-    { field: "scoreFonoaudiologia",   specialty: "Fonoaudiologia"     },
-    { field: "scoreNutricionista",    specialty: "Nutrição"           },
-    { field: "scorePsicopedagogia",   specialty: "Psicopedagogia"     },
-    { field: "scoreEdFisica",         specialty: "Educação Física"    },
-  ];
 
   const resetForm = () => { setFormPatientId(""); };
 
@@ -73,9 +111,9 @@ export default function WaitingList() {
     if (!formPatientId) return;
     setAdding(true);
 
-    const selectedPatient = (patients ?? []).find(p => String(p.id) === formPatientId);
+    const selectedPatient = patients.find(p => String(p.id) === formPatientId);
     const scoredSpecialties = SCORE_SPECIALTY_MAP
-      .filter(({ field }) => ((selectedPatient as any)?.[field] ?? 0) > 0)
+      .filter(({ field }) => ((selectedPatient?.[field] as number | null) ?? 0) > 0)
       .map(({ specialty }) => specialty);
     const specialtiesToAdd: (string | null)[] = scoredSpecialties.length > 0 ? scoredSpecialties : [null];
 
@@ -85,7 +123,7 @@ export default function WaitingList() {
     try {
       for (const sp of specialtiesToAdd) {
         try {
-          const result = await apiAddToFila(parseInt(formPatientId), sp ?? null);
+          const result = await addPatientToFila(parseInt(formPatientId), sp ?? null);
           lastPriority = result.priority;
           added++;
         } catch (err: any) {
@@ -93,8 +131,7 @@ export default function WaitingList() {
           else throw err;
         }
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      await load();
       const desc = added > 0
         ? `${added} especialidade(s) adicionada(s)${skipped > 0 ? `, ${skipped} já existia(m)` : ""}. Prioridade: ${PRIORITY_LABEL[lastPriority] ?? lastPriority}`
         : "Todas as especialidades já estavam na fila.";
@@ -110,39 +147,36 @@ export default function WaitingList() {
   const handleRemove = async (id: number) => {
     if (!confirm("Remover paciente da fila de espera?")) return;
     try {
-      await deleteMutation.mutateAsync({ id });
-      queryClient.invalidateQueries({ queryKey: ["/api/waiting-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      await deleteWaitingListEntry(id);
+      setWaitingList(prev => prev.filter(e => e.id !== id));
       toast({ title: "Removido", description: "Entrada removida com sucesso." });
-    } catch {
-      toast({ title: "Erro", description: "Falha ao remover.", variant: "destructive" });
+    } catch (err: any) {
+      toast({
+        title: "Erro",
+        description: err?.message || "Falha ao remover.",
+        variant: "destructive",
+      });
     }
   };
 
-  // ── Posições independentes por especialidade ─────────────────────────────
+  // Server ja retorna ORDER BY (score_clinico_100 + score_social) DESC (Fase 5C).
+  // Aqui so calculamos a posicao dentro de cada especialidade preservando a ordem recebida.
   const perSpecialtyPosition = new Map<number, number>();
   const specialtyOptions: string[] = [];
-  if (waitingList) {
-    const grouped = new Map<string, (typeof waitingList)[number][]>();
+  {
+    const counters = new Map<string, number>();
     for (const entry of waitingList) {
-      const sp: string = (entry as any).specialty ?? "__null__";
-      if (!grouped.has(sp)) { grouped.set(sp, []); specialtyOptions.push(sp); }
-      grouped.get(sp)!.push(entry);
-    }
-    for (const [, entries] of grouped) {
-      const sorted = [...entries].sort((a, b) => {
-        const pa = PRIORITY_ORDER[a.priority ?? ""] ?? 99;
-        const pb = PRIORITY_ORDER[b.priority ?? ""] ?? 99;
-        return pa - pb;
-      });
-      sorted.forEach((entry, i) => perSpecialtyPosition.set(entry.id, i + 1));
+      const sp: string = entry.specialty ?? "__null__";
+      if (!counters.has(sp)) { counters.set(sp, 0); specialtyOptions.push(sp); }
+      const next = (counters.get(sp) ?? 0) + 1;
+      counters.set(sp, next);
+      perSpecialtyPosition.set(entry.id, next);
     }
   }
 
-  // ── Lista filtrada por especialidade ─────────────────────────────────────
-  const displayList = (waitingList ?? []).filter(entry => {
+  const displayList = waitingList.filter(entry => {
     if (filterSpecialty === "__all__") return true;
-    const sp: string = (entry as any).specialty ?? "__null__";
+    const sp: string = entry.specialty ?? "__null__";
     return sp === filterSpecialty;
   });
 
@@ -191,7 +225,6 @@ export default function WaitingList() {
                 </option>
               ))}
             </select>
-            {/* Seta customizada */}
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-cyan-400 text-xs">▾</span>
           </div>
         )}
@@ -206,16 +239,17 @@ export default function WaitingList() {
                 <th className="px-6 py-4">Paciente</th>
                 <th className="px-6 py-4">Especialidade</th>
                 <th className="px-6 py-4">Prioridade</th>
+                <th className="px-6 py-4">Score</th>
                 <th className="px-6 py-4">Entrada</th>
                 <th className="px-6 py-4 text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-12 animate-pulse">Carregando fila...</td></tr>
-              ) : waitingList?.length === 0 ? (
+                <tr><td colSpan={7} className="text-center py-12 animate-pulse">Carregando fila...</td></tr>
+              ) : waitingList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-16">
+                  <td colSpan={7} className="text-center py-16">
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                       <ListTodo className="w-8 h-8 text-muted-foreground" />
                     </div>
@@ -225,13 +259,12 @@ export default function WaitingList() {
                 </tr>
               ) : displayList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
                     Nenhum paciente nesta especialidade.
                   </td>
                 </tr>
               ) : (
                 displayList.map((entry) => {
-                  const e = entry as any;
                   const pos = perSpecialtyPosition.get(entry.id) ?? "—";
                   return (
                     <tr key={entry.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
@@ -239,19 +272,33 @@ export default function WaitingList() {
                       <td className="px-6 py-4 font-semibold text-foreground">
                         {entry.patientName}
                         <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">
-                          {e.patientProntuario || `#${String(entry.patientId).padStart(4, "0")}`}
+                          {entry.patientProntuario || `#${String(entry.patientId).padStart(4, "0")}`}
                         </div>
                         {entry.patientPhone && (
                           <div className="text-xs text-muted-foreground font-normal mt-0.5">{entry.patientPhone}</div>
                         )}
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">
-                        {e.specialty || "Qualquer especialidade"}
+                        {entry.specialty || "Qualquer especialidade"}
                       </td>
                       <td className="px-6 py-4">
                         <Badge className={getPriorityColor(entry.priority)}>
                           {PRIORITY_LABEL[entry.priority] ?? entry.priority}
                         </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-baseline gap-1 font-mono">
+                          <span className="font-bold text-foreground">{entry.scoreClinico ?? 0}</span>
+                          <span className="text-xs text-muted-foreground">/100</span>
+                          {!!entry.scoreSocial && entry.scoreSocial > 0 && (
+                            <span
+                              title="Score social (desempate)"
+                              className="ml-2 text-xs font-semibold text-amber-500"
+                            >
+                              +{entry.scoreSocial}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
                       <td className="px-6 py-4 text-right">
@@ -285,10 +332,11 @@ export default function WaitingList() {
                 <Select required value={formPatientId} onChange={e => setFormPatientId(e.target.value)}>
                   <option value="">Selecione um paciente triado...</option>
                   {eligiblePatients.map(p => {
-                    const score = p.triagemScore;
+                    const raw = p.triagemScore ?? 0;
+                    const scoreClinico = Math.round((raw * 100) / 360);
                     return (
                       <option key={p.id} value={p.id}>
-                        {p.name} — Score: {score}/360
+                        {p.name} — Score clínico: {scoreClinico}/100
                       </option>
                     );
                   })}

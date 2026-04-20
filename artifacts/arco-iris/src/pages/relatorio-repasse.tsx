@@ -1,5 +1,9 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { useGetProfessionals } from "@workspace/api-client-react";
+import {
+  listProfessionals,
+  listAppointments,
+  type Professional as ArcoProfessional,
+} from "@/lib/arco-rpc";
 import { FileText, Printer, ChevronLeft, ChevronRight, TrendingUp, Users, DollarSign, CheckCircle2, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -39,7 +43,7 @@ function getMonthRange(offset = 0) {
 }
 
 export default function RelatorioRepasse() {
-  const { data: professionals = [] } = useGetProfessionals({} as any);
+  const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [monthOffset, setMonthOffset] = useState(0);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,10 +52,13 @@ export default function RelatorioRepasse() {
   const range = useMemo(() => getMonthRange(monthOffset), [monthOffset]);
 
   useEffect(() => {
+    listProfessionals().then(setProfessionals).catch(console.error);
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
-    fetch(`/api/appointments?dateFrom=${range.dateFrom}&dateTo=${range.dateTo}`)
-      .then(r => r.json())
-      .then((data: Appointment[]) => setAppointments(data))
+    listAppointments({ dateFrom: range.dateFrom, dateTo: range.dateTo })
+      .then((data) => setAppointments(data))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [range.dateFrom, range.dateTo]);

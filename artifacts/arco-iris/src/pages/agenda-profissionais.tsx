@@ -1,10 +1,21 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
+import { supabase } from "@/lib/supabase";
+import {
+  listProfessionals,
+  verifyProfessionalPin,
+  listAppointments,
+  updateAppointment,
+  deleteAppointmentAlta,
+  createNotificacao,
+} from "@/lib/arco-rpc";
+import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
+import { useLocation } from "wouter";
 
 const TIME_SLOTS = [
   "08:00", "08:50", "09:40", "10:30", "11:20",
@@ -22,26 +33,53 @@ type Appointment = { id: number; patientId: number; patientName?: string; date: 
 
 type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
+type RemanejFlow = {
+  apt: Appointment;
+  newDate?: string;
+  newTime?: string;
+  done?: boolean;
+};
+
 const NEON: Record<string, React.CSSProperties> = {
   green: { background: "rgba(5,10,5,0.92)", border: "1px solid #22c55e", color: "#4ade80", boxShadow: "0 0 14px rgba(34,197,94,0.55)", textShadow: "0 0 8px rgba(74,222,128,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   yellow: { background: "rgba(10,8,0,0.92)", border: "1px solid #eab308", color: "#fde047", boxShadow: "0 0 14px rgba(234,179,8,0.55)", textShadow: "0 0 8px rgba(253,224,71,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   red: { background: "rgba(10,0,0,0.92)", border: "1px solid #ef4444", color: "#f87171", boxShadow: "0 0 14px rgba(239,68,68,0.55)", textShadow: "0 0 8px rgba(248,113,113,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   orange: { background: "rgba(10,5,0,0.92)", border: "1px solid #f97316", color: "#fb923c", boxShadow: "0 0 14px rgba(249,115,22,0.55)", textShadow: "0 0 8px rgba(251,146,60,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
+  blue: { background: "rgba(0,5,15,0.92)", border: "1px solid #3b82f6", color: "#60a5fa", boxShadow: "0 0 14px rgba(59,130,246,0.55)", textShadow: "0 0 8px rgba(96,165,250,0.9)", borderRadius: "10px", padding: "6px 10px", fontWeight: 700, fontSize: "11px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s", justifyContent: "center" },
 };
 
 export default function AgendaProfissionais() {
+  const [, setLocation] = useLocation();
+  // Fase 6: identifica o scope vindo do portal unificado.
+  // - admin: seleciona qualquer profissional sem PIN.
+  // - professional: pin ja foi verificado no portal; auto-seleciona.
+  const portalScope = getCurrentScope();
+  const portalProf = getProfessionalSession();
+  const isAdminViewing = portalScope === "admin";
+  const isProfessionalSession = portalScope === "professional" && !!portalProf;
   const [professionals, setProfessionals] = useState<Professional[]>([]);
-  const [selectedProfId, setSelectedProfId] = useState("");
+  const [selectedProfId, setSelectedProfId] = useState(
+    isProfessionalSession ? String(portalProf!.professionalId) : ""
+  );
   const [pinInput, setPinInput] = useState("");
-  const [pinVerified, setPinVerified] = useState(false);
+  const [pinVerified, setPinVerified] = useState(isAdminViewing || isProfessionalSession);
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
-  const [weekRef] = useState(new Date());
+  // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
+  const [weekRef] = useState(() => {
+    const d = new Date();
+    const dow = d.getDay(); // 0 = domingo, 6 = sabado
+    if (dow === 0) d.setDate(d.getDate() + 1);
+    else if (dow === 6) d.setDate(d.getDate() + 2);
+    return d;
+  });
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
   const [absenceAlert, setAbsenceAlert] = useState<AbsenceAlert | null>(null);
+  const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
+  const [remanejSending, setRemanejSending] = useState(false);
   const { toast } = useToast();
 
   const weekDays = getWeekDays(weekRef);
@@ -50,16 +88,52 @@ export default function AgendaProfissionais() {
   const selectedProf = professionals.find(p => String(p.id) === selectedProfId);
 
   useEffect(() => {
-    fetch("/api/professionals").then(r => r.json()).then(setProfessionals).catch(console.error);
+    listProfessionals()
+      .then((list) =>
+        setProfessionals(
+          list.map((p) => ({
+            id: p.id,
+            name: p.name,
+            specialty: p.specialty ?? "",
+            pin: p.pin ?? undefined,
+          }))
+        )
+      )
+      .catch(console.error);
   }, []);
 
   const fetchAppointments = () => {
     if (!selectedProfId) return;
-    fetch(`/api/appointments?professionalId=${selectedProfId}`)
-      .then(r => r.json()).then(setAppointments).catch(console.error);
+    listAppointments({ professionalId: parseInt(selectedProfId) })
+      .then(setAppointments)
+      .catch(console.error);
   };
 
   useEffect(() => { if (pinVerified) fetchAppointments(); }, [selectedProfId, pinVerified]);
+
+  // Realtime: recarrega a agenda quando qualquer appointment desse profissional muda
+  // (grupo novo, remanejar pela Recepcao, status update, etc.).
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!supabase || !pinVerified || !selectedProfId) return;
+    const profId = parseInt(selectedProfId);
+    const scheduleReload = () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = setTimeout(() => { fetchAppointments(); }, 400);
+    };
+    const channel = supabase
+      .channel(`agenda-prof-${profId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointments", filter: `professional_id=eq.${profId}` },
+        scheduleReload
+      )
+      .subscribe();
+    return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [selectedProfId, pinVerified]);
 
   const handleProfChange = (id: string) => {
     setSelectedProfId(id); setPinVerified(false); setPinInput(""); setPinError("");
@@ -69,15 +143,10 @@ export default function AgendaProfissionais() {
     if (!selectedProfId || pinInput.length !== 4) return;
     setPinLoading(true); setPinError("");
     try {
-      const res = await fetch(`/api/professionals/${selectedProfId}/verify-pin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: pinInput }),
-      });
-      if (res.ok) { setPinVerified(true); }
+      const prof = await verifyProfessionalPin(parseInt(selectedProfId), pinInput);
+      if (prof) { setPinVerified(true); }
       else {
-        const data = await res.json();
-        setPinError(data.error || "PIN incorreto"); setPinInput("");
+        setPinError("PIN incorreto"); setPinInput("");
       }
     } catch { setPinError("Erro ao verificar PIN."); }
     finally { setPinLoading(false); }
@@ -151,29 +220,20 @@ export default function AgendaProfissionais() {
   };
 
   const patchStatus = async (apt: Appointment, status: string) => {
-    const res = await fetch(`/api/appointments/${apt.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    const data = await res.json();
+    const data = await updateAppointment(apt.id, { status });
     setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
     return data;
   };
 
   const logNotificacao = async (apt: Appointment, acao: string) => {
     try {
-      await fetch("/api/notificacoes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appointmentId: apt.id,
-          patientName: apt.patientName || `Paciente #${apt.patientId}`,
-          professionalName: selectedProf?.name || "—",
-          acao,
-          dataConsulta: apt.date,
-          horaConsulta: apt.time,
-        }),
+      await createNotificacao({
+        appointmentId: apt.id,
+        patientName: apt.patientName || `Paciente #${apt.patientId}`,
+        professionalName: selectedProf?.name || "—",
+        acao,
+        dataConsulta: apt.date,
+        horaConsulta: apt.time,
       });
     } catch { /* silencioso */ }
   };
@@ -184,19 +244,51 @@ export default function AgendaProfissionais() {
       await patchStatus(apt, "desmarcado");
       await logNotificacao(apt, "Desmarcar");
       toast({ title: "🔴 Desmarcado", description: `${apt.patientName} removido da sessão.` });
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível desmarcar.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Erro ao desmarcar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }
   };
 
-  const handleRemanejar = async (apt: Appointment) => {
+  const handleRemanejar = (apt: Appointment) => {
+    setActionMenuId(null);
+    setRemanejFlow({ apt });
+  };
+
+  const confirmRemanejar = async (newDate: string, newTime: string) => {
+    if (!remanejFlow) return;
+    setRemanejSending(true);
+    try {
+      await updateAppointment(remanejFlow.apt.id, {
+        date: newDate,
+        time: newTime,
+        status: "remarcado",
+      });
+      setAppointments(prev => prev.map(a =>
+        a.id === remanejFlow.apt.id
+          ? { ...a, date: newDate, time: newTime, status: "remarcado" }
+          : a
+      ));
+      await logNotificacao(
+        { ...remanejFlow.apt, date: newDate, time: newTime },
+        "Remanejar"
+      );
+      setRemanejFlow({ ...remanejFlow, newDate, newTime, done: true });
+      toast({ title: "🟠 Remanejado", description: `${remanejFlow.apt.patientName} movido para ${newDate} às ${newTime}. Recepção notificada.` });
+    } catch (err: any) {
+      toast({ title: "Erro ao remanejar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
+    } finally {
+      setRemanejSending(false);
+    }
+  };
+
+  const handleAtendimento = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      await patchStatus(apt, "remarcado");
-      await logNotificacao(apt, "Remanejar");
-      toast({ title: "🟠 Remanejar", description: `${apt.patientName} marcado para reagendamento. A recepção será notificada.` });
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível remarcar.", variant: "destructive" });
+      await patchStatus(apt, "atendimento");
+      await logNotificacao(apt, "Em Atendimento");
+      toast({ title: "✅ Em Atendimento", description: `${apt.patientName} marcado como em atendimento.` });
+    } catch (err: any) {
+      toast({ title: "Erro ao iniciar atendimento", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }
   };
 
@@ -208,16 +300,24 @@ export default function AgendaProfissionais() {
   const confirmDarAlta = async () => {
     if (!altaConfirm) return;
     try {
-      await fetch(`/api/appointments/${altaConfirm.id}/alta`, { method: "DELETE" });
+      await deleteAppointmentAlta(altaConfirm.id);
       setAppointments(prev => prev.filter(a => a.id !== altaConfirm.id));
       setAltaConfirm(null);
       toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado.` });
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Erro ao dar alta", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }
   };
 
-  const getApt = (date: string, time: string) => appointments.find(a => a.date === date && a.time === time);
+  // Fase 5A: slots em grupo — o mesmo horario pode ter varios pacientes.
+  const getApts = (date: string, time: string) =>
+    appointments.filter(a => a.date === date && a.time === time);
+
+  // Remanejar: slots vazios desta semana para o mesmo profissional.
+  const availableSlots = weekDates.flatMap(date =>
+    TIME_SLOTS.filter(t => t !== "12:10" && getApts(date, t).length === 0)
+      .map(time => ({ date, time }))
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
@@ -254,10 +354,18 @@ export default function AgendaProfissionais() {
                   <Printer className="w-4 h-4" /> Imprimir Agenda do Dia
                 </button>
                 <button
-                  onClick={() => { setPinVerified(false); setSelectedProfId(""); setPinInput(""); }}
+                  onClick={() => {
+                    // Admin volta pro dashboard; profissional e acesso direto voltam pro portal.
+                    if (isAdminViewing) {
+                      setLocation("/");
+                    } else {
+                      clearAllSessions();
+                      setLocation("/portal");
+                    }
+                  }}
                   className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground text-sm font-semibold rounded-xl hover:bg-[rgba(255,30,90,0.1)] hover:text-[#ff2060] border border-border hover:border-[rgba(255,30,90,0.3)] transition-all"
                 >
-                  <LogOut className="w-4 h-4" /> Sair da Agenda
+                  <LogOut className="w-4 h-4" /> {isAdminViewing ? "Voltar ao painel" : "Sair da Agenda"}
                 </button>
               </>
             )}
@@ -319,13 +427,29 @@ export default function AgendaProfissionais() {
         ) : (
           <>
             {/* Pro info bar */}
-            <div className="bg-card rounded-2xl border border-primary/20 px-6 py-4 flex items-center justify-between" style={{ boxShadow: "0 0 20px rgba(0,240,255,0.04)" }}>
+            <div className="bg-card rounded-2xl border border-primary/20 px-6 py-4 flex items-center justify-between gap-4 flex-wrap" style={{ boxShadow: "0 0 20px rgba(0,240,255,0.04)" }}>
               <div className="flex items-center gap-3">
                 <ShieldCheck className="w-5 h-5 text-primary" style={{ filter: "drop-shadow(0 0 6px rgba(0,240,255,0.5))" }} />
-                <div>
-                  <p className="font-bold text-foreground">{selectedProf?.name}</p>
-                  <p className="text-sm text-muted-foreground">{selectedProf?.specialty}</p>
-                </div>
+                {isAdminViewing ? (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-fuchsia-400 font-bold">Admin · visualizando</p>
+                    <select
+                      value={selectedProfId}
+                      onChange={(e) => setSelectedProfId(e.target.value)}
+                      className="mt-1 bg-muted text-foreground font-bold rounded-lg px-3 py-1.5 border border-border focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
+                      <option value="">Selecione um profissional...</option>
+                      {professionals.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}{p.specialty ? ` — ${p.specialty}` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-bold text-foreground">{selectedProf?.name}</p>
+                    <p className="text-sm text-muted-foreground">{selectedProf?.specialty}</p>
+                  </div>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-sm font-semibold text-foreground">Semana atual</p>
@@ -365,11 +489,26 @@ export default function AgendaProfissionais() {
                             </td>
                           ) : (
                             weekDates.map((date, i) => {
-                              const apt = getApt(date, time);
+                              const apts = getApts(date, time);
                               const isToday = date === today;
+                              const isGroup = apts.length > 1;
                               return (
-                                <td key={i} className={cn("px-4 py-2.5 relative", isToday && "bg-primary/5")}>
-                                  {apt ? (() => {
+                                <td key={i} className={cn("px-4 py-2.5 relative align-top", isToday && "bg-primary/5")}>
+                                  {apts.length === 0 ? (
+                                    <button
+                                      onClick={() => setBookingSlot({ date, time })}
+                                      className="w-full min-h-[50px] flex items-center justify-center border-2 border-dashed border-border/50 rounded-xl text-muted-foreground/40 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all text-[10px] font-semibold cursor-pointer"
+                                    >
+                                      + Agendar
+                                    </button>
+                                  ) : (
+                                    <div className="flex flex-col gap-1.5">
+                                      {isGroup && (
+                                        <span className="text-[9px] uppercase font-bold text-cyan-400 tracking-wider">
+                                          · grupo ({apts.length})
+                                        </span>
+                                      )}
+                                      {apts.map(apt => (() => {
                                     const isMenuOpen = actionMenuId === apt.id;
                                     const s = apt.status?.toLowerCase() ?? "";
                                     const isDesmarcado    = s === "desmarcado";
@@ -424,16 +563,18 @@ export default function AgendaProfissionais() {
                                           <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
                                         </div>
 
-                                        {/* ── Menu de ações (somente se NÃO for Presente) ── */}
+                                        {/* Fase 5A: visao do profissional — Desmarcar/Falta ficam apenas na Recepção. */}
                                         {isMenuOpen && !isPresente && (
                                           <div
                                             className="absolute z-50 top-full left-0 mt-1 min-w-[180px] rounded-2xl shadow-2xl"
                                             style={{ background: "rgba(2,4,8,0.97)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)", padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}
                                           >
                                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
-                                            <button style={NEON.red} onClick={() => handleDesmarcar(apt)}>
-                                              <XCircle className="w-3.5 h-3.5" /> Desmarcar
-                                            </button>
+                                            {!isAtendimento && (
+                                              <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
+                                                <Activity className="w-3.5 h-3.5" /> ✅ Em Atendimento
+                                              </button>
+                                            )}
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
                                               <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                             </button>
@@ -442,6 +583,9 @@ export default function AgendaProfissionais() {
                                                 <LogOut className="w-3.5 h-3.5" /> Dar Alta
                                               </button>
                                             </div>
+                                            <p className="text-[9px] text-white/30 italic leading-tight px-1 mt-1">
+                                              Faltas e desmarcações ficam no painel da Recepção.
+                                            </p>
                                             <button onClick={() => setActionMenuId(null)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.3)", fontSize: "10px", cursor: "pointer", marginTop: "2px", textAlign: "center" }}>
                                               <XCircle className="w-3 h-3 inline mr-1" />Fechar
                                             </button>
@@ -449,13 +593,15 @@ export default function AgendaProfissionais() {
                                         )}
                                       </div>
                                     );
-                                  })() : (
-                                    <button
-                                      onClick={() => setBookingSlot({ date, time })}
-                                      className="w-full min-h-[50px] flex items-center justify-center border-2 border-dashed border-border/50 rounded-xl text-muted-foreground/40 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all text-[10px] font-semibold cursor-pointer"
-                                    >
-                                      + Agendar
-                                    </button>
+                                  })())}
+                                  {/* Fase 5A (prof): permite empilhar outro paciente no mesmo slot (atendimento em grupo). */}
+                                  <button
+                                    onClick={() => setBookingSlot({ date, time })}
+                                    className="w-full text-[10px] font-semibold py-1.5 rounded-lg border border-dashed border-cyan-500/30 text-cyan-400/70 hover:text-cyan-300 hover:border-cyan-400/60 hover:bg-cyan-500/5 transition-colors flex items-center justify-center gap-1"
+                                  >
+                                    <Plus className="w-3 h-3" /> adicionar ao grupo
+                                  </button>
+                                    </div>
                                   )}
                                 </td>
                               );
@@ -476,7 +622,8 @@ export default function AgendaProfissionais() {
               </h3>
               <div className="space-y-2">
                 {TIME_SLOTS.filter(t => t !== "12:10").map(time => {
-                  const apt = getApt(today, time);
+                  const apts = getApts(today, time);
+                  const apt = apts[0] ?? null;
                   return (
                     <div key={time} className={cn("flex items-center gap-4 px-4 py-3 rounded-xl text-sm", apt ? "bg-primary/8 border border-primary/20" : "bg-secondary/50 border border-border/50")}>
                       <span className="font-bold text-primary w-14 shrink-0">{time}</span>
@@ -560,6 +707,73 @@ export default function AgendaProfissionais() {
               <button onClick={() => setAbsenceAlert(null)} className="w-full py-3 rounded-xl font-bold text-sm mt-1" style={{ background: absenceAlert.consecutive >= 3 ? "rgba(239,68,68,0.15)" : "rgba(234,179,8,0.12)", border: `1px solid ${absenceAlert.consecutive >= 3 ? "#ef4444" : "#eab308"}`, color: absenceAlert.consecutive >= 3 ? "#f87171" : "#fde047" }}>
                 Entendido
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {remanejFlow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => !remanejSending && setRemanejFlow(null)}>
+          <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,5,15,0.97)", border: "1px solid rgba(59,130,246,0.3)" }} onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "rgba(59,130,246,0.15)", border: "1px solid #3b82f6" }}>
+                    <RotateCcw className="w-4 h-4" style={{ color: "#60a5fa" }} />
+                  </div>
+                  <div>
+                    <p className="font-bold" style={{ color: "#60a5fa", textShadow: "0 0 8px rgba(96,165,250,0.8)" }}>Remanejar</p>
+                    <p className="text-xs text-white/50">{remanejFlow.apt.patientName}</p>
+                  </div>
+                </div>
+                <button onClick={() => setRemanejFlow(null)} className="text-white/30 hover:text-white/70" disabled={remanejSending}><X className="w-5 h-5" /></button>
+              </div>
+
+              {remanejFlow.done ? (
+                <div className="flex flex-col items-center gap-3 py-4 text-center">
+                  <CheckCircle className="w-10 h-10" style={{ color: "#60a5fa" }} />
+                  <p className="font-semibold text-white">Remanejamento concluído!</p>
+                  <p className="text-sm text-white/60">
+                    {remanejFlow.apt.patientName} movido(a) para {remanejFlow.newTime} do dia {remanejFlow.newDate}.
+                  </p>
+                  <button onClick={() => setRemanejFlow(null)} className="mt-2 w-full py-2 rounded-xl font-bold text-sm" style={{ background: "rgba(59,130,246,0.15)", border: "1px solid #3b82f6", color: "#60a5fa" }}>
+                    Fechar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-white/60 mb-4">Escolha um novo horário livre nesta semana:</p>
+                  {availableSlots.length === 0 ? (
+                    <p className="text-center text-white/40 py-8">Nenhum horário disponível nesta semana.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
+                      {weekDates.map(date => {
+                        const daySlots = availableSlots.filter(s => s.date === date);
+                        if (daySlots.length === 0) return null;
+                        const dayLabel = weekDays.find(d => format(d, "yyyy-MM-dd") === date);
+                        return (
+                          <div key={date}>
+                            <p className="text-[10px] text-white/40 uppercase font-bold mb-1">
+                              {dayLabel ? format(dayLabel, "EEE dd/MM", { locale: ptBR }) : date}
+                            </p>
+                            {daySlots.map(slot => (
+                              <button
+                                key={slot.time}
+                                onClick={() => confirmRemanejar(slot.date, slot.time)}
+                                disabled={remanejSending}
+                                style={{ ...NEON.blue, opacity: remanejSending ? 0.5 : 1 }}
+                                className="mb-1"
+                              >
+                                {slot.time}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>

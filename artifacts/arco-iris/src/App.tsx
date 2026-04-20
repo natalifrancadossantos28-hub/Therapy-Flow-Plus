@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 
 import { Layout } from "@/components/Layout";
 import AdminGuard from "@/components/AdminGuard";
+import Portal from "@/pages/portal";
 import Dashboard from "@/pages/dashboard";
 import Professionals from "@/pages/professionals";
 import ProfessionalDetail from "@/pages/professional-detail";
@@ -22,6 +23,7 @@ const queryClient = new QueryClient();
 function Router() {
   return (
     <Switch>
+      <Route path="/portal" component={Portal} />
       <Route path="/agenda-profissionais" component={AgendaProfissionais} />
       <Route>
         <Layout>
@@ -31,8 +33,8 @@ function Router() {
             <Route path="/professionals/:id">{(params) => <AdminGuard><ProfessionalDetail /></AdminGuard>}</Route>
             <Route path="/patients">{() => <AdminGuard><Patients /></AdminGuard>}</Route>
             <Route path="/patients/:id">{(params) => <AdminGuard><PatientDetail /></AdminGuard>}</Route>
-            <Route path="/reception">{() => <AdminGuard><Reception /></AdminGuard>}</Route>
-            <Route path="/waiting-list">{() => <AdminGuard><WaitingList /></AdminGuard>}</Route>
+            <Route path="/reception">{() => <AdminGuard requiredScope="reception"><Reception /></AdminGuard>}</Route>
+            <Route path="/waiting-list">{() => <AdminGuard requiredScope="reception"><WaitingList /></AdminGuard>}</Route>
             <Route path="/agenda" component={Agenda} />
             <Route path="/gestao-contratos">{() => <AdminGuard><GestaoContratos /></AdminGuard>}</Route>
             <Route component={NotFound} />
