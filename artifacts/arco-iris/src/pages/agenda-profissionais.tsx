@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -31,11 +31,19 @@ type Appointment = { id: number; patientId: number; patientName?: string; date: 
 
 type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
+type RemanejFlow = {
+  apt: Appointment;
+  newDate?: string;
+  newTime?: string;
+  done?: boolean;
+};
+
 const NEON: Record<string, React.CSSProperties> = {
   green: { background: "rgba(5,10,5,0.92)", border: "1px solid #22c55e", color: "#4ade80", boxShadow: "0 0 14px rgba(34,197,94,0.55)", textShadow: "0 0 8px rgba(74,222,128,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   yellow: { background: "rgba(10,8,0,0.92)", border: "1px solid #eab308", color: "#fde047", boxShadow: "0 0 14px rgba(234,179,8,0.55)", textShadow: "0 0 8px rgba(253,224,71,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   red: { background: "rgba(10,0,0,0.92)", border: "1px solid #ef4444", color: "#f87171", boxShadow: "0 0 14px rgba(239,68,68,0.55)", textShadow: "0 0 8px rgba(248,113,113,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   orange: { background: "rgba(10,5,0,0.92)", border: "1px solid #f97316", color: "#fb923c", boxShadow: "0 0 14px rgba(249,115,22,0.55)", textShadow: "0 0 8px rgba(251,146,60,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
+  blue: { background: "rgba(0,5,15,0.92)", border: "1px solid #3b82f6", color: "#60a5fa", boxShadow: "0 0 14px rgba(59,130,246,0.55)", textShadow: "0 0 8px rgba(96,165,250,0.9)", borderRadius: "10px", padding: "6px 10px", fontWeight: 700, fontSize: "11px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s", justifyContent: "center" },
 };
 
 export default function AgendaProfissionais() {
@@ -58,6 +66,8 @@ export default function AgendaProfissionais() {
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
   const [absenceAlert, setAbsenceAlert] = useState<AbsenceAlert | null>(null);
+  const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
+  const [remanejSending, setRemanejSending] = useState(false);
   const { toast } = useToast();
 
   const weekDays = getWeekDays(weekRef);
@@ -227,14 +237,35 @@ export default function AgendaProfissionais() {
     }
   };
 
-  const handleRemanejar = async (apt: Appointment) => {
+  const handleRemanejar = (apt: Appointment) => {
     setActionMenuId(null);
+    setRemanejFlow({ apt });
+  };
+
+  const confirmRemanejar = async (newDate: string, newTime: string) => {
+    if (!remanejFlow) return;
+    setRemanejSending(true);
     try {
-      await patchStatus(apt, "remarcado");
-      await logNotificacao(apt, "Remanejar");
-      toast({ title: "🟠 Remanejar", description: `${apt.patientName} marcado para reagendamento. A recepção será notificada.` });
+      await updateAppointment(remanejFlow.apt.id, {
+        date: newDate,
+        time: newTime,
+        status: "remarcado",
+      });
+      setAppointments(prev => prev.map(a =>
+        a.id === remanejFlow.apt.id
+          ? { ...a, date: newDate, time: newTime, status: "remarcado" }
+          : a
+      ));
+      await logNotificacao(
+        { ...remanejFlow.apt, date: newDate, time: newTime },
+        "Remanejar"
+      );
+      setRemanejFlow({ ...remanejFlow, newDate, newTime, done: true });
+      toast({ title: "🟠 Remanejado", description: `${remanejFlow.apt.patientName} movido para ${newDate} às ${newTime}. Recepção notificada.` });
     } catch (err: any) {
-      toast({ title: "Erro ao remarcar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
+      toast({ title: "Erro ao remanejar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
+    } finally {
+      setRemanejSending(false);
     }
   };
 
@@ -269,6 +300,12 @@ export default function AgendaProfissionais() {
   // Fase 5A: slots em grupo — o mesmo horario pode ter varios pacientes.
   const getApts = (date: string, time: string) =>
     appointments.filter(a => a.date === date && a.time === time);
+
+  // Remanejar: slots vazios desta semana para o mesmo profissional.
+  const availableSlots = weekDates.flatMap(date =>
+    TIME_SLOTS.filter(t => t !== "12:10" && getApts(date, t).length === 0)
+      .map(time => ({ date, time }))
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
@@ -634,6 +671,73 @@ export default function AgendaProfissionais() {
               <button onClick={() => setAbsenceAlert(null)} className="w-full py-3 rounded-xl font-bold text-sm mt-1" style={{ background: absenceAlert.consecutive >= 3 ? "rgba(239,68,68,0.15)" : "rgba(234,179,8,0.12)", border: `1px solid ${absenceAlert.consecutive >= 3 ? "#ef4444" : "#eab308"}`, color: absenceAlert.consecutive >= 3 ? "#f87171" : "#fde047" }}>
                 Entendido
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {remanejFlow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => !remanejSending && setRemanejFlow(null)}>
+          <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,5,15,0.97)", border: "1px solid rgba(59,130,246,0.3)" }} onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "rgba(59,130,246,0.15)", border: "1px solid #3b82f6" }}>
+                    <RotateCcw className="w-4 h-4" style={{ color: "#60a5fa" }} />
+                  </div>
+                  <div>
+                    <p className="font-bold" style={{ color: "#60a5fa", textShadow: "0 0 8px rgba(96,165,250,0.8)" }}>Remanejar</p>
+                    <p className="text-xs text-white/50">{remanejFlow.apt.patientName}</p>
+                  </div>
+                </div>
+                <button onClick={() => setRemanejFlow(null)} className="text-white/30 hover:text-white/70" disabled={remanejSending}><X className="w-5 h-5" /></button>
+              </div>
+
+              {remanejFlow.done ? (
+                <div className="flex flex-col items-center gap-3 py-4 text-center">
+                  <CheckCircle className="w-10 h-10" style={{ color: "#60a5fa" }} />
+                  <p className="font-semibold text-white">Remanejamento concluído!</p>
+                  <p className="text-sm text-white/60">
+                    {remanejFlow.apt.patientName} movido(a) para {remanejFlow.newTime} do dia {remanejFlow.newDate}.
+                  </p>
+                  <button onClick={() => setRemanejFlow(null)} className="mt-2 w-full py-2 rounded-xl font-bold text-sm" style={{ background: "rgba(59,130,246,0.15)", border: "1px solid #3b82f6", color: "#60a5fa" }}>
+                    Fechar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-white/60 mb-4">Escolha um novo horário livre nesta semana:</p>
+                  {availableSlots.length === 0 ? (
+                    <p className="text-center text-white/40 py-8">Nenhum horário disponível nesta semana.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
+                      {weekDates.map(date => {
+                        const daySlots = availableSlots.filter(s => s.date === date);
+                        if (daySlots.length === 0) return null;
+                        const dayLabel = weekDays.find(d => format(d, "yyyy-MM-dd") === date);
+                        return (
+                          <div key={date}>
+                            <p className="text-[10px] text-white/40 uppercase font-bold mb-1">
+                              {dayLabel ? format(dayLabel, "EEE dd/MM", { locale: ptBR }) : date}
+                            </p>
+                            {daySlots.map(slot => (
+                              <button
+                                key={slot.time}
+                                onClick={() => confirmRemanejar(slot.date, slot.time)}
+                                disabled={remanejSending}
+                                style={{ ...NEON.blue, opacity: remanejSending ? 0.5 : 1 }}
+                                className="mb-1"
+                              >
+                                {slot.time}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
