@@ -45,7 +45,14 @@ export default function AgendaProfissionais() {
   const [pinVerified, setPinVerified] = useState(false);
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
-  const [weekRef] = useState(new Date());
+  // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
+  const [weekRef] = useState(() => {
+    const d = new Date();
+    const dow = d.getDay(); // 0 = domingo, 6 = sabado
+    if (dow === 0) d.setDate(d.getDate() + 1);
+    else if (dow === 6) d.setDate(d.getDate() + 2);
+    return d;
+  });
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
