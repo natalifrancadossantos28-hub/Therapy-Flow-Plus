@@ -58,18 +58,23 @@ const PUNCH_COLORS: Record<string, { bg: string; text: string; border: string }>
   SAIDA_FINAL:    { bg: "bg-rose-500/10",  text: "text-rose-400",   border: "border-rose-500/30" },
 };
 
-async function initCompanyContext(slug: string): Promise<{ id: number; name: string } | null> {
+type InitResult =
+  | { ok: true; id: number; name: string }
+  | { ok: false; reason: "not_found" | "module_off" };
+
+async function initCompanyContext(slug: string): Promise<InitResult> {
   try {
     const company = await getCompanyBySlug(slug);
-    if (!company) return null;
+    if (!company) return { ok: false, reason: "not_found" };
+    if (!company.modulePonto) return { ok: false, reason: "module_off" };
     sessionStorage.setItem("nfs_ponto_session", JSON.stringify({
       type: "kiosk",
       companyId: company.id,
       companyName: company.name,
       companySlug: slug.toLowerCase().trim(),
     }));
-    return { id: company.id, name: company.name };
-  } catch { return null; }
+    return { ok: true, id: company.id, name: company.name };
+  } catch { return { ok: false, reason: "not_found" }; }
 }
 
 type CameraState = "checking" | "blocked" | "missing" | "ready";
@@ -102,9 +107,14 @@ export default function KioskPage() {
       return;
     }
     setCompanyLoading(true);
-    initCompanyContext(slug).then(company => {
-      if (company) setCompanyName(company.name);
-      else setCompanyError(`Empresa "${slug}" não encontrada ou inativa.`);
+    initCompanyContext(slug).then(result => {
+      if (result.ok) {
+        setCompanyName(result.name);
+      } else if (result.reason === "module_off") {
+        setCompanyError(`Empresa "${slug}" está com o módulo Bater Ponto desativado. Fale com o administrador master.`);
+      } else {
+        setCompanyError(`Empresa "${slug}" não encontrada ou inativa.`);
+      }
       setCompanyLoading(false);
     });
   }, []);
