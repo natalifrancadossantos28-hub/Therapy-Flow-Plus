@@ -311,10 +311,19 @@ function calcVulnScore(t: {
 }
 
 // Total raw clinico maximo = 360 (8 areas x 15 perguntas x 3 pts).
-// Escala para 0..100 pra compor com social.
+// Escala para 0..100 pra compor com social (usado internamente).
 const CLINICAL_MAX_RAW = 8 * 15 * 3;
 function toScoreClinico100(clinicalPts: number): number {
   return Math.round((clinicalPts * 100) / CLINICAL_MAX_RAW);
+}
+
+// Score exibido ao usuário em escala padronizada /150 (espelha a Gestão).
+// Não afeta cálculo interno nem o _calc_priority no banco, que continuam
+// operando no domínio 0-360. As faixas de cor (25/50/75%) seguem iguais.
+const SCORE_MAX_DISPLAY = 150;
+function toScoreDisplay(raw: number, rawMax: number): number {
+  if (rawMax <= 0) return 0;
+  return Math.round((raw / rawMax) * SCORE_MAX_DISPLAY);
 }
 
 function getPrioridadeBadge(vulnScore: number, clinicalPts: number) {
@@ -1155,7 +1164,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
         <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Pontuação Total</p>
-            <p className="text-4xl font-bold mt-1">{totalPontos} <span className="text-lg font-normal text-muted-foreground">/ {totalMax}</span></p>
+            <p className="text-4xl font-bold mt-1">{toScoreDisplay(totalPontos, totalMax)} <span className="text-lg font-normal text-muted-foreground">/ {SCORE_MAX_DISPLAY}</span></p>
             <p className="text-sm text-muted-foreground mt-1">{pctTotal}% da pontuação máxima</p>
             <div className="flex gap-3 mt-3 flex-wrap">
               {[["bg-emerald-500","Verde – Baixo"],["bg-blue-500","Azul – Leve"],["bg-amber-500","Laranja – Moderado"],["bg-rose-500","Vermelho – Elevado"]].map(([cor,label]) => (

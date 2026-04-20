@@ -17,6 +17,14 @@ import {
   type PatientAbsencesInfo,
 } from "@/lib/arco-rpc";
 
+// Score interno permanece em 0-360 (8 áreas × 0-72), mas exibimos em escala /150
+// para padronizar com o restante do sistema. _calc_priority no banco continua
+// operando no domínio 360, então as faixas de cor (25/50/75%) não mudam.
+const SCORE_MAX_RAW = 360;
+const SCORE_MAX_DISPLAY = 150;
+const toScoreDisplay = (raw: number | null | undefined): number =>
+  Math.round(((raw ?? 0) / SCORE_MAX_RAW) * SCORE_MAX_DISPLAY);
+
 function calcPriority(score: number, escolaPublica: boolean, trabalhoNaRoca: boolean, semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
   const baseIdx = score >= 270 ? 3 : score >= 180 ? 2 : score >= 90 ? 1 : 0;
@@ -157,7 +165,7 @@ export default function PatientDetail() {
       });
       setPatient(updated);
       setTriagemEdit(false);
-      toast({ title: "Triagem registrada!", description: `Score total: ${total}/360. Paciente apto para a fila.` });
+      toast({ title: "Triagem registrada!", description: `Score total: ${toScoreDisplay(total)}/${SCORE_MAX_DISPLAY}. Paciente apto para a fila.` });
     } catch (err: any) {
       toast({
         title: "Erro",
@@ -376,8 +384,8 @@ export default function PatientDetail() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
                     <p className="text-muted-foreground font-semibold mb-1">Score Total</p>
-                    <p className="text-2xl font-bold text-primary">{p.triagemScore}<span className="text-sm text-muted-foreground font-normal">/360</span></p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round(((p.triagemScore ?? 0) / 360) * 100)}% do máximo</p>
+                    <p className="text-2xl font-bold text-primary">{toScoreDisplay(p.triagemScore)}<span className="text-sm text-muted-foreground font-normal">/{SCORE_MAX_DISPLAY}</span></p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round(((p.triagemScore ?? 0) / SCORE_MAX_RAW) * 100)}% do máximo</p>
                   </div>
                   <div className="p-3 bg-secondary/30 rounded-xl">
                     <p className="text-muted-foreground font-semibold mb-1">Escola Pública</p>
@@ -443,7 +451,7 @@ export default function PatientDetail() {
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <MotionCard className="w-full max-w-lg p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <h2 className="text-2xl font-bold font-display mb-1">{triagemFeita ? "Editar Triagem" : "Registrar Triagem"}</h2>
-            <p className="text-sm text-muted-foreground mb-5">Preencha a nota de cada área (0–72). O score total é a soma (máx. 360).</p>
+            <p className="text-sm text-muted-foreground mb-5">Preencha a nota de cada área (0–72). O score total é exibido em escala padronizada (máx. {SCORE_MAX_DISPLAY}).</p>
             <div className="space-y-5">
               <div>
                 <Label className="text-base font-bold mb-3 block">Perfil Multidisciplinar</Label>
@@ -470,8 +478,8 @@ export default function PatientDetail() {
                   ))}
                   <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 flex flex-col justify-center">
                     <p className="text-xs text-muted-foreground font-semibold mb-0.5">Score Total</p>
-                    <p className="text-2xl font-bold text-primary">{totalScore}<span className="text-sm text-muted-foreground font-normal">/360</span></p>
-                    <p className="text-xs text-muted-foreground">{Math.round((totalScore / 360) * 100)}% do máximo</p>
+                    <p className="text-2xl font-bold text-primary">{toScoreDisplay(totalScore)}<span className="text-sm text-muted-foreground font-normal">/{SCORE_MAX_DISPLAY}</span></p>
+                    <p className="text-xs text-muted-foreground">{Math.round((totalScore / SCORE_MAX_RAW) * 100)}% do máximo</p>
                   </div>
                 </div>
               </div>
@@ -508,7 +516,7 @@ export default function PatientDetail() {
                     })}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Verde 0–90 · Azul 91–180 · Laranja 181–270 · Vermelho 271–360 (Vulnerabilidade sobe um nível)
+                    Verde 0–37 · Azul 38–75 · Laranja 76–112 · Vermelho 113–150 (Vulnerabilidade sobe um nível)
                   </p>
                 </div>
               )}
