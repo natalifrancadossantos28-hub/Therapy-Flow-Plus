@@ -1,194 +1,50 @@
-import { useState, useCallback } from "react";
-import { Lock, ShieldCheck, Eye, EyeOff, Building2 } from "lucide-react";
-import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
+import { getCompanySession, getCurrentScope, getProfessionalSession } from "@/lib/portal-session";
 
-const SESSION_KEY = "nfs_ponto_session";
-const LEGACY_KEY = "nfs_admin_auth";
+// Fase 6: AdminGuard agora redireciona pro /portal quando nao ha sessao
+// apropriada. Aceita um `requiredScope` pra diferenciar acesso admin (pleno)
+// de recepcao (restrito ao /reception e rotas compartilhadas).
 
-type Session = {
-  type: "company" | "master";
-  companyId?: number;
-  companyName?: string;
-  companySlug?: string;
-  adminToken?: string;
-  masterToken?: string;
-  moduleArcoIris?: boolean;
-  moduleTriagem?: boolean;
-  modulePonto?: boolean;
+type Props = {
+  children: React.ReactNode;
+  requiredScope?: "admin" | "reception";
 };
 
-function getSession(): Session | null {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
+// Mantido para compatibilidade com chamadas existentes (arco-rpc, paginas).
 export function isAuthenticated(): boolean {
-  const session = getSession();
-  if (session?.type === "master") return true;
-  if (session?.type === "company" && session.moduleArcoIris) return true;
-  return sessionStorage.getItem(LEGACY_KEY) === "true";
+  const scope = getCurrentScope();
+  return scope === "admin" || scope === "reception";
 }
 
 export function getCompanyId(): number | null {
-  const session = getSession();
-  return session?.companyId ?? null;
+  return getCompanySession()?.companyId ?? null;
 }
 
-function describeAuthError(err: unknown): string {
-  if (!isSupabaseConfigured) {
-    return (
-      "Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY " +
-      "no painel da Vercel (Settings → Environment Variables) e refaça o deploy."
-    );
-  }
-  if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return "Sem conexão com a internet. Verifique sua rede e tente de novo.";
-  }
-  const msg = err instanceof Error ? err.message : String(err ?? "");
-  if (/failed to fetch|networkerror|load failed/i.test(msg)) {
-    return "Não foi possível alcançar o Supabase. Confirme VITE_SUPABASE_URL e que o projeto Supabase está ativo.";
-  }
-  return msg || "Erro inesperado ao autenticar.";
-}
+export default function AdminGuard({ children, requiredScope = "admin" }: Props) {
+  const [, setLocation] = useLocation();
+  const scope = getCurrentScope();
 
-export default function AdminGuard({ children }: { children: React.ReactNode }) {
-  const [authed, setAuthed] = useState(isAuthenticated);
-  const [slug, setSlug] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [shaking, setShaking] = useState(false);
-
-  const shake = () => {
-    setShaking(true);
-    setTimeout(() => setShaking(false), 500);
-  };
-
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      const supabase = requireSupabase();
-      const { data, error: rpcError } = await supabase.rpc("authenticate_company", {
-        p_slug: slug.trim().toLowerCase(),
-        p_password: password,
-      });
-      if (rpcError) {
-        setError(describeAuthError(rpcError));
-        shake();
-        return;
-      }
-      const company = Array.isArray(data) ? data[0] : data;
-      if (!company?.id) {
-        setError("Empresa ou senha incorretos.");
-        shake();
-        return;
-      }
-      if (!company.module_arco_iris) {
-        setError("Esta empresa não tem acesso ao módulo Gestão Terapêutica.");
-        shake();
-        return;
-      }
-      const session: Session = {
-        type: "company",
-        companyId: Number(company.id),
-        companyName: company.name,
-        companySlug: company.slug,
-        adminToken: password,
-        moduleArcoIris: Boolean(company.module_arco_iris),
-        moduleTriagem: Boolean(company.module_triagem),
-        modulePonto: Boolean(company.module_ponto),
-      };
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      sessionStorage.setItem(LEGACY_KEY, "true");
-      setAuthed(true);
-    } catch (err) {
-      setError(describeAuthError(err));
-      shake();
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!scope) {
+      setLocation("/portal");
+      return;
     }
-  }, [slug, password]);
+    if (scope === "professional") {
+      // Profissional nao deve ver telas admin/recepcao.
+      setLocation("/agenda-profissionais");
+      return;
+    }
+    // requiredScope == "admin": recepcao nao pode entrar.
+    if (requiredScope === "admin" && scope === "reception") {
+      setLocation("/reception");
+    }
+  }, [scope, requiredScope, setLocation]);
 
-  if (authed) return <>{children}</>;
-
-  return (
-    <div className="flex items-center justify-center min-h-[60vh] px-4">
-      <div className={`w-full max-w-sm ${shaking ? "animate-[shake_0.4s_ease]" : ""}`}>
-        <div className="bg-card rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.6)] border border-primary/20 overflow-hidden" style={{ boxShadow: "0 0 60px rgba(0,0,0,0.6), 0 0 30px rgba(0,240,255,0.06)" }}>
-          <div className="bg-gradient-to-br from-primary/80 to-primary/40 p-8 text-center text-primary-foreground" style={{ borderBottom: "1px solid rgba(0,240,255,0.2)" }}>
-            <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ boxShadow: "0 0 20px rgba(0,240,255,0.3)" }}>
-              <Lock className="w-8 h-8" />
-            </div>
-            <h2 className="text-xl font-bold">Área Restrita</h2>
-            <p className="text-sm opacity-80 mt-1">Acesse com as credenciais da sua empresa</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-8 space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1 block uppercase tracking-wider flex items-center gap-1">
-                <Building2 className="w-3 h-3" /> Identificador da Empresa
-              </label>
-              <input
-                type="text"
-                value={slug}
-                onChange={e => { setSlug(e.target.value); setError(""); }}
-                placeholder="minha-clinica"
-                autoFocus
-                className="w-full border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground font-mono placeholder:text-muted-foreground transition-all"
-              />
-            </div>
-            <div className="relative">
-              <label className="text-xs font-semibold text-muted-foreground mb-1 block uppercase tracking-wider">Senha Administrativa</label>
-              <input
-                type={showPw ? "text" : "password"}
-                value={password}
-                onChange={e => { setPassword(e.target.value); setError(""); }}
-                placeholder="Senha administrativa"
-                className="w-full border border-border rounded-xl px-4 py-3 pr-12 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground font-medium placeholder:text-muted-foreground transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPw(v => !v)}
-                className="absolute right-3 bottom-3 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-
-            {error && (
-              <p className="text-sm text-destructive font-semibold flex items-center gap-1.5">
-                <span>⚠</span> {error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={!slug || !password || loading}
-              className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-bold py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(0,240,255,0.4)]"
-            >
-              <ShieldCheck className="w-4 h-4" /> {loading ? "Verificando..." : "Entrar"}
-            </button>
-          </form>
-        </div>
-        <p className="text-center text-xs text-muted-foreground mt-4">© 2026 NFS – Gestão Terapêutica</p>
-      </div>
-
-      <style>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          20% { transform: translateX(-8px); }
-          40% { transform: translateX(8px); }
-          60% { transform: translateX(-6px); }
-          80% { transform: translateX(6px); }
-        }
-      `}</style>
-    </div>
-  );
+  if (!scope) return null;
+  if (scope === "professional") return null;
+  if (requiredScope === "admin" && scope === "reception") return null;
+  // Evita warning de unused import em builds estritos.
+  void getProfessionalSession;
+  return <>{children}</>;
 }
