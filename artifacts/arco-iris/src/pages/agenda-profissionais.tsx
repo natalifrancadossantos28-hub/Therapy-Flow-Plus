@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
+import { supabase } from "@/lib/supabase";
 import {
   listProfessionals,
   verifyProfessionalPin,
@@ -80,6 +81,30 @@ export default function AgendaProfissionais() {
   };
 
   useEffect(() => { if (pinVerified) fetchAppointments(); }, [selectedProfId, pinVerified]);
+
+  // Realtime: recarrega a agenda quando qualquer appointment desse profissional muda
+  // (grupo novo, remanejar pela Recepcao, status update, etc.).
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!supabase || !pinVerified || !selectedProfId) return;
+    const profId = parseInt(selectedProfId);
+    const scheduleReload = () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = setTimeout(() => { fetchAppointments(); }, 400);
+    };
+    const channel = supabase
+      .channel(`agenda-prof-${profId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointments", filter: `professional_id=eq.${profId}` },
+        scheduleReload
+      )
+      .subscribe();
+    return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [selectedProfId, pinVerified]);
 
   const handleProfChange = (id: string) => {
     setSelectedProfId(id); setPinVerified(false); setPinInput(""); setPinError("");
@@ -190,8 +215,8 @@ export default function AgendaProfissionais() {
       await patchStatus(apt, "desmarcado");
       await logNotificacao(apt, "Desmarcar");
       toast({ title: "🔴 Desmarcado", description: `${apt.patientName} removido da sessão.` });
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível desmarcar.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Erro ao desmarcar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }
   };
 
@@ -201,8 +226,8 @@ export default function AgendaProfissionais() {
       await patchStatus(apt, "remarcado");
       await logNotificacao(apt, "Remanejar");
       toast({ title: "🟠 Remanejar", description: `${apt.patientName} marcado para reagendamento. A recepção será notificada.` });
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível remarcar.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Erro ao remarcar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }
   };
 
@@ -218,8 +243,8 @@ export default function AgendaProfissionais() {
       setAppointments(prev => prev.filter(a => a.id !== altaConfirm.id));
       setAltaConfirm(null);
       toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado.` });
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Erro ao dar alta", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }
   };
 
@@ -473,6 +498,13 @@ export default function AgendaProfissionais() {
                                       </div>
                                     );
                                   })())}
+                                  {/* Fase 5A (prof): permite empilhar outro paciente no mesmo slot (atendimento em grupo). */}
+                                  <button
+                                    onClick={() => setBookingSlot({ date, time })}
+                                    className="w-full text-[10px] font-semibold py-1.5 rounded-lg border border-dashed border-cyan-500/30 text-cyan-400/70 hover:text-cyan-300 hover:border-cyan-400/60 hover:bg-cyan-500/5 transition-colors flex items-center justify-center gap-1"
+                                  >
+                                    <Plus className="w-3 h-3" /> adicionar ao grupo
+                                  </button>
                                     </div>
                                   )}
                                 </td>
