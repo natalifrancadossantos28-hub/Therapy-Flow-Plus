@@ -152,6 +152,38 @@ function mapColaborador(r: ColaboradorRow): Colaborador {
 
 // ── Professionals ───────────────────────────────────────────────────────────
 
+// Fase 6: lista publica por slug (sem senha), usada pelo Portal unificado.
+export async function listProfessionalsPublic(
+  slug: string
+): Promise<Array<{ id: number; name: string; specialty: string | null }>> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("list_professionals_public", {
+    p_slug: slug.trim().toLowerCase(),
+  });
+  if (error) throw error;
+  return ((data ?? []) as Array<{ id: number; name: string; specialty: string | null }>).map(
+    (r) => ({ id: Number(r.id), name: r.name, specialty: r.specialty })
+  );
+}
+
+// Fase 6: verifica PIN passando slug explicito (sem depender de sessao de empresa).
+export async function verifyProfessionalPinWithSlug(
+  slug: string,
+  professionalId: number,
+  pin: string
+): Promise<{ id: number; name: string; specialty: string | null } | null> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("verify_professional_pin", {
+    p_slug: slug.trim().toLowerCase(),
+    p_professional_id: professionalId,
+    p_pin: pin,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return { id: Number(row.id), name: row.name, specialty: row.specialty };
+}
+
 export async function listProfessionals(): Promise<Professional[]> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();

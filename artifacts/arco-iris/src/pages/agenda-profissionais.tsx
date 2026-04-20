@@ -14,6 +14,8 @@ import {
   deleteAppointmentAlta,
   createNotificacao,
 } from "@/lib/arco-rpc";
+import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
+import { useLocation } from "wouter";
 
 const TIME_SLOTS = [
   "08:00", "08:50", "09:40", "10:30", "11:20",
@@ -47,10 +49,20 @@ const NEON: Record<string, React.CSSProperties> = {
 };
 
 export default function AgendaProfissionais() {
+  const [, setLocation] = useLocation();
+  // Fase 6: identifica o scope vindo do portal unificado.
+  // - admin: seleciona qualquer profissional sem PIN.
+  // - professional: pin ja foi verificado no portal; auto-seleciona.
+  const portalScope = getCurrentScope();
+  const portalProf = getProfessionalSession();
+  const isAdminViewing = portalScope === "admin";
+  const isProfessionalSession = portalScope === "professional" && !!portalProf;
   const [professionals, setProfessionals] = useState<Professional[]>([]);
-  const [selectedProfId, setSelectedProfId] = useState("");
+  const [selectedProfId, setSelectedProfId] = useState(
+    isProfessionalSession ? String(portalProf!.professionalId) : ""
+  );
   const [pinInput, setPinInput] = useState("");
-  const [pinVerified, setPinVerified] = useState(false);
+  const [pinVerified, setPinVerified] = useState(isAdminViewing || isProfessionalSession);
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
   // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
@@ -342,10 +354,18 @@ export default function AgendaProfissionais() {
                   <Printer className="w-4 h-4" /> Imprimir Agenda do Dia
                 </button>
                 <button
-                  onClick={() => { setPinVerified(false); setSelectedProfId(""); setPinInput(""); }}
+                  onClick={() => {
+                    // Admin volta pro dashboard; profissional e acesso direto voltam pro portal.
+                    if (isAdminViewing) {
+                      setLocation("/");
+                    } else {
+                      clearAllSessions();
+                      setLocation("/portal");
+                    }
+                  }}
                   className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground text-sm font-semibold rounded-xl hover:bg-[rgba(255,30,90,0.1)] hover:text-[#ff2060] border border-border hover:border-[rgba(255,30,90,0.3)] transition-all"
                 >
-                  <LogOut className="w-4 h-4" /> Sair da Agenda
+                  <LogOut className="w-4 h-4" /> {isAdminViewing ? "Voltar ao painel" : "Sair da Agenda"}
                 </button>
               </>
             )}
@@ -407,13 +427,29 @@ export default function AgendaProfissionais() {
         ) : (
           <>
             {/* Pro info bar */}
-            <div className="bg-card rounded-2xl border border-primary/20 px-6 py-4 flex items-center justify-between" style={{ boxShadow: "0 0 20px rgba(0,240,255,0.04)" }}>
+            <div className="bg-card rounded-2xl border border-primary/20 px-6 py-4 flex items-center justify-between gap-4 flex-wrap" style={{ boxShadow: "0 0 20px rgba(0,240,255,0.04)" }}>
               <div className="flex items-center gap-3">
                 <ShieldCheck className="w-5 h-5 text-primary" style={{ filter: "drop-shadow(0 0 6px rgba(0,240,255,0.5))" }} />
-                <div>
-                  <p className="font-bold text-foreground">{selectedProf?.name}</p>
-                  <p className="text-sm text-muted-foreground">{selectedProf?.specialty}</p>
-                </div>
+                {isAdminViewing ? (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-fuchsia-400 font-bold">Admin · visualizando</p>
+                    <select
+                      value={selectedProfId}
+                      onChange={(e) => setSelectedProfId(e.target.value)}
+                      className="mt-1 bg-muted text-foreground font-bold rounded-lg px-3 py-1.5 border border-border focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
+                      <option value="">Selecione um profissional...</option>
+                      {professionals.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}{p.specialty ? ` — ${p.specialty}` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-bold text-foreground">{selectedProf?.name}</p>
+                    <p className="text-sm text-muted-foreground">{selectedProf?.specialty}</p>
+                  </div>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-sm font-semibold text-foreground">Semana atual</p>
