@@ -334,9 +334,8 @@ function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" }
     <div className="header-gradient py-5 px-6 no-print">
       <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
-            style={{ background: "linear-gradient(135deg, #00d4ff22 0%, #7c3aed33 100%)", border: "1px solid rgba(0,212,255,0.3)" }}>
-            🧩
+          <div className="bg-white/95 rounded-xl px-2 py-1 flex-shrink-0 shadow">
+            <img src="/nfs-logo.png" alt="NFs systems" className="h-9 w-auto" />
           </div>
           <div>
             <h1 className="text-base md:text-lg font-bold text-white tracking-tight">{CLINIC_CONFIG.name}</h1>
@@ -1045,8 +1044,13 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
         {/* Cabeçalho de impressão */}
         <div className="print-only hidden border-b-2 border-gray-800 pb-4 mb-5">
-          <h1 className="text-2xl font-bold text-foreground">{CLINIC_CONFIG.name}</h1>
-          <p className="text-sm text-muted-foreground">{CLINIC_CONFIG.subtitle}</p>
+          <div className="flex items-center gap-4">
+            <img src="/nfs-logo.png" alt="NFs systems" className="h-16 w-auto" />
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">{CLINIC_CONFIG.name}</h1>
+              <p className="text-sm text-muted-foreground">{CLINIC_CONFIG.subtitle}</p>
+            </div>
+          </div>
           <div className="flex justify-between mt-3 text-sm">
             <span><strong>Paciente:</strong> {nomePaciente}</span>
             <span><strong>Data:</strong> {data}</span>

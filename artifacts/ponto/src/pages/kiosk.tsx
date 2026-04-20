@@ -288,11 +288,12 @@ export default function KioskPage() {
   return (
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 bg-background relative overflow-hidden">
       {/* Header */}
-      <div className="absolute top-8 left-0 right-0 text-center z-10">
-        <h1 className="font-display text-4xl md:text-5xl font-bold text-primary tracking-tight">
+      <div className="absolute top-6 left-0 right-0 flex flex-col items-center z-10">
+        <img src="/nfs-logo.png" alt="NFs systems" className="h-20 md:h-24 w-auto mb-2 drop-shadow-xl" />
+        <h1 className="font-display text-3xl md:text-4xl font-bold text-primary tracking-tight text-center">
           {companyLoading ? "Carregando..." : companyName ?? "NFs – Bater Ponto"}
         </h1>
-        <p className="text-muted-foreground mt-2 text-lg">
+        <p className="text-muted-foreground mt-1 text-base md:text-lg">
           Aproxime seu crachá da câmera para registrar o ponto
         </p>
       </div>
