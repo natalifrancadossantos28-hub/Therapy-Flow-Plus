@@ -21,7 +21,7 @@ set search_path = public
 as $$
   select p.id, p.name, p.specialty
   from public.professionals p
-  join public.companies c on c.id = p.company_id
+  join public.ponto_companies c on c.id = p.company_id
   where c.slug = lower(p_slug)
   order by p.name asc;
 $$;
