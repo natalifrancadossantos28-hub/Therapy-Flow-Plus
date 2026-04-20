@@ -65,6 +65,14 @@ export default function AdminLogin() {
         toast({ title: "Acesso negado", description: "Empresa ou senha incorretos.", variant: "destructive" });
         return;
       }
+      if (!company.module_ponto) {
+        toast({
+          title: "Módulo desativado",
+          description: "Esta empresa não tem acesso ao módulo Bater Ponto. Fale com o administrador master.",
+          variant: "destructive",
+        });
+        return;
+      }
       sessionStorage.setItem("nfs_ponto_session", JSON.stringify({
         type: "company",
         companyId: company.id,
