@@ -1112,6 +1112,7 @@ export type NotificacaoRecepcao = {
   companyId: number;
   appointmentId: number | null;
   patientName: string;
+  patientPhone: string | null;
   professionalName: string;
   acao: string;
   dataConsulta: string;
@@ -1125,6 +1126,7 @@ type NotificacaoRow = {
   company_id: number | string;
   appointment_id: number | string | null;
   patient_name: string;
+  patient_phone: string | null;
   professional_name: string;
   acao: string;
   data_consulta: string;
@@ -1139,6 +1141,7 @@ function mapNotificacao(r: NotificacaoRow): NotificacaoRecepcao {
     companyId: Number(r.company_id),
     appointmentId: r.appointment_id == null ? null : Number(r.appointment_id),
     patientName: r.patient_name,
+    patientPhone: r.patient_phone ?? null,
     professionalName: r.professional_name,
     acao: r.acao,
     dataConsulta: r.data_consulta,
@@ -1167,6 +1170,7 @@ export type NotificacaoPayload = {
   acao: string;
   dataConsulta?: string;
   horaConsulta?: string;
+  patientPhone?: string | null;
 };
 
 export async function createNotificacao(
@@ -1183,6 +1187,7 @@ export async function createNotificacao(
     p_acao: payload.acao,
     p_data_consulta: payload.dataConsulta ?? "",
     p_hora_consulta: payload.horaConsulta ?? "",
+    p_patient_phone: payload.patientPhone ?? null,
   });
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;

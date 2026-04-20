@@ -289,6 +289,7 @@ export default function Agenda() {
       await createNotificacao({
         appointmentId: apt.id,
         patientName: apt.patientName || `Paciente #${apt.patientId}`,
+        patientPhone: apt.guardianPhone ?? null,
         professionalName: apt.professionalName || selectedProf?.name || "—",
         acao,
         dataConsulta: apt.date,
@@ -380,6 +381,7 @@ export default function Agenda() {
     if (!altaConfirm) return;
     try {
       await deleteAppointmentAlta(altaConfirm.id);
+      await logNotificacao(altaConfirm, "Dar Alta");
       setAppointments(prev => prev.filter(a =>
         a.id !== altaConfirm.id &&
         !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.date >= altaConfirm.date)
