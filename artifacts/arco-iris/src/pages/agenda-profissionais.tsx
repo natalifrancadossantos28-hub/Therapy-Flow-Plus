@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -35,6 +35,9 @@ type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: b
 
 type RemanejFlow = {
   apt: Appointment;
+  // 'remanejar' = mover na semana atual; 'remarcar' = escolher qualquer semana futura
+  kind: "remanejar" | "remarcar";
+  weekRef: Date;
   newDate?: string;
   newTime?: string;
   done?: boolean;
@@ -66,13 +69,22 @@ export default function AgendaProfissionais() {
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
   // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
-  const [weekRef] = useState(() => {
+  const [weekRef, setWeekRef] = useState(() => {
     const d = new Date();
     const dow = d.getDay(); // 0 = domingo, 6 = sabado
     if (dow === 0) d.setDate(d.getDate() + 1);
     else if (dow === 6) d.setDate(d.getDate() + 2);
     return d;
   });
+  const goPrevWeek = () => setWeekRef(prev => addDays(prev, -7));
+  const goNextWeek = () => setWeekRef(prev => addDays(prev, 7));
+  const goThisWeek = () => {
+    const d = new Date();
+    const dow = d.getDay();
+    if (dow === 0) d.setDate(d.getDate() + 1);
+    else if (dow === 6) d.setDate(d.getDate() + 2);
+    setWeekRef(d);
+  };
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
@@ -239,55 +251,45 @@ export default function AgendaProfissionais() {
     } catch { /* silencioso */ }
   };
 
-  const handleDesmarcar = async (apt: Appointment) => {
-    setActionMenuId(null);
-    try {
-      await patchStatus(apt, "desmarcado");
-      await logNotificacao(apt, "Desmarcado");
-      toast({ title: "🔴 Desmarcado", description: `${apt.patientName} removido da sessão. Recepção notificada.` });
-    } catch (err: any) {
-      toast({ title: "Erro ao desmarcar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
-    }
-  };
+  // Desmarcar foi removido do Portal do Profissional: so Recepcao/ADM podem desmarcar.
 
-  const handleRemarcar = async (apt: Appointment) => {
+  const handleRemarcar = (apt: Appointment) => {
     setActionMenuId(null);
-    try {
-      await patchStatus(apt, "remarcado");
-      await logNotificacao(apt, "Remarcado");
-      toast({ title: "🟡 Remarcado", description: `${apt.patientName} sinalizado para reagendamento. Recepção notificada.` });
-    } catch (err: any) {
-      toast({ title: "Erro ao remarcar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
-    }
+    // Remarcar abre o seletor de horarios com navegacao entre semanas (agenda infinita)
+    setRemanejFlow({ apt, kind: "remarcar", weekRef: new Date(apt.date + "T12:00:00") });
   };
 
   const handleRemanejar = (apt: Appointment) => {
     setActionMenuId(null);
-    setRemanejFlow({ apt });
+    // Remanejar: move o paciente dentro da semana atual (sem navegacao)
+    setRemanejFlow({ apt, kind: "remanejar", weekRef });
   };
 
   const confirmRemanejar = async (newDate: string, newTime: string) => {
     if (!remanejFlow) return;
+    const newStatus = remanejFlow.kind === "remarcar" ? "remarcado" : "remanejado";
+    const acao = remanejFlow.kind === "remarcar" ? "Remarcado" : "Remanejado";
+    const emoji = remanejFlow.kind === "remarcar" ? "🟡" : "🟠";
     setRemanejSending(true);
     try {
       await updateAppointment(remanejFlow.apt.id, {
         date: newDate,
         time: newTime,
-        status: "remanejado",
+        status: newStatus,
       });
       setAppointments(prev => prev.map(a =>
         a.id === remanejFlow.apt.id
-          ? { ...a, date: newDate, time: newTime, status: "remanejado" }
+          ? { ...a, date: newDate, time: newTime, status: newStatus }
           : a
       ));
       await logNotificacao(
         { ...remanejFlow.apt, date: newDate, time: newTime },
-        "Remanejado"
+        acao
       );
       setRemanejFlow({ ...remanejFlow, newDate, newTime, done: true });
-      toast({ title: "🟠 Remanejado", description: `${remanejFlow.apt.patientName} movido para ${newDate} às ${newTime}. Recepção notificada.` });
+      toast({ title: `${emoji} ${acao}`, description: `${remanejFlow.apt.patientName} movido para ${newDate} às ${newTime}. Recepção notificada.` });
     } catch (err: any) {
-      toast({ title: "Erro ao remanejar", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
+      toast({ title: `Erro ao ${acao.toLowerCase()}`, description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     } finally {
       setRemanejSending(false);
     }
@@ -326,8 +328,11 @@ export default function AgendaProfissionais() {
   const getApts = (date: string, time: string) =>
     appointments.filter(a => a.date === date && a.time === time);
 
-  // Remanejar: slots vazios desta semana para o mesmo profissional.
-  const availableSlots = weekDates.flatMap(date =>
+  // Slots vazios para o seletor do modal (remanejar/remarcar).
+  // Usa a semana atualmente selecionada dentro do modal.
+  const modalWeekDays = remanejFlow ? getWeekDays(remanejFlow.weekRef) : [];
+  const modalWeekDates = modalWeekDays.map(d => format(d, "yyyy-MM-dd"));
+  const modalAvailableSlots = modalWeekDates.flatMap(date =>
     TIME_SLOTS.filter(t => t !== "12:10" && getApts(date, t).length === 0)
       .map(time => ({ date, time }))
   );
@@ -464,9 +469,37 @@ export default function AgendaProfissionais() {
                   </div>
                 )}
               </div>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-foreground">Semana atual</p>
-                <p className="text-xs text-muted-foreground">{format(weekDays[0], "dd/MM")} a {format(weekDays[4], "dd/MM/yyyy")}</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={goPrevWeek}
+                  className="w-9 h-9 rounded-xl border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+                  aria-label="Semana anterior"
+                  title="Semana anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="text-center min-w-[160px]">
+                  <p className="text-sm font-semibold text-foreground">
+                    {format(weekDays[0], "dd/MM")} a {format(weekDays[4], "dd/MM/yyyy")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={goThisWeek}
+                    className="text-[11px] text-primary hover:underline font-semibold"
+                  >
+                    Voltar para esta semana
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={goNextWeek}
+                  className="w-9 h-9 rounded-xl border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+                  aria-label="Próxima semana"
+                  title="Próxima semana"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -593,13 +626,10 @@ export default function AgendaProfissionais() {
                                               </button>
                                             )}
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
-                                              <RotateCcw className="w-3.5 h-3.5" /> Remanejar
+                                              <RotateCcw className="w-3.5 h-3.5" /> Remanejar (nesta semana)
                                             </button>
                                             <button style={NEON.yellow} onClick={() => handleRemarcar(apt)}>
-                                              <CalendarIcon className="w-3.5 h-3.5" /> Remarcar
-                                            </button>
-                                            <button style={NEON.red} onClick={() => handleDesmarcar(apt)}>
-                                              <XCircle className="w-3.5 h-3.5" /> Desmarcar
+                                              <CalendarIcon className="w-3.5 h-3.5" /> Remarcar (qualquer semana)
                                             </button>
                                             <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "4px", paddingTop: "6px" }}>
                                               <button style={NEON.red} onClick={() => handleDarAlta(apt)}>
@@ -745,7 +775,9 @@ export default function AgendaProfissionais() {
                     <RotateCcw className="w-4 h-4" style={{ color: "#60a5fa" }} />
                   </div>
                   <div>
-                    <p className="font-bold" style={{ color: "#60a5fa", textShadow: "0 0 8px rgba(96,165,250,0.8)" }}>Remanejar</p>
+                    <p className="font-bold" style={{ color: "#60a5fa", textShadow: "0 0 8px rgba(96,165,250,0.8)" }}>
+                      {remanejFlow.kind === "remarcar" ? "Remarcar" : "Remanejar"}
+                    </p>
                     <p className="text-xs text-white/50">{remanejFlow.apt.patientName}</p>
                   </div>
                 </div>
@@ -755,7 +787,9 @@ export default function AgendaProfissionais() {
               {remanejFlow.done ? (
                 <div className="flex flex-col items-center gap-3 py-4 text-center">
                   <CheckCircle className="w-10 h-10" style={{ color: "#60a5fa" }} />
-                  <p className="font-semibold text-white">Remanejamento concluído!</p>
+                  <p className="font-semibold text-white">
+                    {remanejFlow.kind === "remarcar" ? "Remarcação concluída!" : "Remanejamento concluído!"}
+                  </p>
                   <p className="text-sm text-white/60">
                     {remanejFlow.apt.patientName} movido(a) para {remanejFlow.newTime} do dia {remanejFlow.newDate}.
                   </p>
@@ -765,15 +799,44 @@ export default function AgendaProfissionais() {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-white/60 mb-4">Escolha um novo horário livre nesta semana:</p>
-                  {availableSlots.length === 0 ? (
+                  {remanejFlow.kind === "remarcar" && (
+                    <div className="flex items-center justify-between mb-3 px-1">
+                      <button
+                        type="button"
+                        onClick={() => setRemanejFlow({ ...remanejFlow, weekRef: addDays(remanejFlow.weekRef, -7) })}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}
+                        aria-label="Semana anterior"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <p className="text-xs font-bold text-white/80 text-center">
+                        {format(modalWeekDays[0], "dd/MM")} a {format(modalWeekDays[4], "dd/MM/yyyy")}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setRemanejFlow({ ...remanejFlow, weekRef: addDays(remanejFlow.weekRef, 7) })}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}
+                        aria-label="Próxima semana"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-sm text-white/60 mb-4">
+                    {remanejFlow.kind === "remarcar"
+                      ? "Navegue entre as semanas e escolha um horário livre:"
+                      : "Escolha um novo horário livre nesta semana:"}
+                  </p>
+                  {modalAvailableSlots.length === 0 ? (
                     <p className="text-center text-white/40 py-8">Nenhum horário disponível nesta semana.</p>
                   ) : (
                     <div className="grid grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
-                      {weekDates.map(date => {
-                        const daySlots = availableSlots.filter(s => s.date === date);
+                      {modalWeekDates.map(date => {
+                        const daySlots = modalAvailableSlots.filter(s => s.date === date);
                         if (daySlots.length === 0) return null;
-                        const dayLabel = weekDays.find(d => format(d, "yyyy-MM-dd") === date);
+                        const dayLabel = modalWeekDays.find(d => format(d, "yyyy-MM-dd") === date);
                         return (
                           <div key={date}>
                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1">
