@@ -31,7 +31,7 @@ function getWeekDays(ref: Date): Date[] {
 type Professional = { id: number; name: string; specialty: string; pin?: string };
 type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; };
 
-type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
+type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; professionalName?: string; professionalSpecialty?: string; };
 
 type RemanejFlow = {
   apt: Appointment;
@@ -710,7 +710,10 @@ export default function AgendaProfissionais() {
                 </div>
               </div>
               <p className="text-sm text-white/70 mb-3">
-                <strong className="text-white">{absenceAlert.patientName}</strong> acumula <strong style={{ color: absenceAlert.consecutive >= 3 ? "#f87171" : "#fde047" }}>{absenceAlert.consecutive} faltas não justificadas consecutivas</strong>.
+                <strong className="text-white">{absenceAlert.patientName}</strong> acumula <strong style={{ color: absenceAlert.consecutive >= 3 ? "#f87171" : "#fde047" }}>{absenceAlert.consecutive} faltas não justificadas consecutivas</strong>
+                {absenceAlert.professionalName ? (
+                  <> com <strong className="text-white/80">{absenceAlert.professionalName}</strong>{absenceAlert.professionalSpecialty ? ` (${absenceAlert.professionalSpecialty})` : ""}</>
+                ) : null}.
               </p>
               {absenceAlert.consecutive >= 3 && (
                 <div className="mb-3 p-3 rounded-xl text-xs" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#fca5a5" }}>
