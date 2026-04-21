@@ -872,10 +872,8 @@ export type AppointmentListItem = {
   guardianName: string | null;
   guardianPhone: string | null;
   professionalName: string;
-  professionalSpecialty?: string | null;
   escolaPublica: boolean;
   trabalhoNaRoca: boolean;
-  /** Faltas consecutivas não justificadas DESTE paciente COM ESTE profissional. */
   consecutiveUnjustifiedAbsences: number;
   createdAt: string;
   updatedAt: string;
@@ -897,7 +895,6 @@ type AppointmentListRow = {
   guardian_name: string | null;
   guardian_phone: string | null;
   professional_name: string;
-  professional_specialty?: string | null;
   escola_publica: boolean | null;
   trabalho_na_roca: boolean | null;
   consecutive_unjustified_absences: number | string | null;
@@ -922,7 +919,6 @@ function mapAppointmentListItem(r: AppointmentListRow): AppointmentListItem {
     guardianName: r.guardian_name,
     guardianPhone: r.guardian_phone,
     professionalName: r.professional_name,
-    professionalSpecialty: r.professional_specialty ?? null,
     escolaPublica: !!r.escola_publica,
     trabalhoNaRoca: !!r.trabalho_na_roca,
     consecutiveUnjustifiedAbsences: Number(r.consecutive_unjustified_absences ?? 0),
@@ -1067,16 +1063,7 @@ export type UpdateAppointmentResult = {
   rescheduledTo: string | null;
   recurrenceGroupId: string | null;
   frequency: string;
-  /** Faltas consecutivas não justificadas POR PROFISSIONAL (não é mais global). */
   consecutiveUnjustifiedAbsences: number;
-  /** Total de faltas (qualquer status de ausência) do paciente com ESTE profissional. */
-  absenceCountByProf?: number;
-  /** Nome do profissional do appointment — usado nos avisos de 3 faltas. */
-  professionalName?: string;
-  /** Especialidade do profissional do appointment — usada nos avisos de 3 faltas. */
-  professionalSpecialty?: string;
-  /** Total global de faltas do paciente (soma entre todos os profissionais). */
-  patientAbsenceCountTotal?: number;
   escolaPublica: boolean;
   trabalhoNaRoca: boolean;
 };

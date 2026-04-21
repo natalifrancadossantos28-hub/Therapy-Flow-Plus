@@ -78,8 +78,6 @@ type AbsenceAlert = {
   consecutive: number;
   escolaPublica: boolean;
   trabalhoNaRoca: boolean;
-  professionalName: string;
-  professionalSpecialty: string;
 };
 
 type CancelDialog = {
@@ -358,25 +356,15 @@ export default function Agenda() {
       const result = await patchStatus(apt, "falta_nao_justificada");
       await logNotificacao(apt, "Falta Não Justificada");
       const consecutive: number = result?.consecutiveUnjustifiedAbsences ?? 1;
-      const profName: string = result?.professionalName || apt.professionalName || selectedProf?.name || "—";
-      const profSpec: string = result?.professionalSpecialty || "";
-      if (consecutive >= 3) {
-        await logNotificacao(
-          apt,
-          `${consecutive} faltas consecutivas com ${profName}${profSpec ? ` (${profSpec})` : ""}`
-        );
-      }
       if (consecutive >= 2) {
         setAbsenceAlert({
           patientName: apt.patientName ?? `Paciente #${apt.patientId}`,
           consecutive,
           escolaPublica: result?.escolaPublica ?? false,
           trabalhoNaRoca: result?.trabalhoNaRoca ?? false,
-          professionalName: profName,
-          professionalSpecialty: profSpec,
         });
       } else {
-        toast({ title: "⚠️ Falta Não Justificada registrada", description: `${apt.patientName} — 1ª ausência com ${profName}.` });
+        toast({ title: "⚠️ Falta Não Justificada registrada", description: `${apt.patientName} — 1ª ausência sem justificativa.` });
       }
     } catch {
       toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
@@ -837,12 +825,7 @@ export default function Agenda() {
                   }}>
                     {absenceAlert.consecutive >= 3 ? "Protocolo de Gestão de Vagas" : "Alerta de Evasão"}
                   </p>
-                  <p className="text-xs text-white/50">
-                    {absenceAlert.patientName}
-                    {absenceAlert.professionalName && (
-                      <> — com <strong className="text-white/80">{absenceAlert.professionalName}</strong>{absenceAlert.professionalSpecialty ? ` (${absenceAlert.professionalSpecialty})` : ""}</>
-                    )}
-                  </p>
+                  <p className="text-xs text-white/50">{absenceAlert.patientName}</p>
                 </div>
               </div>
 
@@ -854,12 +837,12 @@ export default function Agenda() {
                 {absenceAlert.consecutive >= 3 ? (
                   <>
                     <p className="font-bold text-white mb-2">Protocolo de Gestão de Vagas</p>
-                    <p>Limite de <strong>3 ausências não justificadas com {absenceAlert.professionalName || "este profissional"}</strong> atingido. O prontuário será encaminhado para a coordenação para liberação da vaga nesta especialidade. As demais áreas multidisciplinares permanecem ativas.</p>
+                    <p>Limite de <strong>3 ausências não justificadas</strong> atingido. O prontuário será encaminhado para a coordenação para liberação da vaga e redirecionamento de fila. Favor notificar a família sobre o encerramento do ciclo terapêutico atual.</p>
                   </>
                 ) : (
                   <>
                     <p className="font-bold text-white mb-2">Atenção Recepção</p>
-                    <p>Identificada <strong>2ª ausência não justificada com {absenceAlert.professionalName || "este profissional"}</strong>. Favor realizar contato de acolhimento para entender o motivo da falta (transporte/saúde) e reforçar a importância da continuidade. Limite individual por profissional: 3 turnos.</p>
+                    <p>Identificada <strong>2ª ausência não justificada</strong>. Favor realizar contato de acolhimento para entender o motivo da falta (transporte/saúde) e reforçar a importância da continuidade para o sucesso do tratamento. Informar gentilmente que o limite de ausências sem justificativa é de 3 turnos.</p>
                   </>
                 )}
               </div>
