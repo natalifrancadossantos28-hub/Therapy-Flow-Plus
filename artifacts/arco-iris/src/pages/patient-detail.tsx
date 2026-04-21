@@ -20,10 +20,21 @@ import {
 // Score interno permanece em 0-360 (8 áreas × 0-72), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
 // operando no domínio 360, então as faixas de cor (25/50/75%) não mudam.
+// Bônus de vulnerabilidade somam direto no score exibido (desempate visível):
+//   +2 Escola Pública, +2 Trabalho na Roça/Informal. Máximo possível = 154.
 const SCORE_MAX_RAW = 360;
 const SCORE_MAX_DISPLAY = 150;
-const toScoreDisplay = (raw: number | null | undefined): number =>
+const VULN_BONUS_EP = 2;
+const VULN_BONUS_TNR = 2;
+const toScoreDisplayBase = (raw: number | null | undefined): number =>
   Math.round(((raw ?? 0) / SCORE_MAX_RAW) * SCORE_MAX_DISPLAY);
+const vulnBonus = (ep: boolean | null | undefined, tnr: boolean | null | undefined): number =>
+  (ep ? VULN_BONUS_EP : 0) + (tnr ? VULN_BONUS_TNR : 0);
+const toScoreDisplay = (
+  raw: number | null | undefined,
+  ep: boolean | null | undefined = false,
+  tnr: boolean | null | undefined = false,
+): number => toScoreDisplayBase(raw) + vulnBonus(ep, tnr);
 
 function calcPriority(score: number, escolaPublica: boolean, trabalhoNaRoca: boolean, semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
@@ -165,7 +176,7 @@ export default function PatientDetail() {
       });
       setPatient(updated);
       setTriagemEdit(false);
-      toast({ title: "Triagem registrada!", description: `Score total: ${toScoreDisplay(total)}/${SCORE_MAX_DISPLAY}. Paciente apto para a fila.` });
+      toast({ title: "Triagem registrada!", description: `Score total: ${toScoreDisplay(total, escolaPublica, trabalhoNaRoca)}/${SCORE_MAX_DISPLAY} (bônus vuln.: +${vulnBonus(escolaPublica, trabalhoNaRoca)}). Paciente apto para a fila.` });
     } catch (err: any) {
       toast({
         title: "Erro",
@@ -384,8 +395,8 @@ export default function PatientDetail() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
                     <p className="text-muted-foreground font-semibold mb-1">Score Total</p>
-                    <p className="text-2xl font-bold text-primary">{toScoreDisplay(p.triagemScore)}<span className="text-sm text-muted-foreground font-normal">/{SCORE_MAX_DISPLAY}</span></p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round(((p.triagemScore ?? 0) / SCORE_MAX_RAW) * 100)}% do máximo</p>
+                    <p className="text-2xl font-bold text-primary">{toScoreDisplay(p.triagemScore, ep, tnr)}<span className="text-sm text-muted-foreground font-normal">/{SCORE_MAX_DISPLAY}</span></p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{Math.round(((p.triagemScore ?? 0) / SCORE_MAX_RAW) * 100)}% do máximo{vulnBonus(ep, tnr) > 0 ? ` · +${vulnBonus(ep, tnr)} vuln.` : ""}</p>
                   </div>
                   <div className="p-3 bg-secondary/30 rounded-xl">
                     <p className="text-muted-foreground font-semibold mb-1">Escola Pública</p>
@@ -478,8 +489,8 @@ export default function PatientDetail() {
                   ))}
                   <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 flex flex-col justify-center">
                     <p className="text-xs text-muted-foreground font-semibold mb-0.5">Score Total</p>
-                    <p className="text-2xl font-bold text-primary">{toScoreDisplay(totalScore)}<span className="text-sm text-muted-foreground font-normal">/{SCORE_MAX_DISPLAY}</span></p>
-                    <p className="text-xs text-muted-foreground">{Math.round((totalScore / SCORE_MAX_RAW) * 100)}% do máximo</p>
+                    <p className="text-2xl font-bold text-primary">{toScoreDisplay(totalScore, escolaPublica, trabalhoNaRoca)}<span className="text-sm text-muted-foreground font-normal">/{SCORE_MAX_DISPLAY}</span></p>
+                    <p className="text-xs text-muted-foreground">{Math.round((totalScore / SCORE_MAX_RAW) * 100)}% do máximo{vulnBonus(escolaPublica, trabalhoNaRoca) > 0 ? ` · +${vulnBonus(escolaPublica, trabalhoNaRoca)} vuln.` : ""}</p>
                   </div>
                 </div>
               </div>
