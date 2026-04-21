@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { X, Calendar, Clock, AlertCircle, Search, UserCog } from "lucide-react";
 import { MotionCard, Button, Label } from "@/components/ui-custom";
-import { listWaitingList, listPatients, createAppointments, type Patient } from "@/lib/arco-rpc";
+import { listWaitingList, listPatients, createAppointments, listAppointments, type Patient } from "@/lib/arco-rpc";
 import { cn } from "@/lib/utils";
 
 type WaitingEntry = {
@@ -54,6 +54,7 @@ export default function BookingModal({
 }: Props) {
   const [waitingList, setWaitingList] = useState<WaitingEntry[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [alreadyScheduledIds, setAlreadyScheduledIds] = useState<Set<number>>(new Set());
   const [frequency, setFrequency] = useState<"semanal" | "quinzenal" | "mensal">("semanal");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,10 +76,33 @@ export default function BookingModal({
     if (adminMode) {
       listPatients().then(setPatients).catch(console.error);
     }
-  }, [adminMode]);
+    // Trava de selecao: carrega pacientes que ja tem horario ativo futuro
+    // com esse profissional para nao aparecerem como "disponiveis" na fila
+    // ou na busca direta. Admin ainda pode forcar via busca direta + aviso.
+    const today = new Date().toISOString().slice(0, 10);
+    listAppointments({ professionalId, dateFrom: today })
+      .then(apts => {
+        const ids = new Set<number>();
+        for (const a of apts) {
+          if (a.status === "agendado" || a.status === "em_atendimento") {
+            ids.add(a.patientId);
+          }
+        }
+        setAlreadyScheduledIds(ids);
+      })
+      .catch(console.error);
+  }, [adminMode, professionalId]);
 
-  const filteredList = waitingList.filter(e => matchesSpecialty(e.specialty, professionalSpecialty));
+  const matchedBySpec = waitingList.filter(e => matchesSpecialty(e.specialty, professionalSpecialty));
+  // No Portal do Profissional (adminMode=false) o paciente some da fila
+  // assim que ja tem horario ativo com esse profissional.
+  // Na Recepcao (adminMode=true) a fila continua mostrando todo mundo —
+  // admin tem permissao de agendar um 2o/3o horario para o mesmo paciente.
+  const filteredList = adminMode
+    ? matchedBySpec
+    : matchedBySpec.filter(e => !alreadyScheduledIds.has(e.patientId));
   const nextPatient = filteredList[0] ?? null;
+  const queueBlockedCount = matchedBySpec.length - filteredList.length;
 
   const directMatches = useMemo(() => {
     if (!adminMode || mode !== "direto") return [];
@@ -91,6 +115,9 @@ export default function BookingModal({
     ).slice(0, 30);
   }, [adminMode, mode, patients, searchTerm]);
 
+  const selectedDirectAlreadyScheduled =
+    selectedPatientId != null && alreadyScheduledIds.has(selectedPatientId);
+
   const selectedDirect = directMatches.find(p => p.id === selectedPatientId) ?? null;
 
   const handleSave = async () => {
@@ -99,10 +126,22 @@ export default function BookingModal({
     if (isDirect && !selectedDirect) { setError("Selecione um paciente."); return; }
     if (!isDirect && !nextPatient) return;
 
+    const targetPatientId = isDirect ? selectedDirect!.id : nextPatient!.patientId;
+    const targetPatientName = isDirect ? selectedDirect!.name : nextPatient!.patientName;
+    // Trava final: no Portal do Profissional, nao permite agendar paciente
+    // que ja tem horario ativo com esse profissional. Admin (adminMode=true)
+    // passa direto e pode adicionar 2o/3o horario.
+    if (!adminMode && alreadyScheduledIds.has(targetPatientId)) {
+      setError(
+        `${targetPatientName} já tem horário ativo com você. Solicite à Recepção para agendar um segundo horário.`
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       await createAppointments({
-        patientId: isDirect ? selectedDirect!.id : nextPatient!.patientId,
+        patientId: targetPatientId,
         professionalId,
         date,
         time,
@@ -197,12 +236,16 @@ export default function BookingModal({
                   <p className="text-muted-foreground font-semibold">
                     {waitingList.length === 0
                       ? "Fila de espera vazia"
-                      : `Nenhum paciente de ${professionalSpecialty} na fila`}
+                      : queueBlockedCount > 0
+                        ? `Todos os pacientes de ${professionalSpecialty} na fila já têm horário com você`
+                        : `Nenhum paciente de ${professionalSpecialty} na fila`}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {waitingList.length === 0
                       ? "Não há pacientes aguardando vaga."
-                      : "Pacientes de outras especialidades foram filtrados."}
+                      : queueBlockedCount > 0
+                        ? "Fale com a Recepção se precisar de um segundo horário para o mesmo paciente."
+                        : "Pacientes de outras especialidades foram filtrados."}
                   </p>
                   {adminMode && (
                     <p className="text-xs text-primary mt-1">Use a aba "Busca Direta" para agendar qualquer paciente.</p>
@@ -284,6 +327,11 @@ export default function BookingModal({
               {selectedDirect && (
                 <p className="mt-3 text-xs text-primary font-semibold">
                   Selecionado: {selectedDirect.name} — agendamento direto (ignora a fila).
+                </p>
+              )}
+              {selectedDirect && selectedDirectAlreadyScheduled && (
+                <p className="mt-2 text-xs font-semibold text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                  Atenção: {selectedDirect.name} já tem horário ativo com {professionalName}. Só o administrador pode adicionar um segundo horário.
                 </p>
               )}
             </div>
