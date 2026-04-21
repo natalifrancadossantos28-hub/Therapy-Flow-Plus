@@ -288,14 +288,14 @@ export default function WaitingList() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-baseline gap-1 font-mono">
-                          <span className="font-bold text-foreground">{entry.scoreClinico ?? 0}</span>
-                          <span className="text-xs text-muted-foreground">/100</span>
+                          <span className="font-bold text-foreground">{entry.scoreTotal150 ?? 0}</span>
+                          <span className="text-xs text-muted-foreground">/150</span>
                           {!!entry.scoreSocial && entry.scoreSocial > 0 && (
                             <span
-                              title="Score social (desempate)"
+                              title="Bonus de vulnerabilidade ja somado ao score"
                               className="ml-2 text-xs font-semibold text-amber-500"
                             >
-                              +{entry.scoreSocial}
+                              (inclui +{entry.scoreSocial} vuln.)
                             </span>
                           )}
                         </div>
