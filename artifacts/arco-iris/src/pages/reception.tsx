@@ -178,6 +178,23 @@ function AppointmentRow({
             <p className="text-sm text-muted-foreground">
               {apt.professionalName} • {apt.professionalSpecialty}
             </p>
+            {(() => {
+              const s = apt.status?.toLowerCase() ?? "";
+              if (s !== "desmarcado" && s !== "remanejado" && s !== "remarcado") return null;
+              const label =
+                s === "desmarcado" ? "Desmarcado pelo Profissional"
+                : s === "remanejado" ? "Remanejado pelo Profissional"
+                : "Remarcado pelo Profissional";
+              const color =
+                s === "desmarcado" ? "#f87171"
+                : s === "remanejado" ? "#fb923c"
+                : "#facc15";
+              return (
+                <p className="text-xs font-semibold mt-0.5" style={{ color }}>
+                  {label}
+                </p>
+              );
+            })()}
             {apt.patientPhone && (
               <p className="text-xs text-muted-foreground">{apt.patientPhone}</p>
             )}
