@@ -703,6 +703,14 @@ export type WaitingListEntry = {
   scoreClinico?: number | null;
   /** Score social (0..4): +2 escola municipal/estadual, +2 trabalho informal/roca. Desempate apenas. */
   scoreSocial?: number | null;
+  /** Score bruto da triagem (0..360), origem do calculo. */
+  triagemScore?: number | null;
+  /** Flag de vulnerabilidade: escola municipal/estadual (+2 no score /150). */
+  escolaPublica?: boolean | null;
+  /** Flag de vulnerabilidade: trabalho informal/roca (+2 no score /150). */
+  trabalhoNaRoca?: boolean | null;
+  /** Score exibido em escala /150 (espelho do Perfil Multidisciplinar). */
+  scoreTotal150?: number | null;
 };
 
 export async function listWaitingList(opts?: {
