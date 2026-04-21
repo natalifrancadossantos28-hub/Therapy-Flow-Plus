@@ -412,11 +412,11 @@ export default function Agenda() {
       await updateAppointment(remanejFlow.apt.id, {
         date: remanejFlow.newDate,
         time: remanejFlow.newTime,
-        status: "remarcado",
+        status: "remanejado",
       });
       setAppointments(prev => prev.map(a =>
         a.id === remanejFlow.apt.id
-          ? { ...a, date: remanejFlow.newDate!, time: remanejFlow.newTime!, status: "remarcado" }
+          ? { ...a, date: remanejFlow.newDate!, time: remanejFlow.newTime!, status: "remanejado" }
           : a
       ));
       if (notifyCarla && remanejFlow.apt.guardianPhone) {
@@ -601,6 +601,8 @@ export default function Agenda() {
                                     const isDesmarcado = apt.status?.toLowerCase() === "desmarcado";
                                     const isAtendimento = apt.status?.toLowerCase() === "atendimento" || apt.status?.toLowerCase() === "presente";
                                     const isRemarcado = apt.status?.toLowerCase() === "remarcado";
+                                    const isRemanejado = apt.status?.toLowerCase() === "remanejado";
+                                    const isRescheduled = isRemarcado || isRemanejado;
                                     const isFaltaJustificada = apt.status?.toLowerCase() === "falta_justificada" || apt.status?.toLowerCase() === "justificado" || apt.status?.toLowerCase() === "abonado";
                                     const isFaltaNaoJustificada = apt.status?.toLowerCase() === "falta_nao_justificada" || apt.status?.toLowerCase() === "ausente";
                                     const isMenuOpen = actionMenuId === apt.id;
@@ -614,9 +616,10 @@ export default function Agenda() {
                                       isDesmarcado && "bg-red-950/10 border-red-500/40",
                                       isFaltaNaoJustificada && "bg-red-950/10 border-red-500/40",
                                       isAtendimento && "bg-green-950/10 border-green-400/40",
-                                      isRemarcado && "bg-orange-950/10 border-orange-400/40",
+                                      isRemarcado && "bg-yellow-950/10 border-yellow-400/40",
+                                      isRemanejado && "bg-orange-950/10 border-orange-400/40",
                                       isFaltaJustificada && "border-cyan-500/40",
-                                      !isDesmarcado && !isAtendimento && !isRemarcado && !isFaltaJustificada && !isFaltaNaoJustificada && "bg-white border-border/50",
+                                      !isDesmarcado && !isAtendimento && !isRescheduled && !isFaltaJustificada && !isFaltaNaoJustificada && "bg-white border-border/50",
                                       isMenuOpen && "ring-2 ring-primary/40"
                                     )}
                                     style={{
@@ -625,6 +628,8 @@ export default function Agenda() {
                                         : isAtendimento
                                         ? "0 0 8px rgba(34,197,94,0.2)"
                                         : isRemarcado
+                                        ? "0 0 8px rgba(250,204,21,0.2)"
+                                        : isRemanejado
                                         ? "0 0 8px rgba(249,115,22,0.2)"
                                         : isFaltaJustificada
                                         ? "0 0 8px rgba(6,182,212,0.25)"
@@ -641,10 +646,13 @@ export default function Agenda() {
                                     {isDesmarcado && (
                                       <span className="text-[9px] text-orange-400 font-semibold">⚠ só esta data</span>
                                     )}
-                                    {isRemarcado && (
-                                      <span className="text-[9px] text-blue-400 font-semibold">↩ remanejado</span>
+                                    {isRemanejado && (
+                                      <span className="text-[9px] text-orange-400 font-semibold">↩ remanejado</span>
                                     )}
-                                    {apt.recurrenceGroupId && !isDesmarcado && !isRemarcado && (
+                                    {isRemarcado && (
+                                      <span className="text-[9px] text-yellow-400 font-semibold">✎ remarcado</span>
+                                    )}
+                                    {apt.recurrenceGroupId && !isDesmarcado && !isRescheduled && (
                                       <span className="text-[9px] text-muted-foreground/50">
                                         {apt.ciclo === "A" ? "↺ quinzenal A" : apt.ciclo === "B" ? "↺ quinzenal B" : apt.ciclo === "M" ? "↺ mensal" : "↺ semanal"}
                                       </span>

@@ -273,11 +273,11 @@ export default function AgendaProfissionais() {
       await updateAppointment(remanejFlow.apt.id, {
         date: newDate,
         time: newTime,
-        status: "remarcado",
+        status: "remanejado",
       });
       setAppointments(prev => prev.map(a =>
         a.id === remanejFlow.apt.id
-          ? { ...a, date: newDate, time: newTime, status: "remarcado" }
+          ? { ...a, date: newDate, time: newTime, status: "remanejado" }
           : a
       ));
       await logNotificacao(
@@ -528,6 +528,8 @@ export default function AgendaProfissionais() {
                                     const isPresente      = s === "presente";
                                     const isAtendimento   = s === "atendimento";
                                     const isRemarcado     = s === "remarcado";
+                                    const isRemanejado    = s === "remanejado";
+                                    const isRescheduled   = isRemarcado || isRemanejado;
                                     const isFaltaJust     = s === "falta_justificada" || s === "justificado" || s === "abonado";
                                     const isFaltaNaoJust  = s === "falta_nao_justificada" || s === "ausente";
 
@@ -545,9 +547,10 @@ export default function AgendaProfissionais() {
                                             isAtendimento   && "border-green-400/60 bg-green-950/15",
                                             isDesmarcado    && "border-red-500/40 bg-red-950/10",
                                             isFaltaNaoJust  && "border-red-500/40 bg-red-950/10",
-                                            isRemarcado     && "border-orange-400/50 bg-orange-950/10",
+                                            isRemarcado     && "border-yellow-400/50 bg-yellow-950/10",
+                                            isRemanejado    && "border-orange-400/50 bg-orange-950/10",
                                             isFaltaJust     && "border-cyan-500/40 bg-[rgba(6,182,212,0.04)]",
-                                            !isPresente && !isAtendimento && !isDesmarcado && !isFaltaNaoJust && !isRemarcado && !isFaltaJust && "bg-secondary/50 border-border cursor-pointer hover:border-primary/40",
+                                            !isPresente && !isAtendimento && !isDesmarcado && !isFaltaNaoJust && !isRescheduled && !isFaltaJust && "bg-secondary/50 border-border cursor-pointer hover:border-primary/40",
                                             !isPresente && "cursor-pointer",
                                             isPresente && "cursor-default",
                                             isMenuOpen && "ring-2 ring-primary/40",
@@ -560,6 +563,8 @@ export default function AgendaProfissionais() {
                                               : isDesmarcado || isFaltaNaoJust
                                               ? "0 0 8px rgba(239,68,68,0.25)"
                                               : isRemarcado
+                                              ? "0 0 8px rgba(250,204,21,0.2)"
+                                              : isRemanejado
                                               ? "0 0 8px rgba(249,115,22,0.2)"
                                               : isFaltaJust
                                               ? "0 0 8px rgba(6,182,212,0.2)"

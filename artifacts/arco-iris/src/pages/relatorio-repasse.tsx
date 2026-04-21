@@ -12,7 +12,7 @@ const VALOR_SESSAO   = 30;    // R$ por atendimento (repasse Prefeitura)
 const NOME_EMPRESA   = "Zoe";
 const CNPJ_EMPRESA   = "— / —";
 
-const CANCELLED      = new Set(["desmarcado", "remarcado"]);
+const CANCELLED      = new Set(["desmarcado", "remarcado", "remanejado"]);
 
 type Appointment = { id: number; status: string; professionalId: number };
 type ProfRow = {

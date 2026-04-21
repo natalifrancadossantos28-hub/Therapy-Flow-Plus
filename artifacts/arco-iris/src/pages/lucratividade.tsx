@@ -35,7 +35,7 @@ function getCurrentMonthRange() {
   };
 }
 
-const CANCELLED_STATUSES = new Set(["desmarcado", "remarcado"]);
+const CANCELLED_STATUSES = new Set(["desmarcado", "remarcado", "remanejado"]);
 
 export default function Lucratividade() {
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);

@@ -23,7 +23,8 @@ export const getStatusColor = (status: string) => {
   if (s === "inativo" || s === "ausente" || s === "desmarcado" || s === "falta_nao_justificada") return "badge-neon-red";
   if (s === "alta") return "badge-neon-blue";
   if (s === "agendado") return "badge-neon-blue";
-  if (s === "remarcado") return "badge-neon-orange";
+  if (s === "remarcado") return "badge-neon-yellow";
+  if (s === "remanejado") return "badge-neon-orange";
   if (s === "aguardando triagem") return "badge-neon-blue";
   if (s === "fila de espera") return "badge-neon-orange";
   if (s === "abonado" || s === "falta_justificada" || s === "justificado") return "badge-neon-cyan";
@@ -41,6 +42,7 @@ export const getStatusLabel = (status: string): string => {
   if (s === "falta_justificada" || s === "justificado" || s === "abonado") return "Justificado";
   if (s === "desmarcado") return "Desmarcado";
   if (s === "remarcado") return "Remarcado";
+  if (s === "remanejado") return "Remanejado";
   if (s === "agendado") return "Agendado";
   return status;
 };
