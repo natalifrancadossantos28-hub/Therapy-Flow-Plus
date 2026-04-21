@@ -24,6 +24,12 @@
 
 begin;
 
+-- DROPs antes dos CREATE: as funções list_appointments_today e list_appointments
+-- estão ganhando colunas novas no RETURNS TABLE (professional_specialty), então
+-- o CREATE OR REPLACE dispara 42P13 sem o DROP antes.
+drop function if exists public.list_appointments_today(text, text, bigint);
+drop function if exists public.list_appointments(text, text, text, text, text, bigint, bigint);
+
 -- =========================================================================
 -- helper: calcula (abs_count, consecutive_unjustified) para UM par
 -- (paciente, profissional) lendo da tabela appointments.
