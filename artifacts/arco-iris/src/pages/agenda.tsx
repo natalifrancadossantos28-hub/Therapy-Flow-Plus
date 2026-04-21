@@ -4,8 +4,10 @@ import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
-  X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle
+  X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
+  ChevronLeft, ChevronRight
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -205,13 +207,22 @@ export default function Agenda() {
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
   // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
-  const [weekRef] = useState(() => {
+  const [weekRef, setWeekRef] = useState(() => {
     const d = new Date();
     const dow = d.getDay(); // 0 = domingo, 6 = sabado
     if (dow === 0) d.setDate(d.getDate() + 1);
     else if (dow === 6) d.setDate(d.getDate() + 2);
     return d;
   });
+  const goPrevWeek = () => setWeekRef(prev => addDays(prev, -7));
+  const goNextWeek = () => setWeekRef(prev => addDays(prev, 7));
+  const goThisWeek = () => {
+    const d = new Date();
+    const dow = d.getDay();
+    if (dow === 0) d.setDate(d.getDate() + 1);
+    else if (dow === 6) d.setDate(d.getDate() + 2);
+    setWeekRef(d);
+  };
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [cancelDialog, setCancelDialog] = useState<CancelDialog | null>(null);
@@ -250,6 +261,32 @@ export default function Agenda() {
 
   useEffect(() => {
     if (canView && selectedProfId) fetchAppointments();
+    // weekRef change → re-fetch para agenda infinita (qualquer semana)
+  }, [selectedProfId, canView, weekRef]);
+
+  // Realtime: recarrega a agenda quando qualquer appointment desse profissional muda
+  // (agendamento, remanejamento pelo profissional, mudança de status, etc.).
+  // Garante a "interligação total" pedida: ADM/Profissional/Recepção vêem mudanças em tempo real.
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!supabase || !canView || !selectedProfId) return;
+    const profId = parseInt(selectedProfId);
+    const scheduleReload = () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = setTimeout(() => { fetchAppointments(); }, 400);
+    };
+    const channel = supabase
+      .channel(`agenda-recepcao-${profId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointments", filter: `professional_id=eq.${profId}` },
+        scheduleReload
+      )
+      .subscribe();
+    return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      void supabase.removeChannel(channel);
+    };
   }, [selectedProfId, canView]);
 
   // Close action menu on outside click
@@ -508,11 +545,39 @@ export default function Agenda() {
             Grade semanal — {weekDays.length > 0 && `${format(weekDays[0], "dd/MM")} a ${format(weekDays[4], "dd/MM/yyyy")}`}
           </p>
         </div>
-        <Link href="/agenda-profissionais">
-          <Button variant="outline" className="gap-2 text-sm">
-            <ExternalLink className="w-4 h-4" /> Portal do Profissional
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={goPrevWeek}
+            className="w-9 h-9 rounded-xl border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+            aria-label="Semana anterior"
+            title="Semana anterior"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={goThisWeek}
+            className="text-xs text-primary hover:underline font-semibold px-2"
+            title="Voltar para esta semana"
+          >
+            Hoje
+          </button>
+          <button
+            type="button"
+            onClick={goNextWeek}
+            className="w-9 h-9 rounded-xl border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+            aria-label="Próxima semana"
+            title="Próxima semana"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <Link href="/agenda-profissionais">
+            <Button variant="outline" className="gap-2 text-sm">
+              <ExternalLink className="w-4 h-4" /> Portal do Profissional
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Card className="p-5 flex flex-col sm:flex-row items-start sm:items-end gap-4">
