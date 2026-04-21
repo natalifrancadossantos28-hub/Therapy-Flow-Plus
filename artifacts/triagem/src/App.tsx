@@ -852,6 +852,10 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
   const totalPontos = respostas.reduce((a, b) => a + b, 0);
   const totalMax = PERGUNTAS.length * 3;
   const pctTotal = Math.round((totalPontos / totalMax) * 100);
+  // Bonus de vulnerabilidade somado direto ao score exibido (espelha a Gestao):
+  //   +2 Escola Publica (Municipal/Estadual), +2 Trabalho Informal/Roca/Desempregado.
+  const vulnBonusPts = calcVulnScore({ tipoEscola, trabalhoPais });
+  const scoreDisplayTotal = toScoreDisplay(totalPontos, totalMax) + vulnBonusPts;
   const resultadoTexto = ranking.map(({ area, pontos, nivel }) => `${area}: ${pontos} pontos - ${nivel.label}`).join(" | ");
 
   const bodyParaSalvar = {
@@ -1164,8 +1168,8 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
         <div className="bg-card rounded-2xl border border-border/60 p-6 glow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Pontuação Total</p>
-            <p className="text-4xl font-bold mt-1">{toScoreDisplay(totalPontos, totalMax)} <span className="text-lg font-normal text-muted-foreground">/ {SCORE_MAX_DISPLAY}</span></p>
-            <p className="text-sm text-muted-foreground mt-1">{pctTotal}% da pontuação máxima</p>
+            <p className="text-4xl font-bold mt-1">{scoreDisplayTotal} <span className="text-lg font-normal text-muted-foreground">/ {SCORE_MAX_DISPLAY}</span></p>
+            <p className="text-sm text-muted-foreground mt-1">{pctTotal}% da pontuação máxima{vulnBonusPts > 0 ? ` · +${vulnBonusPts} vulnerabilidade` : ""}</p>
             <div className="flex gap-3 mt-3 flex-wrap">
               {[["bg-emerald-500","Verde – Baixo"],["bg-blue-500","Azul – Leve"],["bg-amber-500","Laranja – Moderado"],["bg-rose-500","Vermelho – Elevado"]].map(([cor,label]) => (
                 <span key={label} className="flex items-center gap-1 text-xs text-muted-foreground">
