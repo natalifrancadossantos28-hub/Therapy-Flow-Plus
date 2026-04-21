@@ -74,7 +74,10 @@ type Appointment = {
 };
 
 type AbsenceAlert = {
+  apt: Appointment;
   patientName: string;
+  professionalName: string;
+  professionalSpecialty: string;
   consecutive: number;
   escolaPublica: boolean;
   trabalhoNaRoca: boolean;
@@ -356,15 +359,20 @@ export default function Agenda() {
       const result = await patchStatus(apt, "falta_nao_justificada");
       await logNotificacao(apt, "Falta Não Justificada");
       const consecutive: number = result?.consecutiveUnjustifiedAbsences ?? 1;
+      const profName = result?.professionalName || apt.professionalName || "";
+      const profSpec = result?.professionalSpecialty || "";
       if (consecutive >= 2) {
         setAbsenceAlert({
+          apt,
           patientName: apt.patientName ?? `Paciente #${apt.patientId}`,
+          professionalName: profName,
+          professionalSpecialty: profSpec,
           consecutive,
           escolaPublica: result?.escolaPublica ?? false,
           trabalhoNaRoca: result?.trabalhoNaRoca ?? false,
         });
       } else {
-        toast({ title: "⚠️ Falta Não Justificada registrada", description: `${apt.patientName} — 1ª ausência sem justificativa.` });
+        toast({ title: "⚠️ Falta Não Justificada registrada", description: `${apt.patientName} — 1ª ausência sem justificativa em ${profSpec || "esta especialidade"}.` });
       }
     } catch {
       toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
@@ -836,13 +844,22 @@ export default function Agenda() {
               }}>
                 {absenceAlert.consecutive >= 3 ? (
                   <>
-                    <p className="font-bold text-white mb-2">Protocolo de Gestão de Vagas</p>
-                    <p>Limite de <strong>3 ausências não justificadas</strong> atingido. O prontuário será encaminhado para a coordenação para liberação da vaga e redirecionamento de fila. Favor notificar a família sobre o encerramento do ciclo terapêutico atual.</p>
+                    <p className="font-bold text-white mb-2">
+                      Paciente acumulou 3 faltas em {absenceAlert.professionalSpecialty?.toUpperCase() || "ESTA ESPECIALIDADE"}
+                    </p>
+                    <p>
+                      Limite de <strong>3 ausências não justificadas</strong> atingido
+                      {absenceAlert.professionalName ? <> com <strong>{absenceAlert.professionalName}</strong></> : null}.
+                      Deseja <strong>dar alta nesta especialidade</strong>? Os próximos horários do paciente em {absenceAlert.professionalSpecialty || "esta área"} serão encerrados e a vaga será liberada. Outras especialidades do paciente continuam ativas.
+                    </p>
                   </>
                 ) : (
                   <>
-                    <p className="font-bold text-white mb-2">Atenção Recepção</p>
-                    <p>Identificada <strong>2ª ausência não justificada</strong>. Favor realizar contato de acolhimento para entender o motivo da falta (transporte/saúde) e reforçar a importância da continuidade para o sucesso do tratamento. Informar gentilmente que o limite de ausências sem justificativa é de 3 turnos.</p>
+                    <p className="font-bold text-white mb-2">
+                      Atenção: {absenceAlert.patientName} acumulou 2 faltas em {absenceAlert.professionalSpecialty || "esta especialidade"}
+                      {absenceAlert.professionalName ? <> com {absenceAlert.professionalName}</> : null}
+                    </p>
+                    <p>Próxima ausência sem justificativa dispara protocolo de alta desta especialidade. Favor realizar contato de acolhimento com a família para entender o motivo (transporte/saúde) e reforçar a importância da continuidade.</p>
                   </>
                 )}
               </div>
@@ -864,12 +881,33 @@ export default function Agenda() {
               )}
 
               <div className="flex gap-3 pt-1">
-                <button
-                  onClick={() => setAbsenceAlert(null)}
-                  style={{ ...NEON.green, flex: 1, justifyContent: "center", padding: "10px" }}
-                >
-                  <CheckCircle className="w-4 h-4" /> Entendido
-                </button>
+                {absenceAlert.consecutive >= 3 ? (
+                  <>
+                    <button
+                      onClick={() => setAbsenceAlert(null)}
+                      style={{ ...NEON.yellow, flex: 1, justifyContent: "center", padding: "10px" }}
+                    >
+                      Manter
+                    </button>
+                    <button
+                      onClick={() => {
+                        const apt = absenceAlert.apt;
+                        setAbsenceAlert(null);
+                        setAltaConfirm(apt);
+                      }}
+                      style={{ ...NEON.red, flex: 1, justifyContent: "center", padding: "10px" }}
+                    >
+                      <AlertTriangle className="w-4 h-4" /> Dar Alta em {absenceAlert.professionalSpecialty || "esta especialidade"}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setAbsenceAlert(null)}
+                    style={{ ...NEON.green, flex: 1, justifyContent: "center", padding: "10px" }}
+                  >
+                    <CheckCircle className="w-4 h-4" /> Entendido — vou cobrar a família
+                  </button>
+                )}
               </div>
             </div>
           </div>

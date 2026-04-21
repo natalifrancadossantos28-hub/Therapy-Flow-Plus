@@ -1063,7 +1063,16 @@ export type UpdateAppointmentResult = {
   rescheduledTo: string | null;
   recurrenceGroupId: string | null;
   frequency: string;
+  /** Faltas CONSECUTIVAS por (paciente, profissional). */
   consecutiveUnjustifiedAbsences: number;
+  /** Total de faltas (qualquer tipo) por (paciente, profissional). */
+  absenceCountByProf?: number;
+  /** Nome do profissional do appointment (para compor o texto de aviso). */
+  professionalName?: string;
+  /** Especialidade do profissional do appointment. */
+  professionalSpecialty?: string;
+  /** Contador global do paciente (mantido por compatibilidade). */
+  patientAbsenceCountTotal?: number;
   escolaPublica: boolean;
   trabalhoNaRoca: boolean;
 };
