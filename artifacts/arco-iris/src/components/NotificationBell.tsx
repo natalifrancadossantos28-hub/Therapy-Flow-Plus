@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, X, Check, MessageCircle, CalendarClock } from "lucide-react";
+import { Bell, X, Check, MessageCircle } from "lucide-react";
 import {
   listNotificacoes,
   markNotificacaoLido,
@@ -7,22 +7,19 @@ import {
   type NotificacaoRecepcao,
 } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
+import { getCompanySession } from "@/lib/portal-session";
 import { useToast } from "@/hooks/use-toast";
 
 /**
- * Fase 6 — Central de Notificações da Recepção
+ * Central de Notificações da Recepção.
  *
- * Sininho com contador de não-lidas + painel lateral deslizante que mostra
- * o histórico das últimas ~100 notificações geradas pelas ações dos
- * profissionais (Desmarcar, Remanejar, Dar Alta, Em Atendimento, etc).
+ * Sininho com contador de não-lidas + painel lateral mostrando avisos gerados
+ * pelas ações dos profissionais (Desmarcar, Remanejar, Em Atendimento, etc).
  *
  * Dois botões de ação por item:
- *  - "Ciente"      → marca a notificação como lida (sai da contagem).
- *  - "Avisar Pais" → abre WhatsApp Web/App com mensagem pré-preenchida
- *                    para o responsável do paciente e marca como lida.
- *
- * Usa Realtime (canal "recepcao-notificacoes-bell") pra recarregar a lista
- * em tempo real — independente do banner pulsante da Recepção.
+ *  - "Ciente"             → marca como lido E remove da lista na hora.
+ *  - "Avisar responsáveis" → abre WhatsApp com texto pronto pra Recepção
+ *                            só conferir e enviar; também remove da lista.
  */
 export default function NotificationBell() {
   const { toast } = useToast();
@@ -35,7 +32,8 @@ export default function NotificationBell() {
     setLoading(true);
     try {
       const rows = await listNotificacoes();
-      setNotifs(rows);
+      // Mostra apenas as não-lidas: Ciente faz a notificação sumir da lista.
+      setNotifs(rows.filter((r) => !r.lido));
     } catch {
       /* silencioso — infra pode não estar pronta */
     } finally {
@@ -86,14 +84,15 @@ export default function NotificationBell() {
     };
   }, [open]);
 
-  const unreadCount = notifs.filter((n) => !n.lido).length;
+  const unreadCount = notifs.length;
 
   const handleCiente = async (n: NotificacaoRecepcao) => {
-    setNotifs((prev) => prev.map((x) => (x.id === n.id ? { ...x, lido: true } : x)));
+    // Otimista: tira da lista imediatamente. Se a RPC falhar, recoloca.
+    setNotifs((prev) => prev.filter((x) => x.id !== n.id));
     try {
       await markNotificacaoLido(n.id);
     } catch {
-      setNotifs((prev) => prev.map((x) => (x.id === n.id ? { ...x, lido: false } : x)));
+      setNotifs((prev) => (prev.some((x) => x.id === n.id) ? prev : [n, ...prev]));
       toast({
         title: "Erro ao marcar como ciente",
         description: "Tente novamente.",
@@ -102,28 +101,35 @@ export default function NotificationBell() {
     }
   };
 
-  const handleAvisarPais = async (n: NotificacaoRecepcao) => {
+  const handleAvisarResponsaveis = async (n: NotificacaoRecepcao) => {
     const phone = sanitizePhone(n.patientPhone);
+    const msg = buildWhatsAppMessage(n);
+    // Sem telefone cadastrado → abre WhatsApp Web genérico já com o texto pronto.
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+      : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
     if (!phone) {
       toast({
-        title: "Sem telefone cadastrado",
-        description: `${n.patientName} não tem telefone do responsável registrado.`,
-        variant: "destructive",
+        title: "Sem telefone do responsável",
+        description: `${n.patientName} não tem telefone salvo. Abrimos o WhatsApp com o texto pronto pra você escolher o contato.`,
       });
-      return;
     }
-    const msg = buildWhatsAppMessage(n);
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
     await handleCiente(n);
   };
 
   const handleMarkAllRead = async () => {
-    setNotifs((prev) => prev.map((x) => ({ ...x, lido: true })));
+    const snapshot = notifs;
+    setNotifs([]);
     try {
       await markAllNotificacoesLido();
     } catch {
-      void reload();
+      setNotifs(snapshot);
+      toast({
+        title: "Erro ao marcar todas",
+        description: "Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -159,7 +165,7 @@ export default function NotificationBell() {
       {open && (
         <div
           ref={panelRef}
-          className="absolute right-0 mt-2 w-[360px] max-h-[70vh] overflow-hidden rounded-2xl shadow-2xl z-50 flex flex-col"
+          className="absolute right-0 mt-2 w-[420px] max-h-[78vh] overflow-hidden rounded-2xl shadow-2xl z-50 flex flex-col"
           style={{
             background: "rgba(5,8,16,0.98)",
             border: "1px solid rgba(249,115,22,0.35)",
@@ -174,10 +180,10 @@ export default function NotificationBell() {
             style={{ borderColor: "rgba(249,115,22,0.2)" }}
           >
             <div className="flex items-center gap-2">
-              <Bell className="w-4 h-4 text-orange-400" />
-              <span className="text-sm font-bold text-white">Avisos dos Profissionais</span>
+              <Bell className="w-5 h-5 text-orange-400" />
+              <span className="text-base font-bold text-white">Avisos dos Profissionais</span>
               {unreadCount > 0 && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40">
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40">
                   {unreadCount} nova{unreadCount > 1 ? "s" : ""}
                 </span>
               )}
@@ -187,7 +193,7 @@ export default function NotificationBell() {
                 <button
                   type="button"
                   onClick={handleMarkAllRead}
-                  className="text-[11px] text-slate-300 hover:text-white px-2 py-1 rounded transition-colors"
+                  className="text-xs text-slate-300 hover:text-white px-2 py-1 rounded transition-colors"
                   title="Marcar todas como lidas"
                 >
                   Ciente todas
@@ -209,8 +215,8 @@ export default function NotificationBell() {
             {loading && notifs.length === 0 ? (
               <div className="p-6 text-center text-sm text-slate-400">Carregando…</div>
             ) : notifs.length === 0 ? (
-              <div className="p-6 text-center text-sm text-slate-400">
-                Nenhuma notificação ainda. Quando um profissional desmarcar, remanejar ou dar alta, vai aparecer aqui.
+              <div className="p-8 text-center text-sm text-slate-400">
+                Tudo em dia. Quando um profissional desmarcar, remanejar ou registrar atendimento, vai aparecer aqui.
               </div>
             ) : (
               <ul className="divide-y divide-white/5">
@@ -219,7 +225,7 @@ export default function NotificationBell() {
                     key={n.id}
                     n={n}
                     onCiente={() => handleCiente(n)}
-                    onAvisarPais={() => handleAvisarPais(n)}
+                    onAvisarResponsaveis={() => handleAvisarResponsaveis(n)}
                   />
                 ))}
               </ul>
@@ -234,82 +240,94 @@ export default function NotificationBell() {
 function NotifItem({
   n,
   onCiente,
-  onAvisarPais,
+  onAvisarResponsaveis,
 }: {
   n: NotificacaoRecepcao;
   onCiente: () => void;
-  onAvisarPais: () => void;
+  onAvisarResponsaveis: () => void;
 }) {
   const colors = getAcaoColor(n.acao);
-  const hasPhone = !!sanitizePhone(n.patientPhone);
+  const acaoLabel = formatAcaoLabel(n.acao);
+  const initials = patientInitials(n.patientName);
   return (
     <li
-      className="p-3 transition-colors"
+      className="p-4 transition-colors"
       style={{
-        background: n.lido ? "transparent" : "rgba(249,115,22,0.04)",
+        background: colors.row,
+        borderLeft: `3px solid ${colors.fg}`,
       }}
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-3">
+        {/* Avatar com iniciais (paciente nao tem foto cadastrada). */}
         <div
-          className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5"
-          style={{ background: colors.bg, color: colors.fg }}
+          className="w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold"
+          style={{
+            background: colors.bg,
+            color: colors.fg,
+            border: `1.5px solid ${colors.border}`,
+            boxShadow: `0 0 10px ${colors.glow}`,
+          }}
+          aria-hidden="true"
         >
-          <CalendarClock className="w-4 h-4" />
+          {initials}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span
-              className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
-              style={{ background: colors.bg, color: colors.fg, border: `1px solid ${colors.border}` }}
+              className="text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded"
+              style={{
+                background: colors.bg,
+                color: colors.fg,
+                border: `1px solid ${colors.border}`,
+                boxShadow: `0 0 6px ${colors.glow}`,
+              }}
             >
-              {n.acao}
+              {acaoLabel}
             </span>
-            {!n.lido && (
-              <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" aria-label="Não lida" />
-            )}
-            <span className="ml-auto text-[10px] text-slate-500">{formatRelative(n.createdAt)}</span>
+            <span className="ml-auto text-[11px] text-slate-500">{formatRelative(n.createdAt)}</span>
           </div>
-          <p className="text-sm font-semibold text-white mt-1 truncate">{n.patientName}</p>
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            Profissional <span className="text-slate-200">{n.professionalName}</span>
-            {n.horaConsulta && (
+          <p className="text-base font-semibold text-white mt-1.5 truncate">{n.patientName}</p>
+          <p className="text-sm text-slate-300 mt-0.5">
+            <span className="text-slate-400">com</span>{" "}
+            <span className="text-slate-100 font-medium">{n.professionalName}</span>
+            {(n.dataConsulta || n.horaConsulta) && (
               <>
-                {" "}· <span className="text-slate-200">{n.horaConsulta}</span>
-              </>
-            )}
-            {n.dataConsulta && (
-              <>
-                {" "}· <span className="text-slate-500">{formatDate(n.dataConsulta)}</span>
+                {" · "}
+                <span className="text-slate-100">
+                  {[n.dataConsulta ? formatDate(n.dataConsulta) : null, n.horaConsulta || null]
+                    .filter(Boolean)
+                    .join(" às ")}
+                </span>
               </>
             )}
           </p>
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-3">
             <button
               type="button"
               onClick={onCiente}
-              disabled={n.lido}
-              className="flex-1 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg transition-colors"
               style={{
-                background: "rgba(34,197,94,0.12)",
-                border: "1px solid rgba(34,197,94,0.45)",
-                color: "#4ade80",
+                background: "rgba(34,197,94,0.14)",
+                border: "1px solid rgba(74,222,128,0.55)",
+                color: "#86efac",
+                boxShadow: "0 0 8px rgba(74,222,128,0.18)",
               }}
             >
-              <Check className="w-3 h-3" /> {n.lido ? "Ciente" : "Ciente"}
+              <Check className="w-4 h-4" /> Ciente
             </button>
             <button
               type="button"
-              onClick={onAvisarPais}
-              disabled={!hasPhone}
-              title={hasPhone ? "Abrir WhatsApp com mensagem pré-preenchida" : "Sem telefone do responsável"}
-              className="flex-1 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={onAvisarResponsaveis}
+              title="Abrir WhatsApp com mensagem pronta"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg transition-colors"
               style={{
-                background: "rgba(34,211,238,0.12)",
-                border: "1px solid rgba(34,211,238,0.45)",
-                color: "#22d3ee",
+                background: "rgba(34,211,238,0.14)",
+                border: "1px solid rgba(34,211,238,0.55)",
+                color: "#67e8f9",
+                boxShadow: "0 0 8px rgba(34,211,238,0.18)",
               }}
             >
-              <MessageCircle className="w-3 h-3" /> Avisar Pais
+              <MessageCircle className="w-4 h-4" /> Avisar responsáveis
             </button>
           </div>
         </div>
@@ -320,50 +338,137 @@ function NotifItem({
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function getAcaoColor(acao: string): { bg: string; fg: string; border: string } {
-  const a = acao.toLowerCase();
-  if (a.includes("desmarc"))   return { bg: "rgba(239,68,68,0.15)",  fg: "#f87171", border: "rgba(239,68,68,0.45)" };
-  if (a.includes("remanej"))   return { bg: "rgba(249,115,22,0.15)", fg: "#fb923c", border: "rgba(249,115,22,0.45)" };
-  if (a.includes("alta"))      return { bg: "rgba(168,85,247,0.15)", fg: "#c084fc", border: "rgba(168,85,247,0.45)" };
-  if (a.includes("atendim"))   return { bg: "rgba(34,197,94,0.15)",  fg: "#4ade80", border: "rgba(34,197,94,0.45)" };
-  if (a.includes("falta"))     return { bg: "rgba(234,179,8,0.15)",  fg: "#facc15", border: "rgba(234,179,8,0.45)" };
-  if (a.includes("concluir"))  return { bg: "rgba(34,197,94,0.15)",  fg: "#4ade80", border: "rgba(34,197,94,0.45)" };
-  return { bg: "rgba(148,163,184,0.15)", fg: "#94a3b8", border: "rgba(148,163,184,0.4)" };
+type AcaoColor = {
+  bg: string;
+  fg: string;
+  border: string;
+  row: string;
+  glow: string;
+};
+
+/**
+ * Cores neon-suaves por categoria:
+ *  - Verde   → novo agendamento / em atendimento / alta (positivo)
+ *  - Laranja → remanejado / remarcado (mudança de horário)
+ *  - Vermelho→ desmarcado / cancelado / falta (atenção)
+ *  - Cinza   → fallback
+ */
+function getAcaoColor(acao: string): AcaoColor {
+  const a = (acao || "").toLowerCase();
+  if (a.includes("desmarc") || a.includes("cancel") || a.includes("falta")) {
+    return {
+      bg: "rgba(248,113,113,0.14)",
+      fg: "#fca5a5",
+      border: "rgba(248,113,113,0.55)",
+      row: "rgba(248,113,113,0.06)",
+      glow: "rgba(248,113,113,0.35)",
+    };
+  }
+  if (a.includes("remanej") || a.includes("remarc")) {
+    return {
+      bg: "rgba(251,146,60,0.14)",
+      fg: "#fdba74",
+      border: "rgba(251,146,60,0.55)",
+      row: "rgba(251,146,60,0.06)",
+      glow: "rgba(251,146,60,0.35)",
+    };
+  }
+  if (a.includes("agend") || a.includes("atendim") || a.includes("alta") || a.includes("conclu")) {
+    return {
+      bg: "rgba(74,222,128,0.14)",
+      fg: "#86efac",
+      border: "rgba(74,222,128,0.55)",
+      row: "rgba(74,222,128,0.06)",
+      glow: "rgba(74,222,128,0.35)",
+    };
+  }
+  return {
+    bg: "rgba(148,163,184,0.14)",
+    fg: "#cbd5e1",
+    border: "rgba(148,163,184,0.4)",
+    row: "transparent",
+    glow: "rgba(148,163,184,0.2)",
+  };
+}
+
+function formatAcaoLabel(acao: string): string {
+  const a = (acao || "").toLowerCase();
+  if (a.includes("desmarc")) return "Desmarcado";
+  if (a.includes("remanej")) return "Remanejado";
+  if (a.includes("remarc")) return "Remarcado";
+  if (a.includes("agend")) return "Novo agendamento";
+  if (a.includes("atendim")) return "Em atendimento";
+  if (a.includes("falta")) return "Falta";
+  if (a.includes("alta")) return "Alta";
+  if (a.includes("conclu")) return "Concluído";
+  return acao || "Aviso";
+}
+
+function patientInitials(name: string | null | undefined): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase() || "?";
 }
 
 function sanitizePhone(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const digits = raw.replace(/\D+/g, "");
   if (digits.length < 8) return null;
-  // se já vier com DDI 55, mantém; senão prefixa Brasil
   if (digits.startsWith("55") && digits.length >= 12) return digits;
   return `55${digits}`;
 }
 
+/**
+ * Texto-padrão pedido pela Recepção:
+ *
+ *   "Olá, aqui é da recepção <Clínica>. O atendimento de <Paciente> com
+ *   <Profissional> foi <ação> para <Data> às <Hora>. Pode confirmar?"
+ *
+ * Cobre Remanejado/Remarcado/Novo Agendamento/Em Atendimento. Cancelamentos
+ * e faltas usam variantes específicas (sem "Pode confirmar?").
+ */
 function buildWhatsAppMessage(n: NotificacaoRecepcao): string {
   const acao = (n.acao || "").toLowerCase();
-  const hora = n.horaConsulta || "";
+  const clinica = clinicaName();
+  const hora = (n.horaConsulta || "").trim();
   const data = n.dataConsulta ? formatDate(n.dataConsulta) : "";
-  const quando = [data, hora].filter(Boolean).join(" às ");
+  const quando = [data ? `para ${data}` : null, hora ? `às ${hora}` : null]
+    .filter(Boolean)
+    .join(" ");
 
-  if (acao.includes("desmarc")) {
-    return `Olá! Aqui é da clínica. Informamos que a consulta de ${n.patientName}${quando ? ` em ${quando}` : ""} foi desmarcada pelo profissional ${n.professionalName}. Entre em contato para reagendar. Obrigada!`;
-  }
-  if (acao.includes("remanej")) {
-    return `Olá! Aqui é da clínica. A consulta de ${n.patientName} foi remanejada pelo profissional ${n.professionalName}${quando ? ` para ${quando}` : ""}. Qualquer dúvida, estamos à disposição!`;
-  }
-  if (acao.includes("alta")) {
-    return `Olá! Aqui é da clínica. Temos uma boa notícia: ${n.patientName} recebeu alta do profissional ${n.professionalName}. Parabéns pela jornada!`;
+  const saudacao = `Olá, aqui é da recepção ${clinica}.`;
+
+  if (acao.includes("desmarc") || acao.includes("cancel")) {
+    return `${saudacao} O atendimento de ${n.patientName} com ${n.professionalName}${
+      data || hora ? ` (${[data, hora].filter(Boolean).join(" às ")})` : ""
+    } foi desmarcado pelo profissional. Podemos reagendar quando for melhor pra vocês?`;
   }
   if (acao.includes("falta")) {
-    return `Olá! Aqui é da clínica. Registramos falta de ${n.patientName}${quando ? ` em ${quando}` : ""}. Podemos reagendar?`;
+    return `${saudacao} Registramos a falta de ${n.patientName} no atendimento com ${n.professionalName}${
+      data || hora ? ` (${[data, hora].filter(Boolean).join(" às ")})` : ""
+    }. Tudo bem por aí? Vamos remarcar?`;
   }
-  return `Olá! Aqui é da clínica. Temos uma atualização sobre a consulta de ${n.patientName}${quando ? ` (${quando})` : ""}: ${n.acao}. Qualquer dúvida, estamos à disposição!`;
+  if (acao.includes("alta")) {
+    return `${saudacao} Boa notícia: ${n.patientName} recebeu alta de ${n.professionalName}. Parabéns pela jornada!`;
+  }
+
+  const verbo = formatAcaoLabel(acao).toLowerCase();
+  return `${saudacao} O atendimento de ${n.patientName} com ${n.professionalName} foi ${verbo}${
+    quando ? ` ${quando}` : ""
+  }. Pode confirmar?`;
+}
+
+function clinicaName(): string {
+  const session = getCompanySession();
+  const raw = (session?.companyName || "").trim();
+  if (!raw) return "da clínica";
+  return raw;
 }
 
 function formatDate(iso: string): string {
   if (!iso) return "";
-  // Suporta "YYYY-MM-DD" e ISO completo
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!m) return iso;
   return `${m[3]}/${m[2]}/${m[1]}`;
@@ -380,7 +485,5 @@ function formatRelative(iso: string): string {
   const h = Math.floor(min / 60);
   if (h < 24) return `há ${h}h`;
   const d = Math.floor(h / 24);
-  if (d < 7) return `há ${d}d`;
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
-  return m ? `${m[3]}/${m[2]} ${m[4]}:${m[5]}` : iso;
+  return `há ${d}d`;
 }
