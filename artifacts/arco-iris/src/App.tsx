@@ -15,6 +15,7 @@ import PatientDetail from "@/pages/patient-detail";
 import Reception from "@/pages/reception";
 import WaitingList from "@/pages/waiting-list";
 import Agenda from "@/pages/agenda";
+import AgendaMensal from "@/pages/agenda-mensal";
 import AgendaProfissionais from "@/pages/agenda-profissionais";
 import GestaoContratos from "@/pages/gestao-contratos";
 
@@ -36,6 +37,7 @@ function Router() {
             <Route path="/reception">{() => <AdminGuard requiredScope="reception"><Reception /></AdminGuard>}</Route>
             <Route path="/waiting-list">{() => <AdminGuard requiredScope="reception"><WaitingList /></AdminGuard>}</Route>
             <Route path="/agenda" component={Agenda} />
+            <Route path="/agenda-mensal">{() => <AdminGuard><AgendaMensal /></AdminGuard>}</Route>
             <Route path="/gestao-contratos">{() => <AdminGuard><GestaoContratos /></AdminGuard>}</Route>
             <Route component={NotFound} />
           </Switch>
