@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Building2, UserRound, ShieldCheck, Lock, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Building2, UserRound, ShieldCheck, Lock, ArrowLeft } from "lucide-react";
 import { requireSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   CompanySession,
@@ -27,9 +27,7 @@ const DEFAULT_SLUG = (import.meta.env.VITE_DEFAULT_COMPANY_SLUG as string | unde
 export default function Portal() {
   const [, setLocation] = useLocation();
   const [active, setActive] = useState<CardKey | null>(null);
-  const [slug, setSlug] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
+  const [slug, setSlug] = useState(DEFAULT_SLUG);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [professionals, setProfessionals] = useState<ProfOption[]>([]);
@@ -58,9 +56,7 @@ export default function Portal() {
 
   const resetForm = () => {
     setActive(null);
-    setSlug("");
-    setPassword("");
-    setShowPw(false);
+    setSlug(DEFAULT_SLUG);
     setError("");
     setSelectedProfId("");
     setPinInput("");
@@ -75,14 +71,13 @@ export default function Portal() {
         return;
       }
       const supabase = requireSupabase();
-      const { data, error: rpcError } = await supabase.rpc("authenticate_company", {
+      const { data, error: rpcError } = await supabase.rpc("lookup_company_by_slug", {
         p_slug: slug.trim().toLowerCase(),
-        p_password: password,
       });
       if (rpcError) throw rpcError;
       const company = Array.isArray(data) ? data[0] : data;
       if (!company?.id) {
-        setError("Empresa ou senha incorretos.");
+        setError("Empresa nao encontrada.");
         return;
       }
       if (!company.module_arco_iris) {
@@ -97,7 +92,8 @@ export default function Portal() {
         companyId: Number(company.id),
         companyName: company.name,
         companySlug: company.slug,
-        adminToken: password,
+        // Token de bypass aceito pelas RPCs (Recepcao/Admin nao pedem senha).
+        adminToken: "__noauth__",
         moduleArcoIris: Boolean(company.module_arco_iris),
         moduleTriagem: Boolean(company.module_triagem),
         modulePonto: Boolean(company.module_ponto),
@@ -191,7 +187,7 @@ export default function Portal() {
               Agendamentos, presencas e recepcao de pacientes.
             </p>
             <p className="text-[11px] text-cyan-300/70 mt-4 font-semibold uppercase tracking-wider">
-              Acesso: senha da recepcao
+              Acesso direto
             </p>
           </button>
 
@@ -227,7 +223,7 @@ export default function Portal() {
               Gestao total, dashboards e configuracoes do sistema.
             </p>
             <p className="text-[11px] text-fuchsia-300/70 mt-4 font-semibold uppercase tracking-wider">
-              Acesso: login master
+              Acesso direto
             </p>
           </button>
         </div>
@@ -250,7 +246,7 @@ export default function Portal() {
               {isRecep ? <Building2 className="w-7 h-7" style={{ color: accent }} /> : <ShieldCheck className="w-7 h-7" style={{ color: accent }} />}
             </div>
             <h2 className="text-lg font-bold text-white" style={{ textShadow: `0 0 10px ${accent}66` }}>{isRecep ? "Recepcao" : "Administracao"}</h2>
-            <p className="text-xs text-white/50 mt-1">Digite as credenciais da empresa</p>
+            <p className="text-xs text-white/50 mt-1">Confirme o identificador da empresa</p>
           </div>
 
           <form onSubmit={(e) => { e.preventDefault(); submitCompany(isRecep ? "reception" : "admin"); }} className="p-6 space-y-4">
@@ -266,27 +262,12 @@ export default function Portal() {
                 autoFocus
               />
             </div>
-            <div>
-              <label className="text-[11px] font-semibold text-white/60 mb-1 block uppercase tracking-wider">Senha</label>
-              <div className="relative">
-                <input
-                  type={showPw ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 pr-10 text-sm text-white focus:outline-none focus:border-cyan-400/50"
-                  disabled={loading}
-                />
-                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70">
-                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
 
             {error && <p className="text-xs text-red-400 bg-red-950/30 border border-red-500/30 rounded-xl px-3 py-2">{error}</p>}
 
             <button
               type="submit"
-              disabled={loading || !slug || !password}
+              disabled={loading || !slug.trim()}
               className="w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
               style={{ background: accentBg, border: `1px solid ${accent}`, color: accent, boxShadow: `0 0 20px ${accent}40`, textShadow: `0 0 8px ${accent}` }}
             >
