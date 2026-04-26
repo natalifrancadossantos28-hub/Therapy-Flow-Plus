@@ -1,14 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Bell, X, Check, MessageCircle } from "lucide-react";
 import {
   listNotificacoes,
   markNotificacaoLido,
   markAllNotificacoesLido,
+  listProfessionals,
   type NotificacaoRecepcao,
+  type Professional,
 } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { getCompanySession } from "@/lib/portal-session";
 import { useToast } from "@/hooks/use-toast";
+import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 
 /**
  * Central de Notificações da Recepção.
@@ -26,7 +29,33 @@ export default function NotificationBell() {
   const [notifs, setNotifs] = useState<NotificacaoRecepcao[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  // Mapa nome→especialidade pra colorir cada notificação pela aura do
+  // profissional. Carrega 1x e reaproveita.
+  const specialtyByProfName = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const p of professionals) {
+      m.set(p.name.trim().toLowerCase(), p.specialty ?? null);
+    }
+    return m;
+  }, [professionals]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await listProfessionals();
+        if (!cancelled) setProfessionals(rows);
+      } catch {
+        /* silencioso */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -224,6 +253,7 @@ export default function NotificationBell() {
                   <NotifItem
                     key={n.id}
                     n={n}
+                    specialty={specialtyByProfName.get((n.professionalName || "").trim().toLowerCase()) ?? null}
                     onCiente={() => handleCiente(n)}
                     onAvisarResponsaveis={() => handleAvisarResponsaveis(n)}
                   />
@@ -239,16 +269,20 @@ export default function NotificationBell() {
 
 function NotifItem({
   n,
+  specialty,
   onCiente,
   onAvisarResponsaveis,
 }: {
   n: NotificacaoRecepcao;
+  specialty: string | null;
   onCiente: () => void;
   onAvisarResponsaveis: () => void;
 }) {
   const colors = getAcaoColor(n.acao);
   const acaoLabel = formatAcaoLabel(n.acao);
   const initials = patientInitials(n.patientName);
+  const tone = specialtyTone(specialty);
+  const espLabel = specialty ? specialtyShortLabel(specialty) : null;
   return (
     <li
       className="p-4 transition-colors"
@@ -287,12 +321,25 @@ function NotifItem({
             <span className="ml-auto text-[11px] text-slate-500">{formatRelative(n.createdAt)}</span>
           </div>
           <p className="text-base font-semibold text-white mt-1.5 truncate">{n.patientName}</p>
-          <p className="text-sm text-slate-300 mt-0.5">
-            <span className="text-slate-400">com</span>{" "}
+          <p className="text-sm text-slate-300 mt-0.5 flex items-center gap-1.5 flex-wrap">
+            <span className="text-slate-400">com</span>
             <span className="text-slate-100 font-medium">{n.professionalName}</span>
+            {espLabel && (
+              <span
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded leading-none"
+                style={{
+                  background: tone.bg,
+                  color: tone.fg,
+                  border: `1px solid ${tone.border}`,
+                  boxShadow: `0 0 6px ${tone.glow}`,
+                }}
+              >
+                {espLabel}
+              </span>
+            )}
             {(n.dataConsulta || n.horaConsulta) && (
               <>
-                {" · "}
+                <span className="text-slate-500">·</span>
                 <span className="text-slate-100">
                   {[n.dataConsulta ? formatDate(n.dataConsulta) : null, n.horaConsulta || null]
                     .filter(Boolean)
