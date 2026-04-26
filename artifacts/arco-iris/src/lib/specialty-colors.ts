@@ -108,6 +108,27 @@ const TONE_BY_KEY: Record<string, SpecialtyTone> = Object.fromEntries(
   PALETTE.map((p) => [p.key, p])
 );
 
+/**
+ * Lista oficial de especialidades para o cadastro de profissionais.
+ * Esses são os ÚNICOS valores aceitos no `select` da UI — texto livre fica
+ * proibido pra evitar variações ("Fono" vs "Fonoaudiologia") que quebram
+ * filtros, relatórios e o pareamento da Triagem com a Fila.
+ *
+ * A ordem aqui é a ordem que aparece no dropdown.
+ */
+export const SPECIALTIES = [
+  "Psicologia",
+  "Fonoaudiologia",
+  "Terapia Ocupacional",
+  "Fisioterapia",
+  "Psicopedagogia",
+  "Nutrição",
+  "Psicomotricidade",
+  "Educação Física (Oficina)",
+] as const;
+
+export type SpecialtyOfficial = typeof SPECIALTIES[number];
+
 function normalize(raw: string | null | undefined): string {
   return (raw ?? "")
     .toString()
