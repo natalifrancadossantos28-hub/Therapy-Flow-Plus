@@ -196,6 +196,41 @@ export async function listProfessionals(): Promise<Professional[]> {
   return rows.map(mapProfessional);
 }
 
+export type ProfessionalCapacity = {
+  id: number;
+  name: string;
+  specialty: string | null;
+  cargaHoraria: string;
+  maxPatients: number;
+  currentPatients: number;
+};
+
+export async function listProfessionalsCapacity(): Promise<ProfessionalCapacity[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_professionals_capacity", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{
+    id: number | string;
+    name: string;
+    specialty: string | null;
+    cargaHoraria: string;
+    maxPatients: number;
+    currentPatients: number;
+  }>;
+  return rows.map((r) => ({
+    id: Number(r.id),
+    name: r.name,
+    specialty: r.specialty,
+    cargaHoraria: r.cargaHoraria || "30h",
+    maxPatients: Number(r.maxPatients) || 35,
+    currentPatients: Number(r.currentPatients) || 0,
+  }));
+}
+
 export async function getProfessional(id: number): Promise<Professional | null> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();

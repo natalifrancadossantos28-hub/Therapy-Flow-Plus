@@ -360,8 +360,8 @@ export default function Professionals() {
                   value={formData.cargaHoraria}
                   onChange={(e) => setFormData({ ...formData, cargaHoraria: e.target.value })}
                 >
-                  <option value="30h">30 horas — até 30 pacientes</option>
-                  <option value="20h">20 horas — até 20 pacientes</option>
+                  <option value="30h">30 horas — até 35 pacientes</option>
+                  <option value="20h">20 horas — até 25 pacientes</option>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   Define o limite de pacientes ativos para este profissional.
