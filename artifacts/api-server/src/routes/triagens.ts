@@ -61,12 +61,12 @@ const extractFields = (body: any) => ({
   respostas: body.respostas ? JSON.stringify(body.respostas) : null,
 });
 
-function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean, semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
+// Cor da classificacao depende SO da demanda clinica (triagem_score 0-360).
+// Pesos sociais sao apenas desempate na fila (NAO mudam a cor).
+function calcPriority(triagemScore: number, _escolaPublica: boolean, _trabalhoNaRoca: boolean, _semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
   const baseIdx = triagemScore >= 270 ? 3 : triagemScore >= 180 ? 2 : triagemScore >= 90 ? 1 : 0;
-  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0) + (semTerapia ? 1 : 0);
-  const idx = Math.min(3, baseIdx + vuln);
-  return levels[idx];
+  return levels[baseIdx];
 }
 
 const PRIORITY_LABELS: Record<string, string> = {

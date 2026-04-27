@@ -298,15 +298,16 @@ function parsePontosTotal(resultado: string | null): number {
   }, 0);
 }
 
-// Social: +2 Escola Municipal/Estadual, +2 Trabalho Informal/Roça/Desempregado.
-// Serve apenas como desempate; nao sobrepoe a gravidade clinica.
+// Social: +1 Escola Municipal/Estadual, +1 Trabalho Informal/Roça/Desempregado.
+// Serve apenas como desempate; nao sobrepoe a gravidade clinica e nao muda a
+// cor da classificacao.
 function calcVulnScore(t: {
   tipoEscola?: string | null; trabalhoPais?: string | null;
   bpc?: boolean | null; bolsaFamilia?: boolean | null; outroAtendimento?: boolean | null;
 }): number {
   let score = 0;
-  if (t.tipoEscola === "Municipal" || t.tipoEscola === "Estadual") score += 2;
-  if (t.trabalhoPais === "Informal/Roça" || t.trabalhoPais === "Desempregado") score += 2;
+  if (t.tipoEscola === "Municipal" || t.tipoEscola === "Estadual") score += 1;
+  if (t.trabalhoPais === "Informal/Roça" || t.trabalhoPais === "Desempregado") score += 1;
   return score;
 }
 
@@ -853,7 +854,8 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
   const totalMax = PERGUNTAS.length * 3;
   const pctTotal = Math.round((totalPontos / totalMax) * 100);
   // Bonus de vulnerabilidade somado direto ao score exibido (espelha a Gestao):
-  //   +2 Escola Publica (Municipal/Estadual), +2 Trabalho Informal/Roca/Desempregado.
+  //   +1 Escola Publica (Municipal/Estadual), +1 Trabalho Informal/Roca/Desempregado.
+  // Apenas desempate - NAO muda cor/classificacao.
   const vulnBonusPts = calcVulnScore({ tipoEscola, trabalhoPais });
   const scoreDisplayTotal = toScoreDisplay(totalPontos, totalMax) + vulnBonusPts;
   const resultadoTexto = ranking.map(({ area, pontos, nivel }) => `${area}: ${pontos} pontos - ${nivel.label}`).join(" | ");
