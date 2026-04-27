@@ -16,6 +16,7 @@ import { listAppointments, listProfessionals, type AppointmentListItem, type Pro
 import { supabase } from "@/lib/supabase";
 import { Card, Button } from "@/components/ui-custom";
 import { cn } from "@/lib/utils";
+import { specialtyTone, specialtyShortLabel, specialtyKey } from "@/lib/specialty-colors";
 
 // Visão mensal do Admin: mostra todos os atendimentos de todos os profissionais
 // num grid de mês inteiro. Reflete em tempo real qualquer mudança feita no
@@ -128,6 +129,16 @@ export default function AgendaMensal() {
     return m;
   }, [appointments]);
 
+  // Lookup professionalId → specialty (a RPC list_appointments não devolve specialty).
+  const specialtyByProfId = useMemo(() => {
+    const m = new Map<number, string | null>();
+    for (const p of professionals) m.set(p.id, p.specialty);
+    return m;
+  }, [professionals]);
+
+  const specialtyOf = (a: AppointmentListItem): string | null =>
+    specialtyByProfId.get(a.professionalId) ?? null;
+
   const goPrev = () => setMonthRef((d) => addMonths(d, -1));
   const goNext = () => setMonthRef((d) => addMonths(d, 1));
   const goToday = () => setMonthRef(new Date());
@@ -211,6 +222,10 @@ export default function AgendaMensal() {
           </div>
         </div>
 
+        {/* Legenda neon de especialidades — só mostra as que aparecem nas
+            agendas do mês corrente pra ficar enxuto. */}
+        <SpecialtyLegend professionals={professionals} appointments={appointments} monthRef={monthRef} />
+
         <div className="grid grid-cols-7 gap-1 mb-1">
           {WEEKDAY_HEADERS.map((w) => (
             <div key={w} className="text-xs font-semibold text-muted-foreground text-center py-1">
@@ -227,10 +242,15 @@ export default function AgendaMensal() {
             const apts = byDate.get(dateKey) ?? [];
             // Conta por status para mini-barras.
             const counts: Record<string, number> = {};
+            // Conta por especialidade (cor neon de cada área).
+            const especialidades: Record<string, number> = {};
             for (const a of apts) {
               const k = (a.status ?? "agendado").toLowerCase();
               counts[k] = (counts[k] ?? 0) + 1;
+              const sk = specialtyKey(specialtyOf(a));
+              especialidades[sk] = (especialidades[sk] ?? 0) + 1;
             }
+            const distinctEsp = Object.entries(especialidades).sort((a, b) => b[1] - a[1]);
             return (
               <button
                 key={dateKey}
@@ -253,22 +273,47 @@ export default function AgendaMensal() {
                   )}
                 </div>
                 {apts.length > 0 && (
-                  <div className="mt-1.5 space-y-0.5">
-                    {Object.entries(counts).slice(0, 3).map(([k, n]) => {
-                      const s = statusOf(k);
-                      return (
-                        <div key={k} className="flex items-center gap-1.5 text-[10px] text-foreground/80">
-                          <span className={cn("w-1.5 h-1.5 rounded-full", s.dot)} />
-                          <span className="truncate">{s.label}</span>
-                          <span className="ml-auto font-semibold">{n}</span>
-                        </div>
-                      );
-                    })}
-                    {Object.keys(counts).length > 3 && (
-                      <div className="text-[10px] text-muted-foreground">
-                        +{Object.keys(counts).length - 3} status…
+                  <div className="mt-1.5 space-y-1">
+                    {/* Linha de especialidades — cor neon de cada área pra
+                        bater o olho e identificar o tipo de atendimento. */}
+                    {distinctEsp.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {distinctEsp.slice(0, 4).map(([k, n]) => {
+                          const tone = specialtyTone(k);
+                          return (
+                            <span
+                              key={k}
+                              title={`${specialtyShortLabel(k)} · ${n} atendimento${n !== 1 ? "s" : ""}`}
+                              className="inline-flex items-center gap-0.5 text-[10px] font-bold leading-none px-1 py-0.5 rounded"
+                              style={{
+                                background: tone.bg,
+                                color: tone.fg,
+                                border: `1px solid ${tone.border}`,
+                                boxShadow: `0 0 6px ${tone.glow}`,
+                              }}
+                            >
+                              <span className="w-1 h-1 rounded-full" style={{ background: tone.fg }} />
+                              {n}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
+                    {/* Linha de status — só mostra se houver alguma coisa
+                        além de "agendado" (pendente) pra reduzir ruído. */}
+                    {Object.entries(counts)
+                      .filter(([k]) => k !== "agendado")
+                      .slice(0, 2)
+                      .map(([k, n]) => {
+                        const s = statusOf(k);
+                        return (
+                          <div key={k} className="flex items-center gap-1 text-[9px] text-foreground/70">
+                            <span className={cn("w-1.5 h-1.5 rounded-full", s.dot)} />
+                            <span className="truncate">{s.label}</span>
+                            <span className="ml-auto font-semibold">{n}</span>
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
               </button>
@@ -281,6 +326,7 @@ export default function AgendaMensal() {
         <DayDetailModal
           dateKey={selectedDay}
           appointments={selectedAppointments}
+          specialtyByProfId={specialtyByProfId}
           onClose={() => setSelectedDay(null)}
         />
       )}
@@ -288,13 +334,67 @@ export default function AgendaMensal() {
   );
 }
 
+function SpecialtyLegend({
+  professionals,
+  appointments,
+  monthRef,
+}: {
+  professionals: Professional[];
+  appointments: AppointmentListItem[];
+  monthRef: Date;
+}) {
+  // Mostra só as especialidades que aparecem nos atendimentos visíveis.
+  const counts = useMemo(() => {
+    const specByProf = new Map<number, string | null>();
+    for (const p of professionals) specByProf.set(p.id, p.specialty);
+    const m: Record<string, number> = {};
+    for (const a of appointments) {
+      const d = new Date(a.date + "T00:00:00");
+      if (!isSameMonth(d, monthRef)) continue;
+      const k = specialtyKey(specByProf.get(a.professionalId) ?? null);
+      m[k] = (m[k] ?? 0) + 1;
+    }
+    return Object.entries(m).sort((x, y) => y[1] - x[1]);
+  }, [professionals, appointments, monthRef]);
+
+  if (counts.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 mb-4 pb-3 border-b border-border/60">
+      <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mr-1">
+        Especialidades
+      </span>
+      {counts.map(([k, n]) => {
+        const tone = specialtyTone(k);
+        return (
+          <span
+            key={k}
+            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-bold"
+            style={{
+              background: tone.bg,
+              color: tone.fg,
+              border: `1px solid ${tone.border}`,
+              boxShadow: `0 0 8px ${tone.glow}`,
+            }}
+          >
+            <span className="w-2 h-2 rounded-full" style={{ background: tone.fg, boxShadow: `0 0 6px ${tone.fg}` }} />
+            {specialtyShortLabel(k)}
+            <span className="px-1 py-px rounded-md text-[10px]" style={{ background: "rgba(0,0,0,0.35)" }}>{n}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function DayDetailModal({
   dateKey,
   appointments,
+  specialtyByProfId,
   onClose,
 }: {
   dateKey: string;
   appointments: AppointmentListItem[];
+  specialtyByProfId: Map<number, string | null>;
   onClose: () => void;
 }) {
   const d = new Date(dateKey + "T00:00:00");
@@ -324,16 +424,35 @@ function DayDetailModal({
           )}
           {appointments.map((a) => {
             const s = statusOf(a.status);
+            const specialty = specialtyByProfId.get(a.professionalId) ?? null;
+            const tone = specialtyTone(specialty);
+            const lbl = specialtyShortLabel(specialty);
             return (
               <div
                 key={a.id}
                 className="flex items-start gap-3 p-3 rounded-xl bg-secondary/40 border border-border"
+                style={{
+                  borderLeft: `3px solid ${tone.border}`,
+                  boxShadow: `inset 4px 0 12px -4px ${tone.glow}`,
+                }}
               >
                 <div className="text-sm font-mono font-bold text-primary w-14 shrink-0">{a.time?.slice(0, 5)}</div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-foreground truncate">{a.patientName}</div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {a.professionalName || "—"}
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-muted-foreground truncate">
+                      {a.professionalName || "—"}
+                    </span>
+                    <span
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                      style={{
+                        background: tone.bg,
+                        color: tone.fg,
+                        border: `1px solid ${tone.border}`,
+                      }}
+                    >
+                      {lbl}
+                    </span>
                   </div>
                   {a.notes && (
                     <div className="text-xs text-muted-foreground mt-1 italic">"{a.notes}"</div>

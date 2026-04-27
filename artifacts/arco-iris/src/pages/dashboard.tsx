@@ -10,11 +10,12 @@ import {
   type AppointmentToday,
   type WaitingListEntry,
 } from "@/lib/arco-rpc";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor } from "@/lib/utils";
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from "recharts";
+import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 
 // ── Faixas Etárias ────────────────────────────────────────────────────────────
 const FAIXAS = [
@@ -88,6 +89,49 @@ export default function Dashboard() {
 
   const absentPatients = patients?.filter(p => p.absenceCount >= 3) || [];
 
+  // ── Batimento cardíaco da clínica (hoje) ─────────────────────────────────
+  // Realizado: atendimento concluído (em andamento, presente ou alta naquele dia).
+  // Falta: ausência registrada (justificada ou não).
+  // Pendente: ainda não fechado (agendado, remanejado, remarcado).
+  const heartbeat = useMemo(() => {
+    let realizado = 0;
+    let falta = 0;
+    let pendente = 0;
+    let cancelado = 0;
+    const porEspecialidade: Record<string, number> = {};
+    for (const a of todayAppointments || []) {
+      const st = (a.status || "agendado").toLowerCase();
+      if (st === "atendimento" || st === "presente" || st === "alta") realizado++;
+      else if (st === "ausente" || st === "falta_justificada" || st === "falta_nao_justificada") falta++;
+      else if (st === "cancelado" || st === "desmarcado") cancelado++;
+      else pendente++;
+      const k = (a.professionalSpecialty || "—").trim() || "—";
+      porEspecialidade[k] = (porEspecialidade[k] || 0) + 1;
+    }
+    const fechados = realizado + falta;
+    const taxaPresenca = fechados > 0 ? Math.round((realizado / fechados) * 100) : null;
+    return { realizado, falta, pendente, cancelado, taxaPresenca, porEspecialidade };
+  }, [todayAppointments]);
+
+  // ── Status da fila (cor por prioridade clínica) ──────────────────────────
+  const filaPorCor = useMemo(() => {
+    const buckets = { vermelho: 0, laranja: 0, azul: 0, verde: 0, sem: 0 };
+    for (const w of waitingList || []) {
+      const p = (w.priority || "").toLowerCase();
+      if (p === "elevado" || p === "alto") buckets.vermelho++;
+      else if (p === "moderado") buckets.laranja++;
+      else if (p === "leve") buckets.azul++;
+      else if (p === "baixo") buckets.verde++;
+      else buckets.sem++;
+    }
+    return buckets;
+  }, [waitingList]);
+
+  const presencaDonut = [
+    { name: "Realizados", value: heartbeat.realizado, fill: "#34d399" },
+    { name: "Faltas", value: heartbeat.falta, fill: "#f87171" },
+  ];
+
 
   // ── Perfil de pacientes por profissional ──────────────────────────────────
   const profPerfil = useMemo(() => {
@@ -147,6 +191,20 @@ export default function Dashboard() {
         <h1 className="text-3xl font-display font-bold text-foreground">Visão Geral</h1>
         <p className="text-muted-foreground mt-1">Bem-vindo ao NFS – Gestão Terapêutica.</p>
       </div>
+
+      {/* Batimento Cardíaco da Clínica — resumo do dia em 5s de leitura. */}
+      <Heartbeat
+        total={todayCount}
+        realizado={heartbeat.realizado}
+        falta={heartbeat.falta}
+        pendente={heartbeat.pendente}
+        cancelado={heartbeat.cancelado}
+        taxaPresenca={heartbeat.taxaPresenca}
+        donutData={presencaDonut}
+        porEspecialidade={heartbeat.porEspecialidade}
+        filaPorCor={filaPorCor}
+        waitingCount={waitingCount}
+      />
 
       {/* Top Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -393,6 +451,233 @@ export default function Dashboard() {
           </div>
         </Card>
       )}
+    </div>
+  );
+}
+
+// ── Heartbeat ───────────────────────────────────────────────────────────────
+// Cards neon de "batimento cardíaco" da clínica:
+//   • Atendimentos hoje (realizados / agendados)
+//   • Taxa de presença (donut)
+//   • Status da fila (count por cor de prioridade clínica)
+//   • Mini-listagem de atendimentos por especialidade
+
+type HeartbeatProps = {
+  total: number;
+  realizado: number;
+  falta: number;
+  pendente: number;
+  cancelado: number;
+  taxaPresenca: number | null;
+  donutData: Array<{ name: string; value: number; fill: string }>;
+  porEspecialidade: Record<string, number>;
+  filaPorCor: { vermelho: number; laranja: number; azul: number; verde: number; sem: number };
+  waitingCount: number;
+};
+
+function Heartbeat({
+  total,
+  realizado,
+  falta,
+  pendente,
+  cancelado,
+  taxaPresenca,
+  donutData,
+  porEspecialidade,
+  filaPorCor,
+  waitingCount,
+}: HeartbeatProps) {
+  const especialidades = Object.entries(porEspecialidade)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Card 1: Atendimentos do dia */}
+      <Card className="p-6 relative overflow-hidden border-[rgba(0,240,255,0.25)] shadow-[0_0_28px_rgba(0,240,255,0.08)]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <HeartPulse className="w-5 h-5 text-[#00f0ff]" style={{ filter: "drop-shadow(0 0 6px rgba(0,240,255,0.7))" }} />
+            <h2 className="text-base font-display font-bold text-foreground">Atendimentos hoje</h2>
+          </div>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Pulso</span>
+        </div>
+        <div className="flex items-end gap-2">
+          <span className="text-5xl font-bold font-display leading-none" style={{ color: "#00f0ff", textShadow: "0 0 18px rgba(0,240,255,0.45)" }}>
+            {realizado}
+          </span>
+          <span className="text-2xl font-display text-muted-foreground mb-1">/ {total}</span>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1 font-medium">realizados de {total} agendados hoje</p>
+        <div className="grid grid-cols-3 gap-2 mt-5">
+          <PulseStat label="Pendentes" value={pendente} fg="#fdba74" bg="rgba(251,146,60,0.12)" border="rgba(251,146,60,0.45)" />
+          <PulseStat label="Faltas"    value={falta}    fg="#fca5a5" bg="rgba(248,113,113,0.12)" border="rgba(248,113,113,0.45)" />
+          <PulseStat label="Cancel."   value={cancelado} fg="#cbd5e1" bg="rgba(148,163,184,0.12)" border="rgba(148,163,184,0.4)" />
+        </div>
+        <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-30" style={{ background: "rgba(0,240,255,0.35)" }} />
+      </Card>
+
+      {/* Card 2: Taxa de presença */}
+      <Card className="p-6 relative overflow-hidden border-[rgba(74,222,128,0.25)] shadow-[0_0_28px_rgba(74,222,128,0.08)]">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-[#34d399]" style={{ filter: "drop-shadow(0 0 6px rgba(74,222,128,0.7))" }} />
+            <h2 className="text-base font-display font-bold text-foreground">Taxa de presença</h2>
+          </div>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Hoje</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="relative w-32 h-32 shrink-0">
+            {(realizado + falta) === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <p className="text-3xl font-display font-bold text-muted-foreground/60">—</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">sem dados</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={donutData}
+                      dataKey="value"
+                      innerRadius={42}
+                      outerRadius={60}
+                      stroke="none"
+                      startAngle={90}
+                      endAngle={-270}
+                      isAnimationActive
+                    >
+                      {donutData.map((d, i) => (
+                        <Cell key={i} fill={d.fill} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="text-center">
+                    <p className="text-2xl font-display font-bold" style={{ color: "#34d399", textShadow: "0 0 12px rgba(74,222,128,0.5)" }}>
+                      {taxaPresenca ?? 0}%
+                    </p>
+                    <p className="text-[10px] text-muted-foreground -mt-0.5">presença</p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex-1 space-y-2">
+            <DonutLegend dot="#34d399" label="Realizados" value={realizado} />
+            <DonutLegend dot="#f87171" label="Faltas" value={falta} />
+            <p className="text-[11px] text-muted-foreground/80 mt-2 leading-snug">
+              Considera apenas atendimentos já fechados (realizados ou faltas).
+            </p>
+          </div>
+        </div>
+        <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-30" style={{ background: "rgba(74,222,128,0.35)" }} />
+      </Card>
+
+      {/* Card 3: Status da fila por cor */}
+      <Card className="p-6 relative overflow-hidden border-[rgba(255,30,90,0.25)] shadow-[0_0_28px_rgba(255,30,90,0.08)]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-[#ff2060]" style={{ filter: "drop-shadow(0 0 6px rgba(255,30,90,0.7))" }} />
+            <h2 className="text-base font-display font-bold text-foreground">Status da fila</h2>
+          </div>
+          <Link href="/waiting-list" className="text-[10px] uppercase tracking-wider text-primary font-bold hover:underline">
+            Ver fila
+          </Link>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4">{waitingCount} aguardando vaga · classificação clínica</p>
+        <div className="grid grid-cols-2 gap-2">
+          <FilaBucket label="Vermelho" hint="Elevado" value={filaPorCor.vermelho} fg="#fca5a5" bg="rgba(248,113,113,0.12)" border="rgba(248,113,113,0.5)" glow="rgba(248,113,113,0.4)" />
+          <FilaBucket label="Laranja"  hint="Moderado" value={filaPorCor.laranja} fg="#fdba74" bg="rgba(251,146,60,0.12)" border="rgba(251,146,60,0.5)" glow="rgba(251,146,60,0.4)" />
+          <FilaBucket label="Azul"     hint="Leve"    value={filaPorCor.azul}    fg="#93c5fd" bg="rgba(96,165,250,0.12)" border="rgba(96,165,250,0.5)" glow="rgba(96,165,250,0.4)" />
+          <FilaBucket label="Verde"    hint="Baixo"   value={filaPorCor.verde}   fg="#86efac" bg="rgba(74,222,128,0.12)" border="rgba(74,222,128,0.5)" glow="rgba(74,222,128,0.4)" />
+        </div>
+        {filaPorCor.sem > 0 && (
+          <p className="text-[11px] text-muted-foreground/80 mt-3">
+            {filaPorCor.sem} sem classificação ainda
+          </p>
+        )}
+        <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-25" style={{ background: "rgba(255,30,90,0.35)" }} />
+      </Card>
+
+      {/* Card 4: Atendimentos do dia por especialidade — full width */}
+      {especialidades.length > 0 && (
+        <Card className="p-6 lg:col-span-3">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 className="text-base font-display font-bold text-foreground">Hoje por especialidade</h2>
+            <span className="text-xs text-muted-foreground">{total} atendimento{total !== 1 ? "s" : ""} · cor neon de cada área</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {especialidades.map(([k, n]) => {
+              const tone = specialtyTone(k);
+              const lbl = specialtyShortLabel(k);
+              return (
+                <div
+                  key={k}
+                  className="px-3 py-2 rounded-xl flex items-center gap-2 transition-all"
+                  style={{
+                    background: tone.bg,
+                    border: `1px solid ${tone.border}`,
+                    boxShadow: `0 0 12px ${tone.glow}`,
+                  }}
+                >
+                  <span className="text-sm font-bold" style={{ color: tone.fg }}>
+                    {lbl}
+                  </span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-md" style={{ background: "rgba(0,0,0,0.3)", color: tone.fg }}>
+                    {n}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function PulseStat({ label, value, fg, bg, border }: { label: string; value: number; fg: string; bg: string; border: string }) {
+  return (
+    <div className="rounded-xl px-3 py-2 text-center" style={{ background: bg, border: `1px solid ${border}` }}>
+      <p className="text-xl font-display font-bold leading-none" style={{ color: fg }}>{value}</p>
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1 font-semibold">{label}</p>
+    </div>
+  );
+}
+
+function DonutLegend({ dot, label, value }: { dot: string; label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-2.5 h-2.5 rounded-full" style={{ background: dot, boxShadow: `0 0 6px ${dot}` }} />
+      <span className="text-xs text-foreground font-medium flex-1">{label}</span>
+      <span className="text-sm font-display font-bold text-foreground">{value}</span>
+    </div>
+  );
+}
+
+function FilaBucket({
+  label, hint, value, fg, bg, border, glow,
+}: { label: string; hint: string; value: number; fg: string; bg: string; border: string; glow: string }) {
+  return (
+    <div
+      className="rounded-xl p-3 transition-all"
+      style={{
+        background: bg,
+        border: `1px solid ${border}`,
+        boxShadow: value > 0 ? `0 0 14px ${glow}` : undefined,
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold" style={{ color: fg }}>{label}</p>
+        <p className="text-2xl font-display font-bold leading-none" style={{ color: fg, textShadow: value > 0 ? `0 0 10px ${glow}` : undefined }}>
+          {value}
+        </p>
+      </div>
+      <p className="text-[10px] text-muted-foreground mt-1">{hint}</p>
     </div>
   );
 }
