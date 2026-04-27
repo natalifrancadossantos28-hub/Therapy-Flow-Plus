@@ -61,12 +61,17 @@ const extractFields = (body: any) => ({
   respostas: body.respostas ? JSON.stringify(body.respostas) : null,
 });
 
-function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean, semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
-  const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
-  const baseIdx = triagemScore >= 270 ? 3 : triagemScore >= 180 ? 2 : triagemScore >= 90 ? 1 : 0;
-  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0) + (semTerapia ? 1 : 0);
-  const idx = Math.min(3, baseIdx + vuln);
-  return levels[idx];
+// Cor vem do score TOTAL (clinico /100 + 2 por flag social, max +4).
+// Espelha _calc_priority no banco e calcPriority do app Triagem/Gestao.
+// Sem upgrade automatico de nivel — vulnerabilidade soma pontos pequenos.
+function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean, _semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
+  const clinico100 = ((triagemScore ?? 0) * 100) / 360;
+  const vuln = (escolaPublica ? 2 : 0) + (trabalhoNaRoca ? 2 : 0);
+  const total = clinico100 + vuln;
+  if (total >= 75) return "elevado";
+  if (total >= 50) return "moderado";
+  if (total >= 25) return "leve";
+  return "baixo";
 }
 
 const PRIORITY_LABELS: Record<string, string> = {

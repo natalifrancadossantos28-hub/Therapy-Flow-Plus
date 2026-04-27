@@ -36,11 +36,17 @@ const toScoreDisplay = (
   tnr: boolean | null | undefined = false,
 ): number => toScoreDisplayBase(raw) + vulnBonus(ep, tnr);
 
-function calcPriority(score: number, escolaPublica: boolean, trabalhoNaRoca: boolean, semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
-  const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
-  const baseIdx = score >= 270 ? 3 : score >= 180 ? 2 : score >= 90 ? 1 : 0;
-  const vuln = (escolaPublica ? 1 : 0) + (trabalhoNaRoca ? 1 : 0) + (semTerapia ? 1 : 0);
-  return levels[Math.min(3, baseIdx + vuln)];
+// Cor vem do score TOTAL (clinico em /100 + 2 por flag social, max +4).
+// Espelha _calc_priority no banco e getPrioridadeBadge do app Triagem.
+// Sem upgrade automatico de nivel — vulnerabilidade soma pontos pequenos.
+function calcPriority(scoreRaw: number, escolaPublica: boolean, trabalhoNaRoca: boolean, _semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
+  const clinico100 = ((scoreRaw ?? 0) * 100) / SCORE_MAX_RAW;
+  const vuln = (escolaPublica ? VULN_BONUS_EP : 0) + (trabalhoNaRoca ? VULN_BONUS_TNR : 0);
+  const total = clinico100 + vuln;
+  if (total >= 75) return "elevado";
+  if (total >= 50) return "moderado";
+  if (total >= 25) return "leve";
+  return "baixo";
 }
 
 const PRIORITY_STYLE: Record<string, string> = {
