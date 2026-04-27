@@ -20,6 +20,11 @@ type ProfOption = { id: number; name: string; specialty: string | null };
 // Quando houver multi-tenant, expor um campo dedicado no card.
 const DEFAULT_SLUG = (import.meta.env.VITE_DEFAULT_COMPANY_SLUG as string | undefined) || "clinica-nfs";
 
+// Senha compartilhada para Recepcao e Administracao. O profissional continua
+// usando PIN. Pode ser sobrescrita por env (VITE_PORTAL_PASSWORD) por empresa.
+const PORTAL_PASSWORD =
+  (import.meta.env.VITE_PORTAL_PASSWORD as string | undefined) || "clinica123";
+
 // Fase 6: Portal unificado com 3 cards.
 // - Recepcao: login empresa, session scope = "reception" -> /reception.
 // - Profissional: seleciona nome + PIN, session profissional -> /agenda-profissionais.
@@ -33,6 +38,7 @@ export default function Portal() {
   const [professionals, setProfessionals] = useState<ProfOption[]>([]);
   const [selectedProfId, setSelectedProfId] = useState("");
   const [pinInput, setPinInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
 
   useEffect(() => {
     // Se ja tem sessao ativa, redireciona direto pra area correspondente.
@@ -60,12 +66,17 @@ export default function Portal() {
     setError("");
     setSelectedProfId("");
     setPinInput("");
+    setPasswordInput("");
   };
 
   const submitCompany = async (scope: "admin" | "reception") => {
     setLoading(true);
     setError("");
     try {
+      if (passwordInput.trim() !== PORTAL_PASSWORD) {
+        setError("Senha incorreta.");
+        return;
+      }
       if (!isSupabaseConfigured) {
         setError("Supabase nao configurado.");
         return;
@@ -259,7 +270,21 @@ export default function Portal() {
                 placeholder="ex: clinica-nfs"
                 className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-cyan-400/50"
                 disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-white/60 mb-1 block uppercase tracking-wider">Senha</label>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-black/40 border rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none"
+                style={{ borderColor: `${accent}33`, boxShadow: `inset 0 0 8px ${accent}10` }}
+                disabled={loading}
                 autoFocus
+                autoComplete="current-password"
               />
             </div>
 
@@ -267,7 +292,7 @@ export default function Portal() {
 
             <button
               type="submit"
-              disabled={loading || !slug.trim()}
+              disabled={loading || !slug.trim() || !passwordInput.trim()}
               className="w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
               style={{ background: accentBg, border: `1px solid ${accent}`, color: accent, boxShadow: `0 0 20px ${accent}40`, textShadow: `0 0 8px ${accent}` }}
             >
