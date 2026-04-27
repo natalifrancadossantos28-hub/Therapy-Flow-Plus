@@ -5,6 +5,7 @@ import {
   listAppointmentsToday,
   listWaitingList,
   getAppointmentsStats,
+  listProfessionalsCapacity,
   type Patient,
   type Professional as ArcoProfessional,
   type AppointmentToday,
@@ -48,10 +49,12 @@ function faixaDeIdade(dob: string | null | undefined): string {
 
 type Stats = { semanal: number; mensal: number; trimestral: number; semestral: number; anual: number };
 
+type CapacityStatus = "poucos" | "disponivel" | "proximo" | "lotado";
+
 type Ocupacao = {
   id: number; name: string; specialty: string; cargaHoraria: string;
-  pacientesAtivos: number; capacidade: number; meta: number; metaMin: number;
-  pct: number; vagasAbertas: boolean; alerta: string | null;
+  pacientesAtivos: number; capacidade: number;
+  pct: number; status: CapacityStatus;
 };
 
 const POLL_MS = 30_000; // 30 s
@@ -72,7 +75,30 @@ export default function Dashboard() {
     getAppointmentsStats().then(setAptStats).catch(console.error);
   };
   const fetchOcupacao = () =>
-    fetch("/api/professionals/ocupacao").then(r => r.json()).then(setOcupacao).catch(() => setOcupacao([]));
+    listProfessionalsCapacity()
+      .then((rows) => {
+        const mapped: Ocupacao[] = rows.map((r) => {
+          const max = r.maxPatients || (r.cargaHoraria.startsWith("20") ? 25 : 35);
+          const cur = r.currentPatients;
+          const pct = max > 0 ? Math.round((cur / max) * 100) : 0;
+          let status: CapacityStatus = "poucos";
+          if (pct >= 100) status = "lotado";
+          else if (pct >= 86) status = "proximo";
+          else if (pct >= 60) status = "disponivel";
+          return {
+            id: r.id,
+            name: r.name,
+            specialty: r.specialty || "",
+            cargaHoraria: r.cargaHoraria,
+            pacientesAtivos: cur,
+            capacidade: max,
+            pct,
+            status,
+          };
+        });
+        setOcupacao(mapped);
+      })
+      .catch(() => setOcupacao([]));
 
   useEffect(() => {
     fetchAll();
@@ -352,80 +378,71 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Monitor de Ocupação */}
-      {ocupacao.length > 0 && (
-        <Card className={cn("p-6", ocupacao.some(o => o.vagasAbertas) ? "border-[rgba(249,115,22,0.35)] shadow-[0_0_24px_rgba(249,115,22,0.08)]" : "")}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold font-display flex items-center gap-2"
-              style={ocupacao.some(o => o.vagasAbertas) ? { color: "#f97316", textShadow: "0 0 12px rgba(249,115,22,0.4)" } : {}}>
-              <Briefcase className="w-5 h-5" />
-              Monitor de Ocupação
-              {ocupacao.some(o => o.vagasAbertas) && (
-                <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-lg animate-pulse"
-                  style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.4)", color: "#f97316" }}>
-                  Vagas Abertas
-                </span>
-              )}
-            </h2>
-            <span className="text-xs text-muted-foreground font-semibold">Meta: 28–30 pacientes/profissional</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {ocupacao.map(o => {
-              const cor = o.vagasAbertas
-                ? o.pacientesAtivos < 20 ? "#ef4444" : "#f97316"
-                : "#00f0ff";
-              const bgCor = o.vagasAbertas
-                ? o.pacientesAtivos < 20 ? "rgba(239,68,68,0.07)" : "rgba(249,115,22,0.07)"
-                : "rgba(0,240,255,0.04)";
-              const borderCor = o.vagasAbertas
-                ? o.pacientesAtivos < 20 ? "rgba(239,68,68,0.25)" : "rgba(249,115,22,0.25)"
-                : "rgba(0,240,255,0.12)";
-              return (
-                <div key={o.id}
-                  className="p-4 rounded-xl flex flex-col gap-3 transition-all"
-                  style={{ background: bgCor, border: `1px solid ${borderCor}` }}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-bold text-sm text-foreground">{o.name}</p>
-                      <p className="text-xs text-muted-foreground">{o.specialty || "—"} · {o.cargaHoraria}</p>
+      {/* Status da Equipe — Capacidade dos profissionais */}
+      {ocupacao.length > 0 && (() => {
+        const STATUS_META: Record<CapacityStatus, { label: string; color: string; bg: string; border: string; icon: string }> = {
+          poucos:     { label: "Precisa de mais pacientes", color: "#00f0ff", bg: "rgba(0,240,255,0.06)",  border: "rgba(0,240,255,0.30)",  icon: "⚠️" },
+          disponivel: { label: "Disponível",                 color: "#34d399", bg: "rgba(52,211,153,0.06)", border: "rgba(52,211,153,0.30)", icon: "✅" },
+          proximo:    { label: "Próximo do limite",           color: "#f97316", bg: "rgba(249,115,22,0.07)", border: "rgba(249,115,22,0.35)", icon: "⚡" },
+          lotado:     { label: "Lotado",                     color: "#ef4444", bg: "rgba(239,68,68,0.07)",  border: "rgba(239,68,68,0.35)",  icon: "🔴" },
+        };
+        const algumPoucos = ocupacao.some(o => o.status === "poucos");
+        return (
+          <Card className={cn("p-6", algumPoucos ? "border-[rgba(0,240,255,0.30)] shadow-[0_0_24px_rgba(0,240,255,0.08)]" : "")}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold font-display flex items-center gap-2"
+                style={algumPoucos ? { color: "#00f0ff", textShadow: "0 0 12px rgba(0,240,255,0.4)" } : {}}>
+                <Briefcase className="w-5 h-5" />
+                Status da Equipe
+              </h2>
+              <span className="text-xs text-muted-foreground font-semibold">20h → 25 pacientes · 30h → 35 pacientes</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {ocupacao.map(o => {
+                const meta = STATUS_META[o.status];
+                return (
+                  <div key={o.id}
+                    className="p-4 rounded-xl flex flex-col gap-3 transition-all"
+                    style={{ background: meta.bg, border: `1px solid ${meta.border}` }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-sm text-foreground">{o.name}</p>
+                        <p className="text-xs text-muted-foreground">{o.specialty || "—"} · {o.cargaHoraria}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold font-display" style={{ color: meta.color }}>{o.pacientesAtivos}<span className="text-sm text-muted-foreground">/{o.capacidade}</span></p>
+                        <p className="text-[10px] text-muted-foreground">Ocupação: {o.pct}%</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold font-display" style={{ color: cor }}>{o.pacientesAtivos}</p>
-                      <p className="text-[10px] text-muted-foreground">/ {o.meta} meta</p>
+                    {/* Barra de progresso */}
+                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{
+                        width: `${Math.min(100, o.pct)}%`,
+                        background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})`,
+                        boxShadow: `0 0 8px ${meta.color}66`,
+                      }} />
                     </div>
-                  </div>
-                  {/* Barra de progresso */}
-                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{
-                      width: `${o.pct}%`,
-                      background: `linear-gradient(90deg, ${cor}99, ${cor})`,
-                      boxShadow: `0 0 8px ${cor}66`,
-                    }} />
-                  </div>
-                  {o.vagasAbertas ? (
-                    <p className="text-xs font-bold" style={{ color: cor }}>
-                      ⚠️ Agenda aberta — {o.meta - o.pacientesAtivos} vaga{o.meta - o.pacientesAtivos !== 1 ? "s" : ""} disponíve{o.meta - o.pacientesAtivos !== 1 ? "is" : "l"}
+                    <p className="text-xs font-bold" style={{ color: meta.color }}>
+                      {meta.icon} {meta.label}
                     </p>
-                  ) : (
-                    <p className="text-xs font-semibold" style={{ color: "#00f0ff" }}>✅ Meta atingida</p>
-                  )}
-                  {/* Mini perfil de faixa etária */}
-                  {profPerfil[o.id] && (
-                    <div className="flex flex-wrap gap-1 pt-1 border-t border-border/40">
-                      {FAIXAS.filter(f => f.key !== "sem_data" && (profPerfil[o.id]?.[f.key] || 0) > 0).map(f => (
-                        <span key={f.key} className="text-[10px] px-1.5 py-0.5 rounded font-bold"
-                          style={{ background: `${f.cor}15`, border: `1px solid ${f.cor}40`, color: f.cor }}>
-                          {f.emoji} {profPerfil[o.id]?.[f.key] || 0}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
+                    {/* Mini perfil de faixa etária */}
+                    {profPerfil[o.id] && (
+                      <div className="flex flex-wrap gap-1 pt-1 border-t border-border/40">
+                        {FAIXAS.filter(f => f.key !== "sem_data" && (profPerfil[o.id]?.[f.key] || 0) > 0).map(f => (
+                          <span key={f.key} className="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                            style={{ background: `${f.cor}15`, border: `1px solid ${f.cor}40`, color: f.cor }}>
+                            {f.emoji} {profPerfil[o.id]?.[f.key] || 0}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* Alertas de Faltas */}
       {absentPatients.length > 0 && (
