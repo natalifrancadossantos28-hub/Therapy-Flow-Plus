@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { X, Calendar, Clock, AlertCircle, Search, UserCog } from "lucide-react";
 import { MotionCard, Button, Label } from "@/components/ui-custom";
 import { listWaitingList, listPatients, createAppointments, listAppointments, type Patient } from "@/lib/arco-rpc";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
 type WaitingEntry = {
@@ -61,46 +62,91 @@ export default function BookingModal({
   const [mode, setMode] = useState<"fila" | "direto">("fila");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
+  // Filtro de Disponibilidade: IDs de pacientes já agendados neste mesmo horário com QUALQUER profissional
+  const [bookedAtSlotIds, setBookedAtSlotIds] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
-    listWaitingList()
-      .then((list) => setWaitingList(list.map(e => ({
+  const loadData = useCallback(async () => {
+    try {
+      const list = await listWaitingList();
+      setWaitingList(list.map(e => ({
         id: e.id,
         patientId: e.patientId,
         patientName: e.patientName,
         patientProntuario: e.patientProntuario ?? null,
         priority: e.priority,
         specialty: e.specialty ?? null,
-      }))))
-      .catch(console.error);
+      })));
+    } catch (err) { console.error(err); }
+
     if (adminMode) {
       listPatients().then(setPatients).catch(console.error);
     }
+
     // Trava de selecao: carrega pacientes que ja tem horario ativo futuro
-    // com esse profissional para nao aparecerem como "disponiveis" na fila
-    // ou na busca direta. Admin ainda pode forcar via busca direta + aviso.
+    // com esse profissional para nao aparecerem como "disponiveis".
     const today = new Date().toISOString().slice(0, 10);
-    listAppointments({ professionalId, dateFrom: today })
-      .then(apts => {
-        const ids = new Set<number>();
-        for (const a of apts) {
-          if (a.status === "agendado" || a.status === "em_atendimento") {
-            ids.add(a.patientId);
-          }
+    try {
+      const apts = await listAppointments({ professionalId, dateFrom: today });
+      const ids = new Set<number>();
+      for (const a of apts) {
+        if (a.status === "agendado" || a.status === "em_atendimento") {
+          ids.add(a.patientId);
         }
-        setAlreadyScheduledIds(ids);
-      })
-      .catch(console.error);
-  }, [adminMode, professionalId]);
+      }
+      setAlreadyScheduledIds(ids);
+    } catch (err) { console.error(err); }
+
+    // Filtro de Disponibilidade: busca TODOS os agendamentos no mesmo dia
+    // para identificar pacientes já agendados neste horário com qualquer profissional.
+    try {
+      const allAptsOnDate = await listAppointments({ date });
+      const bookedIds = new Set<number>();
+      for (const a of allAptsOnDate) {
+        if (a.time === time && (a.status === "agendado" || a.status === "atendimento") && a.professionalId !== professionalId) {
+          bookedIds.add(a.patientId);
+        }
+      }
+      setBookedAtSlotIds(bookedIds);
+    } catch (err) { console.error(err); }
+  }, [adminMode, professionalId, date, time]);
+
+  useEffect(() => { void loadData(); }, [loadData]);
+
+  // Atualização em Tempo Real: escuta mudanças na fila de espera e nos agendamentos
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!supabase) return;
+    const scheduleReload = () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = setTimeout(() => { void loadData(); }, 400);
+    };
+    const channel = supabase
+      .channel("booking-modal-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "waiting_list" },
+        scheduleReload
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointments" },
+        scheduleReload
+      )
+      .subscribe();
+    return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [loadData]);
 
   const matchedBySpec = waitingList.filter(e => matchesSpecialty(e.specialty, professionalSpecialty));
-  // No Portal do Profissional (adminMode=false) o paciente some da fila
-  // assim que ja tem horario ativo com esse profissional.
-  // Na Recepcao (adminMode=true) a fila continua mostrando todo mundo —
-  // admin tem permissao de agendar um 2o/3o horario para o mesmo paciente.
-  const filteredList = adminMode
-    ? matchedBySpec
-    : matchedBySpec.filter(e => !alreadyScheduledIds.has(e.patientId));
+  // Filtro de Disponibilidade: remove pacientes já agendados neste horário com outro profissional.
+  // No Portal do Profissional (adminMode=false) também remove quem já tem horário com ESTE profissional.
+  const filteredList = matchedBySpec.filter(e => {
+    if (bookedAtSlotIds.has(e.patientId)) return false;
+    if (!adminMode && alreadyScheduledIds.has(e.patientId)) return false;
+    return true;
+  });
   const nextPatient = filteredList[0] ?? null;
   const queueBlockedCount = matchedBySpec.length - filteredList.length;
 
@@ -117,6 +163,8 @@ export default function BookingModal({
 
   const selectedDirectAlreadyScheduled =
     selectedPatientId != null && alreadyScheduledIds.has(selectedPatientId);
+  const selectedDirectBookedAtSlot =
+    selectedPatientId != null && bookedAtSlotIds.has(selectedPatientId);
 
   const selectedDirect = directMatches.find(p => p.id === selectedPatientId) ?? null;
 
@@ -140,6 +188,24 @@ export default function BookingModal({
 
     setLoading(true);
     try {
+      // Bloqueio de Duplicidade: re-valida se o paciente ainda está disponível
+      // neste horário antes de confirmar. Protege contra dois profissionais
+      // clicando no mesmo paciente ao mesmo tempo.
+      const freshApts = await listAppointments({ date });
+      const alreadyTaken = freshApts.some(
+        a => a.patientId === targetPatientId && a.time === time &&
+             (a.status === "agendado" || a.status === "atendimento")
+      );
+      if (alreadyTaken) {
+        setError(
+          `${targetPatientName} já foi puxado por outro profissional para este horário. ` +
+          `A lista será atualizada automaticamente.`
+        );
+        void loadData();
+        setLoading(false);
+        return;
+      }
+
       await createAppointments({
         patientId: targetPatientId,
         professionalId,
@@ -149,8 +215,9 @@ export default function BookingModal({
         fromWaitingList: !isDirect,
       });
       onSuccess();
-    } catch (e: any) {
-      setError(e?.message || "Erro inesperado");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erro inesperado";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -329,7 +396,12 @@ export default function BookingModal({
                   Selecionado: {selectedDirect.name} — agendamento direto (ignora a fila).
                 </p>
               )}
-              {selectedDirect && selectedDirectAlreadyScheduled && (
+              {selectedDirect && selectedDirectBookedAtSlot && (
+                <p className="mt-2 text-xs font-semibold text-red-500 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                  {selectedDirect.name} já está agendado neste horário ({time}) com outro profissional.
+                </p>
+              )}
+              {selectedDirect && selectedDirectAlreadyScheduled && !selectedDirectBookedAtSlot && (
                 <p className="mt-2 text-xs font-semibold text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
                   Atenção: {selectedDirect.name} já tem horário ativo com {professionalName}. Só o administrador pode adicionar um segundo horário.
                 </p>
