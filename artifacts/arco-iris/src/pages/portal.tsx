@@ -25,6 +25,15 @@ const DEFAULT_SLUG = (import.meta.env.VITE_DEFAULT_COMPANY_SLUG as string | unde
 const PORTAL_PASSWORD =
   (import.meta.env.VITE_PORTAL_PASSWORD as string | undefined) || "clinica123";
 
+// Compara ignorando case, espacos e zero-width chars que o auto-complete
+// do celular costuma colar (ex.: "Clinica123 ", "clinica 123").
+function normalizePassword(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/[\s\u200b-\u200f\u2028\u2029\ufeff]/g, "")
+    .toLowerCase();
+}
+
 // Fase 6: Portal unificado com 3 cards.
 // - Recepcao: login empresa, session scope = "reception" -> /reception.
 // - Profissional: seleciona nome + PIN, session profissional -> /agenda-profissionais.
@@ -73,7 +82,7 @@ export default function Portal() {
     setLoading(true);
     setError("");
     try {
-      if (passwordInput.trim() !== PORTAL_PASSWORD) {
+      if (normalizePassword(passwordInput) !== normalizePassword(PORTAL_PASSWORD)) {
         setError("Senha incorreta.");
         return;
       }
@@ -284,8 +293,12 @@ export default function Portal() {
                 style={{ borderColor: `${accent}33`, boxShadow: `inset 0 0 8px ${accent}10` }}
                 disabled={loading}
                 autoFocus
-                autoComplete="current-password"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
               />
+              <p className="text-[10px] text-white/40 mt-1">Senha padrao: <span className="font-mono text-white/70">clinica123</span></p>
             </div>
 
             {error && <p className="text-xs text-red-400 bg-red-950/30 border border-red-500/30 rounded-xl px-3 py-2">{error}</p>}
