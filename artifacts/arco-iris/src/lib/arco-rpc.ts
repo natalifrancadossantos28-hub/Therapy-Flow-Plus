@@ -746,6 +746,14 @@ export type WaitingListEntry = {
   trabalhoNaRoca?: boolean | null;
   /** Score exibido em escala /150 (espelho do Perfil Multidisciplinar). */
   scoreTotal150?: number | null;
+  /** Score 0..72 da especialidade desta entrada (fonte da cor da fila). */
+  scoreEspecialidade?: number | null;
+  /** Maximo da escala por especialidade (sempre 72). */
+  scoreEspecialidadeMax?: number | null;
+  /** Bonus de desempate (0..2): +1 Escola Publica, +1 Trabalho na Roca. */
+  scoreSocialDesempate?: number | null;
+  /** Score efetivo usado pra ordenar dentro da cor (0..74). */
+  scoreEspecialidadeTotal?: number | null;
 };
 
 export async function listWaitingList(opts?: {
