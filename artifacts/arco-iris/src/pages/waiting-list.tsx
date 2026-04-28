@@ -287,18 +287,31 @@ export default function WaitingList() {
                         </Badge>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-baseline gap-1 font-mono">
-                          <span className="font-bold text-foreground">{entry.scoreTotal150 ?? 0}</span>
-                          <span className="text-xs text-muted-foreground">/150</span>
-                          {!!entry.scoreSocial && entry.scoreSocial > 0 && (
+                        {entry.scoreEspecialidade != null ? (
+                          <div className="flex items-baseline gap-1 font-mono">
+                            <span className="font-bold text-foreground">{entry.scoreEspecialidade}</span>
+                            <span className="text-xs text-muted-foreground">/72</span>
+                            {!!entry.scoreSocialDesempate && entry.scoreSocialDesempate > 0 && (
+                              <span
+                                title="Pontos de vulnerabilidade somados como desempate (+1 Escola Publica / +1 Trabalho na Roca)"
+                                className="ml-2 text-xs font-semibold text-amber-500"
+                              >
+                                +{entry.scoreSocialDesempate} desempate
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-baseline gap-1 font-mono">
+                            <span className="font-bold text-foreground">{entry.scoreTotal150 ?? 0}</span>
+                            <span className="text-xs text-muted-foreground">/150</span>
                             <span
-                              title="Bonus de vulnerabilidade ja somado ao score"
-                              className="ml-2 text-xs font-semibold text-amber-500"
+                              title="Sem especialidade definida: usa score clinico geral"
+                              className="ml-2 text-xs font-semibold text-muted-foreground"
                             >
-                              (inclui +{entry.scoreSocial} vuln.)
+                              geral
                             </span>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
                       <td className="px-6 py-4 text-right">

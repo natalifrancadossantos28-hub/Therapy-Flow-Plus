@@ -53,40 +53,40 @@
    PREMIUM DARK NEON THEME
    ═══════════════════════════════════════════ */
 :root {
-  /* Deep Navy Base */
-  --background: 222 55% 4%;
-  --foreground: 210 30% 92%;
+  /* Graphite Navy Base — #0f172a com hierarquia para card/popover/sidebar */
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
 
-  --border: 222 35% 16%;
-  --input: 222 40% 11%;
+  --border: 222 32% 22%;
+  --input: 222 40% 16%;
   --ring: 183 100% 52%;
 
-  --card: 222 50% 7%;
-  --card-foreground: 210 30% 92%;
-  --card-border: 222 35% 15%;
+  --card: 222 45% 14%;
+  --card-foreground: 210 40% 98%;
+  --card-border: 222 32% 22%;
 
-  --popover: 222 50% 8%;
-  --popover-foreground: 210 30% 92%;
-  --popover-border: 222 35% 15%;
+  --popover: 222 45% 15%;
+  --popover-foreground: 210 40% 98%;
+  --popover-border: 222 32% 22%;
 
   --primary: 183 100% 52%;
-  --primary-foreground: 222 55% 4%;
+  --primary-foreground: 222 47% 11%;
 
-  --secondary: 222 40% 11%;
-  --secondary-foreground: 210 25% 72%;
+  --secondary: 222 40% 16%;
+  --secondary-foreground: 210 35% 88%;
 
-  --muted: 222 38% 9%;
-  --muted-foreground: 220 18% 48%;
+  --muted: 222 40% 14%;
+  --muted-foreground: 220 16% 65%;
 
-  --accent: 200 70% 22%;
-  --accent-foreground: 183 100% 68%;
+  --accent: 200 70% 26%;
+  --accent-foreground: 183 100% 72%;
 
-  --destructive: 340 100% 55%;
+  --destructive: 340 100% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --sidebar: 222 55% 4%;
-  --sidebar-foreground: 210 30% 88%;
-  --sidebar-border: 222 35% 14%;
+  --sidebar: 222 47% 9%;
+  --sidebar-foreground: 210 40% 96%;
+  --sidebar-border: 222 32% 20%;
   --sidebar-primary: 183 100% 52%;
   --sidebar-primary-foreground: 222 55% 4%;
   --sidebar-accent: 222 40% 10%;
@@ -103,9 +103,9 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
     background-image:
-      radial-gradient(ellipse 60% 40% at 80% 0%, rgba(0, 240, 255, 0.06) 0%, transparent 60%),
-      radial-gradient(ellipse 40% 30% at 0% 100%, rgba(0, 255, 136, 0.04) 0%, transparent 60%),
-      radial-gradient(ellipse 80% 60% at 50% 50%, rgba(10, 15, 50, 0.8) 0%, transparent 100%);
+      radial-gradient(ellipse 60% 40% at 80% 0%, rgba(0, 240, 255, 0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 0% 100%, rgba(0, 255, 136, 0.035) 0%, transparent 60%),
+      radial-gradient(ellipse 80% 60% at 50% 50%, rgba(15, 23, 42, 0.6) 0%, transparent 100%);
     background-attachment: fixed;
   }
   h1, h2, h3, h4, h5, h6 {
