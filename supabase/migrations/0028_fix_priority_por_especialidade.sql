@@ -293,59 +293,61 @@ begin
 end;
 $$;
 
--- Recalcula prioridades das filas existentes com a nova regra (CASE inline).
+-- Recalcula prioridades das filas existentes com a nova regra.
+-- Usa subquery pra buscar specialty do profissional (Postgres nao permite
+-- joinar a target table no FROM do UPDATE).
+with target as (
+  select
+    w.id as wid,
+    coalesce(p.triagem_score, 0)             as triagem,
+    coalesce(p.escola_publica, false)        as escola,
+    coalesce(p.trabalho_na_roca, false)      as trabalho,
+    coalesce(
+      w.specialty,
+      (select pr.specialty from public.professionals pr where pr.id = w.professional_id)
+    ) as eff_specialty,
+    coalesce(p.score_psicologia, 0)          as s_psi,
+    coalesce(p.score_psicomotricidade, 0)    as s_psm,
+    coalesce(p.score_fisioterapia, 0)        as s_fis,
+    coalesce(p.score_psicopedagogia, 0)      as s_psp,
+    coalesce(p.score_ed_fisica, 0)           as s_edf,
+    coalesce(p.score_fonoaudiologia, 0)      as s_fon,
+    coalesce(p.score_to, 0)                  as s_to,
+    coalesce(p.score_nutricionista, 0)       as s_nut
+    from public.waiting_list w
+    left join public.patients p on p.id = w.patient_id
+   where p.id is not null
+),
+calc as (
+  select
+    wid, triagem, escola, trabalho, eff_specialty,
+    case
+      when eff_specialty is null or btrim(eff_specialty) = '' then null
+      when eff_specialty ilike 'psicolog%'    then s_psi
+      when eff_specialty ilike 'psicomot%'    then s_psm
+      when eff_specialty ilike 'fisio%'       then s_fis
+      when eff_specialty ilike 'psicoped%'    then s_psp
+      when eff_specialty ilike 'ed%fisica%'
+        or eff_specialty ilike 'educacao fisica%'
+        or eff_specialty ilike 'educa%fisica%'
+        or eff_specialty ilike 'oficina%'     then s_edf
+      when eff_specialty ilike 'fono%'        then s_fon
+      when eff_specialty ilike 'terapia ocup%'
+        or eff_specialty ilike 't.o.%'
+        or eff_specialty ilike 'to'           then s_to
+      when eff_specialty ilike 'nutri%'       then s_nut
+      else null
+    end as sp_score
+    from target
+)
 update public.waiting_list w
    set priority = case
-       when (
-         case
-           when coalesce(w.specialty, pr.specialty) is null
-             or btrim(coalesce(w.specialty, pr.specialty)) = ''            then null
-           when coalesce(w.specialty, pr.specialty) ilike 'psicolog%'      then coalesce(p.score_psicologia, 0)
-           when coalesce(w.specialty, pr.specialty) ilike 'psicomot%'      then coalesce(p.score_psicomotricidade, 0)
-           when coalesce(w.specialty, pr.specialty) ilike 'fisio%'         then coalesce(p.score_fisioterapia, 0)
-           when coalesce(w.specialty, pr.specialty) ilike 'psicoped%'      then coalesce(p.score_psicopedagogia, 0)
-           when coalesce(w.specialty, pr.specialty) ilike 'ed%fisica%'
-             or coalesce(w.specialty, pr.specialty) ilike 'educacao fisica%'
-             or coalesce(w.specialty, pr.specialty) ilike 'educa%fisica%'
-             or coalesce(w.specialty, pr.specialty) ilike 'oficina%'       then coalesce(p.score_ed_fisica, 0)
-           when coalesce(w.specialty, pr.specialty) ilike 'fono%'          then coalesce(p.score_fonoaudiologia, 0)
-           when coalesce(w.specialty, pr.specialty) ilike 'terapia ocup%'
-             or coalesce(w.specialty, pr.specialty) ilike 't.o.%'
-             or coalesce(w.specialty, pr.specialty) ilike 'to'             then coalesce(p.score_to, 0)
-           when coalesce(w.specialty, pr.specialty) ilike 'nutri%'         then coalesce(p.score_nutricionista, 0)
-           else null
-         end
-       ) is null then
-         public._calc_priority(
-           coalesce(p.triagem_score, 0),
-           coalesce(p.escola_publica, false),
-           coalesce(p.trabalho_na_roca, false),
-           false
-         )
-       else
-         public._calc_priority_specialty(
-           case
-             when coalesce(w.specialty, pr.specialty) ilike 'psicolog%'      then coalesce(p.score_psicologia, 0)
-             when coalesce(w.specialty, pr.specialty) ilike 'psicomot%'      then coalesce(p.score_psicomotricidade, 0)
-             when coalesce(w.specialty, pr.specialty) ilike 'fisio%'         then coalesce(p.score_fisioterapia, 0)
-             when coalesce(w.specialty, pr.specialty) ilike 'psicoped%'      then coalesce(p.score_psicopedagogia, 0)
-             when coalesce(w.specialty, pr.specialty) ilike 'ed%fisica%'
-               or coalesce(w.specialty, pr.specialty) ilike 'educacao fisica%'
-               or coalesce(w.specialty, pr.specialty) ilike 'educa%fisica%'
-               or coalesce(w.specialty, pr.specialty) ilike 'oficina%'       then coalesce(p.score_ed_fisica, 0)
-             when coalesce(w.specialty, pr.specialty) ilike 'fono%'          then coalesce(p.score_fonoaudiologia, 0)
-             when coalesce(w.specialty, pr.specialty) ilike 'terapia ocup%'
-               or coalesce(w.specialty, pr.specialty) ilike 't.o.%'
-               or coalesce(w.specialty, pr.specialty) ilike 'to'             then coalesce(p.score_to, 0)
-             when coalesce(w.specialty, pr.specialty) ilike 'nutri%'         then coalesce(p.score_nutricionista, 0)
-             else 0
-           end,
-           coalesce(p.escola_publica, false),
-           coalesce(p.trabalho_na_roca, false)
-         )
-     end
-  from public.patients p
-  left join public.professionals pr on pr.id = w.professional_id
- where p.id = w.patient_id;
+     when c.sp_score is null then
+       public._calc_priority(c.triagem, c.escola, c.trabalho, false)
+     else
+       public._calc_priority_specialty(c.sp_score, c.escola, c.trabalho)
+   end
+  from calc c
+ where c.wid = w.id;
 
 commit;
