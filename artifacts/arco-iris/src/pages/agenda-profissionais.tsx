@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ArrowRightLeft } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -13,6 +13,8 @@ import {
   updateAppointment,
   deleteAppointmentAlta,
   createNotificacao,
+  listWaitingList,
+  addPatientToFila,
 } from "@/lib/arco-rpc";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
@@ -49,7 +51,13 @@ const NEON: Record<string, React.CSSProperties> = {
   red: { background: "rgba(10,0,0,0.92)", border: "1px solid #ef4444", color: "#f87171", boxShadow: "0 0 14px rgba(239,68,68,0.55)", textShadow: "0 0 8px rgba(248,113,113,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   orange: { background: "rgba(10,5,0,0.92)", border: "1px solid #f97316", color: "#fb923c", boxShadow: "0 0 14px rgba(249,115,22,0.55)", textShadow: "0 0 8px rgba(251,146,60,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   blue: { background: "rgba(0,5,15,0.92)", border: "1px solid #3b82f6", color: "#60a5fa", boxShadow: "0 0 14px rgba(59,130,246,0.55)", textShadow: "0 0 8px rgba(96,165,250,0.9)", borderRadius: "10px", padding: "6px 10px", fontWeight: 700, fontSize: "11px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s", justifyContent: "center" },
+  fuchsia: { background: "rgba(10,0,10,0.92)", border: "1px solid #c026d3", color: "#e879f9", boxShadow: "0 0 14px rgba(192,38,211,0.55)", textShadow: "0 0 8px rgba(232,121,249,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
 };
+
+const SPECIALTIES = [
+  "Psicologia", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
+  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
+];
 
 export default function AgendaProfissionais() {
   const [, setLocation] = useLocation();
@@ -89,10 +97,18 @@ export default function AgendaProfissionais() {
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
+  const [altaMotivo, setAltaMotivo] = useState("");
   const [absenceAlert, setAbsenceAlert] = useState<AbsenceAlert | null>(null);
   const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
   const [remanejSending, setRemanejSending] = useState(false);
   const { toast } = useToast();
+
+  // Encaminhamento Interno
+  const [encApt, setEncApt] = useState<Appointment | null>(null);
+  const [encEspecialidade, setEncEspecialidade] = useState("");
+  const [encMotivo, setEncMotivo] = useState("");
+  const [encErro, setEncErro] = useState("");
+  const [encSending, setEncSending] = useState(false);
 
   const weekDays = getWeekDays(weekRef);
   const weekDates = weekDays.map(d => format(d, "yyyy-MM-dd"));
@@ -308,19 +324,57 @@ export default function AgendaProfissionais() {
 
   const handleDarAlta = (apt: Appointment) => {
     setActionMenuId(null);
+    setAltaMotivo("");
     setAltaConfirm(apt);
   };
 
   const confirmDarAlta = async () => {
-    if (!altaConfirm) return;
+    if (!altaConfirm || !altaMotivo.trim()) return;
     try {
       await deleteAppointmentAlta(altaConfirm.id);
-      await logNotificacao(altaConfirm, "Dar Alta");
+      await logNotificacao(altaConfirm, `Dar Alta — Motivo: ${altaMotivo.trim()}`);
       setAppointments(prev => prev.filter(a => a.id !== altaConfirm.id));
       setAltaConfirm(null);
+      setAltaMotivo("");
       toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado. Recepção notificada.` });
-    } catch (err: any) {
-      toast({ title: "Erro ao dar alta", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha inesperada.";
+      toast({ title: "Erro ao dar alta", description: msg, variant: "destructive" });
+    }
+  };
+
+  // ── Encaminhamento Interno ──
+  const handleEncaminhamento = (apt: Appointment) => {
+    setActionMenuId(null);
+    setEncApt(apt);
+    setEncEspecialidade("");
+    setEncMotivo("");
+    setEncErro("");
+  };
+
+  const confirmEncaminhamento = async () => {
+    if (!encApt || !encEspecialidade) return;
+    setEncErro("");
+    setEncSending(true);
+    try {
+      const filaAtual = await listWaitingList();
+      const jaExiste = filaAtual.some(
+        (e) => e.patientId === encApt.patientId && e.specialty === encEspecialidade
+      );
+      if (jaExiste) {
+        setEncErro("Este paciente já possui um encaminhamento ativo/está na fila para esta especialidade.");
+        setEncSending(false);
+        return;
+      }
+      await addPatientToFila(encApt.patientId, encEspecialidade, encMotivo.trim() || null);
+      await logNotificacao(encApt, `Encaminhamento Interno → ${encEspecialidade}${encMotivo.trim() ? ` — ${encMotivo.trim()}` : ""}`);
+      setEncApt(null);
+      toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha inesperada.";
+      toast({ title: "Erro ao encaminhar", description: msg, variant: "destructive" });
+    } finally {
+      setEncSending(false);
     }
   };
 
@@ -622,7 +676,7 @@ export default function AgendaProfissionais() {
                                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
                                             {!isAtendimento && (
                                               <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                                <Activity className="w-3.5 h-3.5" /> ✅ Em Atendimento
+                                                <Activity className="w-3.5 h-3.5" /> Em Atendimento
                                               </button>
                                             )}
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
@@ -636,6 +690,9 @@ export default function AgendaProfissionais() {
                                                 <LogOut className="w-3.5 h-3.5" /> Dar Alta
                                               </button>
                                             </div>
+                                            <button style={NEON.fuchsia} onClick={() => handleEncaminhamento(apt)}>
+                                              <ArrowRightLeft className="w-3.5 h-3.5" /> Encaminhamento Interno
+                                            </button>
                                             <p className="text-[9px] text-white/30 italic leading-tight px-1 mt-1">
                                               Recepção é notificada automaticamente a cada ação.
                                             </p>
@@ -694,7 +751,7 @@ export default function AgendaProfissionais() {
       </div>
 
       {altaConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setAltaConfirm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => { setAltaConfirm(null); setAltaMotivo(""); }}>
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }} onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -702,19 +759,107 @@ export default function AgendaProfissionais() {
                   <LogOut className="w-5 h-5" style={{ color: "#f87171" }} />
                 </div>
                 <div>
-                  <p className="font-bold" style={{ color: "#f87171" }}>Dar Alta</p>
+                  <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>Dar Alta</p>
                   <p className="text-xs text-white/50">Esta ação liberará o horário permanentemente</p>
                 </div>
               </div>
-              <p className="text-sm text-white/70 mb-5">
+              <p className="text-sm text-white/70 mb-4">
                 Confirmar alta de <strong className="text-white">{altaConfirm.patientName}</strong>? Os próximos agendamentos recorrentes serão cancelados.
               </p>
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#f87171" }}>Motivo da Alta *</label>
+                <textarea
+                  value={altaMotivo}
+                  onChange={e => setAltaMotivo(e.target.value)}
+                  placeholder="Descreva o motivo da alta..."
+                  rows={3}
+                  className="w-full rounded-xl text-sm p-3 resize-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(239,68,68,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.boxShadow = "0 0 10px rgba(239,68,68,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(239,68,68,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                />
+              </div>
               <div className="flex gap-3">
-                <button onClick={() => setAltaConfirm(null)} className="flex-1 py-3 rounded-xl font-semibold text-sm" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
+                <button onClick={() => { setAltaConfirm(null); setAltaMotivo(""); }} className="flex-1 py-3 rounded-xl font-semibold text-sm" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
                   Cancelar
                 </button>
-                <button onClick={confirmDarAlta} className="flex-1 py-3 rounded-xl font-bold text-sm" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444", color: "#f87171", boxShadow: "0 0 16px rgba(239,68,68,0.3)" }}>
+                <button
+                  onClick={confirmDarAlta}
+                  disabled={!altaMotivo.trim()}
+                  className="flex-1 py-3 rounded-xl font-bold text-sm"
+                  style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444", color: "#f87171", boxShadow: "0 0 16px rgba(239,68,68,0.3)", opacity: altaMotivo.trim() ? 1 : 0.4, cursor: altaMotivo.trim() ? "pointer" : "not-allowed" }}
+                >
                   Confirmar Alta
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Encaminhamento Interno Modal ── */}
+      {encApt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEncApt(null)}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,5,0.97)", border: "1px solid rgba(192,38,211,0.3)" }} onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(192,38,211,0.15)", border: "1px solid #c026d3" }}>
+                  <ArrowRightLeft className="w-5 h-5" style={{ color: "#e879f9" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#e879f9", textShadow: "0 0 8px rgba(232,121,249,0.8)" }}>Encaminhamento Interno</p>
+                  <p className="text-xs text-white/50">{encApt.patientName}</p>
+                </div>
+              </div>
+
+              {encErro && (
+                <div className="rounded-xl p-3 mb-4 text-sm font-semibold" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171" }}>
+                  {encErro}
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#e879f9" }}>Especialidade de Destino *</label>
+                <select
+                  value={encEspecialidade}
+                  onChange={e => { setEncEspecialidade(e.target.value); setEncErro(""); }}
+                  className="w-full rounded-xl text-sm p-3"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(192,38,211,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#c026d3"; e.currentTarget.style.boxShadow = "0 0 10px rgba(192,38,211,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(192,38,211,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                >
+                  <option value="" style={{ background: "#0a000a" }}>Selecione...</option>
+                  {SPECIALTIES.map(s => (
+                    <option key={s} value={s} style={{ background: "#0a000a" }}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#e879f9" }}>Motivo do Encaminhamento</label>
+                <textarea
+                  value={encMotivo}
+                  onChange={e => setEncMotivo(e.target.value)}
+                  placeholder="Descreva o motivo do encaminhamento..."
+                  rows={3}
+                  className="w-full rounded-xl text-sm p-3 resize-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(192,38,211,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#c026d3"; e.currentTarget.style.boxShadow = "0 0 10px rgba(192,38,211,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(192,38,211,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setEncApt(null)} className="flex-1 py-3 rounded-xl font-semibold text-sm" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmEncaminhamento}
+                  disabled={!encEspecialidade || encSending}
+                  className="flex-1 py-3 rounded-xl font-bold text-sm"
+                  style={{ background: "rgba(192,38,211,0.15)", border: "1px solid #c026d3", color: "#e879f9", boxShadow: "0 0 16px rgba(192,38,211,0.3)", opacity: encEspecialidade && !encSending ? 1 : 0.4, cursor: encEspecialidade && !encSending ? "pointer" : "not-allowed" }}
+                >
+                  {encSending ? "Encaminhando..." : "Confirmar Encaminhamento"}
                 </button>
               </div>
             </div>

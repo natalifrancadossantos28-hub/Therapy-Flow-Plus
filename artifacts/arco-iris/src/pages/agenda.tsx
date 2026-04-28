@@ -5,7 +5,7 @@ import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, ArrowRightLeft
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
@@ -19,6 +19,8 @@ import {
   updateAppointment,
   deleteAppointmentAlta,
   createNotificacao,
+  listWaitingList,
+  addPatientToFila,
   type Professional as ArcoProfessional,
 } from "@/lib/arco-rpc";
 
@@ -185,7 +187,29 @@ const NEON: Record<string, React.CSSProperties> = {
     width: "100%",
     transition: "all 0.15s",
   },
+  fuchsia: {
+    background: "rgba(10,0,10,0.92)",
+    border: "1px solid #c026d3",
+    color: "#e879f9",
+    boxShadow: "0 0 14px rgba(192,38,211,0.55), inset 0 0 8px rgba(192,38,211,0.12)",
+    textShadow: "0 0 8px rgba(232,121,249,0.9)",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    fontWeight: 700,
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    width: "100%",
+    transition: "all 0.15s",
+  },
 };
+
+const SPECIALTIES = [
+  "Psicologia", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
+  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
+];
 
 const isAdminSession = (): boolean => {
   try {
@@ -230,6 +254,7 @@ export default function Agenda() {
   const [notifyDone, setNotifyDone] = useState(false);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
+  const [altaMotivo, setAltaMotivo] = useState("");
   const [absenceAlert, setAbsenceAlert] = useState<AbsenceAlert | null>(null);
   const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
   const [remanejSending, setRemanejSending] = useState(false);
@@ -237,6 +262,13 @@ export default function Agenda() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const { toast } = useToast();
+
+  // Encaminhamento Interno
+  const [encApt, setEncApt] = useState<Appointment | null>(null);
+  const [encEspecialidade, setEncEspecialidade] = useState("");
+  const [encMotivo, setEncMotivo] = useState("");
+  const [encErro, setEncErro] = useState("");
+  const [encSending, setEncSending] = useState(false);
 
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
@@ -419,22 +451,59 @@ export default function Agenda() {
   // ── Dar Alta ──
   const handleDarAlta = (apt: Appointment) => {
     setActionMenuId(null);
+    setAltaMotivo("");
     setAltaConfirm(apt);
   };
 
   const confirmDarAlta = async () => {
-    if (!altaConfirm) return;
+    if (!altaConfirm || !altaMotivo.trim()) return;
     try {
       await deleteAppointmentAlta(altaConfirm.id);
-      await logNotificacao(altaConfirm, "Dar Alta");
+      await logNotificacao(altaConfirm, `Dar Alta — Motivo: ${altaMotivo.trim()}`);
       setAppointments(prev => prev.filter(a =>
         a.id !== altaConfirm.id &&
         !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.date >= altaConfirm.date)
       ));
       setAltaConfirm(null);
+      setAltaMotivo("");
       toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado permanentemente.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
+    }
+  };
+
+  // ── Encaminhamento Interno ──
+  const handleEncaminhamento = (apt: Appointment) => {
+    setActionMenuId(null);
+    setEncApt(apt);
+    setEncEspecialidade("");
+    setEncMotivo("");
+    setEncErro("");
+  };
+
+  const confirmEncaminhamento = async () => {
+    if (!encApt || !encEspecialidade) return;
+    setEncErro("");
+    setEncSending(true);
+    try {
+      const filaAtual = await listWaitingList();
+      const jaExiste = filaAtual.some(
+        (e) => e.patientId === encApt.patientId && e.specialty === encEspecialidade
+      );
+      if (jaExiste) {
+        setEncErro("Este paciente já possui um encaminhamento ativo/está na fila para esta especialidade.");
+        setEncSending(false);
+        return;
+      }
+      await addPatientToFila(encApt.patientId, encEspecialidade, encMotivo.trim() || null);
+      await logNotificacao(encApt, `Encaminhamento Interno → ${encEspecialidade}${encMotivo.trim() ? ` — ${encMotivo.trim()}` : ""}`);
+      setEncApt(null);
+      toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha inesperada.";
+      toast({ title: "Erro ao encaminhar", description: msg, variant: "destructive" });
+    } finally {
+      setEncSending(false);
     }
   };
 
@@ -748,19 +817,17 @@ export default function Agenda() {
                                     >
                                       <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
 
-                                      {/* Fase 5A: "Presente" habilitado apenas para dono (PIN) ou Admin. */}
                                       <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                        <Activity className="w-3.5 h-3.5" /> ✅ Presente
+                                        <Activity className="w-3.5 h-3.5" /> Em Atendimento
                                       </button>
 
-                                      {/* Fase 5A: Falta/Desmarcar centralizados na Recepção. Visao do profissional nao exibe. */}
                                       {isAdmin && (
                                         <>
                                           <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
-                                            <CheckCircle className="w-3.5 h-3.5" /> ⚠️ Falta Justificada
+                                            <CheckCircle className="w-3.5 h-3.5" /> Falta Justificada
                                           </button>
                                           <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
-                                            <AlertTriangle className="w-3.5 h-3.5" /> 🔴 Falta N. Justificada
+                                            <AlertTriangle className="w-3.5 h-3.5" /> Falta N. Justificada
                                           </button>
                                           <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                           <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
@@ -775,6 +842,10 @@ export default function Agenda() {
 
                                       <button style={NEON.red} onClick={() => handleDarAlta(apt)}>
                                         <LogOut className="w-3.5 h-3.5" /> Dar Alta
+                                      </button>
+
+                                      <button style={NEON.fuchsia} onClick={() => handleEncaminhamento(apt)}>
+                                        <ArrowRightLeft className="w-3.5 h-3.5" /> Encaminhamento Interno
                                       </button>
 
                                       {!isAdmin && (
@@ -859,14 +930,97 @@ export default function Agenda() {
                   ⚠ Este é um agendamento recorrente. Todos os próximos serão cancelados.
                 </p>
               )}
-              <div className="flex gap-3 mt-5">
+              <div className="mt-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#f87171" }}>Motivo da Alta *</label>
+                <textarea
+                  value={altaMotivo}
+                  onChange={e => setAltaMotivo(e.target.value)}
+                  placeholder="Descreva o motivo da alta..."
+                  rows={3}
+                  className="w-full rounded-xl text-sm p-3 resize-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(239,68,68,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.boxShadow = "0 0 10px rgba(239,68,68,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(239,68,68,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                />
+              </div>
+              <div className="flex gap-3 mt-4">
                 <button
                   onClick={confirmDarAlta}
-                  style={{ ...NEON.red, flex: 1, justifyContent: "center", padding: "10px" }}
+                  disabled={!altaMotivo.trim()}
+                  style={{ ...NEON.red, flex: 1, justifyContent: "center", padding: "10px", opacity: altaMotivo.trim() ? 1 : 0.4, cursor: altaMotivo.trim() ? "pointer" : "not-allowed" }}
                 >
                   <LogOut className="w-4 h-4" /> Confirmar Alta
                 </button>
-                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setAltaConfirm(null)}>
+                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => { setAltaConfirm(null); setAltaMotivo(""); }}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Encaminhamento Interno Modal ── */}
+      {encApt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEncApt(null)}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,5,0.97)", border: "1px solid rgba(192,38,211,0.3)" }} onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(192,38,211,0.15)", border: "1px solid #c026d3" }}>
+                  <ArrowRightLeft className="w-5 h-5" style={{ color: "#e879f9" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#e879f9", textShadow: "0 0 8px rgba(232,121,249,0.8)" }}>Encaminhamento Interno</p>
+                  <p className="text-xs text-white/50">{encApt.patientName}</p>
+                </div>
+              </div>
+
+              {encErro && (
+                <div className="rounded-xl p-3 mb-4 text-sm font-semibold" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171" }}>
+                  {encErro}
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#e879f9" }}>Especialidade de Destino *</label>
+                <select
+                  value={encEspecialidade}
+                  onChange={e => { setEncEspecialidade(e.target.value); setEncErro(""); }}
+                  className="w-full rounded-xl text-sm p-3"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(192,38,211,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#c026d3"; e.currentTarget.style.boxShadow = "0 0 10px rgba(192,38,211,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(192,38,211,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                >
+                  <option value="" style={{ background: "#0a000a" }}>Selecione...</option>
+                  {SPECIALTIES.map(s => (
+                    <option key={s} value={s} style={{ background: "#0a000a" }}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#e879f9" }}>Motivo do Encaminhamento</label>
+                <textarea
+                  value={encMotivo}
+                  onChange={e => setEncMotivo(e.target.value)}
+                  placeholder="Descreva o motivo do encaminhamento..."
+                  rows={3}
+                  className="w-full rounded-xl text-sm p-3 resize-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(192,38,211,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#c026d3"; e.currentTarget.style.boxShadow = "0 0 10px rgba(192,38,211,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(192,38,211,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={confirmEncaminhamento}
+                  disabled={!encEspecialidade || encSending}
+                  style={{ ...NEON.fuchsia, flex: 1, justifyContent: "center", padding: "10px", opacity: encEspecialidade && !encSending ? 1 : 0.4, cursor: encEspecialidade && !encSending ? "pointer" : "not-allowed" }}
+                >
+                  <ArrowRightLeft className="w-4 h-4" /> {encSending ? "Encaminhando..." : "Confirmar Encaminhamento"}
+                </button>
+                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setEncApt(null)}>
                   Cancelar
                 </Button>
               </div>
