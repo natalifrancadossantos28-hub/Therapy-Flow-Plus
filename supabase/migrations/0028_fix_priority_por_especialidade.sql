@@ -1,10 +1,7 @@
--- =========================================================================
 -- 0028_fix_priority_por_especialidade.sql
---
 -- Corrige a 0027: substitui o helper _specialty_score_72 (que passava
 -- composite row e quebrava no parser) por CASE inline em cada lugar
 -- que precisa do score 0..72 da especialidade.
--- =========================================================================
 
 begin;
 
