@@ -377,7 +377,6 @@ export default function AgendaProfissionais() {
         return;
       }
       await addPatientToFila(encApt.patientId, encEspecialidade, encMotivo.trim() || null);
-      await logNotificacao(encApt, `Encaminhamento Interno → ${encEspecialidade}${encMotivo.trim() ? ` — ${encMotivo.trim()}` : ""}`);
       setEncApt(null);
       toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.` });
     } catch (err: unknown) {
