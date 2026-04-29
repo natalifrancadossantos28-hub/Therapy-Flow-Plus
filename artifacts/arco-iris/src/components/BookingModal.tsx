@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { X, Calendar, Clock, AlertCircle, Search, UserCog } from "lucide-react";
 import { MotionCard, Button, Label } from "@/components/ui-custom";
-import { listWaitingList, listPatients, createAppointments, listAppointments, type Patient } from "@/lib/arco-rpc";
+import { listWaitingList, listPatients, createAppointments, listAppointments, deleteWaitingListEntry, listProfessionals, type Patient } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +64,8 @@ export default function BookingModal({
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
   // Filtro de Disponibilidade: IDs de pacientes já agendados neste mesmo horário com QUALQUER profissional
   const [bookedAtSlotIds, setBookedAtSlotIds] = useState<Set<number>>(new Set());
+  // Mapa professionalId → specialty para validação de duplicidade
+  const [profSpecialtyMap, setProfSpecialtyMap] = useState<Map<number, string>>(new Map());
 
   const loadData = useCallback(async () => {
     try {
@@ -94,6 +96,16 @@ export default function BookingModal({
         }
       }
       setAlreadyScheduledIds(ids);
+    } catch (err) { console.error(err); }
+
+    // Carrega mapa de especialidades dos profissionais para validação de duplicidade
+    try {
+      const profs = await listProfessionals();
+      const map = new Map<number, string>();
+      for (const p of profs) {
+        if (p.specialty) map.set(p.id, p.specialty);
+      }
+      setProfSpecialtyMap(map);
     } catch (err) { console.error(err); }
 
     // Filtro de Disponibilidade: busca TODOS os agendamentos no mesmo dia
@@ -206,6 +218,27 @@ export default function BookingModal({
         return;
       }
 
+      // Validação de Duplicidade por Especialidade: impede novo agendamento
+      // para o mesmo paciente se já tem agendamento ativo/recorrente com
+      // qualquer profissional da mesma especialidade.
+      if (professionalSpecialty) {
+        const today = new Date().toISOString().slice(0, 10);
+        const patientApts = await listAppointments({ patientId: targetPatientId, dateFrom: today });
+        const hasActiveInSpecialty = patientApts.some(a => {
+          if (a.status !== "agendado" && a.status !== "atendimento") return false;
+          const aptSpec = profSpecialtyMap.get(a.professionalId) ?? "";
+          return aptSpec.trim().toLowerCase() === professionalSpecialty.trim().toLowerCase();
+        });
+        if (hasActiveInSpecialty) {
+          setError(
+            `${targetPatientName} já possui um agendamento ativo/recorrente em ${professionalSpecialty}. ` +
+            `Não é possível criar outro agendamento para a mesma especialidade.`
+          );
+          setLoading(false);
+          return;
+        }
+      }
+
       await createAppointments({
         patientId: targetPatientId,
         professionalId,
@@ -214,6 +247,20 @@ export default function BookingModal({
         frequency,
         fromWaitingList: !isDirect,
       });
+
+      // Trigger de Remoção: ao agendar da fila, remove o paciente da fila de espera
+      // para a especialidade correspondente. Busca TODAS as entradas desse paciente
+      // que correspondem à especialidade do profissional e remove.
+      if (!isDirect && nextPatient) {
+        const entriesToRemove = waitingList.filter(
+          e => e.patientId === targetPatientId &&
+               matchesSpecialty(e.specialty, professionalSpecialty)
+        );
+        for (const entry of entriesToRemove) {
+          try { await deleteWaitingListEntry(entry.id); } catch { /* silencioso */ }
+        }
+      }
+
       onSuccess();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Erro inesperado";
