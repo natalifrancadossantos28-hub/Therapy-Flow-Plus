@@ -5,7 +5,7 @@ import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ArrowRightLeft
+  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
@@ -19,6 +19,7 @@ import {
   updateAppointment,
   deleteAppointmentAlta,
   createNotificacao,
+  createAppointments,
   listWaitingList,
   addPatientToFila,
   upsertPatient,
@@ -206,6 +207,23 @@ const NEON: Record<string, React.CSSProperties> = {
     width: "100%",
     transition: "all 0.15s",
   },
+  cyan: {
+    background: "rgba(0,8,10,0.92)",
+    border: "1px solid #06b6d4",
+    color: "#67e8f9",
+    boxShadow: "0 0 14px rgba(6,182,212,0.55), inset 0 0 8px rgba(6,182,212,0.12)",
+    textShadow: "0 0 8px rgba(103,232,249,0.9)",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    fontWeight: 700,
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    width: "100%",
+    transition: "all 0.15s",
+  },
 };
 
 const SPECIALTIES = [
@@ -264,6 +282,12 @@ export default function Agenda() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const { toast } = useToast();
+
+  // Atendimento Multi
+  const [multiApt, setMultiApt] = useState<Appointment | null>(null);
+  const [multiProfId, setMultiProfId] = useState<string>("");
+  const [multiSending, setMultiSending] = useState(false);
+  const [multiErro, setMultiErro] = useState("");
 
   // Encaminhamento Interno
   const [encApt, setEncApt] = useState<Appointment | null>(null);
@@ -514,6 +538,50 @@ export default function Agenda() {
       toast({ title: "Erro ao encaminhar", description: msg, variant: "destructive" });
     } finally {
       setEncSending(false);
+    }
+  };
+
+  // ── Atendimento Multi (Admin) ──
+  const handleMultiAtendimento = (apt: Appointment) => {
+    setActionMenuId(null);
+    setMultiApt(apt);
+    setMultiProfId("");
+    setMultiErro("");
+  };
+
+  const confirmMultiAtendimento = async () => {
+    if (!multiApt || !multiProfId) return;
+    setMultiErro("");
+    setMultiSending(true);
+    try {
+      const secondProf = professionals.find(p => String(p.id) === multiProfId);
+      if (!secondProf) { setMultiErro("Profissional não encontrado."); setMultiSending(false); return; }
+      const currentProf = selectedProf;
+      if (!currentProf) { setMultiErro("Profissional atual não identificado."); setMultiSending(false); return; }
+      const spec1 = (currentProf.specialty || "").trim().toLowerCase();
+      const spec2 = (secondProf.specialty || "").trim().toLowerCase();
+      if (spec1 && spec2 && spec1 === spec2) {
+        setMultiErro(`Bloqueado: ${currentProf.name} e ${secondProf.name} são da mesma especialidade (${currentProf.specialty}). Para Atendimento Multi, os profissionais devem ser de especialidades diferentes.`);
+        setMultiSending(false);
+        return;
+      }
+      await createAppointments({
+        patientId: multiApt.patientId,
+        professionalId: secondProf.id,
+        date: multiApt.date,
+        time: multiApt.time,
+        notes: `Atendimento Multi com ${currentProf.name} (${currentProf.specialty || "—"})`,
+        noRecurrence: true,
+      });
+      await logNotificacao(multiApt, `Atendimento Multi — ${secondProf.name} (${secondProf.specialty || "—"}) adicionado ao horário de ${currentProf.name}`);
+      setMultiApt(null);
+      toast({ title: "Atendimento Multi criado", description: `${secondProf.name} adicionado ao horário de ${multiApt.patientName} às ${multiApt.time}.` });
+      fetchAppointments();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha inesperada.";
+      toast({ title: "Erro ao criar Atendimento Multi", description: msg, variant: "destructive" });
+    } finally {
+      setMultiSending(false);
     }
   };
 
@@ -858,6 +926,12 @@ export default function Agenda() {
                                         <ArrowRightLeft className="w-3.5 h-3.5" /> Encaminhamento Interno
                                       </button>
 
+                                      {isAdmin && (
+                                        <button style={NEON.cyan} onClick={() => handleMultiAtendimento(apt)}>
+                                          <UserPlus className="w-3.5 h-3.5" /> Atendimento Multi
+                                        </button>
+                                      )}
+
                                       {!isAdmin && (
                                         <p className="text-[9px] text-white/30 px-1 mt-1 italic leading-tight">
                                           Faltas e desmarcações ficam na Recepção.
@@ -1031,6 +1105,69 @@ export default function Agenda() {
                   <ArrowRightLeft className="w-4 h-4" /> {encSending ? "Encaminhando..." : "Confirmar Encaminhamento"}
                 </button>
                 <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setEncApt(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Atendimento Multi Modal ── */}
+      {multiApt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setMultiApt(null)}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,8,10,0.97)", border: "1px solid rgba(6,182,212,0.3)" }} onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(6,182,212,0.15)", border: "1px solid #06b6d4" }}>
+                  <UserPlus className="w-5 h-5" style={{ color: "#67e8f9" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#67e8f9", textShadow: "0 0 8px rgba(103,232,249,0.8)" }}>Atendimento Multi</p>
+                  <p className="text-xs text-white/50">{multiApt.patientName} — {multiApt.time}</p>
+                </div>
+              </div>
+
+              {multiErro && (
+                <div className="rounded-xl p-3 mb-4 text-sm font-semibold" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171" }}>
+                  {multiErro}
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#67e8f9" }}>Segundo Profissional *</label>
+                <select
+                  value={multiProfId}
+                  onChange={e => { setMultiProfId(e.target.value); setMultiErro(""); }}
+                  className="w-full rounded-xl text-sm p-3"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(6,182,212,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#06b6d4"; e.currentTarget.style.boxShadow = "0 0 10px rgba(6,182,212,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(6,182,212,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                >
+                  <option value="" style={{ background: "#000a0c" }}>Selecione o profissional...</option>
+                  {professionals
+                    .filter(p => String(p.id) !== selectedProfId)
+                    .map(p => (
+                      <option key={p.id} value={String(p.id)} style={{ background: "#000a0c" }}>
+                        {p.name} — {p.specialty || "Sem especialidade"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <p className="text-[10px] text-white/40 mb-4 leading-relaxed">
+                O horário ficará bloqueado na agenda de ambos os profissionais. Profissionais da mesma especialidade não são permitidos.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={confirmMultiAtendimento}
+                  disabled={!multiProfId || multiSending}
+                  style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: multiProfId && !multiSending ? 1 : 0.4, cursor: multiProfId && !multiSending ? "pointer" : "not-allowed" }}
+                >
+                  <UserPlus className="w-4 h-4" /> {multiSending ? "Criando..." : "Confirmar Multi"}
+                </button>
+                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setMultiApt(null)}>
                   Cancelar
                 </Button>
               </div>
