@@ -485,7 +485,7 @@ function buildWhatsAppMessage(n: NotificacaoRecepcao): string {
     .filter(Boolean)
     .join(" ");
 
-  const saudacao = `Olá, aqui é da recepção ${clinica}.`;
+  const saudacao = `Olá! Aqui é da recepção da NFS Gestão.`;
 
   if (acao.includes("desmarc") || acao.includes("cancel")) {
     return `${saudacao} O atendimento de ${n.patientName} com ${n.professionalName}${
@@ -499,6 +499,10 @@ function buildWhatsAppMessage(n: NotificacaoRecepcao): string {
   }
   if (acao.includes("alta")) {
     return `${saudacao} Boa notícia: ${n.patientName} recebeu alta de ${n.professionalName}. Parabéns pela jornada!`;
+  }
+
+  if (acao.includes("agend") || acao.includes("remanej") || acao.includes("remarc")) {
+    return `${saudacao} Estamos entrando em contato para avisar que o agendamento do paciente ${n.patientName} com o profissional ${n.professionalName} será no dia ${data || "—"} às ${hora || "—"}. Por gentileza, chegar com 10 minutos de antecedência. Confirmamos sua presença?`;
   }
 
   const verbo = formatAcaoLabel(acao).toLowerCase();

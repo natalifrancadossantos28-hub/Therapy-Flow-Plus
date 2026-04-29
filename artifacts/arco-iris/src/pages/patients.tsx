@@ -1,17 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
-import { Users, Plus, Search, AlertCircle, MessageCircle } from "lucide-react";
+import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getStatusColor, cn } from "@/lib/utils";
 import {
   listPatients,
   upsertPatient,
+  deletePatient,
   listProfessionals,
   nextProntuario as fetchNextProntuarioRpc,
   checkProntuario as checkProntuarioRpc,
   type Patient,
   type Professional,
 } from "@/lib/arco-rpc";
+import { hasAdminScope } from "@/lib/portal-session";
 
 const STATUS_OPTIONS = [
   { value: "Aguardando Triagem", label: "Aguardando Triagem" },
@@ -286,13 +288,14 @@ export default function Patients() {
                 <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Profissional</th>
                 <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Status</th>
                 <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Faltas</th>
+                {hasAdminScope() && <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Ações</th>}
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="text-center py-8 animate-pulse text-muted-foreground">Carregando...</td></tr>
+                <tr><td colSpan={hasAdminScope() ? 8 : 7} className="text-center py-8 animate-pulse text-muted-foreground">Carregando...</td></tr>
               ) : filteredPatients.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum paciente encontrado.</td></tr>
+                <tr><td colSpan={hasAdminScope() ? 8 : 7} className="text-center py-8 text-muted-foreground">Nenhum paciente encontrado.</td></tr>
               ) : (
                 filteredPatients.map((patient) => {
                   const prof = professionals.find(p => p.id === patient.professionalId);
@@ -334,6 +337,37 @@ export default function Patients() {
                           <span className="text-muted-foreground ml-2">{patient.absenceCount}</span>
                         )}
                       </td>
+                      {hasAdminScope() && (
+                        <td className="px-4 py-3">
+                          {patient.status === "Alta" && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!confirm(`EXCLUSÃO PERMANENTE: Deseja remover ${patient.name} definitivamente do sistema? Esta ação não pode ser desfeita.`)) return;
+                                void (async () => {
+                                  try {
+                                    await deletePatient(patient.id);
+                                    setPatients(prev => prev.filter(p => p.id !== patient.id));
+                                    toast({ title: "Paciente excluído", description: `${patient.name} foi removido permanentemente.` });
+                                  } catch (err: any) {
+                                    toast({ title: "Erro", description: err?.message || "Falha ao excluir.", variant: "destructive" });
+                                  }
+                                })();
+                              }}
+                              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                              style={{
+                                background: "rgba(239,68,68,0.1)",
+                                border: "1px solid rgba(239,68,68,0.4)",
+                                color: "#ef4444",
+                                boxShadow: "0 0 8px rgba(239,68,68,0.2)",
+                              }}
+                              title="Excluir permanentemente (apenas pacientes com Alta)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Excluir
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })

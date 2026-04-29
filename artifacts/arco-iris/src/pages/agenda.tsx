@@ -21,6 +21,8 @@ import {
   createNotificacao,
   listWaitingList,
   addPatientToFila,
+  upsertPatient,
+  getPatient,
   type Professional as ArcoProfessional,
 } from "@/lib/arco-rpc";
 
@@ -460,13 +462,22 @@ export default function Agenda() {
     try {
       await deleteAppointmentAlta(altaConfirm.id);
       await logNotificacao(altaConfirm, `Dar Alta — Motivo: ${altaMotivo.trim()}`);
+      // Persistência: salva motivo e altera status do paciente para "Alta"
+      try {
+        const existing = await getPatient(altaConfirm.patientId);
+        const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
+        await upsertPatient(altaConfirm.patientId, {
+          status: "Alta",
+          notes: `${prevNotes}[ALTA ${new Date().toLocaleDateString("pt-BR")}] Motivo: ${altaMotivo.trim()}`,
+        });
+      } catch { /* notificação já registra o motivo como fallback */ }
       setAppointments(prev => prev.filter(a =>
         a.id !== altaConfirm.id &&
         !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.date >= altaConfirm.date)
       ));
       setAltaConfirm(null);
       setAltaMotivo("");
-      toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado permanentemente.` });
+      toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado permanentemente. Status alterado para Alta.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
     }

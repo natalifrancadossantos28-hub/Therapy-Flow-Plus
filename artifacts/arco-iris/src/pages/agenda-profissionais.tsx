@@ -15,6 +15,8 @@ import {
   createNotificacao,
   listWaitingList,
   addPatientToFila,
+  upsertPatient,
+  getPatient,
 } from "@/lib/arco-rpc";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
@@ -333,10 +335,18 @@ export default function AgendaProfissionais() {
     try {
       await deleteAppointmentAlta(altaConfirm.id);
       await logNotificacao(altaConfirm, `Dar Alta — Motivo: ${altaMotivo.trim()}`);
+      try {
+        const existing = await getPatient(altaConfirm.patientId);
+        const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
+        await upsertPatient(altaConfirm.patientId, {
+          status: "Alta",
+          notes: `${prevNotes}[ALTA ${new Date().toLocaleDateString("pt-BR")}] Motivo: ${altaMotivo.trim()}`,
+        });
+      } catch { /* notificação já registra o motivo como fallback */ }
       setAppointments(prev => prev.filter(a => a.id !== altaConfirm.id));
       setAltaConfirm(null);
       setAltaMotivo("");
-      toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado. Recepção notificada.` });
+      toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado. Status alterado para Alta.` });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha inesperada.";
       toast({ title: "Erro ao dar alta", description: msg, variant: "destructive" });
