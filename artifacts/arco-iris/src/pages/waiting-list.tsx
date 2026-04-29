@@ -3,6 +3,7 @@ import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-
 import { Trash2, ListTodo, ListPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate } from "@/lib/utils";
+import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 import { supabase } from "@/lib/supabase";
 import {
   listWaitingList,
@@ -270,7 +271,26 @@ export default function WaitingList() {
                     <tr key={entry.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
                       <td className="px-6 py-4 font-display font-bold text-lg text-primary">#{pos}</td>
                       <td className="px-6 py-4 font-semibold text-foreground">
-                        {entry.patientName}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {entry.patientName}
+                          {entry.specialty && (() => {
+                            const tone = specialtyTone(entry.specialty);
+                            return (
+                              <span
+                                className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md leading-none"
+                                style={{
+                                  background: tone.bg,
+                                  color: tone.fg,
+                                  border: `1px solid ${tone.border}`,
+                                  boxShadow: `0 0 8px ${tone.glow}`,
+                                  textShadow: `0 0 6px ${tone.glow}`,
+                                }}
+                              >
+                                {specialtyShortLabel(entry.specialty)}
+                              </span>
+                            );
+                          })()}
+                        </div>
                         <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">
                           {entry.patientProntuario || `#${String(entry.patientId).padStart(4, "0")}`}
                         </div>

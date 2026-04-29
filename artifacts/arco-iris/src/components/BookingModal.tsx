@@ -6,6 +6,7 @@ import { MotionCard, Button, Label } from "@/components/ui-custom";
 import { listWaitingList, listPatients, createAppointments, listAppointments, type Patient } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { specialtyKey } from "@/lib/specialty-colors";
 
 type WaitingEntry = {
   id: number; patientId: number; patientName: string;
@@ -39,8 +40,13 @@ function matchesSpecialty(entrySpecialty: string | null | undefined, profSpecial
   if (!profSpecialty) return true;
   const s = (entrySpecialty ?? "").trim().toLowerCase();
   if (OPEN_SPECIALTIES.includes(s)) return true;
-  return s.includes(profSpecialty.trim().toLowerCase()) ||
-    profSpecialty.trim().toLowerCase().includes(s);
+  const entryKey = specialtyKey(entrySpecialty);
+  const profKey = specialtyKey(profSpecialty);
+  if (entryKey === "default" || profKey === "default") {
+    return s.includes(profSpecialty.trim().toLowerCase()) ||
+      profSpecialty.trim().toLowerCase().includes(s);
+  }
+  return entryKey === profKey;
 }
 
 const FREQUENCY_OPTIONS = [
