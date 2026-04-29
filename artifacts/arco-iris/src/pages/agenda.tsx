@@ -426,8 +426,8 @@ export default function Agenda() {
     setActionMenuId(null);
     try {
       const result = await patchStatus(apt, "falta_nao_justificada");
-      await logNotificacao(apt, "Falta Não Justificada");
       const consecutive: number = result?.consecutiveUnjustifiedAbsences ?? 1;
+      await logNotificacao(apt, `Falta ${consecutive} — Não Justificada`);
       const profName = result?.professionalName || apt.professionalName || "";
       const profSpec = result?.professionalSpecialty || "";
       if (consecutive >= 2) {
@@ -496,7 +496,6 @@ export default function Agenda() {
         return;
       }
       await addPatientToFila(encApt.patientId, encEspecialidade, encMotivo.trim() || null);
-      await logNotificacao(encApt, `Encaminhamento Interno → ${encEspecialidade}${encMotivo.trim() ? ` — ${encMotivo.trim()}` : ""}`);
       setEncApt(null);
       toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.` });
     } catch (err: unknown) {

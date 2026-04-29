@@ -61,8 +61,9 @@ export default function NotificationBell() {
     setLoading(true);
     try {
       const rows = await listNotificacoes();
-      // Mostra apenas as não-lidas: Ciente faz a notificação sumir da lista.
-      setNotifs(rows.filter((r) => !r.lido));
+      // Mostra apenas as não-lidas e exclui encaminhamentos (entram na fila
+      // silenciosamente, sem gerar alerta visual).
+      setNotifs(rows.filter((r) => !r.lido && !(r.acao || "").toLowerCase().includes("encaminhamento")));
     } catch {
       /* silencioso — infra pode não estar pronta */
     } finally {
@@ -445,7 +446,10 @@ function formatAcaoLabel(acao: string): string {
   if (a.includes("remarc")) return "Remarcado";
   if (a.includes("agend")) return "Novo agendamento";
   if (a.includes("atendim")) return "Em atendimento";
-  if (a.includes("falta")) return "Falta";
+  if (a.includes("falta")) {
+    const m = a.match(/falta\s+(\d+)/);
+    return m ? `Falta ${m[1]}` : "Falta";
+  }
   if (a.includes("alta")) return "Alta";
   if (a.includes("conclu")) return "Concluído";
   return acao || "Aviso";
