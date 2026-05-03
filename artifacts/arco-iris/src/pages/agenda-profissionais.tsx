@@ -346,7 +346,9 @@ export default function AgendaProfissionais() {
           status: label,
           notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")}] Motivo: ${altaMotivo.trim()}`,
         });
-      } catch { /* notificação já registra o motivo como fallback */ }
+      } catch {
+        toast({ title: "Aviso", description: "Motivo registrado na notificação, mas houve falha ao gravar no prontuário.", variant: "destructive" });
+      }
       // Remover paciente de TODAS as filas de espera
       try {
         const filaAtual = await listWaitingList();
@@ -389,8 +391,17 @@ export default function AgendaProfissionais() {
         return;
       }
       await addPatientToFila(encApt.patientId, encEspecialidade, encMotivo.trim() || null);
+      // Persistência: salva motivo do encaminhamento no prontuário do paciente
+      try {
+        const existing = await getPatient(encApt.patientId);
+        const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
+        const motivoTexto = encMotivo.trim() ? ` — Motivo: ${encMotivo.trim()}` : "";
+        await upsertPatient(encApt.patientId, {
+          notes: `${prevNotes}[ENCAMINHAMENTO ${new Date().toLocaleDateString("pt-BR")}] ${encEspecialidade}${motivoTexto}`,
+        });
+      } catch { /* fila já registra o motivo como fallback */ }
       setEncApt(null);
-      toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.` });
+      toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}. Motivo registrado no prontuário.` });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha inesperada.";
       toast({ title: "Erro ao encaminhar", description: msg, variant: "destructive" });
