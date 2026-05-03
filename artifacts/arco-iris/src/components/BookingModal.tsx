@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { X, Calendar, Clock, AlertCircle, Search, UserCog } from "lucide-react";
 import { MotionCard, Button, Label } from "@/components/ui-custom";
-import { listWaitingList, listPatients, createAppointments, listAppointments, deleteWaitingListEntry, listProfessionals, type Patient } from "@/lib/arco-rpc";
+import { listWaitingList, listPatients, createAppointments, listAppointments, deleteWaitingListEntry, listProfessionals, createNotificacao, type Patient } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { specialtyKey } from "@/lib/specialty-colors";
@@ -253,6 +253,19 @@ export default function BookingModal({
         frequency,
         fromWaitingList: !isDirect,
       });
+
+      // Notificação para o sininho da Recepção: novo agendamento criado
+      try {
+        const patientPhone = isDirect ? selectedDirect!.phone ?? null : null;
+        await createNotificacao({
+          patientName: targetPatientName,
+          professionalName: professionalName,
+          acao: "Novo Agendamento",
+          dataConsulta: date,
+          horaConsulta: time,
+          patientPhone: patientPhone ?? undefined,
+        });
+      } catch { /* silencioso — notificação não deve bloquear agendamento */ }
 
       // Trigger de Remoção: ao agendar da fila, remove o paciente da fila de espera
       // para a especialidade correspondente. Busca TODAS as entradas desse paciente

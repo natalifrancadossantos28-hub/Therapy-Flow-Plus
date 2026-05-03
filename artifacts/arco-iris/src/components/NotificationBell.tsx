@@ -9,7 +9,6 @@ import {
   type Professional,
 } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
-import { getCompanySession } from "@/lib/portal-session";
 import { useToast } from "@/hooks/use-toast";
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 
@@ -472,55 +471,51 @@ function sanitizePhone(raw: string | null | undefined): string | null {
 }
 
 /**
- * Texto-padrão pedido pela Recepção:
- *
- *   "Olá, aqui é da recepção <Clínica>. O atendimento de <Paciente> com
- *   <Profissional> foi <ação> para <Data> às <Hora>. Pode confirmar?"
- *
- * Cobre Remanejado/Remarcado/Novo Agendamento/Em Atendimento. Cancelamentos
- * e faltas usam variantes específicas (sem "Pode confirmar?").
+ * Templates de WhatsApp por tipo de ação — tom acolhedor e profissional.
+ * Variáveis preenchidas automaticamente: nome do paciente, profissional,
+ * data e hora.
  */
 function buildWhatsAppMessage(n: NotificacaoRecepcao): string {
   const acao = (n.acao || "").toLowerCase();
-  const clinica = clinicaName();
   const hora = (n.horaConsulta || "").trim();
   const data = n.dataConsulta ? formatDate(n.dataConsulta) : "";
-  const quando = [data ? `para ${data}` : null, hora ? `às ${hora}` : null]
-    .filter(Boolean)
-    .join(" ");
 
-  const saudacao = `Olá! Aqui é da recepção da NFS Gestão.`;
-
-  if (acao.includes("desmarc") || acao.includes("cancel")) {
-    return `${saudacao} O atendimento de ${n.patientName} com ${n.professionalName}${
-      data || hora ? ` (${[data, hora].filter(Boolean).join(" às ")})` : ""
-    } foi desmarcado pelo profissional. Podemos reagendar quando for melhor pra vocês?`;
+  // 1. Agendamento (Novo Horário)
+  if (acao.includes("agend")) {
+    return `Olá! 👋 Informamos que um novo atendimento foi agendado para o(a) ${n.patientName} com o profissional ${n.professionalName} no dia ${data || "—"} às ${hora || "—"}. Por favor, confirme o recebimento desta mensagem. Estamos à disposição! 😊`;
   }
+
+  // 2. Em Atendimento (Início da Sessão)
+  if (acao.includes("atendim") || acao.includes("conclu")) {
+    return `Olá! Informamos que o(a) ${n.patientName} já iniciou o atendimento com ${n.professionalName}. Assim que a sessão for finalizada, avisaremos por aqui. Central de Atendimento.`;
+  }
+
+  // 3/4. Faltas (Justificada vs Não Justificada)
   if (acao.includes("falta")) {
-    return `${saudacao} Registramos a falta de ${n.patientName} no atendimento com ${n.professionalName}${
-      data || hora ? ` (${[data, hora].filter(Boolean).join(" às ")})` : ""
-    }. Tudo bem por aí? Vamos remarcar?`;
-  }
-  if (acao.includes("alta")) {
-    return `${saudacao} Boa notícia: ${n.patientName} recebeu alta de ${n.professionalName}. Parabéns pela jornada!`;
+    if (acao.includes("justificada") && !acao.includes("não") && !acao.includes("nao")) {
+      return `Olá, tudo bem? Registramos a falta justificada do(a) ${n.patientName} no atendimento de hoje. Agradecemos pelo aviso prévio e nos vemos na próxima sessão! 🌼`;
+    }
+    return `Olá. Notamos a ausência do(a) ${n.patientName} no atendimento agendado para hoje e não identificamos justificativa prévia. Lembramos que o aviso antecipado é fundamental para a organização da agenda. Atenciosamente, Recepção.`;
   }
 
-  if (acao.includes("agend") || acao.includes("remanej") || acao.includes("remarc")) {
-    return `${saudacao} Estamos entrando em contato para avisar que o agendamento do paciente ${n.patientName} com o profissional ${n.professionalName} será no dia ${data || "—"} às ${hora || "—"}. Por gentileza, chegar com 10 minutos de antecedência. Confirmamos sua presença?`;
+  // 5. Desmarcar Atendimento
+  if (acao.includes("desmarc") || acao.includes("cancel")) {
+    return `Olá, informamos que o atendimento do(a) ${n.patientName} programado para o dia ${data || "hoje"} precisou ser desmarcado. Pedimos desculpas pelo transtorno e em breve entraremos em contato para realizar o reagendamento.`;
   }
 
+  // 6. Remanejar (Volta para Fila de Espera)
+  if (acao.includes("remanej") || acao.includes("remarc")) {
+    return `Olá! Informamos que o atendimento do(a) ${n.patientName} passará por um remanejamento e o nome retornará para nossa fila de prioridade para um novo ajuste de horário. Manteremos você informado(a) sobre as próximas datas!`;
+  }
+
+  // Fallback genérico
   const verbo = formatAcaoLabel(acao).toLowerCase();
-  return `${saudacao} O atendimento de ${n.patientName} com ${n.professionalName} foi ${verbo}${
-    quando ? ` ${quando}` : ""
-  }. Pode confirmar?`;
+  return `Olá! Informamos que o atendimento de ${n.patientName} com ${n.professionalName} foi ${verbo}${
+    data || hora ? ` (${[data, hora].filter(Boolean).join(" às ")})` : ""
+  }. Estamos à disposição!`;
 }
 
-function clinicaName(): string {
-  const session = getCompanySession();
-  const raw = (session?.companyName || "").trim();
-  if (!raw) return "da clínica";
-  return raw;
-}
+
 
 function formatDate(iso: string): string {
   if (!iso) return "";
