@@ -5,7 +5,7 @@ import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus
+  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
@@ -21,6 +21,7 @@ import {
   createNotificacao,
   createAppointments,
   listWaitingList,
+  deleteWaitingListEntry,
   addPatientToFila,
   upsertPatient,
   getPatient,
@@ -275,6 +276,7 @@ export default function Agenda() {
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
   const [altaMotivo, setAltaMotivo] = useState("");
+  const [saidaTipo, setSaidaTipo] = useState<"Alta" | "Óbito" | "Desistência">("Alta");
   const [absenceAlert, setAbsenceAlert] = useState<AbsenceAlert | null>(null);
   const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
   const [remanejSending, setRemanejSending] = useState(false);
@@ -474,36 +476,46 @@ export default function Agenda() {
     }
   };
 
-  // ── Dar Alta ──
-  const handleDarAlta = (apt: Appointment) => {
+  // ── Saída (Alta / Óbito / Desistência) ──
+  const handleSaida = (apt: Appointment, tipo: "Alta" | "Óbito" | "Desistência") => {
     setActionMenuId(null);
     setAltaMotivo("");
+    setSaidaTipo(tipo);
     setAltaConfirm(apt);
   };
 
-  const confirmDarAlta = async () => {
+  const confirmSaida = async () => {
     if (!altaConfirm || !altaMotivo.trim()) return;
+    const label = saidaTipo;
     try {
       await deleteAppointmentAlta(altaConfirm.id);
-      await logNotificacao(altaConfirm, `Dar Alta — Motivo: ${altaMotivo.trim()}`);
-      // Persistência: salva motivo e altera status do paciente para "Alta"
+      await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}`);
+      // Persistência: salva motivo e altera status do paciente
       try {
         const existing = await getPatient(altaConfirm.patientId);
         const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
         await upsertPatient(altaConfirm.patientId, {
-          status: "Alta",
-          notes: `${prevNotes}[ALTA ${new Date().toLocaleDateString("pt-BR")}] Motivo: ${altaMotivo.trim()}`,
+          status: label,
+          notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")}] Motivo: ${altaMotivo.trim()}`,
         });
       } catch { /* notificação já registra o motivo como fallback */ }
+      // Remover paciente de TODAS as filas de espera
+      try {
+        const filaAtual = await listWaitingList();
+        const entradas = filaAtual.filter(e => e.patientId === altaConfirm.patientId);
+        for (const entry of entradas) {
+          await deleteWaitingListEntry(entry.id);
+        }
+      } catch { /* silencioso — fila pode estar vazia */ }
       setAppointments(prev => prev.filter(a =>
         a.id !== altaConfirm.id &&
         !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.date >= altaConfirm.date)
       ));
       setAltaConfirm(null);
       setAltaMotivo("");
-      toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado permanentemente. Status alterado para Alta.` });
+      toast({ title: `${label} aplicada`, description: `${altaConfirm.patientName} — status alterado para ${label}. Removido da fila e agendamentos futuros cancelados.` });
     } catch {
-      toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
+      toast({ title: "Erro", description: `Não foi possível aplicar ${label.toLowerCase()}.`, variant: "destructive" });
     }
   };
 
@@ -918,10 +930,19 @@ export default function Agenda() {
                                         <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                       </button>
 
-                                      <button style={NEON.red} onClick={() => handleDarAlta(apt)}>
+                                      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                      <p className="text-[9px] text-white/40 uppercase font-bold px-1">Saída</p>
+                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Alta")}>
                                         <LogOut className="w-3.5 h-3.5" /> Dar Alta
                                       </button>
+                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Desistência")}>
+                                        <UserX className="w-3.5 h-3.5" /> Desistência
+                                      </button>
+                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Óbito")}>
+                                        <XOctagon className="w-3.5 h-3.5" /> Óbito
+                                      </button>
 
+                                      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                       <button style={NEON.fuchsia} onClick={() => handleEncaminhamento(apt)}>
                                         <ArrowRightLeft className="w-3.5 h-3.5" /> Encaminhamento Interno
                                       </button>
@@ -991,35 +1012,38 @@ export default function Agenda() {
         />
       )}
 
-      {/* ── Dar Alta Confirmation ── */}
+      {/* ── Modal de Saída (Alta / Óbito / Desistência) ── */}
       {altaConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444" }}>
-                  <LogOut className="w-5 h-5" style={{ color: "#f87171" }} />
+                  {saidaTipo === "Alta" && <LogOut className="w-5 h-5" style={{ color: "#f87171" }} />}
+                  {saidaTipo === "Desistência" && <UserX className="w-5 h-5" style={{ color: "#f87171" }} />}
+                  {saidaTipo === "Óbito" && <XOctagon className="w-5 h-5" style={{ color: "#f87171" }} />}
                 </div>
                 <div>
-                  <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>Dar Alta</p>
+                  <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>{saidaTipo === "Alta" ? "Dar Alta" : saidaTipo}</p>
                   <p className="text-xs text-white/50">Ação permanente e irreversível</p>
                 </div>
               </div>
               <p className="text-sm text-white/80 mb-1">
-                Isso removerá <strong className="text-white">{altaConfirm.patientName}</strong> deste horário
-                <strong className="text-white"> e de todas as semanas futuras</strong>.
+                <strong className="text-white">{altaConfirm.patientName}</strong> será removido da agenda,
+                filas de espera e terá agendamentos futuros cancelados.
               </p>
+              <p className="text-xs text-white/50 mt-1">Status será alterado para <strong className="text-orange-300">{saidaTipo}</strong>.</p>
               {altaConfirm.recurrenceGroupId && (
                 <p className="text-xs text-orange-400/80 mt-2">
                   ⚠ Este é um agendamento recorrente. Todos os próximos serão cancelados.
                 </p>
               )}
               <div className="mt-4">
-                <label className="block text-xs font-bold mb-1" style={{ color: "#f87171" }}>Motivo da Alta *</label>
+                <label className="block text-xs font-bold mb-1" style={{ color: "#f87171" }}>Motivo {saidaTipo === "Alta" ? "da Alta" : saidaTipo === "Óbito" ? "do Óbito" : "da Desistência"} *</label>
                 <textarea
                   value={altaMotivo}
                   onChange={e => setAltaMotivo(e.target.value)}
-                  placeholder="Descreva o motivo da alta..."
+                  placeholder={saidaTipo === "Alta" ? "Ex.: Melhora clínica, mudou de cidade..." : saidaTipo === "Óbito" ? "Ex.: Falecimento..." : "Ex.: Mudou de cidade, família desistiu..."}
                   rows={3}
                   className="w-full rounded-xl text-sm p-3 resize-none"
                   style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(239,68,68,0.3)", color: "#fff", outline: "none" }}
@@ -1029,11 +1053,14 @@ export default function Agenda() {
               </div>
               <div className="flex gap-3 mt-4">
                 <button
-                  onClick={confirmDarAlta}
+                  onClick={confirmSaida}
                   disabled={!altaMotivo.trim()}
                   style={{ ...NEON.red, flex: 1, justifyContent: "center", padding: "10px", opacity: altaMotivo.trim() ? 1 : 0.4, cursor: altaMotivo.trim() ? "pointer" : "not-allowed" }}
                 >
-                  <LogOut className="w-4 h-4" /> Confirmar Alta
+                  {saidaTipo === "Alta" && <LogOut className="w-4 h-4" />}
+                  {saidaTipo === "Desistência" && <UserX className="w-4 h-4" />}
+                  {saidaTipo === "Óbito" && <XOctagon className="w-4 h-4" />}
+                  Confirmar {saidaTipo}
                 </button>
                 <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => { setAltaConfirm(null); setAltaMotivo(""); }}>
                   Cancelar
