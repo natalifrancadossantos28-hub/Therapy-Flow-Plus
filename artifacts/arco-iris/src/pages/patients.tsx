@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
-import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2 } from "lucide-react";
+import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getStatusColor, cn } from "@/lib/utils";
 import {
@@ -189,6 +189,42 @@ export default function Patients() {
     });
   };
 
+  const handleExportCSV = () => {
+    const BOM = "\uFEFF";
+    const header = ["Prontuário", "Nome", "Mãe", "Data Nascimento", "Idade", "CPF", "CNS", "Telefone", "Responsável", "Tel. Responsável", "Diagnóstico", "Status", "Data Entrada", "Tipo Registro", "Faltas", "Observações"];
+    const rows = patients.map(p => {
+      const idade = p.dateOfBirth ? String(calcIdade(p.dateOfBirth)) : "";
+      const notes = (p.notes || "").replace(/"/g, '""');
+      return [
+        p.prontuario || "",
+        p.name,
+        p.motherName || "",
+        p.dateOfBirth || "",
+        idade,
+        p.cpf || "",
+        p.cns || "",
+        p.phone || "",
+        p.guardianName || "",
+        p.guardianPhone || "",
+        p.diagnosis || "",
+        p.status,
+        p.entryDate || "",
+        p.tipoRegistro || "",
+        String(p.absenceCount),
+        notes,
+      ].map(v => `"${v}"`).join(",");
+    });
+    const csv = BOM + [header.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pacientes_nfs_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Relatório exportado!", description: `${patients.length} pacientes exportados para CSV.` });
+  };
+
   const filteredPatients = patients.filter(p => {
     const matchName = p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.prontuario || "").toLowerCase().includes(search.toLowerCase());
@@ -244,6 +280,9 @@ export default function Patients() {
           <div className="flex gap-2 flex-wrap">
             <Button className="gap-2" onClick={openNewForm}>
               <Plus className="w-4 h-4" /> Novo Paciente
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={handleExportCSV}>
+              <Download className="w-4 h-4" /> Baixar Relatório
             </Button>
           </div>
         </div>
@@ -339,7 +378,7 @@ export default function Patients() {
                       </td>
                       {hasAdminScope() && (
                         <td className="px-4 py-3">
-                          {patient.status === "Alta" && (
+                          {["Alta", "Óbito", "Desistência"].includes(patient.status) && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -361,7 +400,7 @@ export default function Patients() {
                                 color: "#ef4444",
                                 boxShadow: "0 0 8px rgba(239,68,68,0.2)",
                               }}
-                              title="Excluir permanentemente (apenas pacientes com Alta)"
+                              title="Excluir permanentemente (pacientes com Alta, Óbito ou Desistência)"
                             >
                               <Trash2 className="w-3.5 h-3.5" /> Excluir
                             </button>
