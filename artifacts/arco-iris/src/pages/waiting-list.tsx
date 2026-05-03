@@ -297,6 +297,9 @@ export default function WaitingList() {
                         {entry.patientPhone && (
                           <div className="text-xs text-muted-foreground font-normal mt-0.5">{entry.patientPhone}</div>
                         )}
+                        {entry.notes && (
+                          <div className="text-xs text-amber-400/80 font-normal mt-1 italic">📋 {entry.notes}</div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">
                         {entry.specialty || "Qualquer especialidade"}
