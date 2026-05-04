@@ -754,6 +754,10 @@ export type WaitingListEntry = {
   scoreSocialDesempate?: number | null;
   /** Score efetivo usado pra ordenar dentro da cor (0..74). */
   scoreEspecialidadeTotal?: number | null;
+  /** Bônus de idade: <4 anos = +50, 4-6 anos = +20, >6 = 0. */
+  ageBonus?: number | null;
+  /** Data de nascimento do paciente (ISO). */
+  dateOfBirth?: string | null;
 };
 
 export async function listWaitingList(opts?: {

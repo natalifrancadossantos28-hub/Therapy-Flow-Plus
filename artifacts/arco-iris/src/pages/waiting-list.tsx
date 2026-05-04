@@ -311,28 +311,50 @@ export default function WaitingList() {
                       </td>
                       <td className="px-6 py-4">
                         {entry.scoreEspecialidade != null ? (
-                          <div className="flex items-baseline gap-1 font-mono">
-                            <span className="font-bold text-foreground">{entry.scoreEspecialidade}</span>
-                            <span className="text-xs text-muted-foreground">/72</span>
-                            {!!entry.scoreSocialDesempate && entry.scoreSocialDesempate > 0 && (
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-baseline gap-1 font-mono">
+                              <span className="font-bold text-foreground">{entry.scoreEspecialidade}</span>
+                              <span className="text-xs text-muted-foreground">/72</span>
+                              {!!entry.scoreSocialDesempate && entry.scoreSocialDesempate > 0 && (
+                                <span
+                                  title="Pontos de vulnerabilidade somados como desempate (+1 Escola Publica / +1 Trabalho na Roca)"
+                                  className="ml-2 text-xs font-semibold text-amber-500"
+                                >
+                                  +{entry.scoreSocialDesempate} desempate
+                                </span>
+                              )}
+                            </div>
+                            {!!entry.ageBonus && entry.ageBonus > 0 && (
                               <span
-                                title="Pontos de vulnerabilidade somados como desempate (+1 Escola Publica / +1 Trabalho na Roca)"
-                                className="ml-2 text-xs font-semibold text-amber-500"
+                                title={entry.ageBonus >= 50 ? "Bônus Primeira Infância (<4 anos): +50" : "Bônus Primeira Infância (4-6 anos): +20"}
+                                className="text-xs font-semibold"
+                                style={{ color: entry.ageBonus >= 50 ? "#f472b6" : "#a78bfa" }}
                               >
-                                +{entry.scoreSocialDesempate} desempate
+                                +{entry.ageBonus} {entry.ageBonus >= 50 ? "👶 <4 anos" : "🧒 4-6 anos"}
                               </span>
                             )}
                           </div>
                         ) : (
-                          <div className="flex items-baseline gap-1 font-mono">
-                            <span className="font-bold text-foreground">{entry.scoreTotal150 ?? 0}</span>
-                            <span className="text-xs text-muted-foreground">/150</span>
-                            <span
-                              title="Sem especialidade definida: usa score clinico geral"
-                              className="ml-2 text-xs font-semibold text-muted-foreground"
-                            >
-                              geral
-                            </span>
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-baseline gap-1 font-mono">
+                              <span className="font-bold text-foreground">{entry.scoreTotal150 ?? 0}</span>
+                              <span className="text-xs text-muted-foreground">/150</span>
+                              <span
+                                title="Sem especialidade definida: usa score clinico geral"
+                                className="ml-2 text-xs font-semibold text-muted-foreground"
+                              >
+                                geral
+                              </span>
+                            </div>
+                            {!!entry.ageBonus && entry.ageBonus > 0 && (
+                              <span
+                                title={entry.ageBonus >= 50 ? "Bônus Primeira Infância (<4 anos): +50" : "Bônus Primeira Infância (4-6 anos): +20"}
+                                className="text-xs font-semibold"
+                                style={{ color: entry.ageBonus >= 50 ? "#f472b6" : "#a78bfa" }}
+                              >
+                                +{entry.ageBonus} {entry.ageBonus >= 50 ? "👶 <4 anos" : "🧒 4-6 anos"}
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>

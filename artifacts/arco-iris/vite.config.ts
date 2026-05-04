@@ -47,6 +47,16 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-recharts": ["recharts"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-tanstack": ["@tanstack/react-query"],
+          "vendor-date": ["date-fns"],
+        },
+      },
+    },
   },
   server: {
     port,
