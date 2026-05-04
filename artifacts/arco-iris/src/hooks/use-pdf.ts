@@ -1,9 +1,12 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { formatDate } from "@/lib/utils";
 import type { PatientPdfData } from "@workspace/api-client-react";
 
-export const generatePatientPdf = (data: PatientPdfData) => {
+export const generatePatientPdf = async (data: PatientPdfData) => {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+
   const doc = new jsPDF();
   const { patient, professional, absenceCount, totalAppointments, lastAppointmentDate } = data;
 
