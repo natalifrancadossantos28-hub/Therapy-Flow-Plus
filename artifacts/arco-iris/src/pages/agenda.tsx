@@ -5,7 +5,7 @@ import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
@@ -19,6 +19,12 @@ import {
   updateAppointment,
   deleteAppointmentAlta,
   createNotificacao,
+  createAppointments,
+  listWaitingList,
+  deleteWaitingListEntry,
+  addPatientToFila,
+  upsertPatient,
+  getPatient,
   type Professional as ArcoProfessional,
 } from "@/lib/arco-rpc";
 
@@ -185,7 +191,46 @@ const NEON: Record<string, React.CSSProperties> = {
     width: "100%",
     transition: "all 0.15s",
   },
+  fuchsia: {
+    background: "rgba(10,0,10,0.92)",
+    border: "1px solid #c026d3",
+    color: "#e879f9",
+    boxShadow: "0 0 14px rgba(192,38,211,0.55), inset 0 0 8px rgba(192,38,211,0.12)",
+    textShadow: "0 0 8px rgba(232,121,249,0.9)",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    fontWeight: 700,
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    width: "100%",
+    transition: "all 0.15s",
+  },
+  cyan: {
+    background: "rgba(0,8,10,0.92)",
+    border: "1px solid #06b6d4",
+    color: "#67e8f9",
+    boxShadow: "0 0 14px rgba(6,182,212,0.55), inset 0 0 8px rgba(6,182,212,0.12)",
+    textShadow: "0 0 8px rgba(103,232,249,0.9)",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    fontWeight: 700,
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    width: "100%",
+    transition: "all 0.15s",
+  },
 };
+
+const SPECIALTIES = [
+  "Psicologia", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
+  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
+];
 
 const isAdminSession = (): boolean => {
   try {
@@ -230,6 +275,8 @@ export default function Agenda() {
   const [notifyDone, setNotifyDone] = useState(false);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
+  const [altaMotivo, setAltaMotivo] = useState("");
+  const [saidaTipo, setSaidaTipo] = useState<"Alta" | "Óbito" | "Desistência">("Alta");
   const [absenceAlert, setAbsenceAlert] = useState<AbsenceAlert | null>(null);
   const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
   const [remanejSending, setRemanejSending] = useState(false);
@@ -237,6 +284,19 @@ export default function Agenda() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const { toast } = useToast();
+
+  // Atendimento Multi
+  const [multiApt, setMultiApt] = useState<Appointment | null>(null);
+  const [multiProfId, setMultiProfId] = useState<string>("");
+  const [multiSending, setMultiSending] = useState(false);
+  const [multiErro, setMultiErro] = useState("");
+
+  // Encaminhamento Interno
+  const [encApt, setEncApt] = useState<Appointment | null>(null);
+  const [encEspecialidade, setEncEspecialidade] = useState("");
+  const [encMotivo, setEncMotivo] = useState("");
+  const [encErro, setEncErro] = useState("");
+  const [encSending, setEncSending] = useState(false);
 
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
@@ -394,8 +454,8 @@ export default function Agenda() {
     setActionMenuId(null);
     try {
       const result = await patchStatus(apt, "falta_nao_justificada");
-      await logNotificacao(apt, "Falta Não Justificada");
       const consecutive: number = result?.consecutiveUnjustifiedAbsences ?? 1;
+      await logNotificacao(apt, `Falta ${consecutive} — Não Justificada`);
       const profName = result?.professionalName || apt.professionalName || "";
       const profSpec = result?.professionalSpecialty || "";
       if (consecutive >= 2) {
@@ -416,25 +476,135 @@ export default function Agenda() {
     }
   };
 
-  // ── Dar Alta ──
-  const handleDarAlta = (apt: Appointment) => {
+  // ── Saída (Alta / Óbito / Desistência) ──
+  const handleSaida = (apt: Appointment, tipo: "Alta" | "Óbito" | "Desistência") => {
     setActionMenuId(null);
+    setAltaMotivo("");
+    setSaidaTipo(tipo);
     setAltaConfirm(apt);
   };
 
-  const confirmDarAlta = async () => {
-    if (!altaConfirm) return;
+  const confirmSaida = async () => {
+    if (!altaConfirm || !altaMotivo.trim()) return;
+    const label = saidaTipo;
     try {
       await deleteAppointmentAlta(altaConfirm.id);
-      await logNotificacao(altaConfirm, "Dar Alta");
+      await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}`);
+      // Persistência: salva motivo e altera status do paciente
+      try {
+        const existing = await getPatient(altaConfirm.patientId);
+        const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
+        await upsertPatient(altaConfirm.patientId, {
+          status: label,
+          notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")}] Motivo: ${altaMotivo.trim()}`,
+        });
+      } catch {
+        toast({ title: "Aviso", description: "Motivo registrado na notificação, mas houve falha ao gravar no prontuário.", variant: "destructive" });
+      }
+      // Remover paciente de TODAS as filas de espera
+      try {
+        const filaAtual = await listWaitingList();
+        const entradas = filaAtual.filter(e => e.patientId === altaConfirm.patientId);
+        for (const entry of entradas) {
+          await deleteWaitingListEntry(entry.id);
+        }
+      } catch { /* silencioso — fila pode estar vazia */ }
       setAppointments(prev => prev.filter(a =>
         a.id !== altaConfirm.id &&
         !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.date >= altaConfirm.date)
       ));
       setAltaConfirm(null);
-      toast({ title: "Alta aplicada", description: `Horário de ${altaConfirm.patientName} liberado permanentemente.` });
+      setAltaMotivo("");
+      toast({ title: `${label} aplicada`, description: `${altaConfirm.patientName} — status alterado para ${label}. Removido da fila e agendamentos futuros cancelados.` });
     } catch {
-      toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
+      toast({ title: "Erro", description: `Não foi possível aplicar ${label.toLowerCase()}.`, variant: "destructive" });
+    }
+  };
+
+  // ── Encaminhamento Interno ──
+  const handleEncaminhamento = (apt: Appointment) => {
+    setActionMenuId(null);
+    setEncApt(apt);
+    setEncEspecialidade("");
+    setEncMotivo("");
+    setEncErro("");
+  };
+
+  const confirmEncaminhamento = async () => {
+    if (!encApt || !encEspecialidade) return;
+    setEncErro("");
+    setEncSending(true);
+    try {
+      const filaAtual = await listWaitingList();
+      const jaExiste = filaAtual.some(
+        (e) => e.patientId === encApt.patientId && e.specialty === encEspecialidade
+      );
+      if (jaExiste) {
+        setEncErro("Este paciente já possui um encaminhamento ativo/está na fila para esta especialidade.");
+        setEncSending(false);
+        return;
+      }
+      await addPatientToFila(encApt.patientId, encEspecialidade, encMotivo.trim() || null);
+      // Persistência: salva motivo do encaminhamento no prontuário do paciente
+      try {
+        const existing = await getPatient(encApt.patientId);
+        const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
+        const motivoTexto = encMotivo.trim() ? ` — Motivo: ${encMotivo.trim()}` : "";
+        await upsertPatient(encApt.patientId, {
+          notes: `${prevNotes}[ENCAMINHAMENTO ${new Date().toLocaleDateString("pt-BR")}] ${encEspecialidade}${motivoTexto}`,
+        });
+      } catch { /* fila já registra o motivo como fallback */ }
+      setEncApt(null);
+      toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}. Motivo registrado no prontuário.` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha inesperada.";
+      toast({ title: "Erro ao encaminhar", description: msg, variant: "destructive" });
+    } finally {
+      setEncSending(false);
+    }
+  };
+
+  // ── Atendimento Multi (Admin) ──
+  const handleMultiAtendimento = (apt: Appointment) => {
+    setActionMenuId(null);
+    setMultiApt(apt);
+    setMultiProfId("");
+    setMultiErro("");
+  };
+
+  const confirmMultiAtendimento = async () => {
+    if (!multiApt || !multiProfId) return;
+    setMultiErro("");
+    setMultiSending(true);
+    try {
+      const secondProf = professionals.find(p => String(p.id) === multiProfId);
+      if (!secondProf) { setMultiErro("Profissional não encontrado."); setMultiSending(false); return; }
+      const currentProf = selectedProf;
+      if (!currentProf) { setMultiErro("Profissional atual não identificado."); setMultiSending(false); return; }
+      const spec1 = (currentProf.specialty || "").trim().toLowerCase();
+      const spec2 = (secondProf.specialty || "").trim().toLowerCase();
+      if (spec1 && spec2 && spec1 === spec2) {
+        setMultiErro(`Bloqueado: ${currentProf.name} e ${secondProf.name} são da mesma especialidade (${currentProf.specialty}). Para Atendimento Multi, os profissionais devem ser de especialidades diferentes.`);
+        setMultiSending(false);
+        return;
+      }
+      await createAppointments({
+        patientId: multiApt.patientId,
+        professionalId: secondProf.id,
+        date: multiApt.date,
+        time: multiApt.time,
+        notes: `Atendimento Multi com ${currentProf.name} (${currentProf.specialty || "—"})`,
+        noRecurrence: true,
+      });
+      await logNotificacao(multiApt, `Atendimento Multi — ${secondProf.name} (${secondProf.specialty || "—"}) adicionado ao horário de ${currentProf.name}`);
+      setMultiApt(null);
+      toast({ title: "Atendimento Multi criado", description: `${secondProf.name} adicionado ao horário de ${multiApt.patientName} às ${multiApt.time}.` });
+      fetchAppointments();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha inesperada.";
+      toast({ title: "Erro ao criar Atendimento Multi", description: msg, variant: "destructive" });
+    } finally {
+      setMultiSending(false);
     }
   };
 
@@ -748,19 +918,17 @@ export default function Agenda() {
                                     >
                                       <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
 
-                                      {/* Fase 5A: "Presente" habilitado apenas para dono (PIN) ou Admin. */}
                                       <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                        <Activity className="w-3.5 h-3.5" /> ✅ Presente
+                                        <Activity className="w-3.5 h-3.5" /> Em Atendimento
                                       </button>
 
-                                      {/* Fase 5A: Falta/Desmarcar centralizados na Recepção. Visao do profissional nao exibe. */}
                                       {isAdmin && (
                                         <>
                                           <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
-                                            <CheckCircle className="w-3.5 h-3.5" /> ⚠️ Falta Justificada
+                                            <CheckCircle className="w-3.5 h-3.5" /> Falta Justificada
                                           </button>
                                           <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
-                                            <AlertTriangle className="w-3.5 h-3.5" /> 🔴 Falta N. Justificada
+                                            <AlertTriangle className="w-3.5 h-3.5" /> Falta N. Justificada
                                           </button>
                                           <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                           <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
@@ -773,9 +941,28 @@ export default function Agenda() {
                                         <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                       </button>
 
-                                      <button style={NEON.red} onClick={() => handleDarAlta(apt)}>
+                                      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                      <p className="text-[9px] text-white/40 uppercase font-bold px-1">Saída</p>
+                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Alta")}>
                                         <LogOut className="w-3.5 h-3.5" /> Dar Alta
                                       </button>
+                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Desistência")}>
+                                        <UserX className="w-3.5 h-3.5" /> Desistência
+                                      </button>
+                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Óbito")}>
+                                        <XOctagon className="w-3.5 h-3.5" /> Óbito
+                                      </button>
+
+                                      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                      <button style={NEON.fuchsia} onClick={() => handleEncaminhamento(apt)}>
+                                        <ArrowRightLeft className="w-3.5 h-3.5" /> Encaminhamento Interno
+                                      </button>
+
+                                      {isAdmin && (
+                                        <button style={NEON.cyan} onClick={() => handleMultiAtendimento(apt)}>
+                                          <UserPlus className="w-3.5 h-3.5" /> Atendimento Multi
+                                        </button>
+                                      )}
 
                                       {!isAdmin && (
                                         <p className="text-[9px] text-white/30 px-1 mt-1 italic leading-tight">
@@ -836,37 +1023,189 @@ export default function Agenda() {
         />
       )}
 
-      {/* ── Dar Alta Confirmation ── */}
+      {/* ── Modal de Saída (Alta / Óbito / Desistência) ── */}
       {altaConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444" }}>
-                  <LogOut className="w-5 h-5" style={{ color: "#f87171" }} />
+                  {saidaTipo === "Alta" && <LogOut className="w-5 h-5" style={{ color: "#f87171" }} />}
+                  {saidaTipo === "Desistência" && <UserX className="w-5 h-5" style={{ color: "#f87171" }} />}
+                  {saidaTipo === "Óbito" && <XOctagon className="w-5 h-5" style={{ color: "#f87171" }} />}
                 </div>
                 <div>
-                  <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>Dar Alta</p>
+                  <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>{saidaTipo === "Alta" ? "Dar Alta" : saidaTipo}</p>
                   <p className="text-xs text-white/50">Ação permanente e irreversível</p>
                 </div>
               </div>
               <p className="text-sm text-white/80 mb-1">
-                Isso removerá <strong className="text-white">{altaConfirm.patientName}</strong> deste horário
-                <strong className="text-white"> e de todas as semanas futuras</strong>.
+                <strong className="text-white">{altaConfirm.patientName}</strong> será removido da agenda,
+                filas de espera e terá agendamentos futuros cancelados.
               </p>
+              <p className="text-xs text-white/50 mt-1">Status será alterado para <strong className="text-orange-300">{saidaTipo}</strong>.</p>
               {altaConfirm.recurrenceGroupId && (
                 <p className="text-xs text-orange-400/80 mt-2">
                   ⚠ Este é um agendamento recorrente. Todos os próximos serão cancelados.
                 </p>
               )}
-              <div className="flex gap-3 mt-5">
+              <div className="mt-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#f87171" }}>Motivo {saidaTipo === "Alta" ? "da Alta" : saidaTipo === "Óbito" ? "do Óbito" : "da Desistência"} *</label>
+                <textarea
+                  value={altaMotivo}
+                  onChange={e => setAltaMotivo(e.target.value)}
+                  placeholder={saidaTipo === "Alta" ? "Ex.: Melhora clínica, mudou de cidade..." : saidaTipo === "Óbito" ? "Ex.: Falecimento..." : "Ex.: Mudou de cidade, família desistiu..."}
+                  rows={3}
+                  className="w-full rounded-xl text-sm p-3 resize-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(239,68,68,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.boxShadow = "0 0 10px rgba(239,68,68,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(239,68,68,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                />
+              </div>
+              <div className="flex gap-3 mt-4">
                 <button
-                  onClick={confirmDarAlta}
-                  style={{ ...NEON.red, flex: 1, justifyContent: "center", padding: "10px" }}
+                  onClick={confirmSaida}
+                  disabled={!altaMotivo.trim()}
+                  style={{ ...NEON.red, flex: 1, justifyContent: "center", padding: "10px", opacity: altaMotivo.trim() ? 1 : 0.4, cursor: altaMotivo.trim() ? "pointer" : "not-allowed" }}
                 >
-                  <LogOut className="w-4 h-4" /> Confirmar Alta
+                  {saidaTipo === "Alta" && <LogOut className="w-4 h-4" />}
+                  {saidaTipo === "Desistência" && <UserX className="w-4 h-4" />}
+                  {saidaTipo === "Óbito" && <XOctagon className="w-4 h-4" />}
+                  Confirmar {saidaTipo}
                 </button>
-                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setAltaConfirm(null)}>
+                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => { setAltaConfirm(null); setAltaMotivo(""); }}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Encaminhamento Interno Modal ── */}
+      {encApt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEncApt(null)}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,5,0.97)", border: "1px solid rgba(192,38,211,0.3)" }} onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(192,38,211,0.15)", border: "1px solid #c026d3" }}>
+                  <ArrowRightLeft className="w-5 h-5" style={{ color: "#e879f9" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#e879f9", textShadow: "0 0 8px rgba(232,121,249,0.8)" }}>Encaminhamento Interno</p>
+                  <p className="text-xs text-white/50">{encApt.patientName}</p>
+                </div>
+              </div>
+
+              {encErro && (
+                <div className="rounded-xl p-3 mb-4 text-sm font-semibold" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171" }}>
+                  {encErro}
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#e879f9" }}>Especialidade de Destino *</label>
+                <select
+                  value={encEspecialidade}
+                  onChange={e => { setEncEspecialidade(e.target.value); setEncErro(""); }}
+                  className="w-full rounded-xl text-sm p-3"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(192,38,211,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#c026d3"; e.currentTarget.style.boxShadow = "0 0 10px rgba(192,38,211,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(192,38,211,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                >
+                  <option value="" style={{ background: "#0a000a" }}>Selecione...</option>
+                  {SPECIALTIES.map(s => (
+                    <option key={s} value={s} style={{ background: "#0a000a" }}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#e879f9" }}>Motivo do Encaminhamento</label>
+                <textarea
+                  value={encMotivo}
+                  onChange={e => setEncMotivo(e.target.value)}
+                  placeholder="Descreva o motivo do encaminhamento..."
+                  rows={3}
+                  className="w-full rounded-xl text-sm p-3 resize-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(192,38,211,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#c026d3"; e.currentTarget.style.boxShadow = "0 0 10px rgba(192,38,211,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(192,38,211,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={confirmEncaminhamento}
+                  disabled={!encEspecialidade || encSending}
+                  style={{ ...NEON.fuchsia, flex: 1, justifyContent: "center", padding: "10px", opacity: encEspecialidade && !encSending ? 1 : 0.4, cursor: encEspecialidade && !encSending ? "pointer" : "not-allowed" }}
+                >
+                  <ArrowRightLeft className="w-4 h-4" /> {encSending ? "Encaminhando..." : "Confirmar Encaminhamento"}
+                </button>
+                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setEncApt(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Atendimento Multi Modal ── */}
+      {multiApt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setMultiApt(null)}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,8,10,0.97)", border: "1px solid rgba(6,182,212,0.3)" }} onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(6,182,212,0.15)", border: "1px solid #06b6d4" }}>
+                  <UserPlus className="w-5 h-5" style={{ color: "#67e8f9" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#67e8f9", textShadow: "0 0 8px rgba(103,232,249,0.8)" }}>Atendimento Multi</p>
+                  <p className="text-xs text-white/50">{multiApt.patientName} — {multiApt.time}</p>
+                </div>
+              </div>
+
+              {multiErro && (
+                <div className="rounded-xl p-3 mb-4 text-sm font-semibold" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171" }}>
+                  {multiErro}
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#67e8f9" }}>Segundo Profissional *</label>
+                <select
+                  value={multiProfId}
+                  onChange={e => { setMultiProfId(e.target.value); setMultiErro(""); }}
+                  className="w-full rounded-xl text-sm p-3"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(6,182,212,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#06b6d4"; e.currentTarget.style.boxShadow = "0 0 10px rgba(6,182,212,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(6,182,212,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                >
+                  <option value="" style={{ background: "#000a0c" }}>Selecione o profissional...</option>
+                  {professionals
+                    .filter(p => String(p.id) !== selectedProfId)
+                    .map(p => (
+                      <option key={p.id} value={String(p.id)} style={{ background: "#000a0c" }}>
+                        {p.name} — {p.specialty || "Sem especialidade"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <p className="text-[10px] text-white/40 mb-4 leading-relaxed">
+                O horário ficará bloqueado na agenda de ambos os profissionais. Profissionais da mesma especialidade não são permitidos.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={confirmMultiAtendimento}
+                  disabled={!multiProfId || multiSending}
+                  style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: multiProfId && !multiSending ? 1 : 0.4, cursor: multiProfId && !multiSending ? "pointer" : "not-allowed" }}
+                >
+                  <UserPlus className="w-4 h-4" /> {multiSending ? "Criando..." : "Confirmar Multi"}
+                </button>
+                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setMultiApt(null)}>
                   Cancelar
                 </Button>
               </div>

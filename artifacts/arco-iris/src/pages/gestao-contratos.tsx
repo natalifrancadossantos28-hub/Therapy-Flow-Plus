@@ -20,6 +20,7 @@ import {
   type Colaborador as ColaboradorRpc,
 } from "@/lib/arco-rpc";
 import { useToast } from "@/hooks/use-toast";
+import { SPECIALTIES, specialtyTone } from "@/lib/specialty-colors";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type Contractor   = ContractorRpc;
@@ -683,11 +684,17 @@ export default function GestaoContratos() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-muted-foreground mb-1">Especialidade</label>
-                      <input
+                      <select
+                        required
                         className="w-full rounded-lg px-3 py-2 text-sm bg-background border border-border focus:outline-none"
                         value={profFormData.specialty}
                         onChange={e => setProfFormData({ ...profFormData, specialty: e.target.value })}
-                      />
+                      >
+                        <option value="" disabled>Selecione…</option>
+                        {SPECIALTIES.map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>

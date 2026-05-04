@@ -22,6 +22,7 @@ import {
   deleteProfessional,
   type Professional,
 } from "@/lib/arco-rpc";
+import { SPECIALTIES, specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 
 function PinManager({
   prof,
@@ -238,8 +239,18 @@ export default function Professionals() {
                     <h3 className="font-bold text-lg text-foreground leading-none">
                       {prof.name}
                     </h3>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                      <Stethoscope className="w-3 h-3" /> {prof.specialty || "—"}
+                    <div className="flex items-center gap-1 text-sm mt-1">
+                      <Stethoscope className="w-3 h-3 text-muted-foreground" />
+                      <span
+                        className="text-[11px] font-bold px-1.5 py-0.5 rounded"
+                        style={{
+                          color: specialtyTone(prof.specialty).fg,
+                          background: specialtyTone(prof.specialty).bg,
+                          border: `1px solid ${specialtyTone(prof.specialty).border}`,
+                        }}
+                      >
+                        {prof.specialty || specialtyShortLabel(prof.specialty)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -313,12 +324,19 @@ export default function Professionals() {
               </div>
               <div>
                 <Label>Especialidade</Label>
-                <Input
+                <Select
                   required
                   value={formData.specialty}
                   onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
-                  placeholder="Psicologia"
-                />
+                >
+                  <option value="" disabled>Selecione…</option>
+                  {SPECIALTIES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Lista oficial — define a cor neon na agenda e nos avisos.
+                </p>
               </div>
               <div>
                 <Label>Tipo de Vínculo</Label>
@@ -342,8 +360,8 @@ export default function Professionals() {
                   value={formData.cargaHoraria}
                   onChange={(e) => setFormData({ ...formData, cargaHoraria: e.target.value })}
                 >
-                  <option value="30h">30 horas — até 30 pacientes</option>
-                  <option value="20h">20 horas — até 20 pacientes</option>
+                  <option value="30h">30 horas — até 35 pacientes</option>
+                  <option value="20h">20 horas — até 25 pacientes</option>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   Define o limite de pacientes ativos para este profissional.

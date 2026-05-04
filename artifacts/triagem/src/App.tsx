@@ -327,12 +327,14 @@ function toScoreDisplay(raw: number, rawMax: number): number {
   return Math.round((raw / rawMax) * SCORE_MAX_DISPLAY);
 }
 
+// Cor da prioridade vem do score TOTAL (clinico /100 + vulnerabilidade).
+// Mesma regra do banco (_calc_priority) e do Perfil Multidisciplinar.
+// Sem upgrade automatico de nivel — vulnerabilidade soma pontos.
 function getPrioridadeBadge(vulnScore: number, clinicalPts: number) {
-  const clinico = toScoreClinico100(clinicalPts);
-  if (clinico >= 75) return { label: "Prioridade Máxima", cls: "bg-red-100 text-red-800 border-red-300", icon: "🔴" };
-  if (clinico >= 50) return { label: "Alta Prioridade",    cls: "bg-orange-100 text-orange-800 border-orange-300", icon: "🟠" };
-  if (clinico >= 25) return { label: "Média Prioridade",   cls: "bg-amber-100 text-amber-800 border-amber-300",    icon: "🟡" };
-  if (vulnScore >= 2) return { label: "Vulnerabilidade Social", cls: "bg-yellow-100 text-yellow-800 border-yellow-300", icon: "🟡" };
+  const total = toScoreClinico100(clinicalPts) + vulnScore;
+  if (total >= 75) return { label: "Prioridade Máxima", cls: "bg-red-100 text-red-800 border-red-300", icon: "🔴" };
+  if (total >= 50) return { label: "Alta Prioridade",    cls: "bg-orange-100 text-orange-800 border-orange-300", icon: "🟠" };
+  if (total >= 25) return { label: "Média Prioridade",   cls: "bg-amber-100 text-amber-800 border-amber-300",    icon: "🟡" };
   return null;
 }
 

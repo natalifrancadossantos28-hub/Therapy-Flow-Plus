@@ -3,6 +3,7 @@ import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-
 import { Trash2, ListTodo, ListPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate } from "@/lib/utils";
+import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 import { supabase } from "@/lib/supabase";
 import {
   listWaitingList,
@@ -270,12 +271,34 @@ export default function WaitingList() {
                     <tr key={entry.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
                       <td className="px-6 py-4 font-display font-bold text-lg text-primary">#{pos}</td>
                       <td className="px-6 py-4 font-semibold text-foreground">
-                        {entry.patientName}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {entry.patientName}
+                          {entry.specialty && (() => {
+                            const tone = specialtyTone(entry.specialty);
+                            return (
+                              <span
+                                className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md leading-none"
+                                style={{
+                                  background: tone.bg,
+                                  color: tone.fg,
+                                  border: `1px solid ${tone.border}`,
+                                  boxShadow: `0 0 8px ${tone.glow}`,
+                                  textShadow: `0 0 6px ${tone.glow}`,
+                                }}
+                              >
+                                {specialtyShortLabel(entry.specialty)}
+                              </span>
+                            );
+                          })()}
+                        </div>
                         <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">
                           {entry.patientProntuario || `#${String(entry.patientId).padStart(4, "0")}`}
                         </div>
                         {entry.patientPhone && (
                           <div className="text-xs text-muted-foreground font-normal mt-0.5">{entry.patientPhone}</div>
+                        )}
+                        {entry.notes && (
+                          <div className="text-xs text-amber-400/80 font-normal mt-1 italic">📋 {entry.notes}</div>
                         )}
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">
@@ -287,18 +310,31 @@ export default function WaitingList() {
                         </Badge>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-baseline gap-1 font-mono">
-                          <span className="font-bold text-foreground">{entry.scoreTotal150 ?? 0}</span>
-                          <span className="text-xs text-muted-foreground">/150</span>
-                          {!!entry.scoreSocial && entry.scoreSocial > 0 && (
+                        {entry.scoreEspecialidade != null ? (
+                          <div className="flex items-baseline gap-1 font-mono">
+                            <span className="font-bold text-foreground">{entry.scoreEspecialidade}</span>
+                            <span className="text-xs text-muted-foreground">/72</span>
+                            {!!entry.scoreSocialDesempate && entry.scoreSocialDesempate > 0 && (
+                              <span
+                                title="Pontos de vulnerabilidade somados como desempate (+1 Escola Publica / +1 Trabalho na Roca)"
+                                className="ml-2 text-xs font-semibold text-amber-500"
+                              >
+                                +{entry.scoreSocialDesempate} desempate
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-baseline gap-1 font-mono">
+                            <span className="font-bold text-foreground">{entry.scoreTotal150 ?? 0}</span>
+                            <span className="text-xs text-muted-foreground">/150</span>
                             <span
-                              title="Bonus de vulnerabilidade ja somado ao score"
-                              className="ml-2 text-xs font-semibold text-amber-500"
+                              title="Sem especialidade definida: usa score clinico geral"
+                              className="ml-2 text-xs font-semibold text-muted-foreground"
                             >
-                              (inclui +{entry.scoreSocial} vuln.)
+                              geral
                             </span>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
                       <td className="px-6 py-4 text-right">
