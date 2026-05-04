@@ -12,17 +12,12 @@ function getCompanyId(req: any): number | null {
   return isNaN(n) ? null : n;
 }
 
-// Cor vem do score TOTAL (clinico /100 + 2 por flag social, max +4).
-// Espelha _calc_priority no banco e calcPriority do app Triagem/Gestao.
-// Sem upgrade automatico de nivel — vulnerabilidade soma pontos pequenos.
-function calcPriority(triagemScore: number, escolaPublica: boolean, trabalhoNaRoca: boolean, _semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
-  const clinico100 = ((triagemScore ?? 0) * 100) / 360;
-  const vuln = (escolaPublica ? 2 : 0) + (trabalhoNaRoca ? 2 : 0);
-  const total = clinico100 + vuln;
-  if (total >= 75) return "elevado";
-  if (total >= 50) return "moderado";
-  if (total >= 25) return "leve";
-  return "baixo";
+// Cor da classificacao depende SO da demanda clinica (triagem_score 0-360).
+// Pesos sociais sao apenas desempate na fila (NAO mudam a cor).
+function calcPriority(triagemScore: number, _escolaPublica: boolean, _trabalhoNaRoca: boolean, _semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
+  const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
+  const baseIdx = triagemScore >= 270 ? 3 : triagemScore >= 180 ? 2 : triagemScore >= 90 ? 1 : 0;
+  return levels[baseIdx];
 }
 
 router.get("/patients", async (req, res) => {

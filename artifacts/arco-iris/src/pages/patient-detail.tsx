@@ -20,12 +20,13 @@ import {
 // Score interno permanece em 0-360 (8 áreas × 0-72), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
 // operando no domínio 360, então as faixas de cor (25/50/75%) não mudam.
-// Bônus de vulnerabilidade somam direto no score exibido (desempate visível):
-//   +2 Escola Pública, +2 Trabalho na Roça/Informal. Máximo possível = 154.
+// Bônus de vulnerabilidade somam direto no score exibido (apenas desempate):
+//   +1 Escola Pública, +1 Trabalho na Roça/Informal. Máximo possível = 152.
+// Social NAO muda a cor da classificacao (regra: cor = clinica pura).
 const SCORE_MAX_RAW = 360;
 const SCORE_MAX_DISPLAY = 150;
-const VULN_BONUS_EP = 2;
-const VULN_BONUS_TNR = 2;
+const VULN_BONUS_EP = 1;
+const VULN_BONUS_TNR = 1;
 const toScoreDisplayBase = (raw: number | null | undefined): number =>
   Math.round(((raw ?? 0) / SCORE_MAX_RAW) * SCORE_MAX_DISPLAY);
 const vulnBonus = (ep: boolean | null | undefined, tnr: boolean | null | undefined): number =>
@@ -36,17 +37,12 @@ const toScoreDisplay = (
   tnr: boolean | null | undefined = false,
 ): number => toScoreDisplayBase(raw) + vulnBonus(ep, tnr);
 
-// Cor vem do score TOTAL (clinico em /100 + 2 por flag social, max +4).
-// Espelha _calc_priority no banco e getPrioridadeBadge do app Triagem.
-// Sem upgrade automatico de nivel — vulnerabilidade soma pontos pequenos.
-function calcPriority(scoreRaw: number, escolaPublica: boolean, trabalhoNaRoca: boolean, _semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
-  const clinico100 = ((scoreRaw ?? 0) * 100) / SCORE_MAX_RAW;
-  const vuln = (escolaPublica ? VULN_BONUS_EP : 0) + (trabalhoNaRoca ? VULN_BONUS_TNR : 0);
-  const total = clinico100 + vuln;
-  if (total >= 75) return "elevado";
-  if (total >= 50) return "moderado";
-  if (total >= 25) return "leve";
-  return "baixo";
+// Cor da classificacao depende SO da demanda clinica (triagem_score 0-360).
+// Pesos sociais sao apenas desempate na fila (NAO mudam a cor).
+function calcPriority(score: number, _escolaPublica: boolean, _trabalhoNaRoca: boolean, _semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
+  const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
+  const baseIdx = score >= 270 ? 3 : score >= 180 ? 2 : score >= 90 ? 1 : 0;
+  return levels[baseIdx];
 }
 
 const PRIORITY_STYLE: Record<string, string> = {
