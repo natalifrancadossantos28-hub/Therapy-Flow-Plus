@@ -194,18 +194,28 @@ export default function PainelMaster() {
     setLoading(true);
     try {
       const supabase = requireSupabase();
-      const [companiesRes, statsRes] = await Promise.all([
+      const [companiesRes, statsRes] = await Promise.allSettled([
         supabase.rpc("master_list_companies", { p_master_password: pw }),
         supabase.rpc("master_dashboard_stats", { p_master_password: pw }),
       ]);
-      if (companiesRes.error) throw companiesRes.error;
-      if (statsRes.error) throw statsRes.error;
 
-      const rows = Array.isArray(companiesRes.data) ? companiesRes.data : [];
-      setCompanies(rows.map((r: Record<string, unknown>) => mapCompanyRow(r)));
+      if (companiesRes.status === "fulfilled") {
+        const res = companiesRes.value;
+        if (!res.error) {
+          const rows = Array.isArray(res.data) ? res.data : [];
+          setCompanies(rows.map((r: Record<string, unknown>) => mapCompanyRow(r)));
+        } else {
+          toast({ title: "Erro", description: res.error.message, variant: "destructive" });
+        }
+      }
 
-      const statsRow = Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data;
-      if (statsRow) setStats(mapStats(statsRow as Record<string, unknown>));
+      if (statsRes.status === "fulfilled") {
+        const res = statsRes.value;
+        if (!res.error) {
+          const statsRow = Array.isArray(res.data) ? res.data[0] : res.data;
+          if (statsRow) setStats(mapStats(statsRow as Record<string, unknown>));
+        }
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erro ao carregar dados.";
       toast({ title: "Erro", description: message, variant: "destructive" });
