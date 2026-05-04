@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Building2, UserRound, ShieldCheck, Lock, ArrowLeft } from "lucide-react";
+import { Building2, UserRound, ShieldCheck, Shield, Lock, ArrowLeft } from "lucide-react";
 import { requireSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   CompanySession,
@@ -248,7 +248,16 @@ export default function Portal() {
           </button>
         </div>
 
-        <p className="text-xs text-white/30 mt-10">&copy; 2026 NFs Systems &middot; Gestao Terapeutica</p>
+        {/* Link para Painel Master */}
+        <button
+          onClick={() => setLocation("/master")}
+          className="mt-6 text-xs text-white/30 hover:text-amber-400/80 transition-colors flex items-center gap-1.5"
+        >
+          <Shield className="w-3.5 h-3.5" />
+          Painel Master (Multi-Empresa)
+        </button>
+
+        <p className="text-xs text-white/30 mt-6">&copy; 2026 NFs Systems &middot; Gestao Terapeutica</p>
       </div>
     );
   }

@@ -21,6 +21,7 @@ const Agenda = lazy(() => import("@/pages/agenda"));
 const AgendaMensal = lazy(() => import("@/pages/agenda-mensal"));
 const AgendaProfissionais = lazy(() => import("@/pages/agenda-profissionais"));
 const GestaoContratos = lazy(() => import("@/pages/gestao-contratos"));
+const PainelMaster = lazy(() => import("@/pages/painel-master"));
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ function Router() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path="/portal" component={Portal} />
+        <Route path="/master" component={PainelMaster} />
         <Route path="/agenda-profissionais" component={AgendaProfissionais} />
         <Route>
           <Layout>
