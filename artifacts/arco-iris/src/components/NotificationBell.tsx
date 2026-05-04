@@ -471,7 +471,7 @@ function sanitizePhone(raw: string | null | undefined): string | null {
 }
 
 /**
- * Templates de WhatsApp por tipo de ação — tom acolhedor e profissional.
+ * Templates de WhatsApp por tipo de ação — tom profissional.
  * Variáveis preenchidas automaticamente: nome do paciente, profissional,
  * data e hora.
  */
@@ -480,39 +480,47 @@ function buildWhatsAppMessage(n: NotificacaoRecepcao): string {
   const hora = (n.horaConsulta || "").trim();
   const data = n.dataConsulta ? formatDate(n.dataConsulta) : "";
 
-  // 1. Agendamento (Novo Horário)
+  // 1. Novo Agendamento
   if (acao.includes("agend")) {
-    return `Olá! 👋 Informamos que um novo atendimento foi agendado para o(a) ${n.patientName} com o profissional ${n.professionalName} no dia ${data || "—"} às ${hora || "—"}. Por favor, confirme o recebimento desta mensagem. Estamos à disposição! 😊`;
+    return `Olá, tudo bem? Informamos que o agendamento para o(a) ${n.patientName} foi realizado com o(a) profissional ${n.professionalName}.\n🗓 Data: ${data || "—"}\n🕒 Horário: ${hora || "—"}\nSolicitamos, por gentileza, a chegada com 10 minutos de antecedência.\nAtenciosamente, Recepção.`;
   }
 
-  // 2. Em Atendimento (Início da Sessão)
+  // 2. Em Atendimento
   if (acao.includes("atendim") || acao.includes("conclu")) {
-    return `Olá! Informamos que o(a) ${n.patientName} já iniciou o atendimento com ${n.professionalName}. Assim que a sessão for finalizada, avisaremos por aqui. Central de Atendimento.`;
+    return `Olá, informamos que o(a) ${n.patientName} iniciou o atendimento com o(a) profissional ${n.professionalName} no dia ${data || "hoje"} às ${hora || "—"}.\nSolicitamos, por gentileza, a chegada com 10 minutos de antecedência.\nAtenciosamente, Recepção.`;
   }
 
-  // 3/4. Faltas (Justificada vs Não Justificada)
+  // 3/4/5. Faltas
   if (acao.includes("falta")) {
-    if (acao.includes("justificada") && !acao.includes("não") && !acao.includes("nao")) {
-      return `Olá, tudo bem? Registramos a falta justificada do(a) ${n.patientName} no atendimento de hoje. Agradecemos pelo aviso prévio e nos vemos na próxima sessão! 🌼`;
+    // 5. Excedente de Faltas (3ª falta — retorno para fila)
+    const faltaMatch = acao.match(/falta\s+(\d+)/);
+    const faltaNum = faltaMatch ? parseInt(faltaMatch[1]) : 0;
+    if (faltaNum >= 3) {
+      return `Olá, estamos entrando em contato para avisar que excederam as três faltas do(a) paciente ${n.patientName} com o(a) profissional ${n.professionalName}. Devido ao limite de ausências, o(a) paciente estará retornando para a fila de espera.\nAtenciosamente, Recepção.`;
     }
-    return `Olá. Notamos a ausência do(a) ${n.patientName} no atendimento agendado para hoje e não identificamos justificativa prévia. Lembramos que o aviso antecipado é fundamental para a organização da agenda. Atenciosamente, Recepção.`;
+    // 3. Falta Justificada
+    if (acao.includes("justificada") && !acao.includes("não") && !acao.includes("nao")) {
+      return `Olá, tudo bem? Registramos a falta justificada do(a) ${n.patientName} no atendimento de hoje com o(a) profissional ${n.professionalName}.\nAtenciosamente, Recepção.`;
+    }
+    // 4. Falta Não Justificada (2ª falta)
+    return `Olá, informamos que registramos a${faltaNum >= 2 ? " segunda" : ""} falta não justificada do(a) ${n.patientName} no atendimento com o(a) profissional ${n.professionalName}. Lembramos que o aviso antecipado é fundamental para a organização da agenda.\nAtenciosamente, Recepção.`;
   }
 
-  // 5. Desmarcar Atendimento
+  // 6. Desmarcar Atendimento
   if (acao.includes("desmarc") || acao.includes("cancel")) {
-    return `Olá, informamos que o atendimento do(a) ${n.patientName} programado para o dia ${data || "hoje"} precisou ser desmarcado. Pedimos desculpas pelo transtorno e em breve entraremos em contato para realizar o reagendamento.`;
+    return `Olá, informamos que o agendamento do(a) ${n.patientName} programado para o dia ${data || "hoje"} com o(a) profissional ${n.professionalName} precisou ser desmarcado. Entraremos em contato em breve para o reagendamento.\nAtenciosamente, Recepção.`;
   }
 
-  // 6. Remanejar (Volta para Fila de Espera)
+  // 7. Remanejar (novo dia e horário automáticos)
   if (acao.includes("remanej") || acao.includes("remarc")) {
-    return `Olá! Informamos que o atendimento do(a) ${n.patientName} passará por um remanejamento e o nome retornará para nossa fila de prioridade para um novo ajuste de horário. Manteremos você informado(a) sobre as próximas datas!`;
+    return `Olá, tudo bem? Informamos que o atendimento do(a) ${n.patientName} com o(a) profissional ${n.professionalName} foi remanejado para o dia ${data || "—"} às ${hora || "—"}.\nAtenciosamente, Recepção.`;
   }
 
   // Fallback genérico
   const verbo = formatAcaoLabel(acao).toLowerCase();
-  return `Olá! Informamos que o atendimento de ${n.patientName} com ${n.professionalName} foi ${verbo}${
+  return `Olá, informamos que o atendimento de ${n.patientName} com ${n.professionalName} foi ${verbo}${
     data || hora ? ` (${[data, hora].filter(Boolean).join(" às ")})` : ""
-  }. Estamos à disposição!`;
+  }.\nAtenciosamente, Recepção.`;
 }
 
 

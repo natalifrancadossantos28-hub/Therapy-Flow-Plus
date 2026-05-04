@@ -522,7 +522,18 @@ export default function Agenda() {
   };
 
   // ── Encaminhamento Interno ──
-  const handleEncaminhamento = (apt: Appointment) => {
+  const handleEncaminhamento = async (apt: Appointment) => {
+    if (!isAdmin) {
+      try {
+        const allApts = await listAppointments({ patientId: apt.patientId, professionalId: selectedProf ? Number(selectedProf) : null });
+        const completed = allApts.filter(a => a.status === "atendimento").length;
+        if (completed < 10) {
+          toast({ title: "Encaminhamento bloqueado", description: `Só é possível encaminhar após 10 atendimentos concluídos. Atualmente: ${completed}/10.`, variant: "destructive" });
+          setActionMenuId(null);
+          return;
+        }
+      } catch { /* se falhar a contagem, permite prosseguir */ }
+    }
     setActionMenuId(null);
     setEncApt(apt);
     setEncEspecialidade("");
@@ -565,7 +576,18 @@ export default function Agenda() {
   };
 
   // ── Atendimento Multi (Admin) ──
-  const handleMultiAtendimento = (apt: Appointment) => {
+  const handleMultiAtendimento = async (apt: Appointment) => {
+    if (!isAdmin) {
+      try {
+        const allApts = await listAppointments({ patientId: apt.patientId, professionalId: selectedProf ? Number(selectedProf) : null });
+        const completed = allApts.filter(a => a.status === "atendimento").length;
+        if (completed < 10) {
+          toast({ title: "Atendimento Multi bloqueado", description: `Só é possível após 10 atendimentos concluídos. Atualmente: ${completed}/10.`, variant: "destructive" });
+          setActionMenuId(null);
+          return;
+        }
+      } catch { /* se falhar a contagem, permite prosseguir */ }
+    }
     setActionMenuId(null);
     setMultiApt(apt);
     setMultiProfId("");

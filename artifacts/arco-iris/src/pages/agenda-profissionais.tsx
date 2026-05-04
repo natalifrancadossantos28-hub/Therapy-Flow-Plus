@@ -368,7 +368,17 @@ export default function AgendaProfissionais() {
   };
 
   // ── Encaminhamento Interno ──
-  const handleEncaminhamento = (apt: Appointment) => {
+  const handleEncaminhamento = async (apt: Appointment) => {
+    try {
+      const profId = selectedProfId ? Number(selectedProfId) : null;
+      const allApts = await listAppointments({ patientId: apt.patientId, professionalId: profId });
+      const completed = allApts.filter(a => a.status === "atendimento").length;
+      if (completed < 10) {
+        toast({ title: "Encaminhamento bloqueado", description: `Só é possível encaminhar após 10 atendimentos concluídos. Atualmente: ${completed}/10.`, variant: "destructive" });
+        setActionMenuId(null);
+        return;
+      }
+    } catch { /* se falhar a contagem, permite prosseguir */ }
     setActionMenuId(null);
     setEncApt(apt);
     setEncEspecialidade("");
