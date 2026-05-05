@@ -307,7 +307,6 @@ export default function Portal() {
                 autoCorrect="off"
                 spellCheck={false}
               />
-              <p className="text-[10px] text-white/40 mt-1">Senha padrao: <span className="font-mono text-white/70">clinica123</span></p>
             </div>
 
             {error && <p className="text-xs text-red-400 bg-red-950/30 border border-red-500/30 rounded-xl px-3 py-2">{error}</p>}
