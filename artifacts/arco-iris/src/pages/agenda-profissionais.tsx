@@ -23,7 +23,7 @@ import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib
 import { useLocation } from "wouter";
 
 const TIME_SLOTS = [
-  "08:00", "08:50", "09:40", "10:30", "11:20",
+  "07:10", "08:00", "08:50", "09:40", "10:30", "11:20",
   "12:10",
   "13:10", "14:00", "14:50", "15:40",
 ];

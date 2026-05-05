@@ -141,7 +141,7 @@ router.get("/professionals/:id/capacity", async (req, res) => {
 });
 
 const SCHEDULE_SLOTS = [
-  "08:00", "08:50", "09:40", "10:30", "11:20",
+  "07:10", "08:00", "08:50", "09:40", "10:30", "11:20",
   "13:10", "14:00", "14:50", "15:40",
 ];
 const LUNCH_SLOT = "12:10";
