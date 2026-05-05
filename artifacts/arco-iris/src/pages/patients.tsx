@@ -95,6 +95,7 @@ export default function Patients() {
     diagnosis: "",
     entryDate: today(),
     escolaPublica: false,
+    abrigoCasaCrianca: false,
     tipoRegistro: "Paciente da Unidade",
     localAtendimento: "",
   });
@@ -172,7 +173,7 @@ export default function Patients() {
     setFormData({
       name: "", prontuario: next, cpf: "", cns: "", phone: "", dateOfBirth: "",
       motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
-      entryDate: today(), escolaPublica: false,
+      entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
       tipoRegistro: "Paciente da Unidade", localAtendimento: "",
     });
     setIsDialogOpen(true);
@@ -184,7 +185,7 @@ export default function Patients() {
     setFormData({
       name: "", prontuario: "", cpf: "", cns: "", phone: "", dateOfBirth: "",
       motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
-      entryDate: today(), escolaPublica: false,
+      entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
       tipoRegistro: "Paciente da Unidade", localAtendimento: "",
     });
   };
@@ -565,6 +566,29 @@ export default function Patients() {
                     <div>
                       <p className="text-sm font-semibold text-foreground">🏫 Rede Municipal de Ibiúna</p>
                       <p className="text-xs text-muted-foreground">Matriculado em escola municipal de Ibiúna (prioridade na fila)</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="col-span-2">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div className={cn(
+                      "w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0",
+                      formData.abrigoCasaCrianca
+                        ? "bg-pink-500 border-pink-500"
+                        : "border-border group-hover:border-pink-400"
+                    )}>
+                      {formData.abrigoCasaCrianca && <span className="text-white text-xs font-bold">✓</span>}
+                    </div>
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={formData.abrigoCasaCrianca}
+                      onChange={e => setFormData({ ...formData, abrigoCasaCrianca: e.target.checked })}
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">🏠 Reside em Abrigo / Casa da Criança</p>
+                      <p className="text-xs text-muted-foreground">Prioridade Máxima automática — fura a fila</p>
                     </div>
                   </label>
                 </div>

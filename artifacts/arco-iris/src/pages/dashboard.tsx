@@ -141,10 +141,11 @@ export default function Dashboard() {
 
   // ── Status da fila (cor por prioridade clínica) ──────────────────────────
   const filaPorCor = useMemo(() => {
-    const buckets = { vermelho: 0, laranja: 0, azul: 0, verde: 0, sem: 0 };
+    const buckets = { maxima: 0, vermelho: 0, laranja: 0, azul: 0, verde: 0, sem: 0 };
     for (const w of waitingList || []) {
       const p = (w.priority || "").toLowerCase();
-      if (p === "elevado" || p === "alto") buckets.vermelho++;
+      if (p === "maxima" || p === "máxima") buckets.maxima++;
+      else if (p === "elevado" || p === "alto") buckets.vermelho++;
       else if (p === "moderado") buckets.laranja++;
       else if (p === "leve") buckets.azul++;
       else if (p === "baixo") buckets.verde++;
@@ -488,7 +489,7 @@ type HeartbeatProps = {
   taxaPresenca: number | null;
   donutData: Array<{ name: string; value: number; fill: string }>;
   porEspecialidade: Record<string, number>;
-  filaPorCor: { vermelho: number; laranja: number; azul: number; verde: number; sem: number };
+  filaPorCor: { maxima: number; vermelho: number; laranja: number; azul: number; verde: number; sem: number };
   waitingCount: number;
 };
 
@@ -606,6 +607,11 @@ function Heartbeat({
           </Link>
         </div>
         <p className="text-xs text-muted-foreground mb-4">{waitingCount} aguardando vaga · classificação clínica</p>
+        {filaPorCor.maxima > 0 && (
+          <div className="mb-2">
+            <FilaBucket label="🔴 MÁXIMA" hint="Idade<5 ou Abrigo" value={filaPorCor.maxima} fg="#ff4dd2" bg="rgba(255,0,170,0.14)" border="rgba(255,0,170,0.55)" glow="rgba(255,0,170,0.6)" />
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <FilaBucket label="Vermelho" hint="Elevado" value={filaPorCor.vermelho} fg="#fca5a5" bg="rgba(248,113,113,0.12)" border="rgba(248,113,113,0.5)" glow="rgba(248,113,113,0.4)" />
           <FilaBucket label="Laranja"  hint="Moderado" value={filaPorCor.laranja} fg="#fdba74" bg="rgba(251,146,60,0.12)" border="rgba(251,146,60,0.5)" glow="rgba(251,146,60,0.4)" />

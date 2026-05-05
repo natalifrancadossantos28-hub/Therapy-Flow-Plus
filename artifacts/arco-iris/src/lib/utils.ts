@@ -49,6 +49,7 @@ export const getStatusLabel = (status: string): string => {
 
 export const getPriorityColor = (priority: string) => {
   const p = priority.toLowerCase();
+  if (p === "maxima" || p === "máxima") return "badge-neon-pink";
   if (p === "elevado" || p === "alta") return "badge-neon-red";
   if (p === "moderado" || p === "media" || p === "média") return "badge-neon-orange";
   if (p === "leve") return "badge-neon-blue";

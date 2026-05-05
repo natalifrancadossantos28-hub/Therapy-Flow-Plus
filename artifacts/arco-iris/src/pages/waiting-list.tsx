@@ -15,6 +15,7 @@ import {
 } from "@/lib/arco-rpc";
 
 const PRIORITY_LABEL: Record<string, string> = {
+  maxima: "🔴 MÁXIMA – Prioridade Social/Idade",
   elevado: "VERMELHO – Elevado",
   moderado: "LARANJA – Moderado",
   leve: "AZUL – Leve",
