@@ -223,14 +223,15 @@ begin
       (case when b.p_escola   then 1 else 0 end)
       + (case when b.p_trabalho then 1 else 0 end) as sp_social,
       case
-        when b.p_dob is null then 0
-        when extract(year from age(current_date, b.p_dob)) < 4 then 50
-        when extract(year from age(current_date, b.p_dob)) <= 6 then 20
+        when b.p_dob is null or btrim(b.p_dob) = '' then 0
+        when extract(year from age(current_date, b.p_dob::date)) < 4 then 50
+        when extract(year from age(current_date, b.p_dob::date)) <= 6 then 20
         else 0
       end as age_bonus,
       -- Prioridade Maxima: < 5 anos OU abrigo
       (b.p_dob is not null
-        and extract(year from age(current_date, b.p_dob)) < 5
+        and btrim(b.p_dob) <> ''
+        and extract(year from age(current_date, b.p_dob::date)) < 5
       ) as is_under5,
       (b.p_abrigo) as is_abrigo
     from base b
@@ -359,7 +360,8 @@ begin
     else null
   end;
   v_is_under5 := v_patient.date_of_birth is not null
-                 and extract(year from age(current_date, v_patient.date_of_birth)) < 5;
+                 and btrim(v_patient.date_of_birth) <> ''
+                 and extract(year from age(current_date, v_patient.date_of_birth::date)) < 5;
   v_is_abrigo := coalesce(v_patient.abrigo_casa_crianca, false);
   if v_is_under5 or v_is_abrigo then
     v_priority := 'maxima';
@@ -396,7 +398,11 @@ update public.waiting_list w
  where p.id = w.patient_id
    and (
      coalesce(p.abrigo_casa_crianca, false)
-     or (p.date_of_birth is not null and extract(year from age(current_date, p.date_of_birth)) < 5)
+     or (
+       p.date_of_birth is not null
+       and btrim(p.date_of_birth) <> ''
+       and extract(year from age(current_date, p.date_of_birth::date)) < 5
+     )
    );
 
 commit;
