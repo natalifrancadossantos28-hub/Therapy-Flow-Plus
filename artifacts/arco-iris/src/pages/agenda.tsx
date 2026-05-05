@@ -5,7 +5,7 @@ import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download
+  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
@@ -17,6 +17,7 @@ import {
   verifyProfessionalPin,
   listAppointments,
   updateAppointment,
+  deleteAppointment,
   deleteAppointmentAlta,
   createNotificacao,
   createAppointments,
@@ -281,6 +282,8 @@ export default function Agenda() {
   const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
   const [remanejSending, setRemanejSending] = useState(false);
   const [remanejDone, setRemanejDone] = useState(false);
+  const [excluirConfirm, setExcluirConfirm] = useState<Appointment | null>(null);
+  const [excluirSending, setExcluirSending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const { toast } = useToast();
@@ -473,6 +476,34 @@ export default function Agenda() {
       }
     } catch {
       toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
+    }
+  };
+
+  // ── Exclusão administrativa (sem vínculo clínico) ──
+  const handleExcluirAdmin = (apt: Appointment) => {
+    setActionMenuId(null);
+    setExcluirConfirm(apt);
+  };
+
+  const confirmExcluirAdmin = async () => {
+    if (!excluirConfirm) return;
+    setExcluirSending(true);
+    try {
+      await deleteAppointment(excluirConfirm.id);
+      setAppointments(prev => prev.filter(a => a.id !== excluirConfirm.id));
+      toast({
+        title: "🗑️ Agendamento excluído",
+        description: `${excluirConfirm.patientName} — horário liberado. Sem registro clínico.`,
+      });
+      setExcluirConfirm(null);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao excluir",
+        description: err?.message ?? "Não foi possível excluir o agendamento.",
+        variant: "destructive",
+      });
+    } finally {
+      setExcluirSending(false);
     }
   };
 
@@ -995,6 +1026,16 @@ export default function Agenda() {
                                         </button>
                                       )}
 
+                                      {isAdmin && (
+                                        <>
+                                          <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                          <p className="text-[9px] text-white/40 uppercase font-bold px-1">Admin</p>
+                                          <button style={NEON.red} onClick={() => handleExcluirAdmin(apt)}>
+                                            <Trash2 className="w-3.5 h-3.5" /> Excluir Agendamento
+                                          </button>
+                                        </>
+                                      )}
+
                                       {!isAdmin && (
                                         <p className="text-[9px] text-white/30 px-1 mt-1 italic leading-tight">
                                           Faltas e desmarcações ficam na Recepção.
@@ -1052,6 +1093,49 @@ export default function Agenda() {
             toast({ title: "Agendado!", description: "Sessão(ões) criada(s) com sucesso." });
           }}
         />
+      )}
+
+      {/* ── Modal de Exclusão Administrativa (sem vínculo clínico) ── */}
+      {excluirConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444" }}>
+                  <Trash2 className="w-5 h-5" style={{ color: "#f87171" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>Excluir Agendamento</p>
+                  <p className="text-xs text-white/50">Limpeza administrativa — sem vínculo clínico</p>
+                </div>
+              </div>
+              <p className="text-sm text-white/80 mb-1">
+                <strong className="text-white">{excluirConfirm.patientName}</strong> — {excluirConfirm.date} às {excluirConfirm.time}.
+              </p>
+              <p className="text-xs text-white/60 mt-2">
+                O horário voltará a ficar disponível (+ Agendar). <strong className="text-white/80">Não</strong> gera alta, falta nem registro no prontuário.
+              </p>
+              {excluirConfirm.recurrenceGroupId && (
+                <p className="text-xs text-orange-400/80 mt-2">
+                  ⚠ Apenas este horário será excluído. Os próximos da recorrência permanecem.
+                </p>
+              )}
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={confirmExcluirAdmin}
+                  disabled={excluirSending}
+                  style={{ ...NEON.red, flex: 1, justifyContent: "center", padding: "10px", opacity: excluirSending ? 0.4 : 1, cursor: excluirSending ? "not-allowed" : "pointer" }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {excluirSending ? "Excluindo..." : "Confirmar Exclusão"}
+                </button>
+                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setExcluirConfirm(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Modal de Saída (Alta / Óbito / Desistência) ── */}
