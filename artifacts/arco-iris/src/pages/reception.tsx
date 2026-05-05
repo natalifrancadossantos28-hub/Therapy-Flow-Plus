@@ -402,7 +402,7 @@ export default function Reception() {
   const handlePrintPDF = () => {
     const todayStr = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
     const list = [...(appointments || [])].sort((a, b) => a.time.localeCompare(b.time));
-    const morningSlots = ["08:00","08:50","09:40","10:30","11:20"];
+    const morningSlots = ["07:10","08:00","08:50","09:40","10:30","11:20"];
     const afternoonSlots = ["13:10","14:00","14:50","15:40"];
 
     const aptMap: Record<string, typeof list[0][]> = {};
