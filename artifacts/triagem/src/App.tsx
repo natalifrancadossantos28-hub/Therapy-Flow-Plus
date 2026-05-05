@@ -44,133 +44,133 @@ const SHORT_NAMES: Record<string, string> = {
 
 const PERGUNTAS: Pergunta[] = [
   // ── PSICOLÓGICO (15)
-  { area: "Psicológico", pergunta: "Déficit de atenção sustentada", explicacao: "Dificuldade de manter o foco por períodos esperados para a idade" },
-  { area: "Psicológico", pergunta: "Ansiedade frequente", explicacao: "Fica muito nervoso, agitado ou preocupado sem causa aparente" },
-  { area: "Psicológico", pergunta: "Baixa autoestima", explicacao: "Demonstra insegurança ou se deprecia com frequência" },
-  { area: "Psicológico", pergunta: "Humor instável", explicacao: "Mudanças bruscas de humor sem causa aparente" },
-  { area: "Psicológico", pergunta: "Medos excessivos ou fobias", explicacao: "Medo intenso e desproporcional de situações específicas" },
-  { area: "Psicológico", pergunta: "Dificuldade em lidar com frustração", explicacao: "Reações intensas quando não consegue o que quer" },
-  { area: "Psicológico", pergunta: "Isolamento social", explicacao: "Evita interações com outras pessoas sem razão aparente" },
-  { area: "Psicológico", pergunta: "Comportamento opositor desafiante", explicacao: "Recusa persistente em seguir regras ou desafia autoridades" },
-  { area: "Psicológico", pergunta: "Impulsividade", explicacao: "Age sem pensar ou interrompe situações com frequência" },
-  { area: "Psicológico", pergunta: "Comportamentos repetitivos ou estereotipados", explicacao: "Movimentos ou ações repetidas sem função aparente" },
-  { area: "Psicológico", pergunta: "Dificuldade de reconhecimento emocional", explicacao: "Não identifica as próprias emoções ou as dos outros adequadamente" },
-  { area: "Psicológico", pergunta: "Padrões de sono alterados", explicacao: "Dificuldade para dormir, acorda com frequência ou dorme em excesso" },
-  { area: "Psicológico", pergunta: "Enurese ou encoprese", explicacao: "Molha a cama ou tem acidentes intestinais além do esperado para a faixa etária" },
-  { area: "Psicológico", pergunta: "Comportamento autolesivo", explicacao: "Bate, morde ou machuca a si mesmo sem intenção de suicídio" },
-  { area: "Psicológico", pergunta: "Somatização frequente", explicacao: "Queixas físicas (dor de cabeça, barriga) sem causa médica identificada" },
+  { area: "Psicológico", pergunta: "Déficit de atenção sustentada", explicacao: "Ele se distrai com qualquer barulhinho e não termina o que começa?" },
+  { area: "Psicológico", pergunta: "Ansiedade frequente", explicacao: "Vive nervoso, agitado, roendo unha ou puxando cabelo sem motivo?" },
+  { area: "Psicológico", pergunta: "Baixa autoestima", explicacao: "Costuma falar 'eu não consigo', 'sou burro' ou se acha menos que os outros?" },
+  { area: "Psicológico", pergunta: "Humor instável", explicacao: "Muda de bom pra mau humor de uma hora pra outra, sem motivo?" },
+  { area: "Psicológico", pergunta: "Medos excessivos ou fobias", explicacao: "Tem medo demais de alguma coisa (escuro, palhaço, cachorro, barulho)?" },
+  { area: "Psicológico", pergunta: "Dificuldade em lidar com frustração", explicacao: "Quando contrariam, ele faz birra grande, grita ou se joga no chão?" },
+  { area: "Psicológico", pergunta: "Isolamento social", explicacao: "Prefere ficar sozinho e foge das outras crianças?" },
+  { area: "Psicológico", pergunta: "Comportamento opositor desafiante", explicacao: "Desobedece de propósito e desafia quem manda nele?" },
+  { area: "Psicológico", pergunta: "Impulsividade", explicacao: "Faz primeiro e pensa depois? Não consegue esperar a vez?" },
+  { area: "Psicológico", pergunta: "Comportamentos repetitivos ou estereotipados", explicacao: "Balança o corpo, bate as mãos ou repete a mesma coisa o tempo todo?" },
+  { area: "Psicológico", pergunta: "Dificuldade de reconhecimento emocional", explicacao: "Ele percebe quando você está triste, brava ou alegre?" },
+  { area: "Psicológico", pergunta: "Padrões de sono alterados", explicacao: "Tem dificuldade pra dormir, acorda muito de noite ou tem pesadelo?" },
+  { area: "Psicológico", pergunta: "Enurese ou encoprese", explicacao: "Faz xixi ou cocô na cama / na roupa fora da idade esperada?" },
+  { area: "Psicológico", pergunta: "Comportamento autolesivo", explicacao: "Se bate, se morde ou se machuca de propósito?" },
+  { area: "Psicológico", pergunta: "Somatização frequente", explicacao: "Vive reclamando de dor de cabeça ou de barriga sem o médico achar nada?" },
   // ── PSICOMOTRICIDADE (15)
-  { area: "Psicomotricidade", pergunta: "Dificuldade de coordenação motora global", explicacao: "Problemas para correr, pular ou realizar movimentos amplos" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de equilíbrio estático", explicacao: "Dificuldade para ficar parado em uma posição sem se desequilibrar" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de equilíbrio dinâmico", explicacao: "Desequilíbrio ao caminhar, subir escadas ou mudar de direção" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade com lateralidade", explicacao: "Confunde direita/esquerda; lateralidade não definida para a idade" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de estruturação espaço-temporal", explicacao: "Não organiza adequadamente o espaço ao redor ou a noção de tempo" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de ritmo e coordenação rítmica", explicacao: "Não consegue acompanhar ritmos musicais ou sequências motoras" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de esquema corporal", explicacao: "Não reconhece ou nomeia partes do corpo adequadamente" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de dissociação de movimentos", explicacao: "Não consegue mover uma parte do corpo de forma independente das demais" },
-  { area: "Psicomotricidade", pergunta: "Tonicidade inadequada para a tarefa", explicacao: "Usa força excessiva ou insuficiente em atividades motoras" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de expressão corporal", explicacao: "Corpo rígido, pouco expressivo ou com movimentos estereotipados" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de grafomotricidade", explicacao: "Traço muito fraco, forte ou irregular ao escrever e desenhar" },
-  { area: "Psicomotricidade", pergunta: "Hipotonia generalizada", explicacao: "Corpo mole e cansado; postura excessivamente relaxada" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de percepção tátil", explicacao: "Não identifica objetos pelo toque ou tem reações excessivas ao contato físico" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de projeção espacial", explicacao: "Não calcula distâncias ao pular, escalar ou alcançar objetos" },
-  { area: "Psicomotricidade", pergunta: "Dificuldade de sequência motora", explicacao: "Não consegue reproduzir sequências de movimentos demonstrados" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de coordenação motora global", explicacao: "Tropeça muito, ou tem dificuldade pra correr e pular?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de equilíbrio estático", explicacao: "Consegue ficar parado em um pé só, sem cair?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de equilíbrio dinâmico", explicacao: "Desequilibra fácil quando anda, sobe escada ou muda de direção?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade com lateralidade", explicacao: "Confunde o lado direito com o esquerdo?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de estruturação espaço-temporal", explicacao: "Se atrapalha pra entender em cima/embaixo, antes/depois?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de ritmo e coordenação rítmica", explicacao: "Consegue acompanhar uma música batendo palma no ritmo?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de esquema corporal", explicacao: "Sabe mostrar as partes do corpo (mão, joelho, cotovelo) quando você pede?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de dissociação de movimentos", explicacao: "Consegue mexer um braço sem mexer o outro junto?" },
+  { area: "Psicomotricidade", pergunta: "Tonicidade inadequada para a tarefa", explicacao: "Aperta tudo com força demais ou solta as coisas que vai pegar?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de expressão corporal", explicacao: "O corpinho dele é durinho/travado quando se mexe?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de grafomotricidade", explicacao: "Quando desenha ou escreve, faz a mão pesada ou tremida?" },
+  { area: "Psicomotricidade", pergunta: "Hipotonia generalizada", explicacao: "O corpo dele parece molinho, cansado, 'sem firmeza'?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de percepção tátil", explicacao: "Não suporta certas texturas (etiqueta, areia, grama, massinha)?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de projeção espacial", explicacao: "Esbarra em tudo ou erra distância pra pegar o copo?" },
+  { area: "Psicomotricidade", pergunta: "Dificuldade de sequência motora", explicacao: "Consegue imitar uma sequência simples (bate palma, pula, gira)?" },
   // ── FISIOTERAPIA (15)
-  { area: "Fisioterapia", pergunta: "Atraso no desenvolvimento motor global", explicacao: "Demora a rolar, sentar, engatinhar ou andar conforme o esperado" },
-  { area: "Fisioterapia", pergunta: "Tônus muscular alterado", explicacao: "Músculos muito flácidos (hipotonia) ou muito rígidos (hipertonia)" },
-  { area: "Fisioterapia", pergunta: "Desvio postural", explicacao: "Escoliose, cifose, lordose excessiva ou outras alterações posturais" },
-  { area: "Fisioterapia", pergunta: "Dor músculo-esquelética recorrente", explicacao: "Queixas frequentes de dor em articulações ou músculos" },
-  { area: "Fisioterapia", pergunta: "Limitação de amplitude de movimento", explicacao: "Dificuldade de movimentar articulações em sua amplitude normal" },
-  { area: "Fisioterapia", pergunta: "Marcha atípica", explicacao: "Forma de andar diferente do esperado para a idade (ex.: ponta dos pés)" },
-  { area: "Fisioterapia", pergunta: "Fadiga muscular precoce", explicacao: "Cansa facilmente durante atividades físicas habituais" },
-  { area: "Fisioterapia", pergunta: "Alterações respiratórias funcionais", explicacao: "Respiração alterada que compromete a função motora ou resistência" },
-  { area: "Fisioterapia", pergunta: "Dificuldade de subir/descer escadas", explicacao: "Precisa de apoio ou evita escadas além do esperado para a idade" },
-  { area: "Fisioterapia", pergunta: "Histórico de fraturas ou lesões frequentes", explicacao: "Fraturas, entorses ou lesões musculares recorrentes" },
-  { area: "Fisioterapia", pergunta: "Dor postural recorrente", explicacao: "Queixas de dor nas costas, pescoço ou membros por postura inadequada" },
-  { area: "Fisioterapia", pergunta: "Contraturas musculares", explicacao: "Músculos encurtados que limitam a mobilidade habitual" },
-  { area: "Fisioterapia", pergunta: "Fraqueza nos membros", explicacao: "Força reduzida em braços ou pernas comparada com a faixa etária" },
-  { area: "Fisioterapia", pergunta: "Lentidão em reabilitação", explicacao: "Recuperação anormalmente lenta após lesões ou procedimentos" },
-  { area: "Fisioterapia", pergunta: "Uso de órteses ou próteses", explicacao: "Uso atual ou anterior de aparelhos de suporte motor" },
+  { area: "Fisioterapia", pergunta: "Atraso no desenvolvimento motor global", explicacao: "Ele demorou pra sentar, engatinhar ou andar?" },
+  { area: "Fisioterapia", pergunta: "Tônus muscular alterado", explicacao: "O corpinho dele é molinho demais ou duro demais?" },
+  { area: "Fisioterapia", pergunta: "Desvio postural", explicacao: "Quando você olha de costas, a coluna dele parece torta?" },
+  { area: "Fisioterapia", pergunta: "Dor músculo-esquelética recorrente", explicacao: "Reclama muito de dor nas perninhas, braço ou nas costas?" },
+  { area: "Fisioterapia", pergunta: "Limitação de amplitude de movimento", explicacao: "Consegue levantar os braços e abrir as pernas sem dificuldade?" },
+  { area: "Fisioterapia", pergunta: "Marcha atípica", explicacao: "Anda na ponta do pé, com os pés pra dentro ou pra fora?" },
+  { area: "Fisioterapia", pergunta: "Fadiga muscular precoce", explicacao: "Cansa rápido demais quando brinca ou sobe uma escada?" },
+  { area: "Fisioterapia", pergunta: "Alterações respiratórias funcionais", explicacao: "Cansa pra respirar ou puxa o ar com esforço quando se mexe?" },
+  { area: "Fisioterapia", pergunta: "Dificuldade de subir/descer escadas", explicacao: "Evita escada ou precisa de ajuda pra subir/descer?" },
+  { area: "Fisioterapia", pergunta: "Histórico de fraturas ou lesões frequentes", explicacao: "Já quebrou um osso ou se machuca toda hora?" },
+  { area: "Fisioterapia", pergunta: "Dor postural recorrente", explicacao: "Reclama de dor nas costas ou pescoço depois de sentar na escola?" },
+  { area: "Fisioterapia", pergunta: "Contraturas musculares", explicacao: "Tem algum músculo 'preso' que não estica direito?" },
+  { area: "Fisioterapia", pergunta: "Fraqueza nos membros", explicacao: "Tem dificuldade pra carregar a mochila ou empurrar a porta?" },
+  { area: "Fisioterapia", pergunta: "Lentidão em reabilitação", explicacao: "Quando se machuca, demora demais pra voltar ao normal?" },
+  { area: "Fisioterapia", pergunta: "Uso de órteses ou próteses", explicacao: "Usa ou já usou aparelho ortopédico, palmilha ou prótese?" },
   // ── TERAPIA OCUPACIONAL (15)
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade na coordenação motora fina", explicacao: "Dificuldade com recortar, escrever, montar ou encaixar objetos pequenos" },
-  { area: "Terapia Ocupacional", pergunta: "Hipersensibilidade sensorial", explicacao: "Reação excessiva a texturas, sons, luzes ou odores" },
-  { area: "Terapia Ocupacional", pergunta: "Hiposensibilidade sensorial", explicacao: "Baixa resposta a estímulos sensoriais; busca por sensações intensas" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade nas atividades de vida diária", explicacao: "Problemas para se vestir, alimentar ou higienizar de forma independente" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade em planejar ou executar movimentos (Ex: usar tesoura, pular, abotoar ou imitar gestos)", explicacao: "Não consegue sequenciar ou planejar movimentos para executar tarefas" },
-  { area: "Terapia Ocupacional", pergunta: "Resistência a brincadeiras ou atividades lúdicas", explicacao: "Evita jogar ou participar de atividades próprias da idade" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade de organização do espaço e materiais", explicacao: "Dificuldade em organizar o ambiente, mochila ou mesa de trabalho" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade de concentração em tarefas manuais", explicacao: "Abandona rapidamente atividades que exigem atenção e uso das mãos" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade com brincadeiras simbólicas", explicacao: "Não realiza jogo de faz de conta ou uso simbólico de objetos" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade de adaptação a mudanças de rotina", explicacao: "Reage mal a novas rotinas, ambientes ou mudanças inesperadas" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade com utensílios", explicacao: "Não segura talheres, tesoura ou lápis de forma funcional para a idade" },
-  { area: "Terapia Ocupacional", pergunta: "Comportamento autoestimulatório", explicacao: "Balanceio, estalar de dedos ou movimentos sensoriais repetidos" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade de regulação sensorial", explicacao: "Oscila entre busca e fuga de estímulos de modo prejudicial" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade de higiene independente", explicacao: "Precisa de ajuda para escovar os dentes, banhar-se ou pentear acima do esperado" },
-  { area: "Terapia Ocupacional", pergunta: "Dificuldade de adaptação ambiental", explicacao: "Reage excessivamente a ruídos, luzes ou locais diferentes do habitual" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade na coordenação motora fina", explicacao: "Tem dificuldade pra usar lápis, tesoura ou abotoar a roupa?" },
+  { area: "Terapia Ocupacional", pergunta: "Hipersensibilidade sensorial", explicacao: "Se incomoda muito com barulho, etiqueta de roupa, luz ou cheiro forte?" },
+  { area: "Terapia Ocupacional", pergunta: "Hiposensibilidade sensorial", explicacao: "Cai/se machuca e nem reclama? Sempre procura coisa muito forte (apertar, bater)?" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade nas atividades de vida diária", explicacao: "Já consegue se vestir, comer e tomar banho sozinho?" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade em planejar ou executar movimentos (Ex: usar tesoura, pular, abotoar ou imitar gestos)", explicacao: "Consegue usar tesoura, abotoar botão ou imitar gestos quando você mostra?" },
+  { area: "Terapia Ocupacional", pergunta: "Resistência a brincadeiras ou atividades lúdicas", explicacao: "Evita brincar e prefere ficar parado ou só no celular?" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade de organização do espaço e materiais", explicacao: "A mochila e o quarto dele vivem uma bagunça?" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade de concentração em tarefas manuais", explicacao: "Desiste rápido de atividades com a mão (massinha, pintura, encaixe)?" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade com brincadeiras simbólicas", explicacao: "Brinca de faz de conta (médico, casinha, cozinha)?" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade de adaptação a mudanças de rotina", explicacao: "Quando muda a rotina, ele fica nervoso, chora ou faz birra?" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade com utensílios", explicacao: "Usa garfo, faca e lápis do jeito certo pra idade?" },
+  { area: "Terapia Ocupacional", pergunta: "Comportamento autoestimulatório", explicacao: "Balança o corpo, gira ou mexe nos dedos sem parar?" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade de regulação sensorial", explicacao: "Oscila entre se irritar com tudo e procurar barulho/movimento o tempo todo?" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade de higiene independente", explicacao: "Escova os dentes, penteia o cabelo e toma banho sozinho?" },
+  { area: "Terapia Ocupacional", pergunta: "Dificuldade de adaptação ambiental", explicacao: "Em lugar novo (festa, mercado), ele se desorganiza, chora ou se esconde?" },
   // ── FONOAUDIOLOGIA (15)
-  { area: "Fonoaudiologia", pergunta: "Atraso na fala", explicacao: "Demora para falar ou se comunicar adequadamente para a idade" },
-  { area: "Fonoaudiologia", pergunta: "Dificuldade de articulação", explicacao: "Troca ou omite sons na fala de forma frequente" },
-  { area: "Fonoaudiologia", pergunta: "Gagueira ou disfluência", explicacao: "Repetições, prolongamentos ou bloqueios na fala" },
-  { area: "Fonoaudiologia", pergunta: "Dificuldade de compreensão oral", explicacao: "Não entende comandos ou histórias de acordo com a idade" },
-  { area: "Fonoaudiologia", pergunta: "Voz alterada", explicacao: "Voz muito aguda, grave, rouca ou nasal sem causa médica aparente" },
-  { area: "Fonoaudiologia", pergunta: "Dificuldade de mastigação ou deglutição", explicacao: "Problemas para mastigar ou engolir alimentos adequadamente" },
-  { area: "Fonoaudiologia", pergunta: "Respiração oral", explicacao: "Respira predominantemente pela boca em vez do nariz" },
-  { area: "Fonoaudiologia", pergunta: "Dificuldade de leitura e escrita", explicacao: "Problemas para decodificar letras, sílabas ou palavras" },
-  { area: "Fonoaudiologia", pergunta: "Vocabulário reduzido para a idade", explicacao: "Usa poucas palavras para se expressar em relação à faixa etária" },
-  { area: "Fonoaudiologia", pergunta: "Dificuldade de organização do discurso", explicacao: "Não consegue narrar ou organizar uma sequência de ideias" },
-  { area: "Fonoaudiologia", pergunta: "Ausência de linguagem funcional", explicacao: "Não usa palavras para comunicar necessidades básicas no cotidiano" },
-  { area: "Fonoaudiologia", pergunta: "Dificuldade de pragmática", explicacao: "Não sabe iniciar, manter ou encerrar uma conversa adequadamente" },
-  { area: "Fonoaudiologia", pergunta: "Funções comunicativas restritas", explicacao: "Só pede ou rejeita; não comenta, narra ou questiona" },
-  { area: "Fonoaudiologia", pergunta: "Alteração de nasalidade", explicacao: "Voz com timbre nasal excessivo (hipernasalidade) ou insuficiente (hiponasalidade)" },
-  { area: "Fonoaudiologia", pergunta: "Dificuldade de segmentação silábica", explicacao: "Não identifica ou separa as sílabas de palavras ao ler ou escrever" },
+  { area: "Fonoaudiologia", pergunta: "Atraso na fala", explicacao: "Demorou pra começar a falar ou ainda fala pouco pra idade?" },
+  { area: "Fonoaudiologia", pergunta: "Dificuldade de articulação", explicacao: "Troca letras na fala (ex.: cachorro vira 'tatorro')?" },
+  { area: "Fonoaudiologia", pergunta: "Gagueira ou disfluência", explicacao: "Gagueja, repete sílaba ou trava na hora de falar?" },
+  { area: "Fonoaudiologia", pergunta: "Dificuldade de compreensão oral", explicacao: "Quando você manda fazer algo, ele entende e cumpre?" },
+  { area: "Fonoaudiologia", pergunta: "Voz alterada", explicacao: "A voz dele é rouca, fanha ou estranha pra idade?" },
+  { area: "Fonoaudiologia", pergunta: "Dificuldade de mastigação ou deglutição", explicacao: "Engasga muito ou tem dificuldade pra mastigar comida sólida?" },
+  { area: "Fonoaudiologia", pergunta: "Respiração oral", explicacao: "Dorme de boca aberta, ronca ou baba no travesseiro?" },
+  { area: "Fonoaudiologia", pergunta: "Dificuldade de leitura e escrita", explicacao: "Tem dificuldade pra juntar as letras e ler palavrinha simples?" },
+  { area: "Fonoaudiologia", pergunta: "Vocabulário reduzido para a idade", explicacao: "Fala pouquinhas palavras e usa muito gesto pra se expressar?" },
+  { area: "Fonoaudiologia", pergunta: "Dificuldade de organização do discurso", explicacao: "Quando ele conta uma história, dá pra entender com começo, meio e fim?" },
+  { area: "Fonoaudiologia", pergunta: "Ausência de linguagem funcional", explicacao: "Usa palavras pra pedir o que quer ou só aponta e chora?" },
+  { area: "Fonoaudiologia", pergunta: "Dificuldade de pragmática", explicacao: "Sabe começar uma conversa, esperar a vez de falar e cumprimentar?" },
+  { area: "Fonoaudiologia", pergunta: "Funções comunicativas restritas", explicacao: "Só pede coisa ou também conta o que aconteceu na escola?" },
+  { area: "Fonoaudiologia", pergunta: "Alteração de nasalidade", explicacao: "A voz sai muito pelo nariz ('voz de gripado') sem estar gripado?" },
+  { area: "Fonoaudiologia", pergunta: "Dificuldade de segmentação silábica", explicacao: "Consegue bater palma separando as sílabas (bo-ne-ca)?" },
   // ── NUTRIÇÃO (15)
-  { area: "Nutrição", pergunta: "Seletividade alimentar intensa", explicacao: "Recusa grande variedade de alimentos por textura, cor ou sabor" },
-  { area: "Nutrição", pergunta: "Baixo peso ou sobrepeso para a idade", explicacao: "Peso significativamente abaixo ou acima do esperado para a faixa etária" },
-  { area: "Nutrição", pergunta: "Baixa ingestão de frutas e vegetais", explicacao: "Come muito poucas frutas ou verduras no dia a dia" },
-  { area: "Nutrição", pergunta: "Consumo excessivo de ultraprocessados", explicacao: "Alimentação baseada em fast food, salgadinhos, refrigerantes" },
-  { area: "Nutrição", pergunta: "Dificuldade de mastigação por questão alimentar", explicacao: "Evita alimentos sólidos ou duros por dificuldade de mastigar" },
-  { area: "Nutrição", pergunta: "Baixa ingestão de água", explicacao: "Bebe quantidades insuficientes de água durante o dia" },
-  { area: "Nutrição", pergunta: "Queixas frequentes de dor abdominal ou constipação", explicacao: "Dores de barriga, intestino preso ou diarreias frequentes" },
-  { area: "Nutrição", pergunta: "Fadiga ou cansaço associado à alimentação", explicacao: "Cansa muito após as refeições ou tem baixa energia ao longo do dia" },
-  { area: "Nutrição", pergunta: "Anemia ou deficiência nutricional diagnosticada", explicacao: "Histórico de anemia, falta de vitaminas ou minerais importantes" },
-  { area: "Nutrição", pergunta: "Alimentação sem horários regulares", explicacao: "Não tem rotina alimentar estabelecida; pula refeições com frequência" },
-  { area: "Nutrição", pergunta: "Recusa de novas consistências", explicacao: "Não aceita alimentos em texturas diferentes das habituais" },
-  { area: "Nutrição", pergunta: "Consumo excessivo de açúcar", explicacao: "Preferência acentuada por alimentos muito doces com frequência diária" },
-  { area: "Nutrição", pergunta: "Rituais alimentares rígidos", explicacao: "Come os mesmos alimentos, no mesmo prato ou mesma ordem sem flexibilidade" },
-  { area: "Nutrição", pergunta: "Déficit de micronutrientes", explicacao: "Exames indicando deficiência de ferro, zinco, vitamina D ou outros nutrientes" },
-  { area: "Nutrição", pergunta: "Dificuldade no histórico de amamentação", explicacao: "Dificuldades de sucção, pega ou deglutição no período de amamentação" },
+  { area: "Nutrição", pergunta: "Seletividade alimentar intensa", explicacao: "Só come 3 ou 4 comidas e recusa o resto?" },
+  { area: "Nutrição", pergunta: "Baixo peso ou sobrepeso para a idade", explicacao: "O médico já falou que ele está abaixo ou acima do peso?" },
+  { area: "Nutrição", pergunta: "Baixa ingestão de frutas e vegetais", explicacao: "Come fruta e verdura todo dia?" },
+  { area: "Nutrição", pergunta: "Consumo excessivo de ultraprocessados", explicacao: "Come muito salgadinho, refrigerante ou fast food na rotina?" },
+  { area: "Nutrição", pergunta: "Dificuldade de mastigação por questão alimentar", explicacao: "Evita carne ou comida que precise mastigar muito?" },
+  { area: "Nutrição", pergunta: "Baixa ingestão de água", explicacao: "Bebe pouca água durante o dia?" },
+  { area: "Nutrição", pergunta: "Queixas frequentes de dor abdominal ou constipação", explicacao: "Tem prisão de ventre ou dor de barriga toda hora?" },
+  { area: "Nutrição", pergunta: "Fadiga ou cansaço associado à alimentação", explicacao: "Depois das refeições ele fica muito cansado ou sem energia?" },
+  { area: "Nutrição", pergunta: "Anemia ou deficiência nutricional diagnosticada", explicacao: "Já teve anemia ou falta de vitamina detectada em exame?" },
+  { area: "Nutrição", pergunta: "Alimentação sem horários regulares", explicacao: "Come em horário certo ou belisca o dia inteiro?" },
+  { area: "Nutrição", pergunta: "Recusa de novas consistências", explicacao: "Aceita comida nova com texturas diferentes (papinha, pedaço, crocante)?" },
+  { area: "Nutrição", pergunta: "Consumo excessivo de açúcar", explicacao: "Come muito doce ou bebe suco com açúcar todo dia?" },
+  { area: "Nutrição", pergunta: "Rituais alimentares rígidos", explicacao: "Só come da mesma maneira (mesmo prato, mesma ordem, sem misturar)?" },
+  { area: "Nutrição", pergunta: "Déficit de micronutrientes", explicacao: "No último exame deu falta de ferro, vitamina ou zinco?" },
+  { area: "Nutrição", pergunta: "Dificuldade no histórico de amamentação", explicacao: "Quando bebê, teve dificuldade pra mamar ou pegar o peito?" },
   // ── PSICOPEDAGOGIA (15)
-  { area: "Psicopedagogia", pergunta: "Dificuldade de aprendizagem da leitura", explicacao: "Dificuldade em decodificar palavras, sílabas ou textos" },
-  { area: "Psicopedagogia", pergunta: "Dificuldade de aprendizagem da escrita", explicacao: "Letra ilegível, trocas, omissões ou inversões frequentes" },
-  { area: "Psicopedagogia", pergunta: "Dificuldade em matemática", explicacao: "Dificuldade com contagem, operações ou conceitos numéricos" },
-  { area: "Psicopedagogia", pergunta: "Dificuldade de memória de trabalho", explicacao: "Esquece instruções recém dadas ou perde o fio das tarefas" },
-  { area: "Psicopedagogia", pergunta: "Lentidão na execução de tarefas escolares", explicacao: "Demora muito mais do que os colegas para concluir atividades" },
-  { area: "Psicopedagogia", pergunta: "Baixo rendimento acadêmico geral", explicacao: "Desempenho significativamente abaixo do esperado para a série/idade" },
-  { area: "Psicopedagogia", pergunta: "Recusa escolar ou resistência às tarefas", explicacao: "Evita ir à escola ou realizar atividades de aprendizagem" },
-  { area: "Psicopedagogia", pergunta: "Dificuldade de raciocínio lógico", explicacao: "Problemas para sequenciar, classificar ou relacionar informações" },
-  { area: "Psicopedagogia", pergunta: "Dificuldade de generalização do aprendizado", explicacao: "Aprende algo mas não consegue aplicar em contextos diferentes" },
-  { area: "Psicopedagogia", pergunta: "Dificuldade de planejamento e organização escolar", explicacao: "Dificuldade em planejar, iniciar ou concluir tarefas acadêmicas" },
-  { area: "Psicopedagogia", pergunta: "Dificuldade de atenção seletiva", explicacao: "Não consegue focar ignorando estímulos distratores ao redor" },
-  { area: "Psicopedagogia", pergunta: "Dificuldade de orientação temporal", explicacao: "Não compreende conceitos de ontem, hoje, amanhã ou calendário escolar" },
-  { area: "Psicopedagogia", pergunta: "Dificuldade de transferência do aprendizado", explicacao: "Aprende a lição mas não aplica o conhecimento em situações reais" },
-  { area: "Psicopedagogia", pergunta: "Ausência de motivação para aprender", explicacao: "Desinteresse persistente por qualquer tipo de atividade educacional" },
-  { area: "Psicopedagogia", pergunta: "Dificuldade de resolução de problemas", explicacao: "Não consegue pensar em estratégias para superar desafios cotidianos" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade de aprendizagem da leitura", explicacao: "Ele já lê do jeitinho que se espera pra idade dele?" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade de aprendizagem da escrita", explicacao: "A letra dele dá pra ler? Troca letra ou inverte (ex.: 'b' por 'd')?" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade em matemática", explicacao: "Entende continhas simples e quantidades (mais/menos)?" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade de memória de trabalho", explicacao: "Esquece o que você acabou de mandar fazer?" },
+  { area: "Psicopedagogia", pergunta: "Lentidão na execução de tarefas escolares", explicacao: "Demora muito mais que os outros pra terminar a lição?" },
+  { area: "Psicopedagogia", pergunta: "Baixo rendimento acadêmico geral", explicacao: "A nota dele na escola está abaixo do que se espera pra série?" },
+  { area: "Psicopedagogia", pergunta: "Recusa escolar ou resistência às tarefas", explicacao: "Inventa desculpa pra não ir à escola ou pra não fazer lição?" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade de raciocínio lógico", explicacao: "Consegue resolver probleminhas (juntar, separar, comparar)?" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade de generalização do aprendizado", explicacao: "Aprende uma coisa na escola mas não consegue usar em casa?" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade de planejamento e organização escolar", explicacao: "A mochila e o caderno dele vivem desorganizados?" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade de atenção seletiva", explicacao: "Se distrai com qualquer barulho ou movimento na sala?" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade de orientação temporal", explicacao: "Entende o que é ontem, hoje e amanhã?" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade de transferência do aprendizado", explicacao: "Aprende na escola mas trava na hora de fazer a lição em casa?" },
+  { area: "Psicopedagogia", pergunta: "Ausência de motivação para aprender", explicacao: "Tem curiosidade ou perdeu o interesse por tudo na escola?" },
+  { area: "Psicopedagogia", pergunta: "Dificuldade de resolução de problemas", explicacao: "Quando aparece um probleminha, ele tenta resolver ou desiste logo?" },
   // ── EDUCAÇÃO FÍSICA (15)
-  { area: "Educação Física", pergunta: "Baixa resistência cardiovascular", explicacao: "Cansa muito rapidamente em atividades físicas leves ou moderadas" },
-  { area: "Educação Física", pergunta: "Dificuldade em jogos coletivos", explicacao: "Não consegue participar adequadamente de esportes ou jogos em grupo" },
-  { area: "Educação Física", pergunta: "Dificuldade de habilidades motoras esportivas", explicacao: "Dificuldade com chutar, arremessar, rebater ou quicar uma bola" },
-  { area: "Educação Física", pergunta: "Recusa ou aversão à atividade física", explicacao: "Evita participar de aulas ou atividades físicas sem causa aparente" },
-  { area: "Educação Física", pergunta: "Dificuldade de seguir regras de jogos", explicacao: "Não compreende ou não respeita as regras de brincadeiras e esportes" },
-  { area: "Educação Física", pergunta: "Dificuldade de cooperação em equipe", explicacao: "Não consegue jogar em equipe, divide mal a bola ou isola-se" },
-  { area: "Educação Física", pergunta: "Dificuldade de controle corporal em movimento", explicacao: "Colide com objetos/pessoas, quedas frequentes durante atividades" },
-  { area: "Educação Física", pergunta: "Sedentarismo fora do ambiente escolar", explicacao: "Passa a maior parte do tempo sentado, sem atividades físicas" },
-  { area: "Educação Física", pergunta: "Dificuldade de agilidade e velocidade de reação", explicacao: "Reage lentamente a estímulos em situações de jogo ou exercício" },
-  { area: "Educação Física", pergunta: "Dificuldade de força muscular adequada para a idade", explicacao: "Força muscular abaixo do esperado para a faixa etária" },
-  { area: "Educação Física", pergunta: "Dificuldade em atividades aquáticas", explicacao: "Medo excessivo ou incapacidade funcional em ambientes aquáticos" },
-  { area: "Educação Física", pergunta: "Dificuldade de lateralidade esportiva", explicacao: "Não usa eficientemente o lado dominante em atividades esportivas" },
-  { area: "Educação Física", pergunta: "Dificuldade de orientação espacial em quadra", explicacao: "Não se orienta adequadamente no espaço durante jogos e esportes coletivos" },
-  { area: "Educação Física", pergunta: "Lesões esportivas frequentes", explicacao: "Lesões musculares ou articulares recorrentes durante atividades físicas" },
-  { area: "Educação Física", pergunta: "Dificuldade de autocontrole emocional em jogo", explicacao: "Reações de raiva, choro ou abandono quando perde ou erra em atividades" },
+  { area: "Educação Física", pergunta: "Baixa resistência cardiovascular", explicacao: "Cansa rápido quando corre ou brinca de pega-pega?" },
+  { area: "Educação Física", pergunta: "Dificuldade em jogos coletivos", explicacao: "Consegue brincar em grupo (futebol, queimada, pega-pega)?" },
+  { area: "Educação Física", pergunta: "Dificuldade de habilidades motoras esportivas", explicacao: "Acerta a bola quando chuta ou arremessa?" },
+  { area: "Educação Física", pergunta: "Recusa ou aversão à atividade física", explicacao: "Evita correr, pular ou fazer Educação Física na escola?" },
+  { area: "Educação Física", pergunta: "Dificuldade de seguir regras de jogos", explicacao: "Entende as regras das brincadeiras e respeita?" },
+  { area: "Educação Física", pergunta: "Dificuldade de cooperação em equipe", explicacao: "Divide a bola ou só quer jogar sozinho?" },
+  { area: "Educação Física", pergunta: "Dificuldade de controle corporal em movimento", explicacao: "Esbarra em tudo e cai com frequência quando corre?" },
+  { area: "Educação Física", pergunta: "Sedentarismo fora do ambiente escolar", explicacao: "Em casa ele fica mais no sofá/celular ou se mexe brincando?" },
+  { area: "Educação Física", pergunta: "Dificuldade de agilidade e velocidade de reação", explicacao: "Consegue desviar de uma bola ou parar de repente quando chamam?" },
+  { area: "Educação Física", pergunta: "Dificuldade de força muscular adequada para a idade", explicacao: "Tem força pra carregar a mochila ou empurrar a cadeira?" },
+  { area: "Educação Física", pergunta: "Dificuldade em atividades aquáticas", explicacao: "Tem medo de água ou não se vira na piscina?" },
+  { area: "Educação Física", pergunta: "Dificuldade de lateralidade esportiva", explicacao: "Tem um lado mais forte (chuta sempre com o mesmo pé) ou parece desajeitado dos dois?" },
+  { area: "Educação Física", pergunta: "Dificuldade de orientação espacial em quadra", explicacao: "Se perde dentro do campo/quadra durante o jogo?" },
+  { area: "Educação Física", pergunta: "Lesões esportivas frequentes", explicacao: "Se machuca toda vez que faz atividade física?" },
+  { area: "Educação Física", pergunta: "Dificuldade de autocontrole emocional em jogo", explicacao: "Quando perde, ele chora, briga ou abandona a brincadeira?" },
 ];
 
 const ESCALA = [
@@ -212,6 +212,7 @@ type FormData = {
   nomePaciente: string; dataNascimento: string; idade: string;
   nomeResponsavel: string; telefone: string; endereco: string;
   naturalidade: string; rg: string; cpf: string; sus: string;
+  cpfResponsavel: string; susResponsavel: string;
   nomeMae: string; escolaridadeMae: string; profissaoMae: string;
   nomePai: string; escolaridadePai: string; profissaoPai: string;
   numIrmaos: string; tipoImovel: string;
@@ -222,6 +223,7 @@ type FormData = {
   cadeiraDeRodas: boolean; ortesesProteses: boolean; aparelhoAuditivo: boolean;
   medicacaoContinua: string; alergias: string; problemasSaude: string;
   tipoEscola: string; trabalhoPais: string; outroAtendimento: boolean;
+  abrigoCasaCrianca: boolean;
   localAtendimento: string;
   tipoRegistro: string;
   profissional: string; especialidade: string;
@@ -231,6 +233,7 @@ type TriagemSalva = {
   id: number; nome: string; dataNascimento: string | null; idade: string | null;
   responsavel: string | null; telefone: string | null; endereco: string | null;
   naturalidade: string | null; rg: string | null; cpf: string | null; sus: string | null;
+  cpfResponsavel: string | null; susResponsavel: string | null;
   nomeMae: string | null; escolaridadeMae: string | null; profissaoMae: string | null;
   nomePai: string | null; escolaridadePai: string | null; profissaoPai: string | null;
   numIrmaos: string | null; tipoImovel: string | null;
@@ -242,6 +245,7 @@ type TriagemSalva = {
   cadeiraDeRodas: boolean | null; ortesesProteses: boolean | null; aparelhoAuditivo: boolean | null;
   medicacaoContinua: string | null; alergias: string | null; problemasSaude: string | null;
   tipoEscola: string | null; trabalhoPais: string | null; outroAtendimento: boolean | null;
+  abrigoCasaCrianca: boolean | null;
   localAtendimento: string | null;
   tipoRegistro: string | null;
   profissional: string | null; especialidade: string | null;
@@ -267,6 +271,7 @@ function triSalvaToFormData(t: TriagemSalva): FormData {
     telefone: t.telefone || "", endereco: t.endereco || "",
     naturalidade: t.naturalidade || "", rg: t.rg || "",
     cpf: t.cpf || "", sus: t.sus || "",
+    cpfResponsavel: t.cpfResponsavel || "", susResponsavel: t.susResponsavel || "",
     nomeMae: t.nomeMae || "", escolaridadeMae: t.escolaridadeMae || "",
     profissaoMae: t.profissaoMae || "", nomePai: t.nomePai || "",
     escolaridadePai: t.escolaridadePai || "", profissaoPai: t.profissaoPai || "",
@@ -282,6 +287,7 @@ function triSalvaToFormData(t: TriagemSalva): FormData {
     alergias: t.alergias || "", problemasSaude: t.problemasSaude || "",
     tipoEscola: t.tipoEscola || "", trabalhoPais: t.trabalhoPais || "",
     outroAtendimento: t.outroAtendimento !== false,
+    abrigoCasaCrianca: !!t.abrigoCasaCrianca,
     localAtendimento: t.localAtendimento || "",
     tipoRegistro: t.tipoRegistro || "Paciente da Unidade",
     profissional: t.profissional || "", especialidade: t.especialidade || "",
@@ -420,6 +426,8 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
   const [rg, setRg] = useState(b?.rg ?? "");
   const [cpf, setCpf] = useState(b?.cpf ?? "");
   const [sus, setSus] = useState(b?.sus ?? "");
+  const [cpfResponsavel, setCpfResponsavel] = useState(b?.cpfResponsavel ?? "");
+  const [susResponsavel, setSusResponsavel] = useState(b?.susResponsavel ?? "");
   const [nomeMae, setNomeMae] = useState(b?.nomeMae ?? "");
   const [escolaridadeMae, setEscolaridadeMae] = useState(b?.escolaridadeMae ?? "");
   const [profissaoMae, setProfissaoMae] = useState(b?.profissaoMae ?? "");
@@ -448,6 +456,7 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
   const [tipoEscola, setTipoEscola] = useState(b?.tipoEscola ?? "");
   const [trabalhoPais, setTrabalhoPais] = useState(b?.trabalhoPais ?? "");
   const [outroAtendimento, setOutroAtendimento] = useState(b?.outroAtendimento ?? true);
+  const [abrigoCasaCrianca, setAbrigoCasaCrianca] = useState(b?.abrigoCasaCrianca ?? false);
   const [localAtendimento, setLocalAtendimento] = useState(b?.localAtendimento ?? "");
   const [tipoRegistro, setTipoRegistro] = useState(b?.tipoRegistro ?? "Paciente da Unidade");
   const [profissional, setProfissional] = useState(b?.profissional ?? "");
@@ -462,12 +471,14 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
     onSubmit({
       respostas, nomePaciente, dataNascimento, idade, nomeResponsavel,
       telefone, endereco, naturalidade, rg, cpf, sus,
+      cpfResponsavel, susResponsavel,
       nomeMae, escolaridadeMae, profissaoMae, nomePai, escolaridadePai, profissaoPai,
       numIrmaos, tipoImovel, bolsaFamilia, bpc, pensao, auxilioDoenca, outrosAuxilios, rendaFamiliar,
       diagnostico, cid, cid11, medico, dataUltimaCons,
       cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
       medicacaoContinua, alergias, problemasSaude,
       tipoEscola, trabalhoPais, outroAtendimento,
+      abrigoCasaCrianca,
       localAtendimento, tipoRegistro,
       profissional,
     });
@@ -555,6 +566,10 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
                 <input value={cpf} onChange={e => setCpf(e.target.value)} className={fc} placeholder="000.000.000-00" /></div>
               <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Cartão SUS (CNS)</label>
                 <input value={sus} onChange={e => setSus(e.target.value)} className={fc} placeholder="Nº do cartão SUS" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">CPF do Responsável</label>
+                <input value={cpfResponsavel} onChange={e => setCpfResponsavel(e.target.value)} className={fc} placeholder="000.000.000-00" /></div>
+              <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Cartão SUS do Responsável</label>
+                <input value={susResponsavel} onChange={e => setSusResponsavel(e.target.value)} className={fc} placeholder="Nº do cartão SUS" /></div>
               <div><label className="block text-sm font-semibold text-muted-foreground mb-1">Naturalidade</label>
                 <input value={naturalidade} onChange={e => setNaturalidade(e.target.value)} className={fc} placeholder="Cidade / Estado" /></div>
               <div className="md:col-span-2"><label className="block text-sm font-semibold text-muted-foreground mb-1">Endereço</label>
@@ -632,6 +647,9 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
                   <option value="">Selecione...</option>
                   {["CAPS", "Reabilitação", "Particular", "Sem Atendimento"].map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
+              </div>
+              <div className="md:col-span-2">
+                <Chk checked={abrigoCasaCrianca} onChange={setAbrigoCasaCrianca} label="🏠 Reside em Abrigo / Casa da Criança (Prioridade Máxima)" />
               </div>
             </div>
           </div>
@@ -824,13 +842,13 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 }) {
   const {
     respostas, nomePaciente, dataNascimento, idade, nomeResponsavel, telefone, endereco,
-    naturalidade, rg, cpf, sus,
+    naturalidade, rg, cpf, sus, cpfResponsavel, susResponsavel,
     nomeMae, escolaridadeMae, profissaoMae, nomePai, escolaridadePai, profissaoPai,
     numIrmaos, tipoImovel, bolsaFamilia, bpc, pensao, auxilioDoenca, outrosAuxilios, rendaFamiliar,
     diagnostico, cid, cid11, medico, dataUltimaCons,
     cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
     medicacaoContinua, alergias, problemasSaude,
-    tipoEscola, trabalhoPais, outroAtendimento,
+    tipoEscola, trabalhoPais, outroAtendimento, abrigoCasaCrianca,
     localAtendimento, tipoRegistro,
     profissional, especialidade,
   } = formData;
@@ -864,13 +882,13 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
   const bodyParaSalvar = {
     nome: nomePaciente, dataNascimento, idade, responsavel: nomeResponsavel,
-    telefone, endereco, naturalidade, rg, cpf, sus,
+    telefone, endereco, naturalidade, rg, cpf, sus, cpfResponsavel, susResponsavel,
     nomeMae, escolaridadeMae, profissaoMae, nomePai, escolaridadePai, profissaoPai,
     numIrmaos, tipoImovel, bolsaFamilia, bpc, pensao, auxilioDoenca, outrosAuxilios, rendaFamiliar,
     diagnostico, cid, cid11, medico, dataUltimaCons,
     cadeiraDeRodas, ortesesProteses, aparelhoAuditivo,
     medicacaoContinua, alergias, problemasSaude,
-    tipoEscola, trabalhoPais, outroAtendimento,
+    tipoEscola, trabalhoPais, outroAtendimento, abrigoCasaCrianca,
     localAtendimento, tipoRegistro,
     profissional, data, resultado: resultadoTexto, respostas,
   };
@@ -973,6 +991,8 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
       { label: "RG", valor: rg },
       { label: "Cartão SUS", valor: sus },
       { label: "Responsável", valor: nomeResponsavel },
+      { label: "CPF do Responsável", valor: cpfResponsavel },
+      { label: "Cartão SUS do Responsável", valor: susResponsavel },
       { label: "Telefone", valor: telefone },
       { label: "Endereço", valor: endereco },
       { label: "Diagnóstico", valor: diagnostico },
@@ -1127,6 +1147,8 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
             {cpf && <div><p className="text-muted-foreground font-semibold">CPF</p><p className="font-bold">{cpf}</p></div>}
             {sus && <div><p className="text-muted-foreground font-semibold">Cartão SUS</p><p className="font-bold">{sus}</p></div>}
             {nomeResponsavel && <div><p className="text-muted-foreground font-semibold">Responsável</p><p className="font-bold">{nomeResponsavel}</p></div>}
+            {cpfResponsavel && <div><p className="text-muted-foreground font-semibold">CPF do Responsável</p><p className="font-bold">{cpfResponsavel}</p></div>}
+            {susResponsavel && <div><p className="text-muted-foreground font-semibold">Cartão SUS do Responsável</p><p className="font-bold">{susResponsavel}</p></div>}
             {telefone && <div><p className="text-muted-foreground font-semibold">Telefone</p><p className="font-bold">{telefone}</p></div>}
             {endereco && <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Endereço</p><p className="font-bold">{endereco}</p></div>}
           </div>

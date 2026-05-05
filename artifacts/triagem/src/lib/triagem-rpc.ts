@@ -46,6 +46,8 @@ export type TriagemRow = {
   rg: string | null;
   cpf: string | null;
   sus: string | null;
+  cpfResponsavel: string | null;
+  susResponsavel: string | null;
   nomeMae: string | null;
   escolaridadeMae: string | null;
   profissaoMae: string | null;
@@ -74,6 +76,7 @@ export type TriagemRow = {
   tipoEscola: string | null;
   trabalhoPais: string | null;
   outroAtendimento: boolean | null;
+  abrigoCasaCrianca: boolean | null;
   localAtendimento: string | null;
   tipoRegistro: string | null;
   profissional: string | null;
@@ -97,6 +100,8 @@ type TriagemRowDb = {
   rg: string | null;
   cpf: string | null;
   sus: string | null;
+  cpf_responsavel: string | null;
+  sus_responsavel: string | null;
   nome_mae: string | null;
   escolaridade_mae: string | null;
   profissao_mae: string | null;
@@ -125,6 +130,7 @@ type TriagemRowDb = {
   tipo_escola: string | null;
   trabalho_pais: string | null;
   outro_atendimento: boolean | null;
+  abrigo_casa_crianca: boolean | null;
   local_atendimento: string | null;
   tipo_registro: string | null;
   profissional: string | null;
@@ -149,6 +155,8 @@ function mapRow(r: TriagemRowDb): TriagemRow {
     rg: r.rg,
     cpf: r.cpf,
     sus: r.sus,
+    cpfResponsavel: r.cpf_responsavel,
+    susResponsavel: r.sus_responsavel,
     nomeMae: r.nome_mae,
     escolaridadeMae: r.escolaridade_mae,
     profissaoMae: r.profissao_mae,
@@ -177,6 +185,7 @@ function mapRow(r: TriagemRowDb): TriagemRow {
     tipoEscola: r.tipo_escola,
     trabalhoPais: r.trabalho_pais,
     outroAtendimento: r.outro_atendimento,
+    abrigoCasaCrianca: r.abrigo_casa_crianca,
     localAtendimento: r.local_atendimento,
     tipoRegistro: r.tipo_registro,
     profissional: r.profissional,
@@ -199,6 +208,8 @@ export type TriagemInput = {
   rg?: string | null;
   cpf?: string | null;
   sus?: string | null;
+  cpfResponsavel?: string | null;
+  susResponsavel?: string | null;
   nomeMae?: string | null;
   escolaridadeMae?: string | null;
   profissaoMae?: string | null;
@@ -227,6 +238,7 @@ export type TriagemInput = {
   tipoEscola?: string | null;
   trabalhoPais?: string | null;
   outroAtendimento?: boolean | null;
+  abrigoCasaCrianca?: boolean | null;
   localAtendimento?: string | null;
   tipoRegistro?: string | null;
   profissional?: string | null;
