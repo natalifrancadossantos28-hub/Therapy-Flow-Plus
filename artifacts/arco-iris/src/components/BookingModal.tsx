@@ -23,14 +23,24 @@ type Props = {
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
+  maxima: "badge-neon-pink",
   alta: "badge-neon-red",
+  elevado: "badge-neon-red",
+  moderado: "badge-neon-orange",
   media: "badge-neon-orange",
+  leve: "badge-neon-blue",
+  baixo: "badge-neon-green",
   baixa: "badge-neon-green",
 };
 
 const PRIORITY_LABELS: Record<string, string> = {
+  maxima: "🔴 MÁXIMA",
   alta: "ALTA",
+  elevado: "ALTA",
+  moderado: "MÉDIA",
   media: "MÉDIA",
+  leve: "LEVE",
+  baixo: "BAIXA",
   baixa: "BAIXA",
 };
 

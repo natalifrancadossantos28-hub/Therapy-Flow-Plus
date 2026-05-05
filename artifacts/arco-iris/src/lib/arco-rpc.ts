@@ -441,6 +441,7 @@ export type Patient = {
   scoreNutricionista: number | null;
   escolaPublica: boolean | null;
   trabalhoNaRoca: boolean | null;
+  abrigoCasaCrianca: boolean | null;
   tipoRegistro: string | null;
   localAtendimento: string | null;
   createdAt: string;
@@ -479,6 +480,7 @@ type PatientRow = {
   score_nutricionista: number | string | null;
   escola_publica: boolean | null;
   trabalho_na_roca: boolean | null;
+  abrigo_casa_crianca: boolean | null;
   tipo_registro: string | null;
   local_atendimento: string | null;
   created_at: string;
@@ -524,6 +526,7 @@ function mapPatient(r: PatientRow): Patient {
     scoreNutricionista: num(r.score_nutricionista),
     escolaPublica: r.escola_publica,
     trabalhoNaRoca: r.trabalho_na_roca,
+    abrigoCasaCrianca: r.abrigo_casa_crianca,
     tipoRegistro: r.tipo_registro,
     localAtendimento: r.local_atendimento,
     createdAt: r.created_at,
@@ -744,6 +747,12 @@ export type WaitingListEntry = {
   escolaPublica?: boolean | null;
   /** Flag de vulnerabilidade: trabalho informal/roca (+2 no score /150). */
   trabalhoNaRoca?: boolean | null;
+  /** Flag de vulnerabilidade: reside em abrigo / casa da criança (Prioridade Máxima). */
+  abrigoCasaCrianca?: boolean | null;
+  /** True quando o paciente atende a algum criterio de Prioridade Maxima (idade<5 ou abrigo). */
+  prioridadeMaxima?: boolean | null;
+  /** 'idade' | 'abrigo' | 'idade_e_abrigo' — razao da Prioridade Maxima. */
+  prioridadeMaximaRazao?: string | null;
   /** Score exibido em escala /150 (espelho do Perfil Multidisciplinar). */
   scoreTotal150?: number | null;
   /** Score 0..72 da especialidade desta entrada (fonte da cor da fila). */

@@ -178,6 +178,19 @@
   text-shadow: 0 0 8px rgba(34, 211, 238, 0.7);
 }
 
+.badge-neon-pink {
+  background: rgba(255, 0, 170, 0.14);
+  color: #ff4dd2;
+  border: 1px solid rgba(255, 0, 170, 0.55);
+  box-shadow: 0 0 14px rgba(255, 0, 170, 0.45), 0 0 32px rgba(255, 0, 170, 0.18);
+  text-shadow: 0 0 10px rgba(255, 77, 210, 0.8);
+  animation: pulse-pink 2s ease-in-out infinite;
+}
+@keyframes pulse-pink {
+  0%, 100% { box-shadow: 0 0 14px rgba(255, 0, 170, 0.45), 0 0 32px rgba(255, 0, 170, 0.18); }
+  50%      { box-shadow: 0 0 20px rgba(255, 0, 170, 0.70), 0 0 44px rgba(255, 0, 170, 0.30); }
+}
+
 /* ═══════════════════════════════════════════
    NEON BUTTON GLOW
    ═══════════════════════════════════════════ */
