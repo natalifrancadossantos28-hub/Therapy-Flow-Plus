@@ -676,8 +676,17 @@ export default function Agenda() {
         "Remanejado"
       );
       setRemanejDone(true);
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível remanejar.", variant: "destructive" });
+    } catch (err: any) {
+      const raw = String(err?.message ?? "");
+      if (raw.includes("JA_REMANEJADO_HOJE")) {
+        toast({
+          title: "🚫 Limite diário",
+          description: `${remanejFlow.apt.patientName ?? "Este paciente"} já foi remanejado hoje. Tente novamente amanhã.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Erro", description: "Não foi possível remanejar.", variant: "destructive" });
+      }
     } finally {
       setRemanejSending(false);
     }

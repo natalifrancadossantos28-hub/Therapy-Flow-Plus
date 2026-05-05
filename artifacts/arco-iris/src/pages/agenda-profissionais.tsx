@@ -309,7 +309,16 @@ export default function AgendaProfissionais() {
       setRemanejFlow({ ...remanejFlow, newDate, newTime, done: true });
       toast({ title: `${emoji} ${acao}`, description: `${remanejFlow.apt.patientName} movido para ${newDate} às ${newTime}. Recepção notificada.` });
     } catch (err: any) {
-      toast({ title: `Erro ao ${acao.toLowerCase()}`, description: err?.message ?? "Falha inesperada.", variant: "destructive" });
+      const raw = String(err?.message ?? "");
+      if (raw.includes("JA_REMANEJADO_HOJE")) {
+        toast({
+          title: "🚫 Limite diário",
+          description: `${remanejFlow.apt.patientName} já foi remanejado hoje. Tente novamente amanhã.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: `Erro ao ${acao.toLowerCase()}`, description: raw || "Falha inesperada.", variant: "destructive" });
+      }
     } finally {
       setRemanejSending(false);
     }
