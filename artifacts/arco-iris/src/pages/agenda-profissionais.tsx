@@ -34,7 +34,7 @@ function getWeekDays(ref: Date): Date[] {
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
-type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; };
+type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; };
 
 type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
@@ -253,7 +253,19 @@ export default function AgendaProfissionais() {
 
   const patchStatus = async (apt: Appointment, status: string) => {
     const data = await updateAppointment(apt.id, { status });
-    setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
+    setAppointments(prev => prev.map(a => {
+      if (a.id === apt.id) return { ...a, status };
+      if (
+        status === "atendimento"
+        && apt.recurrenceGroupId
+        && a.recurrenceGroupId === apt.recurrenceGroupId
+        && a.date > apt.date
+        && (a.status?.toLowerCase() ?? "agendado") === "agendado"
+      ) {
+        return { ...a, status: "atendimento" };
+      }
+      return a;
+    }));
     return data;
   };
 

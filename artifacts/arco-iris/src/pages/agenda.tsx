@@ -380,9 +380,24 @@ export default function Agenda() {
   };
 
   // ── Patch status (single occurrence) ──
+  // Quando vira "atendimento" e a sessao e parte de uma recorrencia,
+  // o servidor propaga para as semanas futuras "agendado" do mesmo grupo.
+  // Atualiza o estado local de forma otimista para refletir o mesmo.
   const patchStatus = async (apt: Appointment, status: string) => {
     const data = await updateAppointment(apt.id, { status });
-    setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status } : a));
+    setAppointments(prev => prev.map(a => {
+      if (a.id === apt.id) return { ...a, status };
+      if (
+        status === "atendimento"
+        && apt.recurrenceGroupId
+        && a.recurrenceGroupId === apt.recurrenceGroupId
+        && a.date > apt.date
+        && (a.status?.toLowerCase() ?? "agendado") === "agendado"
+      ) {
+        return { ...a, status: "atendimento" };
+      }
+      return a;
+    }));
     return data;
   };
 
