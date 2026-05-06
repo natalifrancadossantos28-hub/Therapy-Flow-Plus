@@ -2,6 +2,9 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import CompanyGuard from "./CompanyGuard";
+import { bootstrapTheme } from "@/lib/theme";
+
+bootstrapTheme();
 
 // Inject company session headers on all /api/ requests
 const _origFetch = window.fetch.bind(window);

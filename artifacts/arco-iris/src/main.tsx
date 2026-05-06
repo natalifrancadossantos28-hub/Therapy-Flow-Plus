@@ -1,6 +1,9 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { bootstrapTheme } from "@/lib/theme";
+
+bootstrapTheme();
 
 // In production (Vercel), rewrite /api/* requests to VITE_API_URL so the
 // frontend hosted on Vercel can talk to the backend hosted elsewhere (Replit).

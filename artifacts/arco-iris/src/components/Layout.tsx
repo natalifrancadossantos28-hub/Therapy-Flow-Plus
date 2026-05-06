@@ -4,6 +4,7 @@ import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardLis
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type NavItem = {
   href: string;
@@ -72,9 +73,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-8 h-8 rounded-lg" />
           <span className="font-display font-bold text-lg text-primary">NFS</span>
         </div>
-        <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-foreground/70 hover:bg-secondary rounded-lg">
-          {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <ThemeToggle compact />
+          <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-foreground/70 hover:bg-secondary rounded-lg">
+            {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu */}
@@ -107,7 +111,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <nav className="flex flex-col gap-2 flex-1">
           <NavLinks />
         </nav>
-        <div className="mt-auto p-4 bg-secondary/50 rounded-2xl">
+        <div className="mt-2 mb-3 px-1">
+          <ThemeToggle />
+        </div>
+        <div className="p-4 bg-secondary/50 rounded-2xl">
           <p className="text-xs text-center text-muted-foreground">© 2026 NFS – Gestão Terapêutica</p>
         </div>
       </aside>
