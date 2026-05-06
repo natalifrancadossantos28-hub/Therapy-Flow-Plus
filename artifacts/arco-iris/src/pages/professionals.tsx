@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Link } from "wouter";
 import { MotionCard, Button, Input, Label, Select, Badge } from "@/components/ui-custom";
 import {
@@ -111,6 +112,7 @@ function PinManager({
 }
 
 export default function Professionals() {
+  useDocumentTitle("Profissionais");
   const { toast } = useToast();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [isLoading, setIsLoading] = useState(true);

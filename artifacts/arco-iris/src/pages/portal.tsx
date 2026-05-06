@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useLocation } from "wouter";
 import { Building2, UserRound, ShieldCheck, Shield, Lock, ArrowLeft } from "lucide-react";
 import { requireSupabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -39,6 +40,7 @@ function normalizePassword(value: string): string {
 // - Profissional: seleciona nome + PIN, session profissional -> /agenda-profissionais.
 // - Administracao: login empresa, session scope = "admin" -> /.
 export default function Portal() {
+  useDocumentTitle("Portal");
   const [, setLocation] = useLocation();
   const [active, setActive] = useState<CardKey | null>(null);
   const [slug, setSlug] = useState(DEFAULT_SLUG);

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   listPatients,
   listProfessionals,
@@ -16,9 +16,11 @@ import {
 import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
-import { cn, getStatusColor } from "@/lib/utils";
+import { cn, getStatusColor, calcIdade } from "@/lib/utils";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from "recharts";
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
+import { useVisibleInterval } from "@/hooks/usePageVisible";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 // ── Faixas Etárias ────────────────────────────────────────────────────────────
 const FAIXAS = [
@@ -29,15 +31,6 @@ const FAIXAS = [
   { key: "adulto",    label: "Adultos",         emoji: "👤", range: "18+ anos",   min: 19, max: 999,cor: "#ff2060" },
   { key: "sem_data",  label: "Sem data nasc.",  emoji: "❓", range: "—",          min: -1, max: -1, cor: "#64748b" },
 ] as const;
-
-function calcIdade(dob: string): number {
-  const d = new Date(dob + "T00:00:00");
-  const hoje = new Date();
-  let a = hoje.getFullYear() - d.getFullYear();
-  const m = hoje.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && hoje.getDate() < d.getDate())) a--;
-  return a;
-}
 
 function faixaDeIdade(dob: string | null | undefined): string {
   if (!dob) return "sem_data";
@@ -62,6 +55,8 @@ type Ocupacao = {
 const POLL_MS = 30_000; // 30 s
 
 export default function Dashboard() {
+  useDocumentTitle("Dashboard");
+
   const [patients, setPatients] = useState<Patient[]>([]);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [todayAppointments, setTodayAppointments] = useState<AppointmentToday[]>([]);
@@ -70,15 +65,15 @@ export default function Dashboard() {
   const [ocupacao, setOcupacao] = useState<Ocupacao[]>([]);
   const [longAttendance, setLongAttendance] = useState<LongAttendancePatient[]>([]);
 
-  const fetchAll = () => {
+  const fetchAll = useCallback(() => {
     listPatients().then(setPatients).catch(console.error);
     listProfessionals().then(setProfessionals).catch(console.error);
     listAppointmentsToday().then(setTodayAppointments).catch(console.error);
     listWaitingList().then(setWaitingList).catch(console.error);
     getAppointmentsStats().then(setAptStats).catch(console.error);
     listLongAttendancePatients(12).then(setLongAttendance).catch(() => setLongAttendance([]));
-  };
-  const fetchOcupacao = () =>
+  }, []);
+  const fetchOcupacao = useCallback(() => {
     listProfessionalsCapacity()
       .then((rows) => {
         const mapped: Ocupacao[] = rows.map((r) => {
@@ -103,14 +98,11 @@ export default function Dashboard() {
         setOcupacao(mapped);
       })
       .catch(() => setOcupacao([]));
-
-  useEffect(() => {
-    fetchAll();
-    fetchOcupacao();
-    const id1 = setInterval(fetchAll, POLL_MS);
-    const id2 = setInterval(fetchOcupacao, POLL_MS);
-    return () => { clearInterval(id1); clearInterval(id2); };
   }, []);
+
+  // Visibility-aware: pausa polling quando a aba está oculta
+  useVisibleInterval(fetchAll, POLL_MS);
+  useVisibleInterval(fetchOcupacao, POLL_MS);
 
   const totalPatients = patients?.length || 0;
   const totalProfessionals = professionals?.length || 0;

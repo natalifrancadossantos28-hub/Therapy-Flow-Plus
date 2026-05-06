@@ -67,6 +67,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-screen bg-background flex flex-col md:flex-row overflow-hidden">
+      {/* Skip-to-content — acessibilidade para navegação por teclado */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-xl focus:bg-primary focus:text-primary-foreground focus:text-sm focus:font-semibold"
+      >
+        Ir para o conteúdo
+      </a>
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 bg-card border-b border-border z-20">
         <div className="flex items-center gap-2">
@@ -75,7 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
         <div className="flex items-center gap-1">
           <ThemeToggle compact />
-          <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-foreground/70 hover:bg-secondary rounded-lg">
+          <button aria-label={isMobileOpen ? "Fechar menu" : "Abrir menu"} onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-foreground/70 hover:bg-secondary rounded-lg">
             {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
@@ -90,7 +97,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             exit={{ opacity: 0, height: 0 }}
             className="md:hidden bg-card border-b border-border overflow-hidden z-10"
           >
-            <nav className="flex flex-col p-4 gap-2">
+            <nav aria-label="Menu principal" className="flex flex-col p-4 gap-2">
               <NavLinks />
             </nav>
           </motion.div>
@@ -108,7 +115,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </span>
           </div>
         </div>
-        <nav className="flex flex-col gap-2 flex-1">
+        <nav aria-label="Navegação principal" className="flex flex-col gap-2 flex-1">
           <NavLinks />
         </nav>
         <div className="mt-2 mb-3 px-1">
@@ -120,7 +127,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full max-w-[1600px] mx-auto relative">
+      <main id="main-content" className="flex-1 p-4 md:p-8 overflow-y-auto w-full max-w-[1600px] mx-auto relative">
         <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-primary/5 to-transparent -z-10 pointer-events-none" />
         <motion.div
           initial={{ opacity: 0, y: 10 }}
