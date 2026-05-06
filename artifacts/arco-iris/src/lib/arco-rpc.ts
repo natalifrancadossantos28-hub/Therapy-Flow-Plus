@@ -1053,6 +1053,55 @@ export async function getAppointmentsStats(): Promise<AppointmentsStats> {
   return data as AppointmentsStats;
 }
 
+export type LongAttendancePatient = {
+  id: number;
+  name: string;
+  status: string;
+  professionalId: number | null;
+  professionalName: string | null;
+  professionalSpecialty: string | null;
+  firstAttendanceDate: string;
+  monthsInAttendance: number;
+  yearsLabel: string;
+};
+
+type LongAttendanceRow = {
+  id: number;
+  name: string;
+  status: string;
+  professional_id: number | null;
+  professional_name: string | null;
+  professional_specialty: string | null;
+  first_attendance_date: string;
+  months_in_attendance: number;
+  years_label: string;
+};
+
+export async function listLongAttendancePatients(
+  minMonths: number = 12
+): Promise<LongAttendancePatient[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_long_attendance_patients", {
+    p_slug: slug,
+    p_password: password,
+    p_min_months: minMonths,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as LongAttendanceRow[];
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    status: r.status,
+    professionalId: r.professional_id,
+    professionalName: r.professional_name,
+    professionalSpecialty: r.professional_specialty,
+    firstAttendanceDate: r.first_attendance_date,
+    monthsInAttendance: r.months_in_attendance,
+    yearsLabel: r.years_label,
+  }));
+}
+
 export type CreateAppointmentsPayload = {
   patientId: number;
   professionalId: number;
