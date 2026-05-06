@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   addDays,
   addMonths,
@@ -44,6 +45,7 @@ function statusOf(s: string | null | undefined) {
 const WEEKDAY_HEADERS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 export default function AgendaMensal() {
+  useDocumentTitle("Agenda Mensal");
   const [monthRef, setMonthRef] = useState<Date>(() => new Date());
   const [profFilter, setProfFilter] = useState<string>(""); // "" = todos
   const [professionals, setProfessionals] = useState<Professional[]>([]);

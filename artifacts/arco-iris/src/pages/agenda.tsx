@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Card, Select, Button, Label } from "@/components/ui-custom";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -246,6 +247,7 @@ const isAdminSession = (): boolean => {
 };
 
 export default function Agenda() {
+  useDocumentTitle("Agenda Geral");
   const isAdmin = isAdminSession();
   const [selectedProfId, setSelectedProfId] = useState<string>("");
   const [pinInput, setPinInput] = useState("");

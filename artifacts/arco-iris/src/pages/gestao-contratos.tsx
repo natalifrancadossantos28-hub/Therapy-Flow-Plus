@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   FileText, Printer, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   Building2, LayoutList, CheckCircle2, TrendingUp, TrendingDown, DollarSign,
@@ -74,6 +75,7 @@ function getMonthRange(offset = 0) {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function GestaoContratos() {
+  useDocumentTitle("Gestão de Contratos");
   const { toast } = useToast();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
 

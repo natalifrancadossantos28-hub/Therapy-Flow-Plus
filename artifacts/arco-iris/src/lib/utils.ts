@@ -47,6 +47,19 @@ export const getStatusLabel = (status: string): string => {
   return status;
 };
 
+/**
+ * Calcula a idade em anos completos a partir de uma data de nascimento (YYYY-MM-DD).
+ * Centralizado aqui para evitar duplicação em dashboard, patients, etc.
+ */
+export function calcIdade(dateOfBirth: string): number {
+  const dob = new Date(dateOfBirth + "T00:00:00");
+  const hoje = new Date();
+  let anos = hoje.getFullYear() - dob.getFullYear();
+  const m = hoje.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < dob.getDate())) anos--;
+  return anos;
+}
+
 export const getPriorityColor = (priority: string) => {
   const p = priority.toLowerCase();
   if (p === "maxima" || p === "máxima") return "badge-neon-pink";

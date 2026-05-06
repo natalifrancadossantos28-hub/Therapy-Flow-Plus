@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
 import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getStatusColor, cn } from "@/lib/utils";
+import { getStatusColor, cn, calcIdade } from "@/lib/utils";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   listPatients,
   upsertPatient,
@@ -25,15 +26,6 @@ const STATUS_OPTIONS = [
 ];
 
 const today = () => new Date().toISOString().split("T")[0];
-
-function calcIdade(dateOfBirth: string): number {
-  const dob = new Date(dateOfBirth + "T00:00:00");
-  const hoje = new Date();
-  let anos = hoje.getFullYear() - dob.getFullYear();
-  const m = hoje.getMonth() - dob.getMonth();
-  if (m < 0 || (m === 0 && hoje.getDate() < dob.getDate())) anos--;
-  return anos;
-}
 
 type AlertaIdade = { tipo: "critico" | "alerta" | "ok"; text: string | null; idade: number };
 
@@ -71,6 +63,7 @@ function IdadeBadge({ dateOfBirth }: { dateOfBirth?: string | null }) {
 }
 
 export default function Patients() {
+  useDocumentTitle("Pacientes");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [redeFilter, setRedeFilter] = useState(false);

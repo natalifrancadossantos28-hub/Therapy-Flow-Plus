@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-custom";
 import { Trash2, ListTodo, ListPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,7 @@ const SCORE_SPECIALTY_MAP: Array<{ field: keyof Patient; specialty: string }> = 
 ];
 
 export default function WaitingList() {
+  useDocumentTitle("Fila de Espera");
   const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);

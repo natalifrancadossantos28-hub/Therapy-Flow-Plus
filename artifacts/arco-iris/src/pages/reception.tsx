@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useVisibleInterval } from "@/hooks/usePageVisible";
 import {
   listAppointmentsToday,
   listProfessionals,
@@ -279,6 +281,7 @@ function AppointmentRow({
 }
 
 export default function Reception() {
+  useDocumentTitle("Recepção");
   const [profIdFilter, setProfIdFilter] = useState<string>("");
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [appointments, setAppointments] = useState<AppointmentToday[]>([]);
@@ -297,12 +300,8 @@ export default function Reception() {
     listProfessionals().then(setProfessionals).catch(console.error);
   }, []);
 
-  useEffect(() => {
-    setIsLoading(true);
-    reloadAppointments();
-    const id = setInterval(reloadAppointments, 20_000);
-    return () => clearInterval(id);
-  }, [reloadAppointments]);
+  // Visibility-aware: pausa polling quando a aba está oculta
+  useVisibleInterval(reloadAppointments, 20_000);
 
   // Fase 5D: Realtime — recebe INSERTs em notificacoes_recepcao (remanejar/desmarcar/falta)
   // e dispara um alerta visual pulsante + refetch da agenda.
