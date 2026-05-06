@@ -1,4 +1,5 @@
-// Tema claro/escuro persistente. Classe ".light" e aplicada em <html>.
+// Tema claro/escuro persistente. Mesma chave nfs_theme do Arco-Iris.
+// A classe ".light" e aplicada em <html> antes do React montar.
 
 import { useEffect, useState } from "react";
 
