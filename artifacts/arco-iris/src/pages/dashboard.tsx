@@ -6,12 +6,14 @@ import {
   listWaitingList,
   getAppointmentsStats,
   listProfessionalsCapacity,
+  listLongAttendancePatients,
   type Patient,
   type Professional as ArcoProfessional,
   type AppointmentToday,
   type WaitingListEntry,
+  type LongAttendancePatient,
 } from "@/lib/arco-rpc";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor } from "@/lib/utils";
@@ -66,6 +68,7 @@ export default function Dashboard() {
   const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
   const [aptStats, setAptStats] = useState<Stats | null>(null);
   const [ocupacao, setOcupacao] = useState<Ocupacao[]>([]);
+  const [longAttendance, setLongAttendance] = useState<LongAttendancePatient[]>([]);
 
   const fetchAll = () => {
     listPatients().then(setPatients).catch(console.error);
@@ -73,6 +76,7 @@ export default function Dashboard() {
     listAppointmentsToday().then(setTodayAppointments).catch(console.error);
     listWaitingList().then(setWaitingList).catch(console.error);
     getAppointmentsStats().then(setAptStats).catch(console.error);
+    listLongAttendancePatients(12).then(setLongAttendance).catch(() => setLongAttendance([]));
   };
   const fetchOcupacao = () =>
     listProfessionalsCapacity()
@@ -444,6 +448,48 @@ export default function Dashboard() {
           </Card>
         );
       })()}
+
+      {/* Atencao: Revisao de Casos (Permanencia > 1 ano) */}
+      {longAttendance.length > 0 && (
+        <Card className="p-6 border-[rgba(255,159,32,0.35)] shadow-[0_0_24px_rgba(255,159,32,0.08)]">
+          <h2 className="text-xl font-bold font-display flex items-center gap-2 text-[#ff9f20] mb-2" style={{ textShadow: "0 0 12px rgba(255,159,32,0.5)" }}>
+            <Hourglass className="w-5 h-5" />
+            Atenção: Revisão de Casos
+            <span className="ml-2 text-xs font-semibold text-muted-foreground">Permanência &gt; 1 ano</span>
+            <Badge className="ml-auto bg-[rgba(255,159,32,0.15)] text-[#ff9f20] border border-[rgba(255,159,32,0.4)]">
+              {longAttendance.length}
+            </Badge>
+          </h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Pacientes em atendimento há 12+ meses. Considere revisar prontuário, plano terapêutico ou alta.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {longAttendance.map((p) => (
+              <div key={p.id} className="p-4 rounded-xl bg-[rgba(255,159,32,0.06)] border border-[rgba(255,159,32,0.2)] flex flex-col gap-2">
+                <div className="flex justify-between items-start gap-2">
+                  <p className="font-semibold text-foreground">{p.name}</p>
+                  <Badge className="shrink-0 bg-[rgba(255,159,32,0.18)] text-[#ff9f20] border border-[rgba(255,159,32,0.45)]">
+                    {p.yearsLabel}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground/80">Profissional: </span>
+                  {p.professionalName ?? "—"}
+                  {p.professionalSpecialty ? <span className="opacity-70"> · {p.professionalSpecialty}</span> : null}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Início: {p.firstAttendanceDate ? new Date(p.firstAttendanceDate + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
+                </p>
+                <Link href={`/patients/${p.id}`}>
+                  <Button variant="outline" className="w-full text-xs h-8 mt-1 border-[rgba(255,159,32,0.4)] text-[#ff9f20] hover:bg-[rgba(255,159,32,0.08)] hover:shadow-[0_0_14px_rgba(255,159,32,0.35)]">
+                    Ver Ficha
+                  </Button>
+                </Link>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Alertas de Faltas */}
       {absentPatients.length > 0 && (
