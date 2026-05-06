@@ -6,6 +6,8 @@ import {
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { listTriagens, getTriagem, upsertTriagem, deleteTriagem, autolinkTriagem } from "@/lib/triagem-rpc";
+import { useTheme } from "@/lib/theme";
+import { Sun, Moon } from "lucide-react";
 
 // ─── WHITE LABEL CONFIG ──────────────────────────────────────────────────────
 export const CLINIC_CONFIG = {
@@ -348,6 +350,8 @@ function getPrioridadeBadge(vulnScore: number, clinicalPts: number) {
 
 function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" }) {
   const navBtn = "px-4 py-1.5 rounded-xl text-white text-xs font-semibold transition-all duration-200 glass";
+  const [theme, setTheme] = useTheme();
+  const isLight = theme === "light";
   return (
     <div className="header-gradient py-5 px-6 no-print">
       <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
@@ -360,11 +364,20 @@ function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" }
             <p className="mt-0 text-white/50 text-xs hidden md:block">{CLINIC_CONFIG.subtitle}</p>
           </div>
         </div>
-        <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end">
+        <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end items-center">
           {page !== "dashboard" && <Link href="/dashboard" className={navBtn}>Dashboard</Link>}
           {page !== "lista" && page !== "form" && <Link href="/lista" className={navBtn}>Pacientes</Link>}
           {page !== "form" && <Link href="/" className={navBtn}>Nova Triagem</Link>}
           {page === "form" && <Link href="/lista" className={navBtn}>Ver Pacientes →</Link>}
+          <button
+            type="button"
+            onClick={() => setTheme(isLight ? "dark" : "light")}
+            title={isLight ? "Modo escuro" : "Modo claro"}
+            aria-label={isLight ? "Modo escuro" : "Modo claro"}
+            className="p-2 rounded-xl text-white glass transition-all duration-200"
+          >
+            {isLight ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+          </button>
         </div>
       </div>
     </div>
