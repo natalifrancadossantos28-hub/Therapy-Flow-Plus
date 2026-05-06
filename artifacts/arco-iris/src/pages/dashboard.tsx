@@ -176,7 +176,17 @@ export default function Dashboard() {
     return perfil;
   }, [patients]);
 
-  const triadPatients = (patients || []).filter(p => p.triagemScore != null);
+  // Considera triado quem tem QUALQUER score por especialidade definido,
+  // nao apenas o triagem_score agregado (que pode estar null em pacientes
+  // antigos cadastrados antes da migracao de score sincrono).
+  const SPECIALTY_KEYS: ReadonlyArray<keyof Patient> = [
+    "scorePsicologia", "scorePsicomotricidade", "scoreFisioterapia",
+    "scorePsicopedagogia", "scoreEdFisica", "scoreFonoaudiologia",
+    "scoreTO", "scoreNutricionista",
+  ];
+  const triadPatients = (patients || []).filter(p =>
+    p.triagemScore != null || SPECIALTY_KEYS.some(k => (p[k] as number | null) != null)
+  );
   const avg = (key: keyof Patient) => triadPatients.length ? Math.round(triadPatients.reduce((s, p) => s + ((p[key] as number) || 0), 0) / triadPatients.length) : 0;
   const radarData = [
     { area: "Psicologia", score: avg("scorePsicologia") },
