@@ -1,5 +1,5 @@
-// Tema claro/escuro persistente. Usado por Arco-Iris e exposto pra Triagem
-// adotar o mesmo padrao no futuro. A classe ".light" e aplicada em <html>.
+// Tema claro/escuro persistente. Usado por Arco-Iris e Triagem (mesma chave
+// nfs_theme). A classe ".light" e aplicada em <html> antes do React montar.
 
 import { useEffect, useState } from "react";
 
