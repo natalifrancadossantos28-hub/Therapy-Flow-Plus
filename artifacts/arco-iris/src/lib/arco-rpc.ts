@@ -849,6 +849,7 @@ export type AppointmentToday = {
   professionalName: string;
   professionalSpecialty: string;
   ciclo: "A" | "B" | "M" | null;
+  prontuario: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -870,6 +871,7 @@ type AppointmentTodayRow = {
   professional_name: string;
   professional_specialty: string;
   ciclo: string | null;
+  prontuario: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -892,6 +894,7 @@ function mapAppointmentToday(r: AppointmentTodayRow): AppointmentToday {
     professionalName: r.professional_name,
     professionalSpecialty: r.professional_specialty,
     ciclo: (r.ciclo as "A" | "B" | "M" | null) ?? null,
+    prontuario: r.prontuario ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
