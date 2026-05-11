@@ -249,8 +249,11 @@ export type TriagemInput = {
 };
 
 function handleError(err: unknown): never {
-  const msg = err instanceof Error ? err.message : String(err ?? "Erro desconhecido");
-  throw new Error(msg);
+  if (err instanceof Error) throw err;
+  if (typeof err === "object" && err !== null && "message" in err) {
+    throw new Error(String((err as { message: unknown }).message));
+  }
+  throw new Error(String(err ?? "Erro desconhecido"));
 }
 
 export async function listTriagens(): Promise<TriagemRow[]> {
