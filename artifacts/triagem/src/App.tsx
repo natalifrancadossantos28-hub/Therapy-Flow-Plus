@@ -868,6 +868,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
+  const [erroSalvar, setErroSalvar] = useState("");
   const [autolinkMsg, setAutolinkMsg] = useState<string | null>(null);
   const [, navigate] = useLocation();
   const data = new Date().toLocaleDateString("pt-BR");
@@ -908,6 +909,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
 
   const salvarTriagem = async () => {
     setSalvando(true);
+    setErroSalvar("");
     const payload = {
       ...bodyParaSalvar,
       respostas: JSON.stringify(respostas),
@@ -932,11 +934,14 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
           setAutolinkMsg(`✅ Vinculado ao paciente ${result.patientName}.`);
         }
       }
-    } catch {
-      if (!editId) {
+    } catch (err) {
+      if (!navigator.onLine && !editId) {
         const { addToOfflineQueue } = await import("./lib/offline-queue");
         addToOfflineQueue(payload);
         setSalvo(true);
+      } else {
+        const msg = err instanceof Error ? err.message : "Erro ao salvar triagem.";
+        setErroSalvar(msg);
       }
     } finally {
       setSalvando(false);
@@ -963,6 +968,18 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
                 <div className="text-5xl mb-4 animate-pulse">🏛️</div>
                 <p className="text-lg font-bold" style={{ color: "#c4b5fd" }}>Salvando registro…</p>
                 <p className="text-sm text-muted-foreground mt-2">Aguarde um momento</p>
+              </>
+            )}
+            {erroSalvar && !salvo && (
+              <>
+                <div className="text-5xl mb-4">⚠️</div>
+                <p className="text-xl font-extrabold text-red-400">Erro ao salvar</p>
+                <p className="text-sm text-red-300 mt-2 mb-4">{erroSalvar}</p>
+                <button onClick={salvarTriagem} disabled={salvando}
+                  className="w-full py-3 rounded-xl font-bold text-sm"
+                  style={{ background: "rgba(239,68,68,0.2)", border: "1px solid #ef4444", color: "#fca5a5" }}>
+                  Tentar novamente
+                </button>
               </>
             )}
             {salvo && (
@@ -1330,6 +1347,15 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
               className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-60">
               {salvando ? "Salvando…" : editId ? "Atualizar Triagem" : "Salvar Triagem"}
             </button>
+          )}
+          {erroSalvar && (
+            <div className="flex flex-col items-end gap-1">
+              <p className="text-sm text-red-400 font-semibold max-w-sm text-right">{erroSalvar}</p>
+              <button onClick={salvarTriagem} disabled={salvando}
+                className="text-xs text-red-300 underline hover:text-red-200">
+                Tentar novamente
+              </button>
+            </div>
           )}
           {!viewOnly && salvo && (
             <div className="flex flex-col items-end gap-2">
