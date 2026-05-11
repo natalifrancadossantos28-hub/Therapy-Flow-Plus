@@ -365,20 +365,22 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {todayAppointments?.slice(0, 6).map(apt => (
+                {todayAppointments?.slice(0, 6).map(apt => {
+                  const pront = apt.prontuario || patients.find(p => p.id === apt.patientId)?.prontuario || "";
+                  return (
                   <div key={apt.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50 bg-secondary/20 hover:bg-secondary/40 transition-colors">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold font-display text-sm">
                         {apt.time}
                       </div>
                       <div>
-                        <p className="font-semibold text-foreground">{apt.patientName}</p>
+                        <p className="font-semibold text-foreground">{pront ? `${pront} - ` : ""}{apt.patientName}</p>
                         <p className="text-sm text-muted-foreground">{apt.professionalName} • {apt.professionalSpecialty}</p>
                       </div>
                     </div>
                     <Badge className={getStatusColor(apt.status)}>{apt.status}</Badge>
                   </div>
-                ))}
+                  );})}
               </div>
             )}
           </div>

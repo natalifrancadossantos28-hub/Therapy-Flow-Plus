@@ -4,6 +4,7 @@ import { useVisibleInterval } from "@/hooks/usePageVisible";
 import {
   listAppointmentsToday,
   listProfessionals,
+  listPatients,
   updateAppointment,
   deletePatient,
   type Professional as ArcoProfessional,
@@ -36,6 +37,7 @@ type Appointment = {
   date: string;
   notes: string | null;
   rescheduledTo: string | null;
+  prontuario: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -152,12 +154,20 @@ function AppointmentRow({
   };
 
   const hasWarning = apt.patientAbsenceCount >= 3;
+  const statusLower = apt.status?.toLowerCase() ?? "";
+  const isFalta = statusLower === "ausente" || statusLower === "falta_nao_justificada";
+  const isJustificado = statusLower === "falta_justificada" || statusLower === "justificado" || statusLower === "abonado";
+  const isPresente = statusLower === "presente" || statusLower === "atendimento";
 
   return (
     <MotionCard
       className={cn(
         "p-4 border transition-colors",
-        hasWarning ? "border-rose-300 bg-rose-50/50" : "border-border/50 hover:border-primary/30"
+        isFalta ? "border-red-400 bg-red-900/10" :
+        isJustificado ? "border-yellow-400 bg-yellow-900/10" :
+        isPresente ? "border-emerald-400 bg-emerald-900/10" :
+        hasWarning ? "border-rose-300 bg-rose-50/50" :
+        "border-border/50 hover:border-primary/30"
       )}
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
@@ -170,7 +180,7 @@ function AppointmentRow({
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-bold text-lg text-foreground">{apt.patientName}</h3>
+              <h3 className={cn("font-bold text-lg", isFalta ? "text-red-400" : isJustificado ? "text-yellow-400" : "text-foreground")}>{apt.prontuario ? `${apt.prontuario} - ${apt.patientName}` : apt.patientName}</h3>
               {hasWarning && (
                 <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-rose-200 text-rose-700">
                   <AlertCircle className="w-3 h-3" /> {apt.patientAbsenceCount} faltas
@@ -285,6 +295,7 @@ export default function Reception() {
   const [profIdFilter, setProfIdFilter] = useState<string>("");
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [appointments, setAppointments] = useState<AppointmentToday[]>([]);
+  const [prontuarioMap, setProntuarioMap] = useState<Map<number, string>>(new Map());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMutating, setIsMutating] = useState<boolean>(false);
   const { toast } = useToast();
@@ -298,6 +309,11 @@ export default function Reception() {
 
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
+    listPatients().then((patients) => {
+      const map = new Map<number, string>();
+      for (const p of patients) if (p.prontuario) map.set(p.id, p.prontuario);
+      setProntuarioMap(map);
+    }).catch(console.error);
   }, []);
 
   // Visibility-aware: pausa polling quando a aba está oculta
@@ -418,7 +434,7 @@ export default function Reception() {
       const apts = aptMap[time] || [];
       if (apts.length === 0)
         return `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td colspan="3" style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#cbd5e1;font-style:italic;">Livre</td></tr>`;
-      return apts.map(a => `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;font-weight:600;">${a.patientName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.professionalName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.status}</td></tr>`).join("");
+      return apts.map(a => { const pront = a.prontuario || prontuarioMap.get(a.patientId) || ""; return `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;font-weight:600;">${pront ? `${pront} - ` : ""}${a.patientName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.professionalName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.status}</td></tr>`; }).join("");
     };
 
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Agenda do Dia</title>
@@ -688,18 +704,20 @@ export default function Reception() {
               <p className="text-muted-foreground">Nenhuma consulta encontrada para os filtros selecionados.</p>
             </div>
           ) : (
-            appointments?.map((apt, i) => (
+            appointments?.map((apt, i) => {
+              const enriched = { ...apt, prontuario: apt.prontuario || prontuarioMap.get(apt.patientId) || null } as Appointment;
+              return (
               <AppointmentRow
                 key={apt.id}
-                apt={apt as Appointment}
+                apt={enriched}
                 index={i}
-                atestado={findAtestado(apt as Appointment)}
+                atestado={findAtestado(enriched)}
                 onStatusChange={handleStatusChange}
                 onDischargeRequest={handleDischargeRequest}
                 onAbonarClick={handleAbonarClick}
                 isUpdating={isMutating}
               />
-            ))
+            );})
           )}
         </div>
       </Card>
