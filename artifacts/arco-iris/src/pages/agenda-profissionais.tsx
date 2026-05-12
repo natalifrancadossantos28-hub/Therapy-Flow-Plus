@@ -3,6 +3,7 @@ import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ArrowRightLeft, UserX, XOctagon } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { supabase } from "@/lib/supabase";
@@ -480,6 +481,7 @@ export default function AgendaProfissionais() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle compact />
             {pinVerified && (
               <>
                 <button
