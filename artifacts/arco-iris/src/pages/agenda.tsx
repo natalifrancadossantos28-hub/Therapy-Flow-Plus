@@ -41,6 +41,41 @@ function getWeekDays(ref: Date): Date[] {
   return Array.from({ length: 5 }, (_, i) => addDays(monday, i));
 }
 
+const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
+
+/** Projects recurring appointments into weeks that have no real DB row yet. */
+function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string }>(
+  allApts: T[],
+  weekDates: string[],
+): T[] {
+  if (weekDates.length === 0) return allApts;
+  const existing = new Set(allApts.filter(a => weekDates.includes(a.date)).map(a => `${a.date}|${a.time}|${a.patientId}`));
+  const groups = new Map<string, T[]>();
+  for (const a of allApts) {
+    if (!a.recurrenceGroupId) continue;
+    let g = groups.get(a.recurrenceGroupId);
+    if (!g) { g = []; groups.set(a.recurrenceGroupId, g); }
+    g.push(a);
+  }
+  const virtual: T[] = [];
+  for (const [, gApts] of groups) {
+    const sorted = [...gApts].sort((a, b) => a.date.localeCompare(b.date));
+    const last = sorted[sorted.length - 1];
+    if (TERMINAL_STATUSES.includes(last.status.toLowerCase())) continue;
+    const refDow = new Date(sorted[0].date + "T12:00:00").getDay();
+    const target = weekDates.find(d => new Date(d + "T12:00:00").getDay() === refDow);
+    if (!target) continue;
+    if (target < sorted[0].date) continue;
+    if (gApts.some(a => weekDates.includes(a.date))) continue;
+    const key = `${target}|${sorted[0].time}|${sorted[0].patientId}`;
+    if (existing.has(key)) continue;
+    existing.add(key);
+    const ref = sorted.find(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase())) ?? sorted[0];
+    virtual.push({ ...ref, date: target, status: "agendado", id: -(Math.random() * 1e9 | 0) } as T);
+  }
+  return [...allApts, ...virtual];
+}
+
 function isoWeekNumber(dateStr: string): number {
   const d = new Date(dateStr + "T12:00:00");
   const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -310,15 +345,12 @@ export default function Agenda() {
   const canView = isAdmin || pinVerified;
   const weekDays = getWeekDays(weekRef);
   const weekDates = weekDays.map(d => format(d, "yyyy-MM-dd"));
+  const today = format(new Date(), "yyyy-MM-dd");
 
   const fetchAppointments = () => {
     if (!selectedProfId) return;
-    const from = weekDates[0];
-    const to = weekDates[4];
     listAppointments({
       professionalId: parseInt(selectedProfId),
-      dateFrom: from,
-      dateTo: to,
     })
       .then((list) => setAppointments(withCiclo(list) as Appointment[]))
       .catch(console.error);
@@ -326,8 +358,7 @@ export default function Agenda() {
 
   useEffect(() => {
     if (canView && selectedProfId) fetchAppointments();
-    // weekRef change → re-fetch para agenda infinita (qualquer semana)
-  }, [selectedProfId, canView, weekRef]);
+  }, [selectedProfId, canView]);
 
   // Realtime: recarrega a agenda quando qualquer appointment desse profissional muda
   // (agendamento, remanejamento pelo profissional, mudança de status, etc.).
@@ -799,9 +830,12 @@ export default function Agenda() {
     }
   };
 
+  // Expande recorrência: projeta agendamentos recorrentes em semanas sem linha real no banco.
+  const expanded = expandRecurrence(appointments, weekDates);
+
   // Fase 5A: slots em grupo — um mesmo (date,time,profissional) pode ter varios pacientes.
   const getApts = (date: string, time: string) =>
-    appointments.filter(a => a.date === date && a.time === time);
+    expanded.filter(a => a.date === date && a.time === time);
   const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
 
   // Slots disponiveis para remanejar = sem qualquer paciente (vazio de verdade).
@@ -1115,6 +1149,30 @@ export default function Agenda() {
                 })}
               </tbody>
             </table>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Resumo de Hoje ── */}
+      {canView && selectedProfId && (
+        <Card className="p-6">
+          <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-primary" /> Resumo de Hoje — {format(new Date(), "dd/MM/yyyy")}
+          </h3>
+          <div className="space-y-2">
+            {TIME_SLOTS.filter(t => t !== "12:10").map(time => {
+              const apts = getApts(today, time);
+              const apt = apts[0] ?? null;
+              return (
+                <div key={time} className={cn("flex items-center gap-4 px-4 py-3 rounded-xl text-sm", apt ? "bg-primary/10 border border-primary/20" : "bg-secondary/50 border border-border/50")}>
+                  <span className="font-bold text-primary w-14 shrink-0">{time}</span>
+                  <span className={apt ? "font-semibold text-foreground" : "text-muted-foreground italic"}>
+                    {apt ? (apt.patientName || `Paciente #${apt.patientId}`) : "Livre"}
+                  </span>
+                  {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>}
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
