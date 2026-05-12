@@ -49,12 +49,18 @@ const OPEN_SPECIALTIES = ["qualquer", "qualquer especialidade", "multidisciplina
 function matchesSpecialty(entrySpecialty: string | null | undefined, profSpecialty: string): boolean {
   if (!profSpecialty) return true;
   const s = (entrySpecialty ?? "").trim().toLowerCase();
-  if (OPEN_SPECIALTIES.includes(s)) return true;
+  // Entries without specialty (null/empty) match any professional
+  if (!s || OPEN_SPECIALTIES.includes(s)) return true;
   const entryKey = specialtyKey(entrySpecialty);
   const profKey = specialtyKey(profSpecialty);
-  if (entryKey === "default" || profKey === "default") {
+  // If entry has a specialty but it doesn't map to a known key, do substring match
+  if (entryKey === "default") {
     return s.includes(profSpecialty.trim().toLowerCase()) ||
       profSpecialty.trim().toLowerCase().includes(s);
+  }
+  // If the professional specialty is unknown, don't show entries with known specialties
+  if (profKey === "default") {
+    return false;
   }
   return entryKey === profKey;
 }
