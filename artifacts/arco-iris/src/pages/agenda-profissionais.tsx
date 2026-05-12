@@ -34,6 +34,41 @@ function getWeekDays(ref: Date): Date[] {
   return Array.from({ length: 5 }, (_, i) => addDays(monday, i));
 }
 
+const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
+
+/** Projects recurring appointments into weeks that have no real DB row yet. */
+function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string }>(
+  allApts: T[],
+  weekDates: string[],
+): T[] {
+  if (weekDates.length === 0) return allApts;
+  const existing = new Set(allApts.filter(a => weekDates.includes(a.date)).map(a => `${a.date}|${a.time}|${a.patientId}`));
+  const groups = new Map<string, T[]>();
+  for (const a of allApts) {
+    if (!a.recurrenceGroupId) continue;
+    let g = groups.get(a.recurrenceGroupId);
+    if (!g) { g = []; groups.set(a.recurrenceGroupId, g); }
+    g.push(a);
+  }
+  const virtual: T[] = [];
+  for (const [, gApts] of groups) {
+    const sorted = [...gApts].sort((a, b) => a.date.localeCompare(b.date));
+    const last = sorted[sorted.length - 1];
+    if (TERMINAL_STATUSES.includes(last.status.toLowerCase())) continue;
+    const refDow = new Date(sorted[0].date + "T12:00:00").getDay();
+    const target = weekDates.find(d => new Date(d + "T12:00:00").getDay() === refDow);
+    if (!target) continue;
+    if (target < sorted[0].date) continue;
+    if (gApts.some(a => weekDates.includes(a.date))) continue;
+    const key = `${target}|${sorted[0].time}|${sorted[0].patientId}`;
+    if (existing.has(key)) continue;
+    existing.add(key);
+    const ref = sorted.find(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase())) ?? sorted[0];
+    virtual.push({ ...ref, date: target, status: "agendado", id: -(Math.random() * 1e9 | 0) } as T);
+  }
+  return [...allApts, ...virtual];
+}
+
 type Professional = { id: number; name: string; specialty: string; pin?: string };
 type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; };
 
@@ -468,9 +503,12 @@ export default function AgendaProfissionais() {
     }
   };
 
+  // Expande recorrência: projeta agendamentos recorrentes em semanas sem linha real no banco.
+  const expanded = expandRecurrence(appointments, weekDates);
+
   // Fase 5A: slots em grupo — o mesmo horario pode ter varios pacientes.
   const getApts = (date: string, time: string) =>
-    appointments.filter(a => a.date === date && a.time === time);
+    expanded.filter(a => a.date === date && a.time === time);
 
   // Slots vazios para o seletor do modal (remanejar/remarcar).
   // Usa a semana atualmente selecionada dentro do modal.
