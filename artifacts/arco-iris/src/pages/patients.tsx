@@ -348,7 +348,7 @@ export default function Patients() {
                       )}
                       onClick={() => window.location.href = `/patients/${patient.id}`}
                     >
-                      <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
+                      <td className="px-4 py-3 font-mono text-base font-bold text-primary">
                         {patient.prontuario || `#${String(patient.id).padStart(4, "0")}`}
                       </td>
                       <td className="px-4 py-3">
