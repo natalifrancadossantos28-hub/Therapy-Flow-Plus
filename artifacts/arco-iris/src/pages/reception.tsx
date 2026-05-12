@@ -418,7 +418,7 @@ export default function Reception() {
     const todayStr = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
     const list = [...(appointments || [])].sort((a, b) => a.time.localeCompare(b.time));
     const morningSlots = ["07:10","08:00","08:50","09:40","10:30","11:20"];
-    const afternoonSlots = ["13:10","14:00","14:50","15:40"];
+    const afternoonSlots = ["13:10","14:00","14:50","15:40","16:30"];
 
     const aptMap: Record<string, typeof list[0][]> = {};
     for (const a of list) {
@@ -460,7 +460,7 @@ export default function Reception() {
         ${afternoonSlots.map(t => rowHtml(t)).join("")}
       </tbody>
     </table>
-    <p style="margin-top:24px;font-size:11px;color:#94a3b8;">Encerramento: 16:30 | NFS – Gestão Terapêutica</p>
+    <p style="margin-top:24px;font-size:11px;color:#94a3b8;">Encerramento: 17:20 | NFS – Gestão Terapêutica</p>
     </body></html>`);
     w.document.close();
   };

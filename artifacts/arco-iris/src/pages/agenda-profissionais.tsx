@@ -25,7 +25,7 @@ import { useLocation } from "wouter";
 const TIME_SLOTS = [
   "07:10", "08:00", "08:50", "09:40", "10:30", "11:20",
   "12:10",
-  "13:10", "14:00", "14:50", "15:40",
+  "13:10", "14:00", "14:50", "15:40", "16:30",
 ];
 
 function getWeekDays(ref: Date): Date[] {
@@ -235,7 +235,7 @@ export default function AgendaProfissionais() {
             </tr>`;
           }).join("")}
           <tr class="lunch-row"><td colspan="3">🍽 12:10 — Intervalo de Almoço</td></tr>
-          <tr class="section-row"><td colspan="3">Período da Tarde — 13:10 às 15:40</td></tr>
+          <tr class="section-row"><td colspan="3">Período da Tarde — 13:10 às 16:30</td></tr>
           ${TIME_SLOTS.filter(t => t > "12:10").map(time => {
             const apt = todayApts.find(a => a.time === time);
             return `<tr>
@@ -246,7 +246,7 @@ export default function AgendaProfissionais() {
           }).join("")}
         </tbody>
       </table>
-      <p style="margin-top:24px;font-size:11px;color:#94a3b8;">Encerramento: 16:30 | NFS – Gestão Terapêutica</p>
+      <p style="margin-top:24px;font-size:11px;color:#94a3b8;">Encerramento: 17:20 | NFS – Gestão Terapêutica</p>
     </body></html>`);
     printWindow.document.close();
   };
