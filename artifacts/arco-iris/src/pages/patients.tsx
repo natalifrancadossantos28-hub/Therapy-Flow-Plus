@@ -229,6 +229,10 @@ export default function Patients() {
       return a && a.tipo !== "ok";
     })();
     return matchName && matchStatus && matchRede && matchIdade;
+  }).sort((a, b) => {
+    const pa = parseInt(a.prontuario || "0", 10) || 0;
+    const pb = parseInt(b.prontuario || "0", 10) || 0;
+    return pa - pb;
   });
 
   const handleCreate = async (e: React.FormEvent) => {
