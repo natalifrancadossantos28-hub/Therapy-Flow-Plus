@@ -361,28 +361,54 @@ export default function AgendaProfissionais() {
     try {
       await deleteAppointmentAlta(altaConfirm.id);
       await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}`);
+
+      const todayStr = new Date().toISOString().split("T")[0];
+      const profSpecialty = selectedProf?.specialty ?? null;
+
+      // Check if patient still has active appointments with OTHER professionals
+      let hasOtherActive = false;
+      try {
+        const allFuture = await listAppointments({ patientId: altaConfirm.patientId, dateFrom: todayStr });
+        hasOtherActive = allFuture.some(a =>
+          a.professionalId !== altaConfirm.professionalId &&
+          (a.status === "agendado" || a.status === "atendimento" || a.status === "em_atendimento")
+        );
+      } catch { hasOtherActive = true; }
+
+      // Persistência: salva motivo; só altera status global se não houver outros atendimentos
       try {
         const existing = await getPatient(altaConfirm.patientId);
         const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
-        await upsertPatient(altaConfirm.patientId, {
-          status: label,
-          notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")}] Motivo: ${altaMotivo.trim()}`,
-        });
+        const updatePayload: Record<string, unknown> = {
+          notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")} — ${profSpecialty ?? "Geral"}] Motivo: ${altaMotivo.trim()}`,
+        };
+        if (!hasOtherActive) {
+          updatePayload.status = label;
+        }
+        await upsertPatient(altaConfirm.patientId, updatePayload);
       } catch {
         toast({ title: "Aviso", description: "Motivo registrado na notificação, mas houve falha ao gravar no prontuário.", variant: "destructive" });
       }
-      // Remover paciente de TODAS as filas de espera
+
+      // Remover apenas da fila da especialidade deste profissional (não de todas)
       try {
         const filaAtual = await listWaitingList();
-        const entradas = filaAtual.filter(e => e.patientId === altaConfirm.patientId);
+        const entradas = filaAtual.filter(e =>
+          e.patientId === altaConfirm.patientId &&
+          (!profSpecialty || !e.specialty || e.specialty === profSpecialty)
+        );
         for (const entry of entradas) {
           await deleteWaitingListEntry(entry.id);
         }
       } catch { /* silencioso — fila pode estar vazia */ }
+
       setAppointments(prev => prev.filter(a => a.id !== altaConfirm.id));
       setAltaConfirm(null);
       setAltaMotivo("");
-      toast({ title: `${label} aplicada`, description: `${altaConfirm.patientName} — status alterado para ${label}. Removido da fila e agendamentos cancelados.` });
+      const statusMsg = hasOtherActive
+        ? `${altaConfirm.patientName} — removido desta especialidade. Permanece ativo em outras.`
+        : `${altaConfirm.patientName} — status alterado para ${label}.`;
+      toast({ title: `${label} aplicada`, description: statusMsg });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha inesperada.";
       toast({ title: `Erro ao aplicar ${label.toLowerCase()}`, description: msg, variant: "destructive" });
@@ -839,10 +865,10 @@ export default function AgendaProfissionais() {
                 </div>
               </div>
               <p className="text-sm text-white/70 mb-1">
-                <strong className="text-white">{altaConfirm.patientName}</strong> será removido da agenda,
-                filas de espera e terá agendamentos futuros cancelados.
+                <strong className="text-white">{altaConfirm.patientName}</strong> será removido da agenda deste profissional
+                e da fila desta especialidade. Agendamentos em outras especialidades não serão afetados.
               </p>
-              <p className="text-xs text-white/50 mt-1">Status será alterado para <strong className="text-orange-300">{saidaTipo}</strong>.</p>
+              <p className="text-xs text-white/50 mt-1">Status global só será alterado se não houver outros atendimentos ativos.</p>
               <div className="mb-4 mt-4">
                 <label className="block text-xs font-bold mb-1" style={{ color: "#f87171" }}>Motivo {saidaTipo === "Alta" ? "da Alta" : saidaTipo === "Óbito" ? "do Óbito" : "da Desistência"} *</label>
                 <textarea
