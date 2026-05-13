@@ -9,6 +9,7 @@ import {
   upsertPatient,
   deletePatient,
   listProfessionals,
+  listAppointments,
   nextProntuario as fetchNextProntuarioRpc,
   checkProntuario as checkProntuarioRpc,
   type Patient,
@@ -71,6 +72,7 @@ export default function Patients() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [patientProfs, setPatientProfs] = useState<Map<number, { names: string[]; count: number }>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -101,9 +103,28 @@ export default function Patients() {
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [ps, pros] = await Promise.all([listPatients(), listProfessionals()]);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const [ps, pros, apts] = await Promise.all([
+        listPatients(),
+        listProfessionals(),
+        listAppointments({ dateFrom: todayStr }).catch(() => []),
+      ]);
       setPatients(ps);
       setProfessionals(pros);
+      // Group active appointments by patient to count distinct professionals
+      const pMap = new Map<number, Map<number, string>>();
+      for (const a of apts) {
+        if (["agendado", "atendimento", "presente"].includes(a.status)) {
+          if (!pMap.has(a.patientId)) pMap.set(a.patientId, new Map());
+          pMap.get(a.patientId)!.set(a.professionalId, a.professionalName);
+        }
+      }
+      const ppMap = new Map<number, { names: string[]; count: number }>();
+      for (const [pid, profMap] of pMap) {
+        const names = Array.from(profMap.values());
+        ppMap.set(pid, { names, count: names.length });
+      }
+      setPatientProfs(ppMap);
     } catch (err: any) {
       toast({
         title: "Erro ao carregar pacientes",
@@ -361,7 +382,22 @@ export default function Patients() {
                       <td className="px-4 py-3">
                         <IdadeBadge dateOfBirth={patient.dateOfBirth} />
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{prof?.name || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {(() => {
+                          const pp = patientProfs.get(patient.id);
+                          if (pp && pp.count > 1) {
+                            return (
+                              <span className="inline-flex items-center gap-1">
+                                <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.3)" }}>
+                                  Multi ({pp.count})
+                                </span>
+                              </span>
+                            );
+                          }
+                          if (pp && pp.count === 1) return pp.names[0];
+                          return prof?.name || "—";
+                        })()}
+                      </td>
                       <td className="px-4 py-3">
                         <Badge className={getStatusColor(patient.status)}>{patient.status}</Badge>
                       </td>
