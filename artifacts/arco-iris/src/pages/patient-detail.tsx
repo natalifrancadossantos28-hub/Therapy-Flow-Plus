@@ -17,7 +17,7 @@ import {
   type PatientAbsencesInfo,
 } from "@/lib/arco-rpc";
 
-// Score interno permanece em 0-360 (8 áreas × 0-72), mas exibimos em escala /150
+// Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
 // operando no domínio 360, então as faixas de cor (25/50/75%) não mudam.
 // Bônus de vulnerabilidade somam direto no score exibido (apenas desempate):
@@ -156,8 +156,8 @@ export default function PatientDetail() {
 
   const saveTriagem = async () => {
     const scores = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri].map(v => parseInt(v) || 0);
-    if (scores.some(s => s < 0 || s > 72)) {
-      toast({ title: "Score inválido", description: "Cada área deve ter um valor entre 0 e 72.", variant: "destructive" });
+    if (scores.some(s => s < 0 || s > 45)) {
+      toast({ title: "Score inválido", description: "Cada área deve ter um valor entre 0 e 45.", variant: "destructive" });
       return;
     }
     const total = scores.reduce((a, b) => a + b, 0);
@@ -392,7 +392,7 @@ export default function PatientDetail() {
                   ].map(area => (
                     <div key={area.label} className="p-2 bg-secondary/30 rounded-xl text-center">
                       <p className="text-muted-foreground font-semibold text-xs mb-1">{area.label}</p>
-                      <p className="text-lg font-bold text-foreground">{area.val ?? "—"}<span className="text-xs text-muted-foreground">/72</span></p>
+                      <p className="text-lg font-bold text-foreground">{area.val ?? "—"}<span className="text-xs text-muted-foreground">/45</span></p>
                     </div>
                   ))}
                 </div>
@@ -422,7 +422,7 @@ export default function PatientDetail() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground italic">
-                Registre a triagem com as notas por área (0–72 cada) para liberar o botão <strong>"Adicionar à Fila"</strong>.
+                Registre a triagem com as notas por área (0–45 cada) para liberar o botão <strong>"Adicionar à Fila"</strong>.
               </p>
             )}
           </Card>
@@ -466,7 +466,7 @@ export default function PatientDetail() {
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <MotionCard className="w-full max-w-lg p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <h2 className="text-2xl font-bold font-display mb-1">{triagemFeita ? "Editar Triagem" : "Registrar Triagem"}</h2>
-            <p className="text-sm text-muted-foreground mb-5">Preencha a nota de cada área (0–72). O score total é exibido em escala padronizada (máx. {SCORE_MAX_DISPLAY}).</p>
+            <p className="text-sm text-muted-foreground mb-5">Preencha a nota de cada área (0–45). O score total é exibido em escala padronizada (máx. {SCORE_MAX_DISPLAY}).</p>
             <div className="space-y-5">
               <div>
                 <Label className="text-base font-bold mb-3 block">Perfil Multidisciplinar</Label>
@@ -482,9 +482,9 @@ export default function PatientDetail() {
                     { label: "Nutricionista", val: sNutri, set: setSNutri },
                   ] as const).map(area => (
                     <div key={area.label} className="space-y-1">
-                      <Label className="text-sm">{area.label} <span className="text-muted-foreground font-normal">(0–72)</span></Label>
+                      <Label className="text-sm">{area.label} <span className="text-muted-foreground font-normal">(0–45)</span></Label>
                       <Input
-                        type="number" min={0} max={72}
+                        type="number" min={0} max={45}
                         value={area.val}
                         onChange={e => area.set(e.target.value)}
                         placeholder="0"
