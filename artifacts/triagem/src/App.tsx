@@ -348,7 +348,7 @@ function getPrioridadeBadge(vulnScore: number, clinicalPts: number) {
 
 // ─── HEADER ───────────────────────────────────────────────────────────────────
 
-function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" }) {
+function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" | "abc" }) {
   const navBtn = "px-4 py-1.5 rounded-xl text-white text-xs font-semibold transition-all duration-200 glass";
   const [theme, setTheme] = useTheme();
   const isLight = theme === "light";
@@ -367,6 +367,7 @@ function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" }
         <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end items-center">
           {page !== "dashboard" && <Link href="/dashboard" className={navBtn}>Dashboard</Link>}
           {page !== "lista" && page !== "form" && <Link href="/lista" className={navBtn}>Pacientes</Link>}
+          {page !== "abc" && <Link href="/abc" className={navBtn}>ABC</Link>}
           {page !== "form" && <Link href="/" className={navBtn}>Nova Triagem</Link>}
           {page === "form" && <Link href="/lista" className={navBtn}>Ver Pacientes →</Link>}
           <button
@@ -1950,6 +1951,317 @@ function TriagemFlow() {
   return <Formulario onSubmit={setFormData} />;
 }
 
+// ─── ABC CHECKLIST ────────────────────────────────────────────────────────────
+
+type ABCCategory = "ES" | "RE" | "CO" | "LG" | "PS";
+
+type ABCItem = {
+  num: number;
+  text: string;
+  category: ABCCategory;
+  weight: number;
+};
+
+const ABC_CATEGORIES: Record<ABCCategory, { label: string; color: string; bg: string }> = {
+  ES: { label: "Estímulo Sensorial", color: "#a855f7", bg: "rgba(168,85,247,0.12)" },
+  RE: { label: "Relacionamento", color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
+  CO: { label: "Uso do Corpo e Objetos", color: "#f97316", bg: "rgba(249,115,22,0.12)" },
+  LG: { label: "Linguagem", color: "#22c55e", bg: "rgba(34,197,94,0.12)" },
+  PS: { label: "Desenv. Pessoal e Social", color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
+};
+
+const ABC_ITEMS: ABCItem[] = [
+  { num: 1, text: "Gira em torno de si por longo período de tempo", category: "CO", weight: 4 },
+  { num: 2, text: "Aprende uma tarefa, mas esquece rapidamente", category: "PS", weight: 2 },
+  { num: 3, text: "É raro atender estímulo não verbal social/ambiente (expressões, gestos, situações)", category: "RE", weight: 4 },
+  { num: 4, text: "Ausência de resposta para solicitações verbais — venha cá; sente-se", category: "LG", weight: 1 },
+  { num: 5, text: "Usa brinquedos inapropriadamente", category: "CO", weight: 2 },
+  { num: 6, text: "Pobre uso da discriminação visual (fixa uma característica do objeto)", category: "ES", weight: 2 },
+  { num: 7, text: "Ausência do sorriso social", category: "RE", weight: 2 },
+  { num: 8, text: "Uso inadequado de pronomes (eu por ele)", category: "LG", weight: 3 },
+  { num: 9, text: "Insiste em manter certos objetos consigo", category: "CO", weight: 3 },
+  { num: 10, text: "Parece não escutar (suspeita-se de perda de audição)", category: "ES", weight: 3 },
+  { num: 11, text: "Fala monótona e sem ritmo", category: "LG", weight: 4 },
+  { num: 12, text: "Balança-se por longos períodos de tempo", category: "CO", weight: 4 },
+  { num: 13, text: "Não estende o braço para ser pego (nem o fez quando bebê)", category: "RE", weight: 2 },
+  { num: 14, text: "Fortes reações frente a mudanças no ambiente", category: "PS", weight: 3 },
+  { num: 15, text: "Ausência de atenção ao seu nome quando entre 2 outras crianças", category: "CO", weight: 2 },
+  { num: 16, text: "Corre interrompendo com giros em torno de si, balanceio de mãos", category: "CO", weight: 4 },
+  { num: 17, text: "Ausência de resposta para expressão facial/sentimento de outros", category: "RE", weight: 3 },
+  { num: 18, text: "Raramente usa 'sim' ou 'eu'", category: "LG", weight: 2 },
+  { num: 19, text: "Possui habilidade numa área do desenvolvimento", category: "PS", weight: 4 },
+  { num: 20, text: "Ausência de respostas a solicitações verbal envolvendo o uso de referenciais de espaço", category: "LG", weight: 1 },
+  { num: 21, text: "Reação de sobressalto a som intenso (suspeita de surdez)", category: "ES", weight: 3 },
+  { num: 22, text: "Balança as mãos", category: "CO", weight: 4 },
+  { num: 23, text: "Intensos acessos de raiva e/ou frequentes 'chiliques'", category: "PS", weight: 3 },
+  { num: 24, text: "Evita ativamente o contato visual", category: "RE", weight: 4 },
+  { num: 25, text: "Resiste ao toque / ao ser pego / ao carinho", category: "RE", weight: 4 },
+  { num: 26, text: "Não reage a estímulos dolorosos", category: "ES", weight: 3 },
+  { num: 27, text: "Difícil e rígido no colo (ou foi quando bebê)", category: "RE", weight: 3 },
+  { num: 28, text: "Flácido quando no colo", category: "RE", weight: 2 },
+  { num: 29, text: "Aponta para indicar objeto desejado", category: "LG", weight: 2 },
+  { num: 30, text: "Anda nas pontas dos pés", category: "CO", weight: 2 },
+  { num: 31, text: "Machuca outros mordendo, batendo, etc", category: "PS", weight: 2 },
+  { num: 32, text: "Repete a mesma frase muitas vezes", category: "LG", weight: 3 },
+  { num: 33, text: "Ausência de imitação de brincadeiras de outras crianças", category: "RE", weight: 3 },
+  { num: 34, text: "Ausência de reação do piscar quando luz forte incide em seus olhos", category: "ES", weight: 1 },
+  { num: 35, text: "Machuca-se mordendo, batendo a cabeça, etc", category: "CO", weight: 2 },
+  { num: 36, text: "Não espera para ser atendido (quer as coisas imediatamente)", category: "PS", weight: 2 },
+  { num: 37, text: "Não aponta para mais que cinco objetos", category: "LG", weight: 1 },
+  { num: 38, text: "Dificuldade de fazer amigos", category: "RE", weight: 4 },
+  { num: 39, text: "Tapa as orelhas para vários sons", category: "ES", weight: 4 },
+  { num: 40, text: "Gira, bate objetos muitas vezes", category: "CO", weight: 4 },
+  { num: 41, text: "Dificuldade para o treino de toalete", category: "PS", weight: 1 },
+  { num: 42, text: "Usa de 0 a 5 palavras/dia para indicar necessidades e o que quer", category: "LG", weight: 2 },
+  { num: 43, text: "Frequentemente muito ansioso ou medroso", category: "RE", weight: 3 },
+  { num: 44, text: "Franze, cobre ou virar os olhos quando em presença de luz natural", category: "ES", weight: 3 },
+  { num: 45, text: "Não se veste sem ajuda", category: "PS", weight: 1 },
+  { num: 46, text: "Repete constantemente as mesmas palavras e/ou sons", category: "LG", weight: 3 },
+  { num: 47, text: "'Olha através' das pessoas", category: "RE", weight: 4 },
+  { num: 48, text: "Repete perguntas e frases ditas por outras pessoas", category: "LG", weight: 4 },
+  { num: 49, text: "Frequentemente inconsciente dos perigos de situações e do ambiente", category: "PS", weight: 2 },
+  { num: 50, text: "Prefere manipular e ocupar-se com objetos inanimados", category: "PS", weight: 4 },
+  { num: 51, text: "Toca, cheira ou lambe objetos do ambiente", category: "CO", weight: 3 },
+  { num: 52, text: "Frequentemente não reage visualmente à presença de novas pessoas", category: "ES", weight: 3 },
+  { num: 53, text: "Repete sequências de comportamentos complicados (cobrir coisas, por ex.)", category: "CO", weight: 4 },
+  { num: 54, text: "Destrutivo com seus brinquedos e coisas da família", category: "CO", weight: 2 },
+  { num: 55, text: "O atraso no desenvolvimento identificado antes dos 30 meses", category: "PS", weight: 1 },
+  { num: 56, text: "Usa mais que 15 e menos que 30 frases diárias para comunicar-se", category: "LG", weight: 3 },
+  { num: 57, text: "Olha fixamente o ambiente por longos períodos de tempo", category: "ES", weight: 4 },
+];
+
+function classifyABC(total: number): { nivel: string; label: string; desc: string; color: string; bg: string } {
+  if (total >= 68) return { nivel: "Nível 1", label: "Alto Impacto", desc: "Comportamentos com prejuízo significativo na interação, autorregulação e participação", color: "#ef4444", bg: "rgba(239,68,68,0.12)" };
+  if (total >= 55) return { nivel: "Nível 2", label: "Impacto Moderado", desc: "Comportamentos que interferem parcialmente no engajamento e desempenho funcional", color: "#f59e0b", bg: "rgba(245,158,11,0.12)" };
+  return { nivel: "Nível 3", label: "Baixo Impacto", desc: "Pouca interferência comportamental na participação e nas atividades", color: "#22c55e", bg: "rgba(34,197,94,0.12)" };
+}
+
+function ABCChecklist() {
+  const [checked, setChecked] = useState<Record<number, boolean>>({});
+  const [nome, setNome] = useState("");
+  const [prontuario, setProntuario] = useState("");
+  const [dataNasc, setDataNasc] = useState("");
+  const [dataApp, setDataApp] = useState(new Date().toISOString().slice(0, 10));
+  const [showResult, setShowResult] = useState(false);
+
+  const toggle = (num: number) => setChecked(prev => ({ ...prev, [num]: !prev[num] }));
+
+  const catTotals = (Object.keys(ABC_CATEGORIES) as ABCCategory[]).reduce((acc, cat) => {
+    acc[cat] = ABC_ITEMS.filter(i => i.category === cat && checked[i.num]).reduce((s, i) => s + i.weight, 0);
+    return acc;
+  }, {} as Record<ABCCategory, number>);
+
+  const total = Object.values(catTotals).reduce((s, v) => s + v, 0);
+  const checkedCount = Object.values(checked).filter(Boolean).length;
+  const classification = classifyABC(total);
+
+  const handleReset = () => {
+    setChecked({});
+    setNome("");
+    setProntuario("");
+    setDataNasc("");
+    setDataApp(new Date().toISOString().slice(0, 10));
+    setShowResult(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <Header page="abc" />
+      <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+        {/* Título */}
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+            <span className="text-primary">ABC</span> — Autism Behavior Checklist
+          </h1>
+          <p className="text-sm text-muted-foreground">Versão Brasileira · Checklist de Comportamento Autístico</p>
+        </div>
+
+        {/* Dados do paciente */}
+        <div className="rounded-2xl border border-border/50 p-6 space-y-4" style={{ background: "rgba(0,240,255,0.03)" }}>
+          <h2 className="text-sm font-bold uppercase text-primary tracking-wider">Identificação</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Nome do Paciente</label>
+              <input value={nome} onChange={e => setNome(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="Nome completo" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Prontuário</label>
+              <input value={prontuario} onChange={e => setProntuario(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="PRT-000" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Data de Nascimento</label>
+              <input type="date" value={dataNasc} onChange={e => setDataNasc(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Data da Aplicação</label>
+              <input type="date" value={dataApp} onChange={e => setDataApp(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+            </div>
+          </div>
+        </div>
+
+        {/* Legenda */}
+        <div className="rounded-2xl border border-border/50 p-4">
+          <h2 className="text-sm font-bold uppercase text-muted-foreground tracking-wider mb-3">Legenda das Categorias</h2>
+          <div className="flex flex-wrap gap-2">
+            {(Object.entries(ABC_CATEGORIES) as [ABCCategory, typeof ABC_CATEGORIES[ABCCategory]][]).map(([key, cat]) => (
+              <span key={key} className="px-3 py-1.5 rounded-lg text-xs font-bold border" style={{ background: cat.bg, color: cat.color, borderColor: `${cat.color}40` }}>
+                {key} — {cat.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Score ao vivo (sticky) */}
+        <div className="sticky top-0 z-20 rounded-2xl border p-4 backdrop-blur-md" style={{ background: classification.bg, borderColor: `${classification.color}40` }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl font-bold font-display" style={{ color: classification.color }}>{total}</span>
+              <div>
+                <p className="text-sm font-bold" style={{ color: classification.color }}>{classification.nivel} — {classification.label}</p>
+                <p className="text-xs text-muted-foreground">{checkedCount}/57 itens marcados</p>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {(Object.entries(catTotals) as [ABCCategory, number][]).map(([cat, val]) => (
+                <span key={cat} className="px-2 py-1 rounded-lg text-[11px] font-bold border" style={{ color: ABC_CATEGORIES[cat].color, background: ABC_CATEGORIES[cat].bg, borderColor: `${ABC_CATEGORIES[cat].color}30` }}>
+                  {cat}: {val}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Questões */}
+        <div className="space-y-2">
+          {ABC_ITEMS.map(item => {
+            const cat = ABC_CATEGORIES[item.category];
+            const isChecked = !!checked[item.num];
+            return (
+              <button
+                key={item.num}
+                type="button"
+                onClick={() => toggle(item.num)}
+                className="w-full text-left rounded-xl border p-3 sm:p-4 transition-all duration-150 flex items-start gap-3"
+                style={{
+                  background: isChecked ? cat.bg : "transparent",
+                  borderColor: isChecked ? `${cat.color}50` : "rgba(255,255,255,0.08)",
+                  boxShadow: isChecked ? `0 0 12px ${cat.color}15` : undefined,
+                }}
+              >
+                {/* Checkbox */}
+                <div className="mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-all" style={{ borderColor: isChecked ? cat.color : "rgba(255,255,255,0.2)", background: isChecked ? cat.color : "transparent" }}>
+                  {isChecked && <svg viewBox="0 0 12 12" className="w-3 h-3 text-white"><path d="M2 6l3 3 5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                </div>
+                {/* Number */}
+                <span className="text-sm font-bold w-7 shrink-0 mt-0.5" style={{ color: isChecked ? cat.color : "rgba(255,255,255,0.4)" }}>
+                  {String(item.num).padStart(2, "0")}
+                </span>
+                {/* Text */}
+                <span className={`text-sm flex-1 ${isChecked ? "font-semibold" : ""}`} style={{ color: isChecked ? cat.color : undefined }}>
+                  {item.text}
+                </span>
+                {/* Category badge */}
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold shrink-0 mt-0.5" style={{ background: cat.bg, color: cat.color, border: `1px solid ${cat.color}30` }}>
+                  {item.category} · {item.weight}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Resultado final */}
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setShowResult(true)}
+            className="w-full py-3 rounded-xl font-bold text-white transition-all"
+            style={{ background: `linear-gradient(135deg, ${classification.color}, ${classification.color}cc)`, boxShadow: `0 0 20px ${classification.color}40` }}
+          >
+            Ver Resultado Final
+          </button>
+
+          {showResult && (
+            <div className="rounded-2xl border-2 p-6 space-y-6" style={{ borderColor: `${classification.color}50`, background: classification.bg }}>
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl font-bold" style={{ color: classification.color }}>
+                  {classification.nivel} — {classification.label}
+                </h2>
+                <p className="text-4xl font-bold font-display" style={{ color: classification.color }}>{total} pontos</p>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">{classification.desc}</p>
+              </div>
+
+              {/* Tabela de referência */}
+              <div className="rounded-xl border border-border/50 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border/50">
+                      <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Pontuação</th>
+                      <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Nível</th>
+                      <th className="px-4 py-2 text-left font-semibold text-muted-foreground hidden sm:table-cell">Descrição</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className={`border-b border-border/30 ${total >= 68 ? "font-bold" : ""}`} style={total >= 68 ? { background: "rgba(239,68,68,0.08)" } : {}}>
+                      <td className="px-4 py-2" style={total >= 68 ? { color: "#ef4444" } : {}}>≥ 68</td>
+                      <td className="px-4 py-2" style={total >= 68 ? { color: "#ef4444" } : {}}>Nível 1 — Alto Impacto</td>
+                      <td className="px-4 py-2 hidden sm:table-cell text-xs text-muted-foreground">Prejuízo significativo na interação</td>
+                    </tr>
+                    <tr className={`border-b border-border/30 ${total >= 55 && total < 68 ? "font-bold" : ""}`} style={total >= 55 && total < 68 ? { background: "rgba(245,158,11,0.08)" } : {}}>
+                      <td className="px-4 py-2" style={total >= 55 && total < 68 ? { color: "#f59e0b" } : {}}>55 – 67</td>
+                      <td className="px-4 py-2" style={total >= 55 && total < 68 ? { color: "#f59e0b" } : {}}>Nível 2 — Impacto Moderado</td>
+                      <td className="px-4 py-2 hidden sm:table-cell text-xs text-muted-foreground">Interferência parcial no engajamento</td>
+                    </tr>
+                    <tr className={total < 55 ? "font-bold" : ""} style={total < 55 ? { background: "rgba(34,197,94,0.08)" } : {}}>
+                      <td className="px-4 py-2" style={total < 55 ? { color: "#22c55e" } : {}}>{"< 54"}</td>
+                      <td className="px-4 py-2" style={total < 55 ? { color: "#22c55e" } : {}}>Nível 3 — Baixo Impacto</td>
+                      <td className="px-4 py-2 hidden sm:table-cell text-xs text-muted-foreground">Pouca interferência comportamental</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Subtotais por categoria */}
+              <div>
+                <h3 className="text-sm font-bold uppercase text-muted-foreground mb-3">Subtotais por Categoria</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                  {(Object.entries(catTotals) as [ABCCategory, number][]).map(([cat, val]) => (
+                    <div key={cat} className="rounded-xl p-3 text-center border" style={{ background: ABC_CATEGORIES[cat].bg, borderColor: `${ABC_CATEGORIES[cat].color}30` }}>
+                      <p className="text-2xl font-bold font-display" style={{ color: ABC_CATEGORIES[cat].color }}>{val}</p>
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground mt-1">{cat}</p>
+                      <p className="text-[9px] text-muted-foreground">{ABC_CATEGORIES[cat].label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dados do paciente no resultado */}
+              {nome && (
+                <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t border-border/30">
+                  <p><span className="font-semibold text-foreground">Paciente:</span> {nome}</p>
+                  {prontuario && <p><span className="font-semibold text-foreground">Prontuário:</span> {prontuario}</p>}
+                  {dataNasc && <p><span className="font-semibold text-foreground">Nascimento:</span> {new Date(dataNasc + "T00:00:00").toLocaleDateString("pt-BR")}</p>}
+                  <p><span className="font-semibold text-foreground">Data da Aplicação:</span> {new Date(dataApp + "T00:00:00").toLocaleDateString("pt-BR")}</p>
+                </div>
+              )}
+
+              <p className="text-[10px] text-muted-foreground text-center italic">
+                A classificação tem caráter organizacional e não diagnóstico, sendo utilizada exclusivamente para definição de prioridade assistencial e direcionamento terapêutico.
+              </p>
+
+              <button type="button" onClick={handleReset} className="w-full py-2 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all">
+                Nova Avaliação
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-muted-foreground pb-8">{CLINIC_CONFIG.copyright}</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── APP ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -1960,6 +2272,7 @@ export default function App() {
         <Route path="/lista" component={ListaPacientes} />
         <Route path="/editar/:id" component={EditarTriagem} />
         <Route path="/relatorio/:id" component={RelatorioView} />
+        <Route path="/abc" component={ABCChecklist} />
         <Route path="/" component={TriagemFlow} />
       </Switch>
     </WouterRouter>
