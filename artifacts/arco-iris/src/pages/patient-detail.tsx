@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Card, Button, Badge, MotionCard, Input, Label } from "@/components/ui-custom";
 import { generatePatientPdf } from "@/hooks/use-pdf";
-import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon, ShieldOff } from "lucide-react";
+import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon, ShieldOff, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
 import {
@@ -72,6 +72,10 @@ export default function PatientDetail() {
   const [absenceInfo, setAbsenceInfo] = useState<PatientAbsencesInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+
+  // Equipe de Atendimento
+  type TeamMember = { professionalId: number; professionalName: string; specialty: string; status: "Ativo" | "Alta" };
+  const [team, setTeam] = useState<TeamMember[]>([]);
 
   const [triagemEdit, setTriagemEdit] = useState(false);
   const [sPsicologia, setSPsicologia] = useState("");
@@ -203,14 +207,38 @@ export default function PatientDetail() {
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [p, pdf, abs] = await Promise.all([
+      const today = new Date().toISOString().slice(0, 10);
+      const [p, pdf, abs, allApts] = await Promise.all([
         getPatient(patientId),
         getPatientPdf(patientId).catch(() => null),
         getPatientAbsences(patientId).catch(() => null),
+        listAppointments({ patientId }).catch(() => [] as any[]),
       ]);
       setPatient(p);
       setPdfData(pdf);
       setAbsenceInfo(abs);
+      // Derive team from appointments
+      const profMap = new Map<number, { name: string; hasActive: boolean }>();
+      for (const apt of allApts) {
+        const entry = profMap.get(apt.professionalId) || { name: apt.professionalName, hasActive: false };
+        if (["agendado", "atendimento", "presente"].includes(apt.status) && apt.date >= today) {
+          entry.hasActive = true;
+        }
+        entry.name = apt.professionalName;
+        profMap.set(apt.professionalId, entry);
+      }
+      // Get specialties from professionals list
+      const { listProfessionals } = await import("@/lib/arco-rpc");
+      const profs = await listProfessionals().catch(() => []);
+      const profSpecMap = new Map(profs.map((pr: any) => [pr.id, pr.specialty || "—"]));
+      const teamArr: TeamMember[] = Array.from(profMap.entries()).map(([id, info]) => ({
+        professionalId: id,
+        professionalName: info.name,
+        specialty: (profSpecMap.get(id) as string) || "—",
+        status: info.hasActive ? "Ativo" : "Alta",
+      }));
+      teamArr.sort((a, b) => (a.status === "Ativo" ? 0 : 1) - (b.status === "Ativo" ? 0 : 1) || a.specialty.localeCompare(b.specialty));
+      setTeam(teamArr);
     } catch (err: any) {
       toast({
         title: "Erro ao carregar paciente",
@@ -463,6 +491,33 @@ export default function PatientDetail() {
                     <p className="text-base font-semibold mt-1">{patient.localAtendimento}</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Equipe de Atendimento */}
+            {team.length > 0 && (
+              <div className="mt-10">
+                <h2 className="text-xl font-bold font-display mb-6 border-b border-border pb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-primary" /> Equipe de Atendimento
+                </h2>
+                <div className="space-y-2">
+                  {team.map(m => (
+                    <div key={m.professionalId} className={cn("flex items-center justify-between p-3 rounded-xl border transition-colors", m.status === "Ativo" ? "border-emerald-400/40 bg-emerald-50/5" : "border-border/50 bg-secondary/20 opacity-70")}>
+                      <div className="flex items-center gap-3">
+                        <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold", m.status === "Ativo" ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground")}>
+                          {m.specialty.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm text-foreground">{m.professionalName}</p>
+                          <p className="text-xs text-muted-foreground">{m.specialty}</p>
+                        </div>
+                      </div>
+                      <Badge className={m.status === "Ativo" ? "bg-emerald-100 text-emerald-700 border-emerald-300" : "bg-secondary text-muted-foreground border-border"}>
+                        {m.status === "Ativo" ? "Ativo" : "Alta"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
