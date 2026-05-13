@@ -348,7 +348,7 @@ function getPrioridadeBadge(vulnScore: number, clinicalPts: number) {
 
 // ─── HEADER ───────────────────────────────────────────────────────────────────
 
-function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" | "abc" }) {
+function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" }) {
   const navBtn = "px-4 py-1.5 rounded-xl text-white text-xs font-semibold transition-all duration-200 glass";
   const [theme, setTheme] = useTheme();
   const isLight = theme === "light";
@@ -367,7 +367,6 @@ function Header({ page }: { page: "form" | "lista" | "dashboard" | "relatorio" |
         <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end items-center">
           {page !== "dashboard" && <Link href="/dashboard" className={navBtn}>Dashboard</Link>}
           {page !== "lista" && page !== "form" && <Link href="/lista" className={navBtn}>Pacientes</Link>}
-          {page !== "abc" && <Link href="/abc" className={navBtn}>ABC</Link>}
           {page !== "form" && <Link href="/" className={navBtn}>Nova Triagem</Link>}
           {page === "form" && <Link href="/lista" className={navBtn}>Ver Pacientes →</Link>}
           <button
@@ -427,7 +426,7 @@ function GraficoRadar({ porArea }: { porArea: { area: string; pct: number; nivel
 
 // ─── FORMULÁRIO ───────────────────────────────────────────────────────────────
 
-function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void; initialData?: FormData }) {
+function Formulario({ onSubmit, initialData, noHeader }: { onSubmit: (f: FormData) => void; initialData?: FormData; noHeader?: boolean }) {
   const b = initialData;
   const [respostas, setRespostas] = useState<number[]>(b?.respostas ?? Array(PERGUNTAS.length).fill(0));
   const [nomePaciente, setNomePaciente] = useState(b?.nomePaciente ?? "");
@@ -509,8 +508,8 @@ function Formulario({ onSubmit, initialData }: { onSubmit: (f: FormData) => void
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header page="form" />
+    <div className={noHeader ? "" : "min-h-screen bg-background"}>
+      {!noHeader && <Header page="form" />}
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
 
         {/* ── Tipo de Registro – Censo PCD ── */}
@@ -1947,8 +1946,47 @@ function EditarTriagem() {
 
 function TriagemFlow() {
   const [formData, setFormData] = useState<FormData | null>(null);
+  const [mode, setMode] = useState<"triagem" | "abc">("triagem");
+
   if (formData) return <Relatorio formData={formData} onNova={() => setFormData(null)} />;
-  return <Formulario onSubmit={setFormData} />;
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <Header page="form" />
+      {/* Seletor de modo */}
+      <div className="max-w-5xl mx-auto px-4 pt-6">
+        <div className="flex gap-2 p-1 rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm w-fit mx-auto">
+          <button
+            type="button"
+            onClick={() => setMode("triagem")}
+            className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${
+              mode === "triagem"
+                ? "bg-primary text-primary-foreground shadow-lg"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Triagem Multidisciplinar
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("abc")}
+            className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${
+              mode === "abc"
+                ? "bg-violet-600 text-white shadow-lg shadow-violet-600/30"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            ABC — Checklist Autismo
+          </button>
+        </div>
+      </div>
+      {mode === "triagem" ? (
+        <Formulario onSubmit={setFormData} noHeader />
+      ) : (
+        <ABCChecklistContent />
+      )}
+    </div>
+  );
 }
 
 // ─── ABC CHECKLIST ────────────────────────────────────────────────────────────
@@ -2036,7 +2074,7 @@ function classifyABC(total: number): { nivel: string; label: string; desc: strin
   return { nivel: "Nível 3", label: "Baixo Impacto", desc: "Pouca interferência comportamental na participação e nas atividades", color: "#22c55e", bg: "rgba(34,197,94,0.12)" };
 }
 
-function ABCChecklist() {
+function ABCChecklistContent() {
   const [checked, setChecked] = useState<Record<number, boolean>>({});
   const [nome, setNome] = useState("");
   const [prontuario, setProntuario] = useState("");
@@ -2065,8 +2103,6 @@ function ABCChecklist() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <Header page="abc" />
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         {/* Título */}
         <div className="text-center space-y-2">
@@ -2258,7 +2294,6 @@ function ABCChecklist() {
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground pb-8">{CLINIC_CONFIG.copyright}</p>
       </div>
-    </div>
   );
 }
 
@@ -2272,7 +2307,6 @@ export default function App() {
         <Route path="/lista" component={ListaPacientes} />
         <Route path="/editar/:id" component={EditarTriagem} />
         <Route path="/relatorio/:id" component={RelatorioView} />
-        <Route path="/abc" component={ABCChecklist} />
         <Route path="/" component={TriagemFlow} />
       </Switch>
     </WouterRouter>
