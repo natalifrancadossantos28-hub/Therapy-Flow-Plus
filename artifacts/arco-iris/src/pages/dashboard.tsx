@@ -13,22 +13,22 @@ import {
   type WaitingListEntry,
   type LongAttendancePatient,
 } from "@/lib/arco-rpc";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3 } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor, calcIdade } from "@/lib/utils";
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from "recharts";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 // ── Faixas Etárias ────────────────────────────────────────────────────────────
 const FAIXAS = [
-  { key: "bebe",      label: "Bebês",           emoji: "👶", range: "0–2 anos",   min: 0,  max: 2,  cor: "#a78bfa" },
-  { key: "inf1",      label: "1ª Infância",     emoji: "🧒", range: "3–6 anos",   min: 3,  max: 6,  cor: "#34d399" },
-  { key: "inf2",      label: "2ª Infância",     emoji: "🧒", range: "7–10 anos",  min: 7,  max: 10, cor: "#00d4ff" },
-  { key: "adol",      label: "Adolescentes",    emoji: "🧑", range: "11–18 anos", min: 11, max: 18, cor: "#f97316", alerta: true },
-  { key: "adulto",    label: "Adultos",         emoji: "👤", range: "18+ anos",   min: 19, max: 999,cor: "#ff2060" },
+  { key: "bebe",      label: "Bebês",           emoji: "🍼", range: "0–2 anos",   min: 0,  max: 2,  cor: "#c084fc" },
+  { key: "inf1",      label: "1ª Infância",     emoji: "🧒", range: "3–6 anos",   min: 3,  max: 6,  cor: "#4ade80" },
+  { key: "inf2",      label: "2ª Infância",     emoji: "📚", range: "7–10 anos",  min: 7,  max: 10, cor: "#38bdf8" },
+  { key: "adol",      label: "Adolescentes",    emoji: "🎓", range: "11–18 anos", min: 11, max: 18, cor: "#fb923c", alerta: true },
+  { key: "adulto",    label: "Adultos",         emoji: "🧑‍🦱", range: "18+ anos",   min: 19, max: 999,cor: "#f43f5e" },
   { key: "sem_data",  label: "Sem data nasc.",  emoji: "❓", range: "—",          min: -1, max: -1, cor: "#64748b" },
 ] as const;
 
@@ -64,6 +64,8 @@ export default function Dashboard() {
   const [aptStats, setAptStats] = useState<Stats | null>(null);
   const [ocupacao, setOcupacao] = useState<Ocupacao[]>([]);
   const [longAttendance, setLongAttendance] = useState<LongAttendancePatient[]>([]);
+  const [perfFilter, setPerfFilter] = useState<"mes" | "total">("mes");
+  const [histFilter, setHistFilter] = useState<"ano" | "acumulado">("ano");
 
   const fetchAll = useCallback(() => {
     listPatients().then(setPatients).catch(console.error);
@@ -160,6 +162,64 @@ export default function Dashboard() {
     { name: "Faltas", value: heartbeat.falta, fill: "#f87171" },
   ];
 
+  // ── Performance dos Profissionais ─────────────────────────────────────────
+  const performanceData = useMemo(() => {
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    const profMap: Record<number, { name: string; specialty: string; altas: number; atendimentos: number }> = {};
+    for (const prof of professionals || []) {
+      profMap[prof.id] = { name: prof.name, specialty: prof.specialty || "", altas: 0, atendimentos: 0 };
+    }
+
+    for (const p of patients || []) {
+      if (!p.professionalId || !profMap[p.professionalId]) continue;
+      const isAlta = (p.status || "").toLowerCase() === "alta";
+      if (isAlta) {
+        if (perfFilter === "total") {
+          profMap[p.professionalId].altas++;
+        } else {
+          const updStr = p.updatedAt || p.createdAt || "";
+          if (updStr.slice(0, 7) === mesAtual) {
+            profMap[p.professionalId].altas++;
+          }
+        }
+      }
+    }
+
+    for (const a of todayAppointments || []) {
+      const st = (a.status || "").toLowerCase();
+      const profId = a.professionalId;
+      if (!profId || !profMap[profId]) continue;
+      if (st === "presente" || st === "atendimento") {
+        profMap[profId].atendimentos++;
+      }
+    }
+
+    if (perfFilter === "total") {
+      for (const p of patients || []) {
+        if (!p.professionalId || !profMap[p.professionalId]) continue;
+        const st = (p.status || "").toLowerCase();
+        if (st === "atendimento" || st === "em atendimento") {
+          profMap[p.professionalId].atendimentos++;
+        }
+      }
+    }
+
+    const arr = Object.entries(profMap).map(([id, d]) => ({
+      id: Number(id),
+      name: d.name.split(" ")[0],
+      fullName: d.name,
+      specialty: d.specialty,
+      altas: d.altas,
+      atendimentos: perfFilter === "total" ? d.atendimentos : d.atendimentos,
+    }));
+
+    const byAltas = [...arr].sort((a, b) => b.altas - a.altas).filter(x => x.altas > 0);
+    const byAtend = [...arr].sort((a, b) => b.atendimentos - a.atendimentos).filter(x => x.atendimentos > 0);
+
+    return { byAltas, byAtend, chartData: arr.filter(x => x.altas > 0 || x.atendimentos > 0).sort((a, b) => (b.altas + b.atendimentos) - (a.altas + a.atendimentos)).slice(0, 10) };
+  }, [patients, professionals, todayAppointments, perfFilter]);
 
   // ── Perfil de pacientes por profissional ──────────────────────────────────
   const profPerfil = useMemo(() => {
@@ -327,21 +387,47 @@ export default function Dashboard() {
         )}
       </Card>
 
-      {/* Histórico de Crescimento + Pacientes de Hoje */}
+      {/* Histórico de Crescimento + Performance dos Profissionais */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Histórico por ano */}
         <Card className="p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <CalendarDays className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-bold font-display">Histórico de Pacientes</h2>
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-bold font-display">Histórico de Pacientes</h2>
+            </div>
+            <div className="flex gap-1">
+              <button onClick={() => setHistFilter("ano")} className={cn("px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-all", histFilter === "ano" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground")}>
+                Por Ano
+              </button>
+              <button onClick={() => setHistFilter("acumulado")} className={cn("px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-all", histFilter === "acumulado" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground")}>
+                Acumulado
+              </button>
+            </div>
           </div>
           <div className="space-y-3">
-            {anos.map(ano => (
-              <div key={ano} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border/50">
-                <span className="font-semibold text-foreground">{ano}</span>
-                <span className="font-bold text-lg text-primary">{byYear[ano] || 0}</span>
-              </div>
-            ))}
+            {histFilter === "ano" ? (
+              <>
+                {anos.map(ano => (
+                  <div key={ano} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border/50">
+                    <span className="font-semibold text-foreground">{ano}</span>
+                    <span className="font-bold text-lg text-primary">{byYear[ano] || 0}</span>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <>
+                {anos.map((ano, i) => {
+                  const acum = anos.slice(0, i + 1).reduce((s, a) => s + (byYear[a] || 0), 0);
+                  return (
+                    <div key={ano} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border/50">
+                      <span className="font-semibold text-foreground">Até {ano}</span>
+                      <span className="font-bold text-lg text-primary">{acum}</span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
             <div className="flex items-center justify-between p-3 rounded-xl bg-primary/10 border border-primary/20 mt-2">
               <span className="font-bold text-foreground">Total geral</span>
               <span className="font-bold text-xl text-primary">{totalPatients}</span>
@@ -349,46 +435,82 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* Atendimentos Hoje */}
-        <Card className="lg:col-span-2 p-6 flex flex-col">
-          <div className="flex justify-between items-center mb-6">
+        {/* Performance dos Profissionais */}
+        <Card className="lg:col-span-2 p-6 flex flex-col border-[rgba(168,85,247,0.25)] shadow-[0_0_28px_rgba(168,85,247,0.08)]">
+          <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
             <h2 className="text-xl font-bold font-display flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-primary" />
-              Atendimentos Hoje
+              <Trophy className="w-5 h-5 text-amber-400" style={{ filter: "drop-shadow(0 0 6px rgba(251,191,36,0.7))" }} />
+              Performance dos Profissionais
             </h2>
-            <Link href="/reception" className="text-sm font-semibold text-primary hover:underline">Ver Recepção</Link>
+            <div className="flex gap-1">
+              <button onClick={() => setPerfFilter("mes")} className={cn("px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all", perfFilter === "mes" ? "bg-amber-500/20 text-amber-400 border border-amber-400/40" : "text-muted-foreground hover:text-foreground border border-transparent")}>
+                Mês Atual
+              </button>
+              <button onClick={() => setPerfFilter("total")} className={cn("px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all", perfFilter === "total" ? "bg-amber-500/20 text-amber-400 border border-amber-400/40" : "text-muted-foreground hover:text-foreground border border-transparent")}>
+                Total Geral
+              </button>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-auto max-h-[400px]">
-            {todayCount === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                  <ClipboardList className="w-8 h-8 text-muted-foreground" />
-                </div>
-                <p className="text-foreground font-semibold">Nenhum atendimento hoje</p>
-                <p className="text-sm text-muted-foreground">A agenda está livre por enquanto.</p>
+          {performanceData.chartData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center flex-1 py-12 text-center">
+              <Trophy className="w-10 h-10 text-muted-foreground/40 mb-2" />
+              <p className="text-sm text-muted-foreground">Nenhum dado de performance disponível{perfFilter === "mes" ? " este mês" : ""}.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6 flex-1">
+              {/* Gráfico de barras */}
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={performanceData.chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "rgba(210,230,255,0.7)" }} />
+                    <YAxis tick={{ fontSize: 10, fill: "rgba(150,180,220,0.6)" }} allowDecimals={false} />
+                    <Tooltip contentStyle={{ background: "hsl(222 50% 8%)", border: "1px solid rgba(168,85,247,0.25)", borderRadius: 12, color: "#e0f0ff", boxShadow: "0 0 20px rgba(168,85,247,0.1)" }} />
+                    <Bar dataKey="altas" name="Altas" fill="#a855f7" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="atendimentos" name="Atendimentos" fill="#22d3ee" radius={[6, 6, 0, 0]} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: "rgba(210,230,255,0.7)" }} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {todayAppointments?.slice(0, 6).map(apt => {
-                  const pront = apt.prontuario || patients.find(p => p.id === apt.patientId)?.prontuario || "";
-                  return (
-                  <div key={apt.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50 bg-secondary/20 hover:bg-secondary/40 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold font-display text-sm">
-                        {apt.time}
+
+              {/* Rankings lado a lado */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Ranking Altas */}
+                <div>
+                  <p className="text-xs font-bold uppercase text-purple-400 mb-2 flex items-center gap-1"><Star className="w-3 h-3" /> Quem mais dá Alta</p>
+                  <div className="space-y-1.5">
+                    {performanceData.byAltas.slice(0, 5).map((p, i) => (
+                      <div key={p.id} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: i === 0 ? "rgba(168,85,247,0.12)" : "rgba(168,85,247,0.04)", border: `1px solid ${i === 0 ? "rgba(168,85,247,0.4)" : "rgba(168,85,247,0.1)"}` }}>
+                        <span className="text-sm font-bold w-5" style={{ color: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#d97706" : "#64748b" }}>
+                          {i === 0 ? "\ud83e\udd47" : i === 1 ? "\ud83e\udd48" : i === 2 ? "\ud83e\udd49" : `${i + 1}`}
+                        </span>
+                        <span className="text-xs font-semibold text-foreground flex-1 truncate">{p.fullName}</span>
+                        <span className="text-sm font-bold text-purple-400">{p.altas}</span>
                       </div>
-                      <div>
-                        <p className="font-semibold text-foreground">{pront ? `${pront} - ` : ""}{apt.patientName}</p>
-                        <p className="text-sm text-muted-foreground">{apt.professionalName} • {apt.professionalSpecialty}</p>
-                      </div>
-                    </div>
-                    <Badge className={getStatusColor(apt.status)}>{apt.status}</Badge>
+                    ))}
+                    {performanceData.byAltas.length === 0 && <p className="text-xs text-muted-foreground italic px-3">Nenhuma alta registrada</p>}
                   </div>
-                  );})}
+                </div>
+                {/* Ranking Atendimentos */}
+                <div>
+                  <p className="text-xs font-bold uppercase text-cyan-400 mb-2 flex items-center gap-1"><BarChart3 className="w-3 h-3" /> Quem mais atende</p>
+                  <div className="space-y-1.5">
+                    {performanceData.byAtend.slice(0, 5).map((p, i) => (
+                      <div key={p.id} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: i === 0 ? "rgba(34,211,238,0.12)" : "rgba(34,211,238,0.04)", border: `1px solid ${i === 0 ? "rgba(34,211,238,0.4)" : "rgba(34,211,238,0.1)"}` }}>
+                        <span className="text-sm font-bold w-5" style={{ color: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#d97706" : "#64748b" }}>
+                          {i === 0 ? "\ud83e\udd47" : i === 1 ? "\ud83e\udd48" : i === 2 ? "\ud83e\udd49" : `${i + 1}`}
+                        </span>
+                        <span className="text-xs font-semibold text-foreground flex-1 truncate">{p.fullName}</span>
+                        <span className="text-sm font-bold text-cyan-400">{p.atendimentos}</span>
+                      </div>
+                    ))}
+                    {performanceData.byAtend.length === 0 && <p className="text-xs text-muted-foreground italic px-3">Nenhum atendimento registrado</p>}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </Card>
       </div>
 
