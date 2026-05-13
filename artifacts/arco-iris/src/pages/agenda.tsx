@@ -338,6 +338,7 @@ export default function Agenda() {
   const [encMotivo, setEncMotivo] = useState("");
   const [encErro, setEncErro] = useState("");
   const [encSending, setEncSending] = useState(false);
+  const [encManterAgenda, setEncManterAgenda] = useState(true);
 
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
@@ -656,6 +657,7 @@ export default function Agenda() {
     setEncEspecialidade("");
     setEncMotivo("");
     setEncErro("");
+    setEncManterAgenda(true);
   };
 
   const confirmEncaminhamento = async () => {
@@ -682,8 +684,13 @@ export default function Agenda() {
           notes: `${prevNotes}[ENCAMINHAMENTO ${new Date().toLocaleDateString("pt-BR")}] ${encEspecialidade}${motivoTexto}`,
         });
       } catch { /* fila já registra o motivo como fallback */ }
+      // Se escolheu remover da agenda atual, deleta os agendamentos futuros
+      if (!encManterAgenda) {
+        try { await deleteAppointmentAlta(encApt.id); } catch { /* best-effort */ }
+      }
       setEncApt(null);
-      toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}. Motivo registrado no prontuário.` });
+      toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.${encManterAgenda ? " Mantido na agenda atual." : " Removido da agenda atual."}` });
+      fetchAppointments();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha inesperada.";
       toast({ title: "Erro ao encaminhar", description: msg, variant: "destructive" });
@@ -1371,6 +1378,25 @@ export default function Agenda() {
                   onFocus={e => { e.currentTarget.style.borderColor = "#c026d3"; e.currentTarget.style.boxShadow = "0 0 10px rgba(192,38,211,0.3)"; }}
                   onBlur={e => { e.currentTarget.style.borderColor = "rgba(192,38,211,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
                 />
+              </div>
+
+              <div className="mb-4">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={encManterAgenda}
+                    onChange={e => setEncManterAgenda(e.target.checked)}
+                    className="w-4 h-4 rounded accent-fuchsia-500"
+                  />
+                  <span className="text-xs font-semibold" style={{ color: encManterAgenda ? "#e879f9" : "#f87171" }}>
+                    {encManterAgenda ? "Manter na minha agenda" : "Remover da minha agenda"}
+                  </span>
+                </label>
+                <p className="text-[10px] text-white/40 mt-1 ml-6">
+                  {encManterAgenda
+                    ? "O paciente continuará nos seus horários atuais."
+                    : "Os agendamentos futuros com este profissional serão removidos."}
+                </p>
               </div>
 
               <div className="flex gap-3">
