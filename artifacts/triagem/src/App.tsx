@@ -176,10 +176,10 @@ const PERGUNTAS: Pergunta[] = [
 ];
 
 const ESCALA = [
-  { valor: 0, label: "0 – Não apresenta" },
-  { valor: 1, label: "1 – Leve" },
-  { valor: 2, label: "2 – Moderado" },
-  { valor: 3, label: "3 – Frequente" },
+  { valor: 0, label: "0 – Nunca" },
+  { valor: 1, label: "1 – Às vezes" },
+  { valor: 2, label: "2 – Quase sempre" },
+  { valor: 3, label: "3 – Sempre" },
 ];
 
 const ESCOLARIDADE_OPTIONS = [
