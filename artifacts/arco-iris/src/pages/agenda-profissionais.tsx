@@ -70,7 +70,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
-type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; };
+type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; };
 
 type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
@@ -234,7 +234,7 @@ export default function AgendaProfissionais() {
       const apt = todayApts.find(a => a.time === time);
       return `<tr>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:700;color:#059669;">${time}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? (apt.patientName || `Paciente #${apt.patientId}`) : '<span style="color:#9ca3af;font-style:italic">Livre</span>'}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? `${apt.prontuario ? `<strong style="color:#06b6d4">[${apt.prontuario}]</strong> ` : ''}${apt.patientName || `Paciente #${apt.patientId}`}` : '<span style="color:#9ca3af;font-style:italic">Livre</span>'}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? apt.status : ""}</td>
       </tr>`;
     }).join("");
@@ -266,7 +266,7 @@ export default function AgendaProfissionais() {
             const apt = todayApts.find(a => a.time === time);
             return `<tr>
               <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:700;color:#059669;">${time}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? (apt.patientName || `Paciente #${apt.patientId}`) : '<span style="color:#9ca3af;font-style:italic">Livre</span>'}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? `${apt.prontuario ? `<strong style="color:#06b6d4">[${apt.prontuario}]</strong> ` : ''}${apt.patientName || `Paciente #${apt.patientId}`}` : '<span style="color:#9ca3af;font-style:italic">Livre</span>'}</td>
               <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? apt.status : ""}</td>
             </tr>`;
           }).join("")}
@@ -276,7 +276,7 @@ export default function AgendaProfissionais() {
             const apt = todayApts.find(a => a.time === time);
             return `<tr>
               <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:700;color:#059669;">${time}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? (apt.patientName || `Paciente #${apt.patientId}`) : '<span style="color:#9ca3af;font-style:italic">Livre</span>'}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? `${apt.prontuario ? `<strong style="color:#06b6d4">[${apt.prontuario}]</strong> ` : ''}${apt.patientName || `Paciente #${apt.patientId}`}` : '<span style="color:#9ca3af;font-style:italic">Livre</span>'}</td>
               <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? apt.status : ""}</td>
             </tr>`;
           }).join("")}
@@ -788,7 +788,10 @@ export default function AgendaProfissionais() {
                                           }}
                                         >
                                           <div className="flex items-center justify-between gap-1">
-                                            <p className="font-bold text-foreground truncate text-xs leading-tight">{apt.patientName || `Paciente #${apt.patientId}`}</p>
+                                            <p className="font-bold text-foreground truncate text-xs leading-tight">
+                                              {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
+                                              {apt.patientName || `Paciente #${apt.patientId}`}
+                                            </p>
                                             {/* Cadeado visível quando Presente — status vem da recepção */}
                                             {isPresente && (
                                               <Lock className="w-3 h-3 shrink-0" style={{ color: "#22d3ee", filter: "drop-shadow(0 0 4px rgba(6,182,212,0.7))" }} />

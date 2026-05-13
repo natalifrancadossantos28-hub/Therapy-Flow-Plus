@@ -934,6 +934,7 @@ export type AppointmentListItem = {
   escolaPublica: boolean;
   trabalhoNaRoca: boolean;
   consecutiveUnjustifiedAbsences: number;
+  prontuario: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -957,6 +958,7 @@ type AppointmentListRow = {
   escola_publica: boolean | null;
   trabalho_na_roca: boolean | null;
   consecutive_unjustified_absences: number | string | null;
+  prontuario: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -981,6 +983,7 @@ function mapAppointmentListItem(r: AppointmentListRow): AppointmentListItem {
     escolaPublica: !!r.escola_publica,
     trabalhoNaRoca: !!r.trabalho_na_roca,
     consecutiveUnjustifiedAbsences: Number(r.consecutive_unjustified_absences ?? 0),
+    prontuario: r.prontuario ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
