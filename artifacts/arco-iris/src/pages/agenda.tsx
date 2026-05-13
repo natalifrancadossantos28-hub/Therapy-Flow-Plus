@@ -115,6 +115,7 @@ type Appointment = {
   escolaPublica?: boolean | null;
   trabalhoNaRoca?: boolean | null;
   consecutiveUnjustifiedAbsences?: number | null;
+  prontuario?: string | null;
 };
 
 type AbsenceAlert = {
@@ -1030,6 +1031,7 @@ export default function Agenda() {
                                     }}
                                   >
                                     <span className="font-bold text-foreground truncate text-xs leading-tight">
+                                      {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
                                       {apt.patientName || `Paciente #${apt.patientId}`}
                                     </span>
                                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
