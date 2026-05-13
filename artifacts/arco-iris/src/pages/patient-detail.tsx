@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Card, Button, Badge, MotionCard, Input, Label } from "@/components/ui-custom";
 import { generatePatientPdf } from "@/hooks/use-pdf";
-import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
 import {
@@ -86,6 +86,58 @@ export default function PatientDetail() {
 
   const [addingToFila, setAddingToFila] = useState(false);
   const [, navigate] = useLocation();
+
+  // Edição de dados pessoais
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDob, setEditDob] = useState("");
+  const [editCpf, setEditCpf] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editGuardianName, setEditGuardianName] = useState("");
+  const [editGuardianPhone, setEditGuardianPhone] = useState("");
+  const [editDiagnosis, setEditDiagnosis] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEditModal = () => {
+    if (!patient) return;
+    setEditName(patient.name || "");
+    setEditDob(patient.dateOfBirth || "");
+    setEditCpf(patient.cpf || "");
+    setEditPhone(patient.phone || "");
+    setEditEmail(patient.email || "");
+    setEditGuardianName(patient.guardianName || "");
+    setEditGuardianPhone(patient.guardianPhone || "");
+    setEditDiagnosis(patient.diagnosis || "");
+    setEditNotes(patient.notes || "");
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!patient || !editName.trim()) return;
+    setSavingEdit(true);
+    try {
+      const updated = await upsertPatient(patientId, {
+        name: editName.trim(),
+        dateOfBirth: editDob || null,
+        cpf: editCpf || null,
+        phone: editPhone || null,
+        email: editEmail || null,
+        guardianName: editGuardianName || null,
+        guardianPhone: editGuardianPhone || null,
+        diagnosis: editDiagnosis || null,
+        notes: editNotes || null,
+      });
+      setPatient(updated);
+      setEditOpen(false);
+      toast({ title: "Dados atualizados!", description: "As informações do paciente foram salvas com sucesso." });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar", description: err?.message || "Falha inesperada.", variant: "destructive" });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -279,6 +331,9 @@ export default function PatientDetail() {
           </div>
         </div>
         <div className="flex gap-3 flex-wrap">
+          <Button variant="outline" onClick={openEditModal} className="gap-2">
+            <Pencil className="w-4 h-4" /> Editar Dados
+          </Button>
           <Button variant="outline" onClick={handleDownloadPdf} disabled={!pdfData} className="gap-2">
             <Download className="w-4 h-4" /> Gerar PDF
           </Button>
@@ -541,6 +596,94 @@ export default function PatientDetail() {
               <Button onClick={saveTriagem} disabled={savingTriagem}>{savingTriagem ? "Salvando..." : "Salvar Triagem"}</Button>
             </div>
           </MotionCard>
+        </div>
+      )}
+
+      {/* ── Modal Editar Dados ── */}
+      {editOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEditOpen(false)}>
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl bg-card border border-border max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-cyan-100 text-cyan-600">
+                    <Pencil className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">Editar Dados do Paciente</h3>
+                    <p className="text-xs text-muted-foreground">Altere os campos e clique em Salvar</p>
+                  </div>
+                </div>
+                <button onClick={() => setEditOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <XIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-semibold">Nome *</Label>
+                  <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Nome completo" className="mt-1" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-semibold">Data de Nascimento</Label>
+                    <Input value={editDob} onChange={e => setEditDob(e.target.value)} placeholder="DD/MM/AAAA" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold">CPF</Label>
+                    <Input value={editCpf} onChange={e => setEditCpf(e.target.value)} placeholder="000.000.000-00" className="mt-1" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-semibold">Telefone</Label>
+                    <Input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="(00) 0 0000-0000" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold">Email</Label>
+                    <Input value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="email@exemplo.com" className="mt-1" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-semibold">Responsável</Label>
+                    <Input value={editGuardianName} onChange={e => setEditGuardianName(e.target.value)} placeholder="Nome do responsável" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold">Tel. Responsável</Label>
+                    <Input value={editGuardianPhone} onChange={e => setEditGuardianPhone(e.target.value)} placeholder="(00) 0 0000-0000" className="mt-1" />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Diagnóstico / Motivo</Label>
+                  <Input value={editDiagnosis} onChange={e => setEditDiagnosis(e.target.value)} placeholder="Diagnóstico ou motivo do encaminhamento" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Observações</Label>
+                  <textarea
+                    value={editNotes}
+                    onChange={e => setEditNotes(e.target.value)}
+                    placeholder="Observações adicionais..."
+                    rows={3}
+                    className="w-full rounded-xl text-sm p-3 resize-none mt-1 bg-secondary/30 border border-border text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <Button variant="ghost" className="flex-1" onClick={() => setEditOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={saveEdit}
+                  disabled={!editName.trim() || savingEdit}
+                  className="flex-1 gap-2 bg-cyan-600 hover:bg-cyan-700 text-white"
+                >
+                  <Pencil className="w-4 h-4" /> {savingEdit ? "Salvando..." : "Salvar Alterações"}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
