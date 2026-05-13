@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ArrowRightLeft, UserX, XOctagon } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ArrowRightLeft, UserX, XOctagon, Users } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
@@ -70,7 +70,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
-type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; };
+type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; };
 
 type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
@@ -748,6 +748,8 @@ export default function AgendaProfissionais() {
                                     const isRescheduled   = isRemarcado || isRemanejado;
                                     const isFaltaJust     = s === "falta_justificada" || s === "justificado" || s === "abonado";
                                     const isFaltaNaoJust  = s === "falta_nao_justificada" || s === "ausente";
+                                    const isMulti = !!(apt.notes && apt.notes.startsWith("Atendimento Multi com "));
+                                    const multiPartner = isMulti ? apt.notes!.replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "") : null;
 
                                     return (
                                       <div className="relative">
@@ -766,7 +768,8 @@ export default function AgendaProfissionais() {
                                             isRemarcado     && "border-yellow-400/50 bg-yellow-950/10",
                                             isRemanejado    && "border-orange-400/50 bg-orange-950/10",
                                             isFaltaJust     && "border-cyan-500/40 bg-[rgba(6,182,212,0.04)]",
-                                            !isPresente && !isAtendimento && !isDesmarcado && !isFaltaNaoJust && !isRescheduled && !isFaltaJust && "bg-secondary/50 border-border cursor-pointer hover:border-primary/40",
+                                            isMulti && !isDesmarcado && !isRescheduled && "border-violet-400/60 bg-violet-950/10",
+                                            !isPresente && !isAtendimento && !isDesmarcado && !isFaltaNaoJust && !isRescheduled && !isFaltaJust && !isMulti && "bg-secondary/50 border-border cursor-pointer hover:border-primary/40",
                                             !isPresente && "cursor-pointer",
                                             isPresente && "cursor-default",
                                             isMenuOpen && "ring-2 ring-primary/40",
@@ -798,6 +801,11 @@ export default function AgendaProfissionais() {
                                             )}
                                           </div>
                                           <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
+                                          {isMulti && multiPartner && (
+                                            <span className="text-[9px] text-violet-400 font-semibold flex items-center gap-0.5">
+                                              <Users className="w-2.5 h-2.5" /> Multi: {selectedProf?.name?.split(" ")[0]} & {multiPartner.split(" ")[0]}
+                                            </span>
+                                          )}
                                         </div>
 
                                         {isMenuOpen && !isPresente && (
