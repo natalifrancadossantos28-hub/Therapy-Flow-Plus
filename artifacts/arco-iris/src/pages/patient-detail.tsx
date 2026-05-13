@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Card, Button, Badge, MotionCard, Input, Label } from "@/components/ui-custom";
 import { generatePatientPdf } from "@/hooks/use-pdf";
-import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon } from "lucide-react";
+import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon, ShieldOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
 import {
@@ -12,6 +12,8 @@ import {
   upsertPatient,
   deletePatient,
   addPatientToFila,
+  listAppointments,
+  updateAppointment,
   type Patient,
   type PatientPdfData,
   type PatientAbsencesInfo,
@@ -99,6 +101,65 @@ export default function PatientDetail() {
   const [editDiagnosis, setEditDiagnosis] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Afastamento
+  const [afastOpen, setAfastOpen] = useState(false);
+  const [afastInicio, setAfastInicio] = useState("");
+  const [afastFim, setAfastFim] = useState("");
+  const [afastMotivo, setAfastMotivo] = useState("");
+  const [afastSaving, setAfastSaving] = useState(false);
+
+  const openAfastModal = () => {
+    setAfastInicio("");
+    setAfastFim("");
+    setAfastMotivo("");
+    setAfastOpen(true);
+  };
+
+  const saveAfastamento = async () => {
+    if (!patient || !afastInicio || !afastFim) return;
+    if (afastFim < afastInicio) {
+      toast({ title: "Data inv\u00e1lida", description: "A data fim deve ser posterior \u00e0 data in\u00edcio.", variant: "destructive" });
+      return;
+    }
+    setAfastSaving(true);
+    try {
+      const apts = await listAppointments({
+        patientId: patientId,
+        dateFrom: afastInicio,
+        dateTo: afastFim,
+      });
+      const toJustify = apts.filter(a =>
+        a.status !== "falta_justificada" &&
+        a.status !== "alta" &&
+        a.status !== "desmarcado" &&
+        a.status !== "cancelado"
+      );
+      let count = 0;
+      for (const a of toJustify) {
+        try {
+          await updateAppointment(a.id, { status: "falta_justificada" });
+          count++;
+        } catch { /* best-effort */ }
+      }
+      // Registra no prontu\u00e1rio
+      try {
+        const existing = await getPatient(patientId);
+        const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
+        const motivoTxt = afastMotivo.trim() ? ` \u2014 ${afastMotivo.trim()}` : "";
+        await upsertPatient(patientId, {
+          notes: `${prevNotes}[AFASTAMENTO ${afastInicio} a ${afastFim}]${motivoTxt}`,
+        });
+      } catch { /* best-effort */ }
+      setAfastOpen(false);
+      toast({ title: "Afastamento registrado!", description: `${count} agendamento(s) marcado(s) como Falta Justificada no per\u00edodo.` });
+      await load();
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message || "Falha ao registrar afastamento.", variant: "destructive" });
+    } finally {
+      setAfastSaving(false);
+    }
+  };
 
   const openEditModal = () => {
     if (!patient) return;
@@ -345,6 +406,11 @@ export default function PatientDetail() {
           {naFila && (
             <Button variant="outline" disabled className="gap-2 text-orange-600 border-orange-300 cursor-default">
               <Clock className="w-4 h-4" /> Na Fila de Espera
+            </Button>
+          )}
+          {emAtendimento && (
+            <Button variant="outline" onClick={openAfastModal} className="gap-2 border-amber-400/50 text-amber-500 hover:bg-amber-500/10">
+              <ShieldOff className="w-4 h-4" /> Registrar Afastamento
             </Button>
           )}
           <Button variant="destructive" onClick={handleDischarge} disabled={deleting || patient.status === "Alta"} className="gap-2">
@@ -596,6 +662,70 @@ export default function PatientDetail() {
               <Button onClick={saveTriagem} disabled={savingTriagem}>{savingTriagem ? "Salvando..." : "Salvar Triagem"}</Button>
             </div>
           </MotionCard>
+        </div>
+      )}
+
+      {/* ── Modal Afastamento ── */}
+      {afastOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setAfastOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl bg-card border border-border" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-100 text-amber-600">
+                    <ShieldOff className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">Registrar Afastamento</h3>
+                    <p className="text-xs text-muted-foreground">{patient?.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setAfastOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <XIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-sm text-muted-foreground mb-4">
+                Todos os agendamentos deste paciente no período serão marcados automaticamente como <strong className="text-amber-500">Falta Justificada</strong>.
+              </p>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-semibold">Data Início *</Label>
+                    <Input type="date" value={afastInicio} onChange={e => setAfastInicio(e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold">Data Fim *</Label>
+                    <Input type="date" value={afastFim} onChange={e => setAfastFim(e.target.value)} className="mt-1" />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Motivo do Afastamento</Label>
+                  <textarea
+                    value={afastMotivo}
+                    onChange={e => setAfastMotivo(e.target.value)}
+                    placeholder="Ex: Quebrou o pé, ficará 90 dias afastado..."
+                    rows={3}
+                    className="w-full rounded-xl text-sm p-3 resize-none mt-1 bg-secondary/30 border border-border text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <Button variant="ghost" className="flex-1" onClick={() => setAfastOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={saveAfastamento}
+                  disabled={!afastInicio || !afastFim || afastSaving}
+                  className="flex-1 gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  <ShieldOff className="w-4 h-4" /> {afastSaving ? "Processando..." : "Confirmar Afastamento"}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

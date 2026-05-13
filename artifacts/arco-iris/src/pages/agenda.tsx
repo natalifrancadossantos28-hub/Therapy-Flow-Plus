@@ -1011,6 +1011,7 @@ export default function Agenda() {
                                     const isMulti = !!(apt.notes && apt.notes.startsWith("Atendimento Multi com "));
                                     const multiPartner = isMulti ? apt.notes!.replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "") : null;
                                     const isMenuOpen = actionMenuId === apt.id;
+                                    const isPastDate = date < today;
                                     return (
                                 <div key={apt.id} className="relative" ref={isMenuOpen ? menuRef : null}>
                                   {/* Appointment block */}
@@ -1086,6 +1087,9 @@ export default function Agenda() {
                                       }}
                                     >
                                       <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
+                                      {isPastDate && isAdmin && (
+                                        <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⏪ Ajuste Retroativo (Admin)</p>
+                                      )}
 
                                       <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
                                         <Activity className="w-3.5 h-3.5" /> Em Atendimento
