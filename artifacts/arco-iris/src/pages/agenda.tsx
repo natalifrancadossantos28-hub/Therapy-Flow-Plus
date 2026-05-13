@@ -6,7 +6,7 @@ import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2
+  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
@@ -116,6 +116,7 @@ type Appointment = {
   trabalhoNaRoca?: boolean | null;
   consecutiveUnjustifiedAbsences?: number | null;
   prontuario?: string | null;
+  notes?: string | null;
 };
 
 type AbsenceAlert = {
@@ -734,6 +735,8 @@ export default function Agenda() {
         notes: `Atendimento Multi com ${currentProf.name} (${currentProf.specialty || "—"})`,
         noRecurrence: true,
       });
+      // Marca o appointment original como Multi também
+      await updateAppointment(multiApt.id, { notes: `Atendimento Multi com ${secondProf.name} (${secondProf.specialty || "—"})` });
       await logNotificacao(multiApt, `Atendimento Multi — ${secondProf.name} (${secondProf.specialty || "—"}) adicionado ao horário de ${currentProf.name}`);
       setMultiApt(null);
       toast({ title: "Atendimento Multi criado", description: `${secondProf.name} adicionado ao horário de ${multiApt.patientName} às ${multiApt.time}.` });
@@ -998,6 +1001,8 @@ export default function Agenda() {
                                     const isRescheduled = isRemarcado || isRemanejado;
                                     const isFaltaJustificada = apt.status?.toLowerCase() === "falta_justificada" || apt.status?.toLowerCase() === "justificado" || apt.status?.toLowerCase() === "abonado";
                                     const isFaltaNaoJustificada = apt.status?.toLowerCase() === "falta_nao_justificada" || apt.status?.toLowerCase() === "ausente";
+                                    const isMulti = !!(apt.notes && apt.notes.startsWith("Atendimento Multi com "));
+                                    const multiPartner = isMulti ? apt.notes!.replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "") : null;
                                     const isMenuOpen = actionMenuId === apt.id;
                                     return (
                                 <div key={apt.id} className="relative" ref={isMenuOpen ? menuRef : null}>
@@ -1012,7 +1017,8 @@ export default function Agenda() {
                                       isRemarcado && "bg-yellow-950/10 border-yellow-400/40",
                                       isRemanejado && "bg-orange-950/10 border-orange-400/40",
                                       isFaltaJustificada && "border-cyan-500/40",
-                                      !isDesmarcado && !isAtendimento && !isRescheduled && !isFaltaJustificada && !isFaltaNaoJustificada && "bg-white border-border/50",
+                                      isMulti && !isDesmarcado && !isRescheduled && "border-violet-400/60 bg-violet-950/10",
+                                      !isDesmarcado && !isAtendimento && !isRescheduled && !isFaltaJustificada && !isFaltaNaoJustificada && !isMulti && "bg-white border-border/50",
                                       isMenuOpen && "ring-2 ring-primary/40"
                                     )}
                                     style={{
@@ -1045,6 +1051,11 @@ export default function Agenda() {
                                     )}
                                     {isRemarcado && (
                                       <span className="text-[9px] text-yellow-400 font-semibold">✎ remarcado</span>
+                                    )}
+                                    {isMulti && multiPartner && (
+                                      <span className="text-[9px] text-violet-400 font-semibold flex items-center gap-0.5">
+                                        <Users className="w-2.5 h-2.5" /> Multi: {selectedProf?.name?.split(" ")[0]} & {multiPartner.split(" ")[0]}
+                                      </span>
                                     )}
                                     {apt.recurrenceGroupId && !isDesmarcado && !isRescheduled && (
                                       <span className="text-[9px] text-muted-foreground/50">
