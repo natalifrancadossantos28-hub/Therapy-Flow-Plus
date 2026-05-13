@@ -198,7 +198,7 @@ export default function Dashboard() {
     { area: "Fonoaud.", score: avg("scoreFonoaudiologia") },
     { area: "T.O.", score: avg("scoreTO") },
     { area: "Nutrição", score: avg("scoreNutricionista") },
-  ].map(d => ({ ...d, pct: Math.round((d.score / 72) * 100) }));
+  ].map(d => ({ ...d, pct: Math.round((d.score / 45) * 100) }));
 
   // Historical count by year — prefer entryDate, fallback to createdAt
   const byYear: Record<number, number> = {};
@@ -287,7 +287,7 @@ export default function Dashboard() {
           <h2 className="text-xl font-bold font-display">Perfil Multidisciplinar</h2>
           <span className="ml-auto text-xs text-muted-foreground font-semibold">Média dos {triadPatients.length} pacientes triados</span>
         </div>
-        <p className="text-sm text-muted-foreground mb-4">Média do score por área terapêutica (% do máximo 72 pts por área)</p>
+        <p className="text-sm text-muted-foreground mb-4">Média do score por área terapêutica (% do máximo 45 pts por área)</p>
         {triadPatients.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-center">
             <Activity className="w-10 h-10 text-muted-foreground/40 mb-2" />
@@ -314,7 +314,7 @@ export default function Dashboard() {
                   <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: `${d.pct}%`, background: "linear-gradient(90deg, #00b4d8, #00f0ff)", boxShadow: "0 0 8px rgba(0,240,255,0.5)" }} />
                   </div>
-                  <span className="w-12 text-right text-xs font-bold text-foreground">{d.score}/72</span>
+                  <span className="w-12 text-right text-xs font-bold text-foreground">{d.score}/45</span>
                   <span className="w-10 text-right text-xs text-muted-foreground">{d.pct}%</span>
                 </div>
               ))}
