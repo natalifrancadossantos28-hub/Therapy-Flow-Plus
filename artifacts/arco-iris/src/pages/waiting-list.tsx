@@ -317,7 +317,7 @@ export default function WaitingList() {
                           <div className="flex flex-col gap-0.5">
                             <div className="flex items-baseline gap-1 font-mono">
                               <span className="font-bold text-foreground">{entry.scoreEspecialidade}</span>
-                              <span className="text-xs text-muted-foreground">/72</span>
+                              <span className="text-xs text-muted-foreground">/45</span>
                               {!!entry.scoreSocialDesempate && entry.scoreSocialDesempate > 0 && (
                                 <span
                                   title="Pontos de vulnerabilidade somados como desempate (+1 Escola Publica / +1 Trabalho na Roca)"

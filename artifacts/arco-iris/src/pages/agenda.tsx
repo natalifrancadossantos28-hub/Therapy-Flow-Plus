@@ -18,7 +18,6 @@ import {
   verifyProfessionalPin,
   listAppointments,
   updateAppointment,
-  deleteAppointment,
   deleteAppointmentAlta,
   createNotificacao,
   createAppointments,
@@ -537,11 +536,23 @@ export default function Agenda() {
     if (!excluirConfirm) return;
     setExcluirSending(true);
     try {
-      await deleteAppointment(excluirConfirm.id);
-      setAppointments(prev => prev.filter(a => a.id !== excluirConfirm.id));
+      await deleteAppointmentAlta(excluirConfirm.id);
+      setAppointments(prev =>
+        prev.filter(a =>
+          a.id !== excluirConfirm.id &&
+          !(a.recurrenceGroupId && a.recurrenceGroupId === excluirConfirm.recurrenceGroupId && a.date >= excluirConfirm.date)
+        )
+      );
+      // Re-adiciona o paciente à fila de espera da especialidade do profissional
+      try {
+        const prof = professionals.find(p => p.id === excluirConfirm.professionalId);
+        if (prof?.specialty) {
+          await addPatientToFila(excluirConfirm.patientId, prof.specialty, null);
+        }
+      } catch { /* se falhar a re-inserção na fila, não bloqueia */ }
       toast({
         title: "🗑️ Agendamento excluído",
-        description: `${excluirConfirm.patientName} — horário liberado. Sem registro clínico.`,
+        description: `${excluirConfirm.patientName} — todos os horários futuros liberados. Paciente retornou à fila de espera.`,
       });
       setExcluirConfirm(null);
     } catch (err: any) {
