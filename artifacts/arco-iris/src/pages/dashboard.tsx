@@ -106,7 +106,10 @@ export default function Dashboard() {
 
   const totalPatients = patients?.length || 0;
   const totalProfessionals = professionals?.length || 0;
-  const todayCount = todayAppointments?.length || 0;
+  const todayCount = (todayAppointments || []).filter(a => {
+    const st = (a.status || "agendado").toLowerCase();
+    return st !== "desmarcado" && st !== "cancelado";
+  }).length;
   const waitingCount = waitingList?.length || 0;
 
   const absentPatients = patients?.filter(p => p.absenceCount >= 3) || [];
@@ -127,8 +130,10 @@ export default function Dashboard() {
       else if (st === "ausente" || st === "falta_justificada" || st === "falta_nao_justificada") falta++;
       else if (st === "cancelado" || st === "desmarcado") cancelado++;
       else pendente++;
-      const k = (a.professionalSpecialty || "—").trim() || "—";
-      porEspecialidade[k] = (porEspecialidade[k] || 0) + 1;
+      if (st !== "cancelado" && st !== "desmarcado") {
+        const k = (a.professionalSpecialty || "—").trim() || "—";
+        porEspecialidade[k] = (porEspecialidade[k] || 0) + 1;
+      }
     }
     const fechados = realizado + falta;
     const taxaPresenca = fechados > 0 ? Math.round((realizado / fechados) * 100) : null;
