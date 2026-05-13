@@ -756,7 +756,6 @@ export default function AgendaProfissionais() {
                                         {/* ── Card do paciente ─────────────────────────────── */}
                                         <div
                                           onClick={() => {
-                                            if (isPresente) return; // travado — recepção define
                                             setActionMenuId(isMenuOpen ? null : apt.id);
                                           }}
                                           className={cn(
@@ -770,8 +769,7 @@ export default function AgendaProfissionais() {
                                             isFaltaJust     && "border-cyan-500/40 bg-[rgba(6,182,212,0.04)]",
                                             isMulti && !isDesmarcado && !isRescheduled && "border-violet-400/60 bg-violet-950/10",
                                             !isPresente && !isAtendimento && !isDesmarcado && !isFaltaNaoJust && !isRescheduled && !isFaltaJust && !isMulti && "bg-secondary/50 border-border cursor-pointer hover:border-primary/40",
-                                            !isPresente && "cursor-pointer",
-                                            isPresente && "cursor-default",
+                                            "cursor-pointer",
                                             isMenuOpen && "ring-2 ring-primary/40",
                                           )}
                                           style={{
@@ -808,13 +806,13 @@ export default function AgendaProfissionais() {
                                           )}
                                         </div>
 
-                                        {isMenuOpen && !isPresente && (
+                                        {isMenuOpen && (
                                           <div
                                             className="absolute z-50 top-full left-0 mt-1 min-w-[180px] rounded-2xl shadow-2xl"
                                             style={{ background: "rgba(2,4,8,0.97)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)", padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}
                                           >
                                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
-                                            {!isAtendimento && (
+                                            {!isAtendimento && !isPresente && (
                                               <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
                                                 <Activity className="w-3.5 h-3.5" /> Em Atendimento
                                               </button>
