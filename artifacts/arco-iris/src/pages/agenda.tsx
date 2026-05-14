@@ -550,7 +550,7 @@ export default function Agenda() {
       try {
         const prof = professionals.find(p => p.id === excluirConfirm.professionalId);
         if (prof?.specialty) {
-          await addPatientToFila(excluirConfirm.patientId, prof.specialty, null);
+          await addPatientToFila(excluirConfirm.patientId, prof.specialty, null, true);
         }
       } catch { /* se falhar a re-inserção na fila, não bloqueia */ }
       toast({
@@ -674,7 +674,10 @@ export default function Agenda() {
         setEncSending(false);
         return;
       }
-      await addPatientToFila(encApt.patientId, encEspecialidade, encMotivo.trim() || null);
+      // Admin ou prontuário antigo (< 500) pula exigência de triagem
+      const prt = parseInt(encApt.prontuario ?? "", 10);
+      const skipTriagem = isAdmin || (!isNaN(prt) && prt < 500);
+      await addPatientToFila(encApt.patientId, encEspecialidade, encMotivo.trim() || null, skipTriagem);
       // Persistência: salva motivo do encaminhamento no prontuário do paciente
       try {
         const existing = await getPatient(encApt.patientId);

@@ -103,9 +103,11 @@ export default function WaitingList() {
 
   const eligiblePatients = patients.filter((p) => {
     const score = p.triagemScore;
+    const prt = parseInt(p.prontuario ?? "", 10);
+    const isProntuarioAntigo = !isNaN(prt) && prt < 500;
     const inactiveStatus = ["Alta", "Óbito", "Desistência", "Atendimento"].includes(p.status ?? "");
     const isCenso = p.tipoRegistro === "Registro Censo Municipal";
-    return score != null && !inactiveStatus && !isCenso;
+    return (score != null || isProntuarioAntigo) && !inactiveStatus && !isCenso;
   });
 
   const resetForm = () => { setFormPatientId(""); };
@@ -127,7 +129,9 @@ export default function WaitingList() {
     try {
       for (const sp of specialtiesToAdd) {
         try {
-          const result = await addPatientToFila(parseInt(formPatientId), sp ?? null);
+          const prt = parseInt(selectedPatient?.prontuario ?? "", 10);
+          const skipTriagem = !isNaN(prt) && prt < 500 && selectedPatient?.triagemScore == null;
+          const result = await addPatientToFila(parseInt(formPatientId), sp ?? null, null, skipTriagem);
           lastPriority = result.priority;
           added++;
         } catch (err: any) {

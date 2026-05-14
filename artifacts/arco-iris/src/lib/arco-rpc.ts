@@ -651,7 +651,8 @@ export type AddToFilaResult = {
 export async function addPatientToFila(
   patientId: number,
   specialty: string | null,
-  notes?: string | null
+  notes?: string | null,
+  skipTriagemCheck?: boolean
 ): Promise<AddToFilaResult> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
@@ -661,6 +662,7 @@ export async function addPatientToFila(
     p_patient_id: patientId,
     p_specialty: specialty,
     p_notes: notes ?? null,
+    p_skip_triagem: skipTriagemCheck ?? false,
   });
   if (error) throw new Error(error.message);
   return data as AddToFilaResult;
