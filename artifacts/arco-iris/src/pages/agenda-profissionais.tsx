@@ -756,6 +756,7 @@ export default function AgendaProfissionais() {
                                     const isFaltaNaoJust  = s === "falta_nao_justificada" || s === "ausente";
                                     const isMulti = !!(apt.notes && apt.notes.startsWith("Atendimento Multi com "));
                                     const multiPartner = isMulti ? apt.notes!.replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "") : null;
+                                    const isGhost = !apt.patientName || apt.patientName.trim() === "";
 
                                     return (
                                       <div className="relative">
@@ -766,15 +767,16 @@ export default function AgendaProfissionais() {
                                           }}
                                           className={cn(
                                             "p-2 rounded-xl border flex flex-col gap-1 transition-all select-none",
-                                            isPresente      && "border-cyan-400/60 bg-cyan-950/15",
-                                            isAtendimento   && "border-green-400/60 bg-green-950/15",
-                                            isDesmarcado    && "border-red-500/40 bg-red-950/10",
-                                            isFaltaNaoJust  && "border-red-500/40 bg-red-950/10",
-                                            isRemarcado     && "border-yellow-400/50 bg-yellow-950/10",
-                                            isRemanejado    && "border-orange-400/50 bg-orange-950/10",
-                                            isFaltaJust     && "border-cyan-500/40 bg-[rgba(6,182,212,0.04)]",
-                                            isMulti && !isDesmarcado && !isRescheduled && "border-violet-400/60 bg-violet-950/10",
-                                            !isPresente && !isAtendimento && !isDesmarcado && !isFaltaNaoJust && !isRescheduled && !isFaltaJust && !isMulti && "bg-secondary/50 border-border cursor-pointer hover:border-primary/40",
+                                            isGhost && "bg-amber-950/20 border-amber-500/60 animate-pulse",
+                                            !isGhost && isPresente      && "border-cyan-400/60 bg-cyan-950/15",
+                                            !isGhost && isAtendimento   && "border-green-400/60 bg-green-950/15",
+                                            !isGhost && isDesmarcado    && "border-red-500/40 bg-red-950/10",
+                                            !isGhost && isFaltaNaoJust  && "border-red-500/40 bg-red-950/10",
+                                            !isGhost && isRemarcado     && "border-yellow-400/50 bg-yellow-950/10",
+                                            !isGhost && isRemanejado    && "border-orange-400/50 bg-orange-950/10",
+                                            !isGhost && isFaltaJust     && "border-cyan-500/40 bg-[rgba(6,182,212,0.04)]",
+                                            !isGhost && isMulti && !isDesmarcado && !isRescheduled && "border-violet-400/60 bg-violet-950/10",
+                                            !isGhost && !isPresente && !isAtendimento && !isDesmarcado && !isFaltaNaoJust && !isRescheduled && !isFaltaJust && !isMulti && "bg-secondary/50 border-border cursor-pointer hover:border-primary/40",
                                             "cursor-pointer",
                                             isMenuOpen && "ring-2 ring-primary/40",
                                           )}
@@ -797,7 +799,11 @@ export default function AgendaProfissionais() {
                                           <div className="flex items-center justify-between gap-1">
                                             <p className="font-bold text-foreground truncate text-xs leading-tight">
                                               {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
-                                              {apt.patientName || `Paciente #${apt.patientId}`}
+                                              {isGhost ? (
+                                                <span className="text-amber-400">⚠ Sem dados</span>
+                                              ) : (
+                                                apt.patientName || `Paciente #${apt.patientId}`
+                                              )}
                                             </p>
                                             {/* Cadeado visível quando Presente — status vem da recepção */}
                                             {isPresente && (
@@ -817,7 +823,10 @@ export default function AgendaProfissionais() {
                                             className="absolute z-50 top-full left-0 mt-1 min-w-[180px] rounded-2xl shadow-2xl"
                                             style={{ background: "rgba(2,4,8,0.97)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)", padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}
                                           >
-                                            <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
+                                            <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName || `Agendamento #${apt.id}`}</p>
+                                            {isGhost && (
+                                              <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⚠ Paciente sem dados — solicite exclução ao admin</p>
+                                            )}
                                             {!isAtendimento && !isPresente && (
                                               <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
                                                 <Activity className="w-3.5 h-3.5" /> Em Atendimento
