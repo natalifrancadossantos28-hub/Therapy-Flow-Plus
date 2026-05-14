@@ -283,17 +283,20 @@ export default function BookingModal({
         });
       } catch { /* silencioso — notificação não deve bloquear agendamento */ }
 
-      // Trigger de Remoção: ao agendar da fila, remove o paciente da fila de espera
-      // para a especialidade correspondente. Busca TODAS as entradas desse paciente
-      // que correspondem à especialidade do profissional e remove.
-      if (!isDirect && nextPatient) {
-        const entriesToRemove = waitingList.filter(
-          e => e.patientId === targetPatientId &&
-               matchesSpecialty(e.specialty, professionalSpecialty)
-        );
-        for (const entry of entriesToRemove) {
-          try { await deleteWaitingListEntry(entry.id); } catch { /* silencioso */ }
-        }
+      // Trigger de Remoção: ao agendar (fila OU direto), remove o paciente da
+      // fila de espera da mesma especialidade. Busca a fila atualizada para
+      // garantir que não fique "suja" com pacientes já agendados.
+      if (professionalSpecialty) {
+        try {
+          const currentFila = await listWaitingList();
+          const entriesToRemove = currentFila.filter(
+            e => e.patientId === targetPatientId &&
+                 matchesSpecialty(e.specialty, professionalSpecialty)
+          );
+          for (const entry of entriesToRemove) {
+            try { await deleteWaitingListEntry(entry.id); } catch { /* silencioso */ }
+          }
+        } catch { /* se falhar a limpeza da fila, não bloqueia o agendamento */ }
       }
 
       onSuccess();

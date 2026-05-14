@@ -11,9 +11,12 @@ import {
   deleteWaitingListEntry,
   addPatientToFila,
   listPatients,
+  listAppointments,
+  listProfessionals,
   type WaitingListEntry,
   type Patient,
 } from "@/lib/arco-rpc";
+import { specialtyKey } from "@/lib/specialty-colors";
 
 const PRIORITY_LABEL: Record<string, string> = {
   maxima: "🔴 MÁXIMA – Prioridade Social/Idade",
@@ -53,7 +56,43 @@ export default function WaitingList() {
     setIsLoading(true);
     try {
       const [wl, ps] = await Promise.all([listWaitingList(), listPatients()]);
-      setWaitingList(wl);
+
+      // Pente-fino: remove da fila pacientes que já têm agendamento ativo
+      // na mesma especialidade (status "Atendimento" no cadastro do paciente)
+      const atendimentoPatientIds = new Set(
+        ps.filter(p => p.status === "Atendimento").map(p => p.id)
+      );
+      const entriesToClean: WaitingListEntry[] = [];
+      if (atendimentoPatientIds.size > 0) {
+        try {
+          const today = new Date().toISOString().slice(0, 10);
+          const [allApts, profs] = await Promise.all([
+            listAppointments({ dateFrom: today }),
+            listProfessionals(),
+          ]);
+          const profSpecMap = new Map(profs.map(p => [p.id, p.specialty ?? ""]));
+          for (const entry of wl) {
+            if (!atendimentoPatientIds.has(entry.patientId)) continue;
+            const entrySpecKey = specialtyKey(entry.specialty ?? "");
+            const hasActiveApt = allApts.some(a => {
+              if (a.patientId !== entry.patientId) return false;
+              if (a.status !== "agendado" && a.status !== "atendimento") return false;
+              const aptSpec = profSpecMap.get(a.professionalId) ?? "";
+              return specialtyKey(aptSpec) === entrySpecKey;
+            });
+            if (hasActiveApt) entriesToClean.push(entry);
+          }
+        } catch { /* se falhar o cruzamento, exibe a fila normalmente */ }
+      }
+      // Remove silenciosamente
+      for (const e of entriesToClean) {
+        try { await deleteWaitingListEntry(e.id); } catch { /* silencioso */ }
+      }
+      const cleanedWl = entriesToClean.length > 0
+        ? wl.filter(e => !entriesToClean.some(c => c.id === e.id))
+        : wl;
+
+      setWaitingList(cleanedWl);
       setPatients(ps);
     } catch (err: any) {
       toast({
