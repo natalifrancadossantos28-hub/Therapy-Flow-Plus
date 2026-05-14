@@ -1012,6 +1012,7 @@ export default function Agenda() {
                                     const multiPartner = isMulti ? apt.notes!.replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "") : null;
                                     const isMenuOpen = actionMenuId === apt.id;
                                     const isPastDate = date < today;
+                                    const isGhost = !apt.patientName || apt.patientName.trim() === "";
                                     return (
                                 <div key={apt.id} className="relative" ref={isMenuOpen ? menuRef : null}>
                                   {/* Appointment block */}
@@ -1019,14 +1020,15 @@ export default function Agenda() {
                                     onClick={() => setActionMenuId(isMenuOpen ? null : apt.id)}
                                     className={cn(
                                       "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
-                                      isDesmarcado && "bg-red-950/10 border-red-500/40",
-                                      isFaltaNaoJustificada && "bg-red-950/10 border-red-500/40",
-                                      isAtendimento && "bg-green-950/10 border-green-400/40",
-                                      isRemarcado && "bg-yellow-950/10 border-yellow-400/40",
-                                      isRemanejado && "bg-orange-950/10 border-orange-400/40",
-                                      isFaltaJustificada && "border-cyan-500/40",
-                                      isMulti && !isDesmarcado && !isRescheduled && "border-violet-400/60 bg-violet-950/10",
-                                      !isDesmarcado && !isAtendimento && !isRescheduled && !isFaltaJustificada && !isFaltaNaoJustificada && !isMulti && "bg-white border-border/50",
+                                      isGhost && "bg-amber-950/20 border-amber-500/60 animate-pulse",
+                                      !isGhost && isDesmarcado && "bg-red-950/10 border-red-500/40",
+                                      !isGhost && isFaltaNaoJustificada && "bg-red-950/10 border-red-500/40",
+                                      !isGhost && isAtendimento && "bg-green-950/10 border-green-400/40",
+                                      !isGhost && isRemarcado && "bg-yellow-950/10 border-yellow-400/40",
+                                      !isGhost && isRemanejado && "bg-orange-950/10 border-orange-400/40",
+                                      !isGhost && isFaltaJustificada && "border-cyan-500/40",
+                                      !isGhost && isMulti && !isDesmarcado && !isRescheduled && "border-violet-400/60 bg-violet-950/10",
+                                      !isGhost && !isDesmarcado && !isAtendimento && !isRescheduled && !isFaltaJustificada && !isFaltaNaoJustificada && !isMulti && "bg-card border-border/50",
                                       isMenuOpen && "ring-2 ring-primary/40"
                                     )}
                                     style={{
@@ -1046,7 +1048,11 @@ export default function Agenda() {
                                   >
                                     <span className="font-bold text-foreground truncate text-xs leading-tight">
                                       {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
-                                      {apt.patientName || `Paciente #${apt.patientId}`}
+                                      {isGhost ? (
+                                        <span className="text-amber-400">⚠ Sem dados do paciente</span>
+                                      ) : (
+                                        apt.patientName || `Paciente #${apt.patientId}`
+                                      )}
                                     </span>
                                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
                                       {getStatusLabel(apt.status)}
@@ -1086,7 +1092,10 @@ export default function Agenda() {
                                         gap: "6px",
                                       }}
                                     >
-                                      <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName}</p>
+                                      <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName || `Agendamento #${apt.id}`}</p>
+                                      {isGhost && (
+                                        <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⚠ Paciente sem dados — clique em Excluir para limpar</p>
+                                      )}
                                       {isPastDate && isAdmin && (
                                         <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⏪ Ajuste Retroativo (Admin)</p>
                                       )}
