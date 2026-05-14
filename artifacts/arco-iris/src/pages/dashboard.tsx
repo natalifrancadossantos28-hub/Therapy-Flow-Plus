@@ -3,6 +3,7 @@ import {
   listPatients,
   listProfessionals,
   listAppointmentsToday,
+  listAppointments,
   listWaitingList,
   getAppointmentsStats,
   listProfessionalsCapacity,
@@ -67,6 +68,10 @@ export default function Dashboard() {
   const [perfFilter, setPerfFilter] = useState<"mes" | "total">("mes");
   const [histFilter, setHistFilter] = useState<"ano" | "acumulado">("ano");
 
+  // Faltas por profissional (não geral)
+  type AbsenceByProf = { patientId: number; patientName: string; professionalName: string; specialty: string; count: number };
+  const [absencesByProf, setAbsencesByProf] = useState<AbsenceByProf[]>([]);
+
   const fetchAll = useCallback(() => {
     listPatients().then(setPatients).catch(console.error);
     listProfessionals().then(setProfessionals).catch(console.error);
@@ -74,6 +79,37 @@ export default function Dashboard() {
     listWaitingList().then(setWaitingList).catch(console.error);
     getAppointmentsStats().then(setAptStats).catch(console.error);
     listLongAttendancePatients(12).then(setLongAttendance).catch(() => setLongAttendance([]));
+    // Faltas POR PROFISSIONAL — só alerta quando >= 3 com o MESMO profissional
+    listAppointments().then(allApts => {
+      const ABSENCE = ["ausente", "falta_nao_justificada"];
+      const key = (pid: number, profId: number) => `${pid}|${profId}`;
+      const map = new Map<string, { patientId: number; patientName: string; professionalName: string; count: number }>();
+      for (const a of allApts) {
+        const st = (a.status || "").toLowerCase();
+        if (!ABSENCE.includes(st)) continue;
+        const k = key(a.patientId, a.professionalId);
+        const entry = map.get(k) || { patientId: a.patientId, patientName: a.patientName, professionalName: a.professionalName, count: 0 };
+        entry.count++;
+        map.set(k, entry);
+      }
+      // Enriquecer com especialidade do profissional
+      listProfessionals().then(profs => {
+        const specMap = new Map(profs.map(p => [p.name, p.specialty || "—"]));
+        const alerts: AbsenceByProf[] = [];
+        for (const v of map.values()) {
+          if (v.count >= 3) {
+            alerts.push({ ...v, specialty: specMap.get(v.professionalName) || "—" });
+          }
+        }
+        setAbsencesByProf(alerts);
+      }).catch(() => {
+        const alerts: AbsenceByProf[] = [];
+        for (const v of map.values()) {
+          if (v.count >= 3) alerts.push({ ...v, specialty: "—" });
+        }
+        setAbsencesByProf(alerts);
+      });
+    }).catch(() => setAbsencesByProf([]));
   }, []);
   const fetchOcupacao = useCallback(() => {
     listProfessionalsCapacity()
@@ -114,7 +150,16 @@ export default function Dashboard() {
   }).length;
   const waitingCount = waitingList?.length || 0;
 
-  const absentPatients = patients?.filter(p => p.absenceCount >= 3) || [];
+  // Agrupar alertas por paciente (pode ter múltiplos profissionais com >= 3 faltas)
+  const absentByPatient = useMemo(() => {
+    const grouped = new Map<number, { patientId: number; patientName: string; profs: Array<{ professionalName: string; specialty: string; count: number }> }>();
+    for (const a of absencesByProf) {
+      const entry = grouped.get(a.patientId) || { patientId: a.patientId, patientName: a.patientName, profs: [] };
+      entry.profs.push({ professionalName: a.professionalName, specialty: a.specialty, count: a.count });
+      grouped.set(a.patientId, entry);
+    }
+    return Array.from(grouped.values());
+  }, [absencesByProf]);
 
   // ── Batimento cardíaco da clínica (hoje) ─────────────────────────────────
   // Realizado: atendimento concluído (em andamento, presente ou alta naquele dia).
@@ -622,21 +667,25 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Alertas de Faltas */}
-      {absentPatients.length > 0 && (
+      {/* Alertas de Faltas — por profissional */}
+      {absentByPatient.length > 0 && (
         <Card className="p-6 border-[rgba(255,30,90,0.3)] shadow-[0_0_24px_rgba(255,30,90,0.08)]">
           <h2 className="text-xl font-bold font-display flex items-center gap-2 text-[#ff2060] mb-6" style={{ textShadow: "0 0 12px rgba(255,30,90,0.5)" }}>
             <AlertCircle className="w-5 h-5" />
             Atenção: Pacientes com Faltas
           </h2>
+          <p className="text-xs text-muted-foreground mb-4">Alerta quando o paciente atinge 3+ faltas com o <strong>mesmo profissional</strong>.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {absentPatients.map(p => (
-              <div key={p.id} className="p-4 rounded-xl bg-[rgba(255,30,90,0.06)] border border-[rgba(255,30,90,0.2)] flex flex-col gap-2">
-                <div className="flex justify-between items-start">
-                  <p className="font-semibold text-foreground">{p.name}</p>
-                  <Badge className="badge-neon-red">{p.absenceCount} Faltas</Badge>
-                </div>
-                <Link href={`/patients/${p.id}`}>
+            {absentByPatient.map(p => (
+              <div key={p.patientId} className="p-4 rounded-xl bg-[rgba(255,30,90,0.06)] border border-[rgba(255,30,90,0.2)] flex flex-col gap-2">
+                <p className="font-semibold text-foreground">{p.patientName}</p>
+                {p.profs.map((pr, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-muted-foreground">{pr.specialty}: <span className="text-foreground font-medium">{pr.professionalName}</span></span>
+                    <Badge className="badge-neon-red text-[10px] px-1.5 py-0.5">{pr.count} faltas</Badge>
+                  </div>
+                ))}
+                <Link href={`/patients/${p.patientId}`}>
                   <Button variant="outline" className="w-full text-xs h-8 mt-2 border-[rgba(255,30,90,0.4)] text-[#ff2060] hover:bg-[rgba(255,30,90,0.08)] hover:shadow-[0_0_14px_rgba(255,30,90,0.35)]">
                     Ver Ficha
                   </Button>
