@@ -1996,6 +1996,7 @@ type ABCCategory = "ES" | "RE" | "CO" | "LG" | "PS";
 type ABCItem = {
   num: number;
   text: string;
+  hint: string;
   category: ABCCategory;
   weight: number;
 };
@@ -2009,63 +2010,63 @@ const ABC_CATEGORIES: Record<ABCCategory, { label: string; color: string; bg: st
 };
 
 const ABC_ITEMS: ABCItem[] = [
-  { num: 1, text: "Gira em torno de si por longo período de tempo", category: "CO", weight: 4 },
-  { num: 2, text: "Aprende uma tarefa, mas esquece rapidamente", category: "PS", weight: 2 },
-  { num: 3, text: "É raro atender estímulo não verbal social/ambiente (expressões, gestos, situações)", category: "RE", weight: 4 },
-  { num: 4, text: "Ausência de resposta para solicitações verbais — venha cá; sente-se", category: "LG", weight: 1 },
-  { num: 5, text: "Usa brinquedos inapropriadamente", category: "CO", weight: 2 },
-  { num: 6, text: "Pobre uso da discriminação visual (fixa uma característica do objeto)", category: "ES", weight: 2 },
-  { num: 7, text: "Ausência do sorriso social", category: "RE", weight: 2 },
-  { num: 8, text: "Uso inadequado de pronomes (eu por ele)", category: "LG", weight: 3 },
-  { num: 9, text: "Insiste em manter certos objetos consigo", category: "CO", weight: 3 },
-  { num: 10, text: "Parece não escutar (suspeita-se de perda de audição)", category: "ES", weight: 3 },
-  { num: 11, text: "Fala monótona e sem ritmo", category: "LG", weight: 4 },
-  { num: 12, text: "Balança-se por longos períodos de tempo", category: "CO", weight: 4 },
-  { num: 13, text: "Não estende o braço para ser pego (nem o fez quando bebê)", category: "RE", weight: 2 },
-  { num: 14, text: "Fortes reações frente a mudanças no ambiente", category: "PS", weight: 3 },
-  { num: 15, text: "Ausência de atenção ao seu nome quando entre 2 outras crianças", category: "CO", weight: 2 },
-  { num: 16, text: "Corre interrompendo com giros em torno de si, balanceio de mãos", category: "CO", weight: 4 },
-  { num: 17, text: "Ausência de resposta para expressão facial/sentimento de outros", category: "RE", weight: 3 },
-  { num: 18, text: "Raramente usa 'sim' ou 'eu'", category: "LG", weight: 2 },
-  { num: 19, text: "Possui habilidade numa área do desenvolvimento", category: "PS", weight: 4 },
-  { num: 20, text: "Ausência de respostas a solicitações verbal envolvendo o uso de referenciais de espaço", category: "LG", weight: 1 },
-  { num: 21, text: "Reação de sobressalto a som intenso (suspeita de surdez)", category: "ES", weight: 3 },
-  { num: 22, text: "Balança as mãos", category: "CO", weight: 4 },
-  { num: 23, text: "Intensos acessos de raiva e/ou frequentes 'chiliques'", category: "PS", weight: 3 },
-  { num: 24, text: "Evita ativamente o contato visual", category: "RE", weight: 4 },
-  { num: 25, text: "Resiste ao toque / ao ser pego / ao carinho", category: "RE", weight: 4 },
-  { num: 26, text: "Não reage a estímulos dolorosos", category: "ES", weight: 3 },
-  { num: 27, text: "Difícil e rígido no colo (ou foi quando bebê)", category: "RE", weight: 3 },
-  { num: 28, text: "Flácido quando no colo", category: "RE", weight: 2 },
-  { num: 29, text: "Aponta para indicar objeto desejado", category: "LG", weight: 2 },
-  { num: 30, text: "Anda nas pontas dos pés", category: "CO", weight: 2 },
-  { num: 31, text: "Machuca outros mordendo, batendo, etc", category: "PS", weight: 2 },
-  { num: 32, text: "Repete a mesma frase muitas vezes", category: "LG", weight: 3 },
-  { num: 33, text: "Ausência de imitação de brincadeiras de outras crianças", category: "RE", weight: 3 },
-  { num: 34, text: "Ausência de reação do piscar quando luz forte incide em seus olhos", category: "ES", weight: 1 },
-  { num: 35, text: "Machuca-se mordendo, batendo a cabeça, etc", category: "CO", weight: 2 },
-  { num: 36, text: "Não espera para ser atendido (quer as coisas imediatamente)", category: "PS", weight: 2 },
-  { num: 37, text: "Não aponta para mais que cinco objetos", category: "LG", weight: 1 },
-  { num: 38, text: "Dificuldade de fazer amigos", category: "RE", weight: 4 },
-  { num: 39, text: "Tapa as orelhas para vários sons", category: "ES", weight: 4 },
-  { num: 40, text: "Gira, bate objetos muitas vezes", category: "CO", weight: 4 },
-  { num: 41, text: "Dificuldade para o treino de toalete", category: "PS", weight: 1 },
-  { num: 42, text: "Usa de 0 a 5 palavras/dia para indicar necessidades e o que quer", category: "LG", weight: 2 },
-  { num: 43, text: "Frequentemente muito ansioso ou medroso", category: "RE", weight: 3 },
-  { num: 44, text: "Franze, cobre ou virar os olhos quando em presença de luz natural", category: "ES", weight: 3 },
-  { num: 45, text: "Não se veste sem ajuda", category: "PS", weight: 1 },
-  { num: 46, text: "Repete constantemente as mesmas palavras e/ou sons", category: "LG", weight: 3 },
-  { num: 47, text: "'Olha através' das pessoas", category: "RE", weight: 4 },
-  { num: 48, text: "Repete perguntas e frases ditas por outras pessoas", category: "LG", weight: 4 },
-  { num: 49, text: "Frequentemente inconsciente dos perigos de situações e do ambiente", category: "PS", weight: 2 },
-  { num: 50, text: "Prefere manipular e ocupar-se com objetos inanimados", category: "PS", weight: 4 },
-  { num: 51, text: "Toca, cheira ou lambe objetos do ambiente", category: "CO", weight: 3 },
-  { num: 52, text: "Frequentemente não reage visualmente à presença de novas pessoas", category: "ES", weight: 3 },
-  { num: 53, text: "Repete sequências de comportamentos complicados (cobrir coisas, por ex.)", category: "CO", weight: 4 },
-  { num: 54, text: "Destrutivo com seus brinquedos e coisas da família", category: "CO", weight: 2 },
-  { num: 55, text: "O atraso no desenvolvimento identificado antes dos 30 meses", category: "PS", weight: 1 },
-  { num: 56, text: "Usa mais que 15 e menos que 30 frases diárias para comunicar-se", category: "LG", weight: 3 },
-  { num: 57, text: "Olha fixamente o ambiente por longos períodos de tempo", category: "ES", weight: 4 },
+  { num: 1, text: "Gira em torno de si por longo período de tempo", hint: "Ele fica rodando o próprio corpo várias vezes, como se fosse um peão?", category: "CO", weight: 4 },
+  { num: 2, text: "Aprende uma tarefa, mas esquece rapidamente", hint: "Você ensina algo hoje e amanhã ele já não lembra mais como fazer?", category: "PS", weight: 2 },
+  { num: 3, text: "É raro atender estímulo não verbal social/ambiente (expressões, gestos, situações)", hint: "Ele costuma ignorar quando você faz gestos, aponta para algo ou faz expressões faciais?", category: "RE", weight: 4 },
+  { num: 4, text: "Ausência de resposta para solicitações verbais — venha cá; sente-se", hint: "Quando você pede 'vem cá' ou 'senta aqui', ele não responde ou ignora?", category: "LG", weight: 1 },
+  { num: 5, text: "Usa brinquedos inapropriadamente", hint: "Em vez de brincar do jeito esperado (ex: empurrar o carrinho), ele faz outra coisa (ex: só gira a rodinha)?", category: "CO", weight: 2 },
+  { num: 6, text: "Pobre uso da discriminação visual (fixa uma característica do objeto)", hint: "Ele fica olhando só para uma parte do brinquedo (ex: só a roda, só a cor) em vez de ver o todo?", category: "ES", weight: 2 },
+  { num: 7, text: "Ausência do sorriso social", hint: "Ele não sorri de volta quando alguém sorri para ele?", category: "RE", weight: 2 },
+  { num: 8, text: "Uso inadequado de pronomes (eu por ele)", hint: "Ele fala de si mesmo na terceira pessoa? (Ex: 'Ele quer água' em vez de 'Eu quero água')", category: "LG", weight: 3 },
+  { num: 9, text: "Insiste em manter certos objetos consigo", hint: "Ele anda para todo lado segurando sempre o mesmo objeto e não quer largar de jeito nenhum?", category: "CO", weight: 3 },
+  { num: 10, text: "Parece não escutar (suspeita-se de perda de audição)", hint: "Às vezes parece que ele não ouve quando você chama, mesmo estando perto?", category: "ES", weight: 3 },
+  { num: 11, text: "Fala monótona e sem ritmo", hint: "A fala dele é sempre no mesmo tom, sem variação, quase como um robô?", category: "LG", weight: 4 },
+  { num: 12, text: "Balança-se por longos períodos de tempo", hint: "Ele fica se balançando para frente e para trás por muito tempo, sentado ou em pé?", category: "CO", weight: 4 },
+  { num: 13, text: "Não estende o braço para ser pego (nem o fez quando bebê)", hint: "Quando você vai pegá-lo no colo, ele não levanta os bracinhos para você?", category: "RE", weight: 2 },
+  { num: 14, text: "Fortes reações frente a mudanças no ambiente", hint: "Ele fica muito irritado ou nervoso quando algo muda na rotina ou no ambiente (ex: trocar de caminho, mudar os móveis)?", category: "PS", weight: 3 },
+  { num: 15, text: "Ausência de atenção ao seu nome quando entre 2 outras crianças", hint: "Quando está perto de outras crianças e você chama o nome dele, ele não olha?", category: "CO", weight: 2 },
+  { num: 16, text: "Corre interrompendo com giros em torno de si, balanceio de mãos", hint: "Ele sai correndo e no meio da corrida para, gira o corpo ou sacode as mãos?", category: "CO", weight: 4 },
+  { num: 17, text: "Ausência de resposta para expressão facial/sentimento de outros", hint: "Se alguém está chorando ou triste perto dele, ele não reage nem parece perceber?", category: "RE", weight: 3 },
+  { num: 18, text: "Raramente usa 'sim' ou 'eu'", hint: "Ele quase nunca diz 'sim' ou 'eu' quando fala?", category: "LG", weight: 2 },
+  { num: 19, text: "Possui habilidade numa área do desenvolvimento", hint: "Ele é muito bom em uma coisa específica (ex: decorar números, montar puzzles), mas tem dificuldade em outras?", category: "PS", weight: 4 },
+  { num: 20, text: "Ausência de respostas a solicitações verbal envolvendo o uso de referenciais de espaço", hint: "Quando você diz 'coloca em cima da mesa' ou 'pega embaixo da cadeira', ele não entende?", category: "LG", weight: 1 },
+  { num: 21, text: "Reação de sobressalto a som intenso (suspeita de surdez)", hint: "Ele não se assusta com barulhos fortes (fogos, porta batendo) como outras crianças?", category: "ES", weight: 3 },
+  { num: 22, text: "Balança as mãos", hint: "Ele fica sacudindo ou abanando as mãos repetidamente, como se estivesse 'batendo asas'?", category: "CO", weight: 4 },
+  { num: 23, text: "Intensos acessos de raiva e/ou frequentes 'chiliques'", hint: "Ele tem crises de raiva muito fortes ou faz birra intensa com frequência?", category: "PS", weight: 3 },
+  { num: 24, text: "Evita ativamente o contato visual", hint: "Ele desvia o olhar de propósito quando você tenta olhar nos olhos dele?", category: "RE", weight: 4 },
+  { num: 25, text: "Resiste ao toque / ao ser pego / ao carinho", hint: "Ele não gosta de ser abraçado, tocado ou pegado no colo? Fica incomodado?", category: "RE", weight: 4 },
+  { num: 26, text: "Não reage a estímulos dolorosos", hint: "Quando se machuca (cai, bate), ele não chora nem parece sentir dor?", category: "ES", weight: 3 },
+  { num: 27, text: "Difícil e rígido no colo (ou foi quando bebê)", hint: "Quando você pega ele no colo, o corpo fica duro, esticado, difícil de acomodar?", category: "RE", weight: 3 },
+  { num: 28, text: "Flácido quando no colo", hint: "Quando está no colo, ele fica 'mole demais', sem firmeza, como se não segurasse o corpo?", category: "RE", weight: 2 },
+  { num: 29, text: "Aponta para indicar objeto desejado", hint: "Ele aponta com o dedo para mostrar o que quer? (Se SIM, marque este item)", category: "LG", weight: 2 },
+  { num: 30, text: "Anda nas pontas dos pés", hint: "Ele caminha na ponta dos pés em vez de pisar com o pé inteiro no chão?", category: "CO", weight: 2 },
+  { num: 31, text: "Machuca outros mordendo, batendo, etc", hint: "Ele morde, bate ou arranha outras crianças ou adultos?", category: "PS", weight: 2 },
+  { num: 32, text: "Repete a mesma frase muitas vezes", hint: "Ele fica repetindo a mesma frase várias vezes, mesmo fora de contexto?", category: "LG", weight: 3 },
+  { num: 33, text: "Ausência de imitação de brincadeiras de outras crianças", hint: "Ele não copia o que as outras crianças estão fazendo na brincadeira?", category: "RE", weight: 3 },
+  { num: 34, text: "Ausência de reação do piscar quando luz forte incide em seus olhos", hint: "Quando uma luz forte bate nos olhos dele, ele não pisca nem fecha os olhos?", category: "ES", weight: 1 },
+  { num: 35, text: "Machuca-se mordendo, batendo a cabeça, etc", hint: "Ele se morde, bate a cabeça na parede ou se machuca de propósito?", category: "CO", weight: 2 },
+  { num: 36, text: "Não espera para ser atendido (quer as coisas imediatamente)", hint: "Ele não consegue esperar sua vez? Quer tudo na hora, sem paciência?", category: "PS", weight: 2 },
+  { num: 37, text: "Não aponta para mais que cinco objetos", hint: "Ele quase não usa o dedo para apontar e mostrar coisas para você?", category: "LG", weight: 1 },
+  { num: 38, text: "Dificuldade de fazer amigos", hint: "Ele tem dificuldade de brincar junto com outras crianças ou de fazer amizades?", category: "RE", weight: 4 },
+  { num: 39, text: "Tapa as orelhas para vários sons", hint: "Ele cobre ou tapa as orelhas quando ouve certos sons (aspirador, liquidificador, música alta)?", category: "ES", weight: 4 },
+  { num: 40, text: "Gira, bate objetos muitas vezes", hint: "Ele fica girando ou batendo objetos de forma repetitiva por muito tempo?", category: "CO", weight: 4 },
+  { num: 41, text: "Dificuldade para o treino de toalete", hint: "Ele tem muita dificuldade para aprender a usar o banheiro sozinho?", category: "PS", weight: 1 },
+  { num: 42, text: "Usa de 0 a 5 palavras/dia para indicar necessidades e o que quer", hint: "No dia a dia, ele fala muito pouco (menos de 5 palavras) para pedir o que precisa?", category: "LG", weight: 2 },
+  { num: 43, text: "Frequentemente muito ansioso ou medroso", hint: "Ele demonstra medo ou ansiedade excessiva em situações do dia a dia?", category: "RE", weight: 3 },
+  { num: 44, text: "Franze, cobre ou virar os olhos quando em presença de luz natural", hint: "Ele fecha os olhos, faz careta ou vira o rosto quando está em ambientes com luz do sol?", category: "ES", weight: 3 },
+  { num: 45, text: "Não se veste sem ajuda", hint: "Ele não consegue colocar a roupa sozinho, mesmo peças simples?", category: "PS", weight: 1 },
+  { num: 46, text: "Repete constantemente as mesmas palavras e/ou sons", hint: "Ele fica repetindo as mesmas palavras ou sons o tempo todo, como um 'eco'?", category: "LG", weight: 3 },
+  { num: 47, text: "'Olha através' das pessoas", hint: "Quando alguém está na frente dele, ele olha como se a pessoa fosse transparente, sem enxergar de verdade?", category: "RE", weight: 4 },
+  { num: 48, text: "Repete perguntas e frases ditas por outras pessoas", hint: "Se você pergunta 'quer água?', ele repete 'quer água?' em vez de responder sim ou não?", category: "LG", weight: 4 },
+  { num: 49, text: "Frequentemente inconsciente dos perigos de situações e do ambiente", hint: "Ele não percebe perigos (rua movimentada, altura, objetos quentes) como outras crianças?", category: "PS", weight: 2 },
+  { num: 50, text: "Prefere manipular e ocupar-se com objetos inanimados", hint: "Ele prefere ficar mexendo em objetos (chaves, tampas, fios) em vez de brincar com pessoas?", category: "PS", weight: 4 },
+  { num: 51, text: "Toca, cheira ou lambe objetos do ambiente", hint: "Ele tem o hábito de cheirar, lamber ou passar a mão em objetos ou superfícies?", category: "CO", weight: 3 },
+  { num: 52, text: "Frequentemente não reage visualmente à presença de novas pessoas", hint: "Quando alguém novo chega perto, ele não olha nem demonstra curiosidade?", category: "ES", weight: 3 },
+  { num: 53, text: "Repete sequências de comportamentos complicados (cobrir coisas, por ex.)", hint: "Ele faz rituais repetitivos (ex: cobrir e descobrir objetos, abrir e fechar portas várias vezes)?", category: "CO", weight: 4 },
+  { num: 54, text: "Destrutivo com seus brinquedos e coisas da família", hint: "Ele quebra ou destrói brinquedos e objetos da casa com frequência?", category: "CO", weight: 2 },
+  { num: 55, text: "O atraso no desenvolvimento identificado antes dos 30 meses", hint: "Algum atraso no desenvolvimento (fala, andar, socializar) foi percebido antes dos 2 anos e meio?", category: "PS", weight: 1 },
+  { num: 56, text: "Usa mais que 15 e menos que 30 frases diárias para comunicar-se", hint: "No dia a dia, ele fala entre 15 e 30 frases para se comunicar (vocabulário limitado)?", category: "LG", weight: 3 },
+  { num: 57, text: "Olha fixamente o ambiente por longos períodos de tempo", hint: "Ele fica parado olhando para o nada ou para um ponto fixo por muito tempo?", category: "ES", weight: 4 },
 ];
 
 function classifyABC(total: number): { nivel: string; label: string; desc: string; color: string; bg: string } {
@@ -2192,10 +2193,15 @@ function ABCChecklistContent() {
                 <span className="text-sm font-bold w-7 shrink-0 mt-0.5" style={{ color: isChecked ? cat.color : "rgba(255,255,255,0.4)" }}>
                   {String(item.num).padStart(2, "0")}
                 </span>
-                {/* Text */}
-                <span className={`text-sm flex-1 ${isChecked ? "font-semibold" : ""}`} style={{ color: isChecked ? cat.color : undefined }}>
-                  {item.text}
-                </span>
+                {/* Text + Hint */}
+                <div className="flex-1">
+                  <span className={`text-sm ${isChecked ? "font-semibold" : ""}`} style={{ color: isChecked ? cat.color : undefined }}>
+                    {item.text}
+                  </span>
+                  <p className="text-xs mt-1 leading-relaxed" style={{ color: isChecked ? `${cat.color}cc` : "rgba(255,255,255,0.35)", fontStyle: "italic" }}>
+                    {item.hint}
+                  </p>
+                </div>
                 {/* Category badge */}
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold shrink-0 mt-0.5" style={{ background: cat.bg, color: cat.color, border: `1px solid ${cat.color}30` }}>
                   {item.category} · {item.weight}
