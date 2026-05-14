@@ -359,7 +359,7 @@ export default function PatientDetail() {
     try {
       for (const sp of targets) {
         try {
-          await addPatientToFila(patientId, sp);
+          await addPatientToFila(patientId, sp, null, isProntuarioAntigo && !triagemFeita);
           added.push(sp ?? "Geral");
         } catch (err: any) {
           if (err.message?.toLowerCase().includes("fila")) skipped.push(sp ?? "Geral");
@@ -396,7 +396,10 @@ export default function PatientDetail() {
   const isCensoMunicipal = patient.tipoRegistro === "Registro Censo Municipal";
   const naFila = patient.status === "Fila de Espera";
   const emAtendimento = patient.status === "Atendimento";
-  const podeAdicionarFila = triagemFeita && !naFila && !emAtendimento && patient.status !== "Alta" && !isCensoMunicipal;
+  // Prontuário antigo (< 500) pode ser adicionado à fila mesmo sem triagem
+  const prtNum = parseInt(patient.prontuario ?? "", 10);
+  const isProntuarioAntigo = !isNaN(prtNum) && prtNum < 500;
+  const podeAdicionarFila = (triagemFeita || isProntuarioAntigo) && !naFila && !emAtendimento && patient.status !== "Alta" && !isCensoMunicipal;
 
   return (
     <div className="space-y-8">

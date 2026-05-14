@@ -485,7 +485,10 @@ export default function AgendaProfissionais() {
         setEncSending(false);
         return;
       }
-      await addPatientToFila(encApt.patientId, encEspecialidade, encMotivo.trim() || null);
+      // Prontuário antigo (< 500) pula exigência de triagem (pacientes pré-sistema)
+      const prt = parseInt(encApt.prontuario ?? "", 10);
+      const skipTriagem = !isNaN(prt) && prt < 500;
+      await addPatientToFila(encApt.patientId, encEspecialidade, encMotivo.trim() || null, skipTriagem);
       // Persistência: salva motivo do encaminhamento no prontuário do paciente
       try {
         const existing = await getPatient(encApt.patientId);
