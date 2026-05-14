@@ -2103,6 +2103,114 @@ function ABCChecklistContent() {
     setShowResult(false);
   };
 
+  const handlePrintPDF = () => {
+    const checkedItems = ABC_ITEMS.filter(i => checked[i.num]);
+    const uncheckedItems = ABC_ITEMS.filter(i => !checked[i.num]);
+    const dataNascFmt = dataNasc ? new Date(dataNasc + "T00:00:00").toLocaleDateString("pt-BR") : "—";
+    const dataAppFmt = new Date(dataApp + "T00:00:00").toLocaleDateString("pt-BR");
+
+    const catColors: Record<string, string> = { ES: "#7c3aed", RE: "#2563eb", CO: "#ea580c", LG: "#16a34a", PS: "#dc2626" };
+    const catLabels: Record<string, string> = { ES: "Estímulo Sensorial", RE: "Relacionamento", CO: "Uso do Corpo e Objetos", LG: "Linguagem", PS: "Desenv. Pessoal e Social" };
+
+    const itemRow = (item: ABCItem, isMarked: boolean) => `
+      <tr style="border-bottom:1px solid #e5e7eb;${isMarked ? "background:#fef9c3;" : ""}">
+        <td style="padding:6px 10px;font-weight:bold;color:${catColors[item.category]};text-align:center;width:40px">${String(item.num).padStart(2, "0")}</td>
+        <td style="padding:6px 10px;">
+          <div style="font-size:13px;${isMarked ? "font-weight:600;" : ""}">${item.text}</div>
+          <div style="font-size:11px;color:#6b7280;font-style:italic;margin-top:2px">${item.hint}</div>
+        </td>
+        <td style="padding:6px 10px;text-align:center;width:60px">
+          <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:${catColors[item.category]}18;color:${catColors[item.category]};border:1px solid ${catColors[item.category]}30">${item.category}</span>
+        </td>
+        <td style="padding:6px 10px;text-align:center;width:50px;font-weight:bold">${item.weight}</td>
+        <td style="padding:6px 10px;text-align:center;width:50px;font-size:18px">${isMarked ? "✔" : ""}</td>
+      </tr>`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ABC - ${nome || "Paciente"}</title>
+    <style>
+      @page { size: A4; margin: 15mm; }
+      body { font-family: 'Segoe UI', Tahoma, sans-serif; color: #1f2937; margin: 0; padding: 20px; }
+      .header { text-align: center; border-bottom: 3px solid #1e40af; padding-bottom: 16px; margin-bottom: 20px; }
+      .header h1 { margin: 0; font-size: 20px; color: #1e40af; }
+      .header p { margin: 4px 0 0; font-size: 12px; color: #6b7280; }
+      .patient-info { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 16px; background: #f0f9ff; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+      .patient-info span { font-weight: 600; color: #1e40af; }
+      .result-box { text-align: center; padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 2px solid; }
+      .subtotals { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+      .subtotals > div { flex: 1; min-width: 80px; text-align: center; padding: 8px; border-radius: 8px; border: 1px solid #e5e7eb; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      thead th { background: #f3f4f6; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: #6b7280; border-bottom: 2px solid #d1d5db; }
+      .section-title { font-size: 14px; font-weight: 700; margin: 20px 0 8px; padding: 6px 12px; background: #f3f4f6; border-radius: 6px; }
+      .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+      @media print { body { padding: 0; } }
+    </style></head><body>
+    <div class="header">
+      <h1>${CLINIC_CONFIG.name}</h1>
+      <p>${CLINIC_CONFIG.subtitle}</p>
+      <p style="margin-top:8px;font-size:16px;font-weight:700;color:#1e40af">ABC — Autism Behavior Checklist</p>
+      <p style="font-size:11px;color:#6b7280">Checklist de Comportamento Autístico · Versão Brasileira</p>
+    </div>
+
+    <div class="patient-info">
+      <div><span>Paciente:</span> ${nome || "—"}</div>
+      <div><span>Prontuário:</span> ${prontuario || "—"}</div>
+      <div><span>Nascimento:</span> ${dataNascFmt}</div>
+      <div><span>Data da Aplicação:</span> ${dataAppFmt}</div>
+    </div>
+
+    <div class="result-box" style="border-color:${classification.color};background:${classification.color}08">
+      <div style="font-size:22px;font-weight:800;color:${classification.color}">${classification.nivel} — ${classification.label}</div>
+      <div style="font-size:32px;font-weight:900;color:${classification.color};margin:4px 0">${total} pontos</div>
+      <div style="font-size:12px;color:#6b7280">${classification.desc}</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:4px">${checkedCount} de 57 itens marcados</div>
+    </div>
+
+    <div class="subtotals">
+      ${(Object.entries(catTotals) as [ABCCategory, number][]).map(([cat, val]) => `
+        <div style="border-color:${catColors[cat]}30">
+          <div style="font-size:20px;font-weight:800;color:${catColors[cat]}">${val}</div>
+          <div style="font-size:10px;font-weight:700;color:#6b7280">${cat}</div>
+          <div style="font-size:9px;color:#9ca3af">${catLabels[cat]}</div>
+        </div>
+      `).join("")}
+    </div>
+
+    ${checkedItems.length > 0 ? `
+      <div class="section-title">✔ Itens Marcados (${checkedItems.length})</div>
+      <table><thead><tr>
+        <th style="width:40px;text-align:center">Nº</th>
+        <th>Descrição / Explicação Simplificada</th>
+        <th style="width:60px;text-align:center">Cat.</th>
+        <th style="width:50px;text-align:center">Peso</th>
+        <th style="width:50px;text-align:center">✔</th>
+      </tr></thead><tbody>${checkedItems.map(i => itemRow(i, true)).join("")}</tbody></table>
+    ` : ""}
+
+    ${uncheckedItems.length > 0 ? `
+      <div class="section-title" style="color:#9ca3af">Itens Não Marcados (${uncheckedItems.length})</div>
+      <table><thead><tr>
+        <th style="width:40px;text-align:center">Nº</th>
+        <th>Descrição / Explicação Simplificada</th>
+        <th style="width:60px;text-align:center">Cat.</th>
+        <th style="width:50px;text-align:center">Peso</th>
+        <th style="width:50px;text-align:center">✔</th>
+      </tr></thead><tbody>${uncheckedItems.map(i => itemRow(i, false)).join("")}</tbody></table>
+    ` : ""}
+
+    <div class="footer">
+      <p>A classificação tem caráter organizacional e não diagnóstico, sendo utilizada exclusivamente para definição de prioridade assistencial e direcionamento terapêutico.</p>
+      <p style="margin-top:6px">${CLINIC_CONFIG.copyright} · Gerado em ${new Date().toLocaleString("pt-BR")}</p>
+    </div>
+    </body></html>`;
+
+    const printWin = window.open("", "_blank");
+    if (printWin) {
+      printWin.document.write(html);
+      printWin.document.close();
+      setTimeout(() => printWin.print(), 400);
+    }
+  };
+
   return (
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         {/* Título */}
@@ -2290,6 +2398,9 @@ function ABCChecklistContent() {
                 A classificação tem caráter organizacional e não diagnóstico, sendo utilizada exclusivamente para definição de prioridade assistencial e direcionamento terapêutico.
               </p>
 
+              <button type="button" onClick={handlePrintPDF} className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all" style={{ background: classification.color }}>
+                📄 Gerar PDF / Imprimir
+              </button>
               <button type="button" onClick={handleReset} className="w-full py-2 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all">
                 Nova Avaliação
               </button>
