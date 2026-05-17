@@ -1,3 +1,5 @@
-// Vercel serverless entry — exports the Express app (no listen)
-import app from "../src/app.js";
-export default app;
+// Vercel serverless entry — delegates to esbuild-bundled app
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const app = require("../.vercel-build/app.cjs");
+export default app.default ?? app;
