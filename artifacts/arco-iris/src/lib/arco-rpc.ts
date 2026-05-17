@@ -1344,3 +1344,40 @@ export async function markAllNotificacoesLido(): Promise<void> {
   });
   if (error) throw error;
 }
+
+// ── AI Brain API calls ─────────────────────────────────────────────────────
+
+export type AIAnalysis = {
+  success: boolean;
+  analysis: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+async function fetchAI(endpoint: string): Promise<AIAnalysis> {
+  const resp = await fetch(`/api/ai/${endpoint}`);
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}));
+    throw new Error((body as Record<string, string>).error ?? `Erro ${resp.status}`);
+  }
+  return resp.json() as Promise<AIAnalysis>;
+}
+
+export function getAIFullAnalysis(): Promise<AIAnalysis> {
+  return fetchAI("full-analysis");
+}
+
+export function getAIWaitingListOptimization(): Promise<AIAnalysis> {
+  return fetchAI("waiting-list-optimization");
+}
+
+export function getAIChurnAlerts(): Promise<AIAnalysis> {
+  return fetchAI("churn-alerts");
+}
+
+export function getAIAgeLimitReport(): Promise<AIAnalysis> {
+  return fetchAI("age-limit-report");
+}
+
+export function getAISystemHealth(): Promise<AIAnalysis> {
+  return fetchAI("system-health");
+}
