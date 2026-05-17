@@ -43,7 +43,7 @@ function getWeekDays(ref: Date): Date[] {
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
 
 /** Projects recurring appointments into weeks that have no real DB row yet. */
-function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string }>(
+function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string; frequency?: string | null }>(
   allApts: T[],
   weekDates: string[],
 ): T[] {
@@ -66,6 +66,20 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (!target) continue;
     if (target < sorted[0].date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
+
+    // ── Respeitar frequência: semanal=toda semana, quinzenal=semanas alternadas, mensal=1x/mês ──
+    const freq = (sorted[0] as any).frequency ?? "semanal";
+    if (freq === "quinzenal") {
+      const refWeek = isoWeekNumber(sorted[0].date);
+      const targetWeek = isoWeekNumber(target);
+      if ((targetWeek - refWeek) % 2 !== 0) continue;
+    } else if (freq === "mensal") {
+      const refDay = new Date(sorted[0].date + "T12:00:00").getDate();
+      const targetDate = new Date(target + "T12:00:00");
+      const targetDay = targetDate.getDate();
+      if (Math.abs(targetDay - refDay) > 3) continue;
+    }
+
     const key = `${target}|${sorted[0].time}|${sorted[0].patientId}`;
     if (existing.has(key)) continue;
     existing.add(key);

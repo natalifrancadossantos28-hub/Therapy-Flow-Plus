@@ -243,7 +243,8 @@ export default function BookingModal({
       // Validação de Duplicidade por Especialidade: impede novo agendamento
       // para o mesmo paciente se já tem agendamento ativo/recorrente com
       // qualquer profissional da mesma especialidade.
-      if (professionalSpecialty) {
+      // Admin pode forçar (ex: transferir paciente entre profissionais da mesma especialidade).
+      if (professionalSpecialty && !adminMode) {
         const today = new Date().toISOString().slice(0, 10);
         const patientApts = await listAppointments({ patientId: targetPatientId, dateFrom: today });
         const hasActiveInSpecialty = patientApts.some(a => {

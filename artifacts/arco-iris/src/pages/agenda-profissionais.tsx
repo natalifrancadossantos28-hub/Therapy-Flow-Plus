@@ -36,8 +36,17 @@ function getWeekDays(ref: Date): Date[] {
 
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
 
+function isoWeekNumber(dateStr: string): number {
+  const d = new Date(dateStr + "T12:00:00");
+  const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = target.getUTCDay() || 7;
+  target.setUTCDate(target.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+  return Math.ceil((((+target - +yearStart) / 86_400_000) + 1) / 7);
+}
+
 /** Projects recurring appointments into weeks that have no real DB row yet. */
-function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string }>(
+function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string; frequency?: string | null }>(
   allApts: T[],
   weekDates: string[],
 ): T[] {
@@ -60,6 +69,20 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (!target) continue;
     if (target < sorted[0].date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
+
+    // ── Respeitar frequência: semanal=toda semana, quinzenal=semanas alternadas, mensal=1x/mês ──
+    const freq = (sorted[0] as any).frequency ?? "semanal";
+    if (freq === "quinzenal") {
+      const refWeek = isoWeekNumber(sorted[0].date);
+      const targetWeek = isoWeekNumber(target);
+      if ((targetWeek - refWeek) % 2 !== 0) continue;
+    } else if (freq === "mensal") {
+      const refDay = new Date(sorted[0].date + "T12:00:00").getDate();
+      const targetDate = new Date(target + "T12:00:00");
+      const targetDay = targetDate.getDate();
+      if (Math.abs(targetDay - refDay) > 3) continue;
+    }
+
     const key = `${target}|${sorted[0].time}|${sorted[0].patientId}`;
     if (existing.has(key)) continue;
     existing.add(key);
@@ -70,7 +93,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
-type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; };
+type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; };
 
 type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
