@@ -1,4 +1,5 @@
-// Vercel serverless entry — exports the Express app (no listen)
-// @ts-ignore — Vercel's @vercel/node runtime resolves .ts files automatically
-import app from "../src/app";
-export default app;
+// Vercel serverless entry — delegates to esbuild-bundled app
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const app = require("../.vercel-build/app.cjs");
+export default app.default ?? app;
