@@ -11,6 +11,7 @@ import whatsappRouter from "./whatsapp";
 import notificacoesRouter from "./notificacoes";
 import contractorsRouter from "./contractors";
 import colaboradoresRouter from "./colaboradores";
+import aiBrainRouter from "./ai-brain";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use("/whatsapp", whatsappRouter);
 router.use(notificacoesRouter);
 router.use(contractorsRouter);
 router.use(colaboradoresRouter);
+router.use(aiBrainRouter);
 
 export default router;

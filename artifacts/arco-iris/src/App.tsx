@@ -23,6 +23,7 @@ const AgendaMensal = lazy(() => import("@/pages/agenda-mensal"));
 const AgendaProfissionais = lazy(() => import("@/pages/agenda-profissionais"));
 const GestaoContratos = lazy(() => import("@/pages/gestao-contratos"));
 const PainelMaster = lazy(() => import("@/pages/painel-master"));
+const AIBrain = lazy(() => import("@/pages/ai-brain"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,6 +69,7 @@ function Router() {
                 <Route path="/agenda" component={Agenda} />
                 <Route path="/agenda-mensal">{() => <AdminGuard><AgendaMensal /></AdminGuard>}</Route>
                 <Route path="/gestao-contratos">{() => <AdminGuard><GestaoContratos /></AdminGuard>}</Route>
+                <Route path="/ai-brain">{() => <AdminGuard><AIBrain /></AdminGuard>}</Route>
                 <Route component={NotFound} />
               </Switch>
             </Suspense>
