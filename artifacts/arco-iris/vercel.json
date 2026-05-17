@@ -4,7 +4,13 @@
   "outputDirectory": "dist",
   "installCommand": "cd ../.. && pnpm install",
   "framework": null,
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
+    { "source": "/api/ai/:path*", "destination": "/api/ai/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

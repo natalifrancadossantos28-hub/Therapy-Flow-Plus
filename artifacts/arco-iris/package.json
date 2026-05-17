@@ -75,7 +75,9 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.103.3",
+    "@vercel/node": "^5.8.2",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7"
   }
