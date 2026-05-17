@@ -934,9 +934,11 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
         const result = await autolinkTriagem(saved.id);
         if (result?.addedToQueue && result.addedSpecialties?.length) {
           const specs = result.addedSpecialties.join(", ");
-          setAutolinkMsg(`✅ Paciente adicionado à fila de espera: ${specs}.`);
+          const prioLabel = result.priority ? ` (Prioridade: ${result.priority})` : "";
+          setAutolinkMsg(`✅ Integrado ao sistema de gestão! Paciente adicionado à fila de espera: ${specs}${prioLabel}.`);
         } else if (result?.linkedOnly && result.patientName) {
-          setAutolinkMsg(`✅ Vinculado ao paciente ${result.patientName}.`);
+          const reason = result.reason === "all_already_queued" ? " (já está na fila)" : "";
+          setAutolinkMsg(`✅ Vinculado ao paciente ${result.patientName}${reason}.`);
         }
       }
     } catch (err) {
