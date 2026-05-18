@@ -20,6 +20,7 @@ import {
   addPatientToFila,
   upsertPatient,
   getPatient,
+  updateRecurrenceFrequency,
 } from "@/lib/arco-rpc";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
@@ -656,12 +657,10 @@ export default function AgendaProfissionais() {
       toast({ title: "Sem recorrência", description: "Este agendamento não possui grupo de recorrência.", variant: "destructive" });
       return;
     }
+    if ((apt.frequency ?? "semanal") === newFreq) return;
     setFreqSending(true);
     try {
-      const sb = supabase;
-      if (!sb) throw new Error("Supabase não disponível");
-      const { error } = await sb.from("appointments").update({ frequency: newFreq }).eq("recurrence_group_id", apt.recurrenceGroupId);
-      if (error) throw error;
+      await updateRecurrenceFrequency(apt.recurrenceGroupId, newFreq);
       setAppointments(prev => prev.map(a =>
         a.recurrenceGroupId === apt.recurrenceGroupId ? { ...a, frequency: newFreq } : a
       ));

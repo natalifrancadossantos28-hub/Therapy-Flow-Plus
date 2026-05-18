@@ -1210,6 +1210,22 @@ export async function updateAppointment(
   return data as UpdateAppointmentResult;
 }
 
+export async function updateRecurrenceFrequency(
+  recurrenceGroupId: string,
+  frequency: AppointmentFrequency
+): Promise<{ ok: boolean; updatedCount: number; frequency: string }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("update_recurrence_frequency", {
+    p_slug: slug,
+    p_password: password,
+    p_recurrence_group_id: recurrenceGroupId,
+    p_frequency: frequency,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; updatedCount: number; frequency: string };
+}
+
 export async function deleteAppointmentAlta(
   id: number
 ): Promise<{ ok: true; deletedCount: number }> {
