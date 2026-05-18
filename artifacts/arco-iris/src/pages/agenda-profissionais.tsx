@@ -98,7 +98,9 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (existing.has(key)) continue;
     existing.add(key);
     const ref = sorted.find(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase())) ?? sorted[0];
-    virtual.push({ ...ref, date: target, status: "agendado", id: stableVirtualId(target, sorted[0].time, sorted[0].patientId, sorted[0].recurrenceGroupId!) } as T);
+    const hasAtendimento = sorted.some(a => ["atendimento", "em_atendimento", "em atendimento"].includes(a.status.toLowerCase()));
+    const virtualStatus = hasAtendimento ? "atendimento" : "agendado";
+    virtual.push({ ...ref, date: target, status: virtualStatus, id: stableVirtualId(target, sorted[0].time, sorted[0].patientId, sorted[0].recurrenceGroupId!) } as T);
   }
   return [...allApts, ...virtual];
 }
