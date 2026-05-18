@@ -1,8 +1,7 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export function getCompanyId(req: VercelRequest): number | null {
+export function getCompanyId(req) {
   const h = req.headers["x-company-id"];
   if (!h) return null;
   const n = Number(h);
@@ -23,7 +22,7 @@ export function getModel() {
   return genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 }
 
-export function calcAge(dob: string | null | undefined): number | null {
+export function calcAge(dob) {
   if (!dob) return null;
   const birth = new Date(dob + "T00:00:00");
   if (isNaN(birth.getTime())) return null;
@@ -34,11 +33,11 @@ export function calcAge(dob: string | null | undefined): number | null {
   return age;
 }
 
-export function todayStr(): string {
+export function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
-export function parseAIResponse(text: string): Record<string, unknown> {
+export function parseAIResponse(text) {
   try {
     const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     return JSON.parse(cleaned);
@@ -47,7 +46,7 @@ export function parseAIResponse(text: string): Record<string, unknown> {
   }
 }
 
-export function cors(req: VercelRequest, res: VercelResponse): boolean {
+export function cors(req, res) {
   const origin = req.headers.origin ?? "";
   if (origin && /\.vercel\.app$/.test(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);

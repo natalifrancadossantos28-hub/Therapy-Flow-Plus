@@ -1,7 +1,7 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getCompanyId, getSupabase, getModel, calcAge, parseAIResponse, cors } from "./_helpers";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+import { getCompanyId, getSupabase, getModel, calcAge, parseAIResponse, cors } from "./_helpers.mjs";
+
+export default async function handler(req, res) {
   if (cors(req, res)) return;
   try {
     const companyId = getCompanyId(req);
@@ -18,16 +18,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const professionals = profRes.data ?? [];
 
     // Get patient details for waiting list entries
-    const patientIds = [...new Set(waitingRows.map((w: any) => w.patient_id).filter(Boolean))];
+    const patientIds = [...new Set(waitingRows.map(w => w.patient_id).filter(Boolean))];
     const { data: patientsData } = patientIds.length > 0
       ? await sb.from("patients").select("id, name, date_of_birth, triagem_score, escola_publica, abrigo_casa_crianca").in("id", patientIds)
       : { data: [] };
     const patients = patientsData ?? [];
-    const patientMap = new Map<number, any>(patients.map((p: any) => [p.id, p]));
+    const patientMap = new Map(patients.map(p => [p.id, p]));
 
     // Count active patients per professional
     const profCapacity = await Promise.all(
-      professionals.map(async (p: any) => {
+      professionals.map(async p => {
         const { count } = await sb
           .from("appointments")
           .select("patient_id", { count: "exact", head: true })
@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     );
 
-    const waitingData = waitingRows.map((w: any) => {
+    const waitingData = waitingRows.map(w => {
       const pat = patientMap.get(w.patient_id);
       return {
         paciente: pat?.name ?? "Desconhecido",
@@ -88,7 +88,7 @@ Responda APENAS com o JSON, sem markdown.`;
     const parsed = parseAIResponse(result.response.text());
 
     res.json({ success: true, analysis: parsed, rawPatientCount: waitingData.length });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[AI] waiting-list-optimization error:", err);
     res.status(500).json({ error: err.message ?? "Erro interno" });
   }

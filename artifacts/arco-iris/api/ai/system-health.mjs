@@ -1,7 +1,7 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getCompanyId, getSupabase, getModel, parseAIResponse, cors } from "./_helpers";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+import { getCompanyId, getSupabase, getModel, parseAIResponse, cors } from "./_helpers.mjs";
+
+export default async function handler(req, res) {
   if (cors(req, res)) return;
   try {
     const companyId = getCompanyId(req);
@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq("company_id", companyId)
       .eq("status", "Em Atendimento");
 
-    const orphanPatients: Array<{ nome: string; issue: string }> = [];
+    const orphanPatients = [];
     for (const p of emAtendimento ?? []) {
       const { count } = await sb
         .from("appointments")
@@ -34,13 +34,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select("patient_id, specialty")
       .eq("company_id", companyId);
 
-    const waitingPatientIds = [...new Set((waitingData ?? []).map((w: any) => w.patient_id).filter(Boolean))];
+    const waitingPatientIds = [...new Set((waitingData ?? []).map(w => w.patient_id).filter(Boolean))];
     const { data: inTreatmentData } = waitingPatientIds.length > 0
       ? await sb.from("patients").select("id, name, status").in("id", waitingPatientIds).eq("status", "Em Atendimento")
       : { data: [] };
 
-    const filaAndAtendimento = (inTreatmentData ?? []).map((p: any) => {
-      const specs = (waitingData ?? []).filter((w: any) => w.patient_id === p.id).map((w: any) => w.specialty);
+    const filaAndAtendimento = (inTreatmentData ?? []).map(p => {
+      const specs = (waitingData ?? []).filter(w => w.patient_id === p.id).map(w => w.specialty);
       return {
         nome: p.name,
         especialidadeNaFila: specs.join(", "),
@@ -53,8 +53,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? await sb.from("patients").select("id, name, status").in("id", waitingPatientIds).in("status", ["Alta", "Óbito", "Desistência"])
       : { data: [] };
 
-    const statusInconsistencies = (exitedData ?? []).map((p: any) => {
-      const specs = (waitingData ?? []).filter((w: any) => w.patient_id === p.id).map((w: any) => w.specialty);
+    const statusInconsistencies = (exitedData ?? []).map(p => {
+      const specs = (waitingData ?? []).filter(w => w.patient_id === p.id).map(w => w.specialty);
       return {
         nome: p.name,
         status: p.status,
@@ -68,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select("name")
       .eq("company_id", companyId);
 
-    const nameCounts = new Map<string, number>();
+    const nameCounts = new Map();
     for (const p of allPatients ?? []) {
       const lower = (p.name ?? "").toLowerCase().trim();
       nameCounts.set(lower, (nameCounts.get(lower) ?? 0) + 1);
@@ -119,7 +119,7 @@ Responda APENAS com o JSON, sem markdown.`;
     const parsed = parseAIResponse(result.response.text());
 
     res.json({ success: true, analysis: parsed, rawIssues: totalIssues });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[AI] system-health error:", err);
     res.status(500).json({ error: err.message ?? "Erro interno" });
   }

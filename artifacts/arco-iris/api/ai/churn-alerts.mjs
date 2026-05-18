@@ -1,7 +1,7 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getCompanyId, getSupabase, getModel, calcAge, todayStr, parseAIResponse, cors } from "./_helpers";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+import { getCompanyId, getSupabase, getModel, calcAge, todayStr, parseAIResponse, cors } from "./_helpers.mjs";
+
+export default async function handler(req, res) {
   if (cors(req, res)) return;
   try {
     const companyId = getCompanyId(req);
@@ -28,14 +28,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const recentAppts = apptsRes.data ?? [];
 
     // Get professional names
-    const profIds = [...new Set(recentAppts.map((a: any) => a.professional_id).filter(Boolean))];
+    const profIds = [...new Set(recentAppts.map(a => a.professional_id).filter(Boolean))];
     const { data: profsData } = profIds.length > 0
       ? await sb.from("professionals").select("id, name, specialty").in("id", profIds)
       : { data: [] };
     const profs = profsData ?? [];
-    const profMap = new Map<number, any>(profs.map((p: any) => [p.id, p]));
+    const profMap = new Map(profs.map(p => [p.id, p]));
 
-    const patientAppts = new Map<number, any[]>();
+    const patientAppts = new Map();
     for (const a of recentAppts) {
       if (!a.patient_id) continue;
       const arr = patientAppts.get(a.patient_id) ?? [];
@@ -43,18 +43,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       patientAppts.set(a.patient_id, arr);
     }
 
-    const patientData = activePatients.map((p: any) => {
+    const patientData = activePatients.map(p => {
       const appts = patientAppts.get(p.id) ?? [];
-      const faltas = appts.filter((a: any) => a.status === "Falta").length;
-      const presencas = appts.filter((a: any) =>
+      const faltas = appts.filter(a => a.status === "Falta").length;
+      const presencas = appts.filter(a =>
         ["Presente", "Confirmado", "Em Espera"].includes(a.status ?? "")
       ).length;
       const ultimaPresenca = appts
-        .filter((a: any) => a.status === "Presente")
-        .sort((a: any, b: any) => (b.date ?? "").localeCompare(a.date ?? ""))
+        .filter(a => a.status === "Presente")
+        .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))
         [0]?.date ?? null;
 
-      const profNames = [...new Set(appts.map((a: any) => {
+      const profNames = [...new Set(appts.map(a => {
         const prof = profMap.get(a.professional_id);
         return prof ? `${prof.specialty}: ${prof.name}` : null;
       }).filter(Boolean))];
@@ -106,7 +106,7 @@ Responda APENAS com o JSON, sem markdown.`;
     const parsed = parseAIResponse(result.response.text());
 
     res.json({ success: true, analysis: parsed, totalPatients: patientData.length });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[AI] churn-alerts error:", err);
     res.status(500).json({ error: err.message ?? "Erro interno" });
   }
