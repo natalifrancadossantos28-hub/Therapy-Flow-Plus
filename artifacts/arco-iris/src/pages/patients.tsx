@@ -33,6 +33,7 @@ type AlertaIdade = { tipo: "critico" | "alerta" | "ok"; text: string | null; ida
 function alertaIdade(dateOfBirth: string | null | undefined): AlertaIdade | null {
   if (!dateOfBirth) return null;
   const idade = calcIdade(dateOfBirth);
+  if (isNaN(idade)) return null;
   if (idade > 11) return { tipo: "critico", text: "🛑 Fora da faixa — Encaminhar Reabilitação", idade };
   if (idade === 11) return { tipo: "alerta", text: "⚠️ Preparar Encaminhamento (11 anos)", idade };
   return { tipo: "ok", text: null, idade };
@@ -208,7 +209,8 @@ export default function Patients() {
     const BOM = "\uFEFF";
     const header = ["Prontuário", "Nome", "Mãe", "Data Nascimento", "Idade", "CPF", "CNS", "Telefone", "Responsável", "Tel. Responsável", "Diagnóstico", "Status", "Data Entrada", "Tipo Registro", "Faltas", "Observações"];
     const rows = patients.map(p => {
-      const idade = p.dateOfBirth ? String(calcIdade(p.dateOfBirth)) : "";
+      const raw = p.dateOfBirth ? calcIdade(p.dateOfBirth) : NaN;
+      const idade = isNaN(raw) ? "" : String(raw);
       const notes = (p.notes || "").replace(/"/g, '""');
       return [
         p.prontuario || "",
@@ -511,7 +513,8 @@ export default function Patients() {
                   <Input type="date" value={formData.dateOfBirth} onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })} />
                   {formData.dateOfBirth && (() => {
                     const a = alertaIdade(formData.dateOfBirth);
-                    if (!a || a.tipo === "ok") return <p className="text-xs text-muted-foreground mt-1">{a?.idade} anos</p>;
+                    if (!a) return null;
+                    if (a.tipo === "ok") return <p className="text-xs text-muted-foreground mt-1">{a.idade} anos</p>;
                     if (a.tipo === "alerta") return <p className="text-xs font-bold mt-1" style={{ color: "#f97316" }}>⚠️ {a.idade} anos — Preparar Encaminhamento</p>;
                     return <p className="text-xs font-bold mt-1" style={{ color: "#ef4444" }}>🛑 {a.idade} anos — Fora da faixa etária</p>;
                   })()}

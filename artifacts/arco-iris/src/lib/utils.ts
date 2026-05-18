@@ -48,11 +48,21 @@ export const getStatusLabel = (status: string): string => {
 };
 
 /**
- * Calcula a idade em anos completos a partir de uma data de nascimento (YYYY-MM-DD).
- * Centralizado aqui para evitar duplicação em dashboard, patients, etc.
+ * Calcula a idade em anos completos a partir de uma data de nascimento.
+ * Aceita YYYY-MM-DD, DD/MM/YYYY e ISO timestamps.
+ * Retorna NaN para datas inválidas/vazias.
  */
 export function calcIdade(dateOfBirth: string): number {
-  const dob = new Date(dateOfBirth + "T00:00:00");
+  if (!dateOfBirth || !dateOfBirth.trim()) return NaN;
+  let dob: Date;
+  const brMatch = dateOfBirth.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (brMatch) {
+    dob = new Date(Number(brMatch[3]), Number(brMatch[2]) - 1, Number(brMatch[1]));
+  } else {
+    const iso = dateOfBirth.includes("T") ? dateOfBirth : dateOfBirth + "T00:00:00";
+    dob = new Date(iso);
+  }
+  if (isNaN(dob.getTime())) return NaN;
   const hoje = new Date();
   let anos = hoje.getFullYear() - dob.getFullYear();
   const m = hoje.getMonth() - dob.getMonth();
