@@ -102,6 +102,14 @@ const PALETTE: SpecialtyTone[] = [
     border: "rgba(251,191,36,0.55)",
     glow: "rgba(251,191,36,0.4)",
   },
+  // Psicologia Parental → magenta rosado
+  {
+    key: "parental",
+    fg: "#f0abfc",
+    bg: "rgba(217,70,239,0.16)",
+    border: "rgba(217,70,239,0.55)",
+    glow: "rgba(217,70,239,0.4)",
+  },
 ];
 
 const TONE_BY_KEY: Record<string, SpecialtyTone> = Object.fromEntries(
@@ -118,6 +126,7 @@ const TONE_BY_KEY: Record<string, SpecialtyTone> = Object.fromEntries(
  */
 export const SPECIALTIES = [
   "Psicologia",
+  "Psicologia Parental",
   "Fonoaudiologia",
   "Terapia Ocupacional",
   "Fisioterapia",
@@ -151,6 +160,7 @@ export function specialtyKey(specialty: string | null | undefined): string {
   if (s.includes("fono")) return "fono";
   if (s.includes("psicop")) return "psicoped";
   if (s.includes("psicomot")) return "psicomotricidade";
+  if (s.includes("parental")) return "parental";
   if (s.includes("psico")) return "psicologia";
   if (s.includes("fisio")) return "fisio";
   if (s.includes("ed fisica") || s.includes("educacao fisica") || /(^|\s)ef(\s|$)/.test(s)) return "edfisica";
@@ -169,6 +179,7 @@ export function specialtyShortLabel(specialty: string | null | undefined): strin
     case "fono":               return "Fono";
     case "to":                 return "TO";
     case "psicologia":         return "Psicologia";
+    case "parental":           return "Psic. Parental";
     case "fisio":              return "Fisio";
     case "psicoped":           return "Psicoped.";
     case "psicomotricidade":   return "Psicomotr.";

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ArrowRightLeft, UserX, XOctagon, Users } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2 } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import {
   updateAppointment,
   deleteAppointmentAlta,
   createNotificacao,
+  createAppointments,
   listWaitingList,
   deleteWaitingListEntry,
   addPatientToFila,
@@ -93,9 +94,9 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
-type Appointment = { id: number; patientId: number; patientName?: string; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; };
+type Appointment = { id: number; patientId: number; patientName?: string; guardianName?: string | null; professionalName?: string | null; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; };
 
-type AbsenceAlert = { patientName: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
+type AbsenceAlert = { patientName: string; professionalName: string; professionalSpecialty: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
 type RemanejFlow = {
   apt: Appointment;
@@ -117,7 +118,7 @@ const NEON: Record<string, React.CSSProperties> = {
 };
 
 const SPECIALTIES = [
-  "Psicologia", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
+  "Psicologia", "Psicologia Parental", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
   "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
 ];
 
@@ -173,6 +174,16 @@ export default function AgendaProfissionais() {
   const [encErro, setEncErro] = useState("");
   const [encSending, setEncSending] = useState(false);
   const [encManterAgenda, setEncManterAgenda] = useState(true);
+
+  // Multi-Atendimento
+  const [multiApt, setMultiApt] = useState<Appointment | null>(null);
+  const [multiProfId, setMultiProfId] = useState<string>("");
+  const [multiSending, setMultiSending] = useState(false);
+  const [multiErro, setMultiErro] = useState("");
+
+  // Frequência (Periodicidade)
+  const [freqApt, setFreqApt] = useState<Appointment | null>(null);
+  const [freqSending, setFreqSending] = useState(false);
 
   const weekDays = getWeekDays(weekRef);
   const weekDates = weekDays.map(d => format(d, "yyyy-MM-dd"));
@@ -535,6 +546,137 @@ export default function AgendaProfissionais() {
     }
   };
 
+  // ── Falta Justificada ──
+  const handleFaltaJustificada = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "falta_justificada");
+      await logNotificacao(apt, "Falta Justificada");
+      toast({ title: "Falta Justificada registrada", description: `${apt.patientName} — sequência de alertas zerada.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
+    }
+  };
+
+  // ── Falta Não Justificada ──
+  const handleFaltaNaoJustificada = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      const result = await patchStatus(apt, "falta_nao_justificada");
+      const consecutive: number = result?.consecutiveUnjustifiedAbsences ?? 1;
+      await logNotificacao(apt, `Falta ${consecutive} — Não Justificada`);
+      const profName = result?.professionalName || apt.professionalName || "";
+      const profSpec = result?.professionalSpecialty || "";
+      if (consecutive >= 2) {
+        setAbsenceAlert({
+          patientName: apt.patientName ?? `Paciente #${apt.patientId}`,
+          professionalName: profName,
+          professionalSpecialty: profSpec,
+          consecutive,
+          escolaPublica: result?.escolaPublica ?? false,
+          trabalhoNaRoca: result?.trabalhoNaRoca ?? false,
+        });
+      } else {
+        toast({ title: "Falta Não Justificada registrada", description: `${apt.patientName} — 1ª ausência sem justificativa.` });
+      }
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
+    }
+  };
+
+  // ── Desmarcar ──
+  const handleDesmarcado = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "desmarcado");
+      await logNotificacao(apt, "Desmarcado");
+      toast({ title: "Desmarcado", description: `${apt.patientName} — agendamento desmarcado.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível desmarcar.", variant: "destructive" });
+    }
+  };
+
+  // ── Multi-Atendimento ──
+  const handleMultiAtendimento = async (apt: Appointment) => {
+    try {
+      const allApts = await listAppointments({ patientId: apt.patientId, professionalId: Number(selectedProfId) });
+      const completed = allApts.filter(a => a.status === "atendimento").length;
+      if (completed < 10) {
+        toast({ title: "Atendimento Multi bloqueado", description: `Só é possível após 10 atendimentos concluídos. Atualmente: ${completed}/10.`, variant: "destructive" });
+        setActionMenuId(null);
+        return;
+      }
+    } catch { /* se falhar a contagem, permite prosseguir */ }
+    setActionMenuId(null);
+    setMultiApt(apt);
+    setMultiProfId("");
+    setMultiErro("");
+  };
+
+  const confirmMultiAtendimento = async () => {
+    if (!multiApt || !multiProfId) return;
+    setMultiErro("");
+    setMultiSending(true);
+    try {
+      const secondProf = professionals.find(p => String(p.id) === multiProfId);
+      if (!secondProf) { setMultiErro("Profissional não encontrado."); setMultiSending(false); return; }
+      const currentProf = selectedProf;
+      if (!currentProf) { setMultiErro("Profissional atual não identificado."); setMultiSending(false); return; }
+      const spec1 = (currentProf.specialty || "").trim().toLowerCase();
+      const spec2 = (secondProf.specialty || "").trim().toLowerCase();
+      if (spec1 && spec2 && spec1 === spec2) {
+        setMultiErro(`Bloqueado: ${currentProf.name} e ${secondProf.name} são da mesma especialidade (${currentProf.specialty}). Para Atendimento Multi, os profissionais devem ser de especialidades diferentes.`);
+        setMultiSending(false);
+        return;
+      }
+      await createAppointments({
+        patientId: multiApt.patientId,
+        professionalId: secondProf.id,
+        date: multiApt.date,
+        time: multiApt.time,
+        notes: `Atendimento Multi com ${currentProf.name} (${currentProf.specialty || "—"})`,
+        noRecurrence: true,
+      });
+      await updateAppointment(multiApt.id, { notes: `Atendimento Multi com ${secondProf.name} (${secondProf.specialty || "—"})` });
+      await logNotificacao(multiApt, `Atendimento Multi — ${secondProf.name} (${secondProf.specialty || "—"}) adicionado ao horário de ${currentProf.name}`);
+      setMultiApt(null);
+      toast({ title: "Atendimento Multi criado", description: `${secondProf.name} adicionado ao horário de ${multiApt.patientName} às ${multiApt.time}.` });
+      fetchAppointments();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha inesperada.";
+      toast({ title: "Erro ao criar Atendimento Multi", description: msg, variant: "destructive" });
+    } finally {
+      setMultiSending(false);
+    }
+  };
+
+  // ── Alterar Periodicidade (Frequência) ──
+  const handleChangeFrequency = async (apt: Appointment, newFreq: "semanal" | "quinzenal" | "mensal") => {
+    if (!apt.recurrenceGroupId) {
+      toast({ title: "Sem recorrência", description: "Este agendamento não possui grupo de recorrência.", variant: "destructive" });
+      return;
+    }
+    setFreqSending(true);
+    try {
+      const sb = supabase;
+      if (!sb) throw new Error("Supabase não disponível");
+      const { error } = await sb.from("appointments").update({ frequency: newFreq }).eq("recurrence_group_id", apt.recurrenceGroupId);
+      if (error) throw error;
+      setAppointments(prev => prev.map(a =>
+        a.recurrenceGroupId === apt.recurrenceGroupId ? { ...a, frequency: newFreq } : a
+      ));
+      await logNotificacao(apt, `Periodicidade alterada para ${newFreq}`);
+      toast({ title: "Periodicidade alterada", description: `${apt.patientName} agora é ${newFreq}.` });
+      setFreqApt(null);
+      fetchAppointments();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha inesperada.";
+      toast({ title: "Erro ao alterar periodicidade", description: msg, variant: "destructive" });
+    } finally {
+      setFreqSending(false);
+    }
+  };
+
   // Expande recorrência: projeta agendamentos recorrentes em semanas sem linha real no banco.
   const expanded = expandRecurrence(appointments, weekDates);
 
@@ -842,43 +984,136 @@ export default function AgendaProfissionais() {
                                               <Users className="w-2.5 h-2.5" /> Multi: {selectedProf?.name?.split(" ")[0]} & {multiPartner.split(" ")[0]}
                                             </span>
                                           )}
+                                          {isDesmarcado && (
+                                            <span className="text-[9px] text-orange-400 font-semibold">⚠ só esta data</span>
+                                          )}
+                                          {isRemanejado && (
+                                            <span className="text-[9px] text-orange-400 font-semibold">↩ remanejado</span>
+                                          )}
+                                          {isRemarcado && (
+                                            <span className="text-[9px] text-yellow-400 font-semibold">✎ remarcado</span>
+                                          )}
+                                          {apt.recurrenceGroupId && !isDesmarcado && !isRescheduled && (
+                                            <span className="text-[9px] text-muted-foreground/50">
+                                              {apt.frequency === "quinzenal" ? "↺ quinzenal" : apt.frequency === "mensal" ? "↺ mensal" : "↺ semanal"}
+                                            </span>
+                                          )}
+                                          {/* Psicologia Parental: show guardian/mother name */}
+                                          {apt.guardianName && selectedProf?.specialty?.toLowerCase().includes("parental") && (
+                                            <span className="text-[9px] text-pink-400/80 font-semibold truncate">
+                                              Mãe: {apt.guardianName}
+                                            </span>
+                                          )}
+                                          {/* Encaminhamento info on slot card */}
+                                          {apt.notes && apt.notes.includes("ENCAMINHAMENTO") && (
+                                            <span className="text-[9px] text-fuchsia-400/70 font-semibold flex items-center gap-0.5 truncate">
+                                              <ArrowRightLeft className="w-2.5 h-2.5 shrink-0" /> Enc. Interno
+                                            </span>
+                                          )}
                                         </div>
 
                                         {isMenuOpen && (
                                           <div
-                                            className="absolute z-50 top-full left-0 mt-1 min-w-[180px] rounded-2xl shadow-2xl"
+                                            className="absolute z-50 top-full left-0 mt-1 w-56 rounded-2xl shadow-2xl"
                                             style={{ background: "rgba(2,4,8,0.97)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)", padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}
                                           >
                                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName || `Agendamento #${apt.id}`}</p>
                                             {isGhost && (
-                                              <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⚠ Paciente sem dados — solicite exclução ao admin</p>
+                                              <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⚠ Paciente sem dados — solicite exclusão ao admin</p>
                                             )}
                                             {!isAtendimento && !isPresente && (
                                               <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
                                                 <Activity className="w-3.5 h-3.5" /> Em Atendimento
                                               </button>
                                             )}
+
+                                            <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
+                                              <CheckCircle className="w-3.5 h-3.5" /> Falta Justificada
+                                            </button>
+                                            <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
+                                              <AlertTriangle className="w-3.5 h-3.5" /> Falta N. Justificada
+                                            </button>
+                                            <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                            <button style={NEON.red} onClick={() => handleDesmarcado(apt)}>
+                                              <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
+                                            </button>
+
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
                                               <RotateCcw className="w-3.5 h-3.5" /> Remanejar (nesta semana)
                                             </button>
                                             <button style={NEON.yellow} onClick={() => handleRemarcar(apt)}>
                                               <CalendarIcon className="w-3.5 h-3.5" /> Remarcar (qualquer semana)
                                             </button>
-                                            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "4px", paddingTop: "6px" }}>
-                                              <p className="text-[9px] text-white/40 uppercase font-bold px-1 mb-1">Saída</p>
-                                              <button style={NEON.red} onClick={() => handleSaida(apt, "Alta")}>
-                                                <LogOut className="w-3.5 h-3.5" /> Dar Alta
-                                              </button>
-                                              <button style={{ ...NEON.red, marginTop: "6px" }} onClick={() => handleSaida(apt, "Desistência")}>
-                                                <UserX className="w-3.5 h-3.5" /> Desistência
-                                              </button>
-                                              <button style={{ ...NEON.red, marginTop: "6px" }} onClick={() => handleSaida(apt, "Óbito")}>
-                                                <XOctagon className="w-3.5 h-3.5" /> Óbito
-                                              </button>
-                                            </div>
+
+                                            {/* ── Periodicidade (Frequência) Cards ── */}
+                                            {apt.recurrenceGroupId && (
+                                              <>
+                                                <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                                <p className="text-[9px] text-white/40 uppercase font-bold px-1">Periodicidade</p>
+                                                <div className="grid grid-cols-3 gap-1">
+                                                  {(["semanal", "quinzenal", "mensal"] as const).map(freq => {
+                                                    const isActive = (apt.frequency ?? "semanal") === freq;
+                                                    const labels: Record<string, { label: string; desc: string }> = {
+                                                      semanal: { label: "Semanal", desc: "Toda semana" },
+                                                      quinzenal: { label: "Quinzenal", desc: "A cada 14 dias" },
+                                                      mensal: { label: "Mensal", desc: "1x por mês" },
+                                                    };
+                                                    return (
+                                                      <button
+                                                        key={freq}
+                                                        disabled={freqSending}
+                                                        onClick={(e) => { e.stopPropagation(); handleChangeFrequency(apt, freq); }}
+                                                        className="rounded-lg p-1.5 text-center transition-all"
+                                                        style={{
+                                                          background: isActive ? "rgba(0,240,255,0.12)" : "rgba(255,255,255,0.03)",
+                                                          border: isActive ? "1px solid rgba(0,240,255,0.5)" : "1px solid rgba(255,255,255,0.08)",
+                                                          color: isActive ? "#67e8f9" : "rgba(255,255,255,0.5)",
+                                                          boxShadow: isActive ? "0 0 8px rgba(0,240,255,0.2)" : "none",
+                                                          cursor: freqSending ? "wait" : "pointer",
+                                                          opacity: freqSending ? 0.5 : 1,
+                                                        }}
+                                                      >
+                                                        <Repeat className="w-3 h-3 mx-auto mb-0.5" />
+                                                        <span className="text-[9px] font-bold block">{labels[freq].label}</span>
+                                                        <span className="text-[8px] block opacity-60">{labels[freq].desc}</span>
+                                                      </button>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </>
+                                            )}
+
+                                            <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                            <p className="text-[9px] text-white/40 uppercase font-bold px-1">Saída</p>
+                                            <button style={NEON.red} onClick={() => handleSaida(apt, "Alta")}>
+                                              <LogOut className="w-3.5 h-3.5" /> Dar Alta
+                                            </button>
+                                            <button style={{ ...NEON.red, marginTop: "2px" }} onClick={() => handleSaida(apt, "Desistência")}>
+                                              <UserX className="w-3.5 h-3.5" /> Desistência
+                                            </button>
+                                            <button style={{ ...NEON.red, marginTop: "2px" }} onClick={() => handleSaida(apt, "Óbito")}>
+                                              <XOctagon className="w-3.5 h-3.5" /> Óbito
+                                            </button>
+
+                                            <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                             <button style={NEON.fuchsia} onClick={() => handleEncaminhamento(apt)}>
                                               <ArrowRightLeft className="w-3.5 h-3.5" /> Encaminhamento Interno
                                             </button>
+
+                                            <button style={{ ...NEON.fuchsia, background: "rgba(0,8,10,0.92)", border: "1px solid #06b6d4", color: "#67e8f9", boxShadow: "0 0 14px rgba(6,182,212,0.55)", textShadow: "0 0 8px rgba(103,232,249,0.9)" }} onClick={() => handleMultiAtendimento(apt)}>
+                                              <UserPlus className="w-3.5 h-3.5" /> Atendimento Multi
+                                            </button>
+
+                                            {/* ── Referral info if exists ── */}
+                                            {apt.notes && apt.notes.includes("Encaminhamento") && (
+                                              <div className="rounded-lg p-2 mt-1" style={{ background: "rgba(192,38,211,0.08)", border: "1px solid rgba(192,38,211,0.2)" }}>
+                                                <p className="text-[9px] text-fuchsia-400 font-bold flex items-center gap-1">
+                                                  <Info className="w-3 h-3" /> Info do Encaminhamento
+                                                </p>
+                                                <p className="text-[8px] text-white/50 mt-0.5 leading-tight">{apt.notes}</p>
+                                              </div>
+                                            )}
+
                                             <p className="text-[9px] text-white/30 italic leading-tight px-1 mt-1">
                                               Recepção é notificada automaticamente a cada ação.
                                             </p>
@@ -1073,6 +1308,70 @@ export default function AgendaProfissionais() {
                   style={{ background: "rgba(192,38,211,0.15)", border: "1px solid #c026d3", color: "#e879f9", boxShadow: "0 0 16px rgba(192,38,211,0.3)", opacity: encEspecialidade && !encSending ? 1 : 0.4, cursor: encEspecialidade && !encSending ? "pointer" : "not-allowed" }}
                 >
                   {encSending ? "Encaminhando..." : "Confirmar Encaminhamento"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Multi-Atendimento Modal ── */}
+      {multiApt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setMultiApt(null)}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,8,10,0.97)", border: "1px solid rgba(6,182,212,0.3)" }} onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(6,182,212,0.15)", border: "1px solid #06b6d4" }}>
+                  <UserPlus className="w-5 h-5" style={{ color: "#67e8f9" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#67e8f9", textShadow: "0 0 8px rgba(103,232,249,0.8)" }}>Atendimento Multi</p>
+                  <p className="text-xs text-white/50">{multiApt.patientName} — {multiApt.time}</p>
+                </div>
+              </div>
+
+              {multiErro && (
+                <div className="rounded-xl p-3 mb-4 text-sm font-semibold" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171" }}>
+                  {multiErro}
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1" style={{ color: "#67e8f9" }}>Segundo Profissional *</label>
+                <select
+                  value={multiProfId}
+                  onChange={e => { setMultiProfId(e.target.value); setMultiErro(""); }}
+                  className="w-full rounded-xl text-sm p-3"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(6,182,212,0.3)", color: "#fff", outline: "none" }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#06b6d4"; e.currentTarget.style.boxShadow = "0 0 10px rgba(6,182,212,0.3)"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(6,182,212,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+                >
+                  <option value="" style={{ background: "#000a0c" }}>Selecione o profissional...</option>
+                  {professionals
+                    .filter(p => String(p.id) !== selectedProfId)
+                    .map(p => (
+                      <option key={p.id} value={String(p.id)} style={{ background: "#000a0c" }}>
+                        {p.name} — {p.specialty || "Sem especialidade"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <p className="text-[10px] text-white/40 mb-4 leading-relaxed">
+                O horário ficará bloqueado na agenda de ambos os profissionais. Profissionais da mesma especialidade não são permitidos.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={confirmMultiAtendimento}
+                  disabled={!multiProfId || multiSending}
+                  className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
+                  style={{ background: "rgba(6,182,212,0.15)", border: "1px solid #06b6d4", color: "#67e8f9", boxShadow: "0 0 16px rgba(6,182,212,0.3)", opacity: multiProfId && !multiSending ? 1 : 0.4, cursor: multiProfId && !multiSending ? "pointer" : "not-allowed" }}
+                >
+                  <UserPlus className="w-4 h-4" /> {multiSending ? "Criando..." : "Confirmar Multi"}
+                </button>
+                <button onClick={() => setMultiApt(null)} className="flex-1 py-3 rounded-xl font-semibold text-sm" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
+                  Cancelar
                 </button>
               </div>
             </div>

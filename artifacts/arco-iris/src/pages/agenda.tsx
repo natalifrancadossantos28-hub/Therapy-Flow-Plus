@@ -280,7 +280,7 @@ const NEON: Record<string, React.CSSProperties> = {
 };
 
 const SPECIALTIES = [
-  "Psicologia", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
+  "Psicologia", "Psicologia Parental", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
   "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
 ];
 
@@ -1091,6 +1091,12 @@ export default function Agenda() {
                                     {apt.recurrenceGroupId && !isDesmarcado && !isRescheduled && (
                                       <span className="text-[9px] text-muted-foreground/50">
                                         {apt.ciclo === "A" ? "↺ quinzenal A" : apt.ciclo === "B" ? "↺ quinzenal B" : apt.ciclo === "M" ? "↺ mensal" : "↺ semanal"}
+                                      </span>
+                                    )}
+                                    {/* Psicologia Parental: show guardian/mother name */}
+                                    {apt.guardianName && selectedProf?.specialty?.toLowerCase().includes("parental") && (
+                                      <span className="text-[9px] text-pink-400/80 font-semibold truncate">
+                                        Mãe: {apt.guardianName}
                                       </span>
                                     )}
                                   </div>
