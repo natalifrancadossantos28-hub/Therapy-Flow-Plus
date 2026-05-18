@@ -6,7 +6,7 @@ import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users
+  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
@@ -26,6 +26,7 @@ import {
   addPatientToFila,
   upsertPatient,
   getPatient,
+  updateRecurrenceFrequency,
   type Professional as ArcoProfessional,
 } from "@/lib/arco-rpc";
 
@@ -345,6 +346,9 @@ export default function Agenda() {
   const [multiProfId, setMultiProfId] = useState<string>("");
   const [multiSending, setMultiSending] = useState(false);
   const [multiErro, setMultiErro] = useState("");
+
+  // Frequência (Periodicidade)
+  const [freqSending, setFreqSending] = useState(false);
 
   // Encaminhamento Interno
   const [encApt, setEncApt] = useState<Appointment | null>(null);
@@ -773,6 +777,30 @@ export default function Agenda() {
     }
   };
 
+  // ── Alterar Periodicidade (Frequência) ──
+  const handleChangeFrequency = async (apt: Appointment, newFreq: "semanal" | "quinzenal" | "mensal") => {
+    if (!apt.recurrenceGroupId) {
+      toast({ title: "Sem recorrência", description: "Este agendamento não possui grupo de recorrência.", variant: "destructive" });
+      return;
+    }
+    if ((apt.frequency ?? "semanal") === newFreq) return;
+    setFreqSending(true);
+    try {
+      await updateRecurrenceFrequency(apt.recurrenceGroupId, newFreq);
+      setAppointments(prev => prev.map(a =>
+        a.recurrenceGroupId === apt.recurrenceGroupId ? { ...a, frequency: newFreq } : a
+      ));
+      await logNotificacao(apt, `Periodicidade alterada para ${newFreq}`);
+      toast({ title: "Periodicidade alterada", description: `${apt.patientName} agora é ${newFreq}.` });
+      fetchAppointments();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha inesperada.";
+      toast({ title: "Erro ao alterar periodicidade", description: msg, variant: "destructive" });
+    } finally {
+      setFreqSending(false);
+    }
+  };
+
   // ── Remanejar ──
   const handleStartRemanejar = (apt: Appointment) => {
     setActionMenuId(null);
@@ -1145,6 +1173,44 @@ export default function Agenda() {
                                       <button style={NEON.orange} onClick={() => handleStartRemanejar(apt)}>
                                         <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                       </button>
+
+                                      {/* ── Periodicidade (Frequência) Cards ── */}
+                                      {apt.recurrenceGroupId && isAdmin && (
+                                        <>
+                                          <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                          <p className="text-[9px] text-white/40 uppercase font-bold px-1">Periodicidade</p>
+                                          <div className="grid grid-cols-3 gap-1">
+                                            {(["semanal", "quinzenal", "mensal"] as const).map(freq => {
+                                              const isActive = (apt.frequency ?? "semanal") === freq;
+                                              const labels: Record<string, { label: string; desc: string }> = {
+                                                semanal: { label: "Semanal", desc: "Toda semana" },
+                                                quinzenal: { label: "Quinzenal", desc: "A cada 14 dias" },
+                                                mensal: { label: "Mensal", desc: "1x por mês" },
+                                              };
+                                              return (
+                                                <button
+                                                  key={freq}
+                                                  disabled={freqSending}
+                                                  onClick={(e) => { e.stopPropagation(); handleChangeFrequency(apt, freq); }}
+                                                  className="rounded-lg p-1.5 text-center transition-all"
+                                                  style={{
+                                                    background: isActive ? "rgba(0,240,255,0.12)" : "rgba(255,255,255,0.03)",
+                                                    border: isActive ? "1px solid rgba(0,240,255,0.5)" : "1px solid rgba(255,255,255,0.08)",
+                                                    color: isActive ? "#67e8f9" : "rgba(255,255,255,0.5)",
+                                                    boxShadow: isActive ? "0 0 8px rgba(0,240,255,0.2)" : "none",
+                                                    cursor: freqSending ? "wait" : "pointer",
+                                                    opacity: freqSending ? 0.5 : 1,
+                                                  }}
+                                                >
+                                                  <Repeat className="w-3 h-3 mx-auto mb-0.5" />
+                                                  <span className="text-[9px] font-bold block">{labels[freq].label}</span>
+                                                  <span className="text-[8px] block opacity-60">{labels[freq].desc}</span>
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        </>
+                                      )}
 
                                       <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                       <p className="text-[9px] text-white/40 uppercase font-bold px-1">Saída</p>
