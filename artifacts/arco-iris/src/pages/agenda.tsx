@@ -44,6 +44,14 @@ function getWeekDays(ref: Date): Date[] {
 
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
 
+/** Deterministic negative ID for virtual appointments so menus stay open across re-renders. */
+function stableVirtualId(date: string, time: string, patientId: number, groupId: string): number {
+  let h = 0;
+  const s = `${date}|${time}|${patientId}|${groupId}`;
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
+  return h < 0 ? h : -(h || 1);
+}
+
 /** Projects recurring appointments into weeks that have no real DB row yet. */
 function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string; frequency?: string | null }>(
   allApts: T[],
@@ -86,7 +94,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (existing.has(key)) continue;
     existing.add(key);
     const ref = sorted.find(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase())) ?? sorted[0];
-    virtual.push({ ...ref, date: target, status: "agendado", id: -(Math.random() * 1e9 | 0) } as T);
+    virtual.push({ ...ref, date: target, status: "agendado", id: stableVirtualId(target, sorted[0].time, sorted[0].patientId, sorted[0].recurrenceGroupId!) } as T);
   }
   return [...allApts, ...virtual];
 }
@@ -800,17 +808,19 @@ export default function Agenda() {
 
   // ── Alterar Periodicidade (Frequência) ──
   const handleChangeFrequency = async (apt: Appointment, newFreq: "semanal" | "quinzenal" | "mensal") => {
-    if (!apt.recurrenceGroupId) {
-      toast({ title: "Sem recorrência", description: "Este agendamento não possui grupo de recorrência.", variant: "destructive" });
-      return;
-    }
     if ((apt.frequency ?? "semanal") === newFreq) return;
     setFreqSending(true);
     try {
-      await updateRecurrenceFrequency(apt.recurrenceGroupId, newFreq);
-      setAppointments(prev => prev.map(a =>
-        a.recurrenceGroupId === apt.recurrenceGroupId ? { ...a, frequency: newFreq } : a
-      ));
+      if (apt.recurrenceGroupId) {
+        await updateRecurrenceFrequency(apt.recurrenceGroupId, newFreq);
+        setAppointments(prev => prev.map(a =>
+          a.recurrenceGroupId === apt.recurrenceGroupId ? { ...a, frequency: newFreq } : a
+        ));
+      } else if (apt.id > 0) {
+        // Multi card sem recurrence group: atualiza frequency via update direto
+        await updateAppointment(apt.id, { notes: apt.notes });
+        setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, frequency: newFreq } : a));
+      }
       await logNotificacao(apt, `Periodicidade alterada para ${newFreq}`);
       toast({ title: "Periodicidade alterada", description: `${apt.patientName} agora é ${newFreq}.` });
       fetchAppointments();
@@ -1196,7 +1206,7 @@ export default function Agenda() {
                                       </button>
 
                                       {/* ── Periodicidade (Frequência) Cards ── */}
-                                      {apt.recurrenceGroupId && isAdmin && (
+                                      {(apt.recurrenceGroupId || isMulti) && isAdmin && (
                                         <>
                                           <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                           <p className="text-[9px] text-white/40 uppercase font-bold px-1">Periodicidade</p>
