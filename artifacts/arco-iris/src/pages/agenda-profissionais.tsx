@@ -21,6 +21,7 @@ import {
   upsertPatient,
   getPatient,
   updateRecurrenceFrequency,
+  materializeVirtualAppointment,
 } from "@/lib/arco-rpc";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
@@ -324,9 +325,25 @@ export default function AgendaProfissionais() {
   };
 
   const patchStatus = async (apt: Appointment, status: string) => {
-    const data = await updateAppointment(apt.id, { status });
+    let realId = apt.id;
+
+    // Virtual appointment (projeção de recorrência): materializar no banco
+    if (apt.id < 0 && selectedProf) {
+      const mat = await materializeVirtualAppointment({
+        patientId: apt.patientId,
+        professionalId: selectedProf.id,
+        date: apt.date,
+        time: apt.time,
+        recurrenceGroupId: apt.recurrenceGroupId,
+        frequency: (apt.frequency as "semanal" | "quinzenal" | "mensal") ?? "semanal",
+        notes: apt.notes,
+      });
+      realId = mat.id;
+    }
+
+    const data = await updateAppointment(realId, { status });
     setAppointments(prev => prev.map(a => {
-      if (a.id === apt.id) return { ...a, status };
+      if (a.id === apt.id || a.id === realId) return { ...a, id: realId, status };
       if (
         status === "atendimento"
         && apt.recurrenceGroupId
@@ -430,7 +447,7 @@ export default function AgendaProfissionais() {
     if (!altaConfirm || !altaMotivo.trim()) return;
     const label = saidaTipo;
     try {
-      await deleteAppointmentAlta(altaConfirm.id);
+      if (altaConfirm.id > 0) await deleteAppointmentAlta(altaConfirm.id);
       await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}`);
 
       const todayStr = new Date().toISOString().split("T")[0];
@@ -534,7 +551,7 @@ export default function AgendaProfissionais() {
         });
       } catch { /* fila já registra o motivo como fallback */ }
       if (!encManterAgenda) {
-        try { await deleteAppointmentAlta(encApt.id); } catch { /* best-effort */ }
+        try { if (encApt.id > 0) await deleteAppointmentAlta(encApt.id); } catch { /* best-effort */ }
       }
       setEncApt(null);
       toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.${encManterAgenda ? " Mantido na agenda atual." : " Removido da agenda atual."}` });
@@ -636,6 +653,7 @@ export default function AgendaProfissionais() {
         date: multiApt.date,
         time: multiApt.time,
         notes: `Atendimento Multi com ${currentProf.name} (${currentProf.specialty || "—"})`,
+        frequency: (multiApt.frequency as "semanal" | "quinzenal" | "mensal") ?? "semanal",
         noRecurrence: true,
       });
       await updateAppointment(multiApt.id, { notes: `Atendimento Multi com ${secondProf.name} (${secondProf.specialty || "—"})` });
@@ -992,7 +1010,7 @@ export default function AgendaProfissionais() {
                                           {isRemarcado && (
                                             <span className="text-[9px] text-yellow-400 font-semibold">✎ remarcado</span>
                                           )}
-                                          {apt.recurrenceGroupId && !isDesmarcado && !isRescheduled && (
+                                          {(apt.recurrenceGroupId || isMulti) && !isDesmarcado && !isRescheduled && (
                                             <span className="text-[9px] text-muted-foreground/50">
                                               {apt.frequency === "quinzenal" ? "↺ quinzenal" : apt.frequency === "mensal" ? "↺ mensal" : "↺ semanal"}
                                             </span>

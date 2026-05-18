@@ -1226,6 +1226,32 @@ export async function updateRecurrenceFrequency(
   return data as { ok: boolean; updatedCount: number; frequency: string };
 }
 
+export async function materializeVirtualAppointment(payload: {
+  patientId: number;
+  professionalId: number;
+  date: string;
+  time: string;
+  recurrenceGroupId?: string | null;
+  frequency?: AppointmentFrequency;
+  notes?: string | null;
+}): Promise<{ id: number; alreadyExisted: boolean }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("materialize_virtual_appointment", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: payload.patientId,
+    p_professional_id: payload.professionalId,
+    p_date: payload.date,
+    p_time: payload.time,
+    p_recurrence_group_id: payload.recurrenceGroupId ?? null,
+    p_frequency: payload.frequency ?? "semanal",
+    p_notes: payload.notes ?? null,
+  });
+  if (error) throw error;
+  return data as { id: number; alreadyExisted: boolean };
+}
+
 export async function deleteAppointmentAlta(
   id: number
 ): Promise<{ ok: true; deletedCount: number }> {

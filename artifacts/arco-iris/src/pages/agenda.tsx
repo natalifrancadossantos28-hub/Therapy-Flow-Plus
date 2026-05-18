@@ -27,6 +27,7 @@ import {
   upsertPatient,
   getPatient,
   updateRecurrenceFrequency,
+  materializeVirtualAppointment,
   type Professional as ArcoProfessional,
 } from "@/lib/arco-rpc";
 
@@ -436,10 +437,28 @@ export default function Agenda() {
   // Quando vira "atendimento" e a sessao e parte de uma recorrencia,
   // o servidor propaga para as semanas futuras "agendado" do mesmo grupo.
   // Atualiza o estado local de forma otimista para refletir o mesmo.
+  // Se o appointment for virtual (id negativo = projeção de recorrência),
+  // materializa-o primeiro no banco preservando recurrence_group_id.
   const patchStatus = async (apt: Appointment, status: string) => {
-    const data = await updateAppointment(apt.id, { status });
+    let realId = apt.id;
+
+    // Virtual appointment: materializar no banco antes de prosseguir
+    if (apt.id < 0 && selectedProfId) {
+      const mat = await materializeVirtualAppointment({
+        patientId: apt.patientId,
+        professionalId: parseInt(selectedProfId),
+        date: apt.date,
+        time: apt.time,
+        recurrenceGroupId: apt.recurrenceGroupId,
+        frequency: (apt.frequency as "semanal" | "quinzenal" | "mensal") ?? "semanal",
+        notes: apt.notes,
+      });
+      realId = mat.id;
+    }
+
+    const data = await updateAppointment(realId, { status });
     setAppointments(prev => prev.map(a => {
-      if (a.id === apt.id) return { ...a, status };
+      if (a.id === apt.id || a.id === realId) return { ...a, id: realId, status };
       if (
         status === "atendimento"
         && apt.recurrenceGroupId
@@ -486,10 +505,11 @@ export default function Agenda() {
     setActionMenuId(null);
     const originalStatus = apt.status;
     try {
-      await patchStatus(apt, "desmarcado");
-      await logNotificacao(apt, "Desmarcado");
+      const data = await patchStatus(apt, "desmarcado");
+      const realApt = { ...apt, id: data.id, status: "desmarcado" };
+      await logNotificacao(realApt, "Desmarcado");
       setNotifyDone(false);
-      setCancelDialog({ apt: { ...apt, status: "desmarcado" }, profName, originalStatus });
+      setCancelDialog({ apt: realApt, profName, originalStatus });
     } catch {
       toast({ title: "Erro", description: "Não foi possível desmarcar.", variant: "destructive" });
     }
@@ -557,7 +577,7 @@ export default function Agenda() {
     if (!excluirConfirm) return;
     setExcluirSending(true);
     try {
-      await deleteAppointmentAlta(excluirConfirm.id);
+      if (excluirConfirm.id > 0) await deleteAppointmentAlta(excluirConfirm.id);
       setAppointments(prev =>
         prev.filter(a =>
           a.id !== excluirConfirm.id &&
@@ -599,7 +619,7 @@ export default function Agenda() {
     if (!altaConfirm || !altaMotivo.trim()) return;
     const label = saidaTipo;
     try {
-      await deleteAppointmentAlta(altaConfirm.id);
+      if (altaConfirm.id > 0) await deleteAppointmentAlta(altaConfirm.id);
       await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}`);
 
       const todayStr = new Date().toISOString().split("T")[0];
@@ -707,7 +727,7 @@ export default function Agenda() {
       } catch { /* fila já registra o motivo como fallback */ }
       // Se escolheu remover da agenda atual, deleta os agendamentos futuros
       if (!encManterAgenda) {
-        try { await deleteAppointmentAlta(encApt.id); } catch { /* best-effort */ }
+        try { if (encApt.id > 0) await deleteAppointmentAlta(encApt.id); } catch { /* best-effort */ }
       }
       setEncApt(null);
       toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.${encManterAgenda ? " Mantido na agenda atual." : " Removido da agenda atual."}` });
@@ -761,6 +781,7 @@ export default function Agenda() {
         date: multiApt.date,
         time: multiApt.time,
         notes: `Atendimento Multi com ${currentProf.name} (${currentProf.specialty || "—"})`,
+        frequency: (multiApt.frequency as "semanal" | "quinzenal" | "mensal") ?? "semanal",
         noRecurrence: true,
       });
       // Marca o appointment original como Multi também
@@ -1116,9 +1137,9 @@ export default function Agenda() {
                                         <Users className="w-2.5 h-2.5" /> Multi: {selectedProf?.name?.split(" ")[0]} & {multiPartner.split(" ")[0]}
                                       </span>
                                     )}
-                                    {apt.recurrenceGroupId && !isDesmarcado && !isRescheduled && (
+                                    {(apt.recurrenceGroupId || isMulti) && !isDesmarcado && !isRescheduled && (
                                       <span className="text-[9px] text-muted-foreground/50">
-                                        {apt.ciclo === "A" ? "↺ quinzenal A" : apt.ciclo === "B" ? "↺ quinzenal B" : apt.ciclo === "M" ? "↺ mensal" : "↺ semanal"}
+                                        {apt.frequency === "quinzenal" ? "↺ quinzenal" : apt.frequency === "mensal" ? "↺ mensal" : "↺ semanal"}
                                       </span>
                                     )}
                                     {/* Psicologia Parental: show guardian/mother name */}
