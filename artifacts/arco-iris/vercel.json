@@ -5,7 +5,7 @@
   "installCommand": "cd ../.. && pnpm install",
   "framework": null,
   "functions": {
-    "api/**/*.ts": {
+    "api/**/*.mjs": {
       "maxDuration": 60
     }
   },

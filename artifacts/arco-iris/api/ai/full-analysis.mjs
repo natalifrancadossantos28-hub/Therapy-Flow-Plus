@@ -1,7 +1,7 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getCompanyId, getSupabase, getModel, calcAge, todayStr, parseAIResponse, cors } from "./_helpers";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+import { getCompanyId, getSupabase, getModel, calcAge, todayStr, parseAIResponse, cors } from "./_helpers.mjs";
+
+export default async function handler(req, res) {
   if (cors(req, res)) return;
   try {
     const companyId = getCompanyId(req);
@@ -31,15 +31,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .gte("date", thirtyStr);
 
     const appts = recentAppts ?? [];
-    const activePatients = patients.filter((p: any) =>
+    const activePatients = patients.filter(p =>
       ["Em Atendimento", "Fila de Espera"].includes(p.status ?? "")
     );
-    const agingPatients = patients.filter((p: any) => {
+    const agingPatients = patients.filter(p => {
       const age = calcAge(p.date_of_birth);
       return age !== null && age >= 17 && ["Em Atendimento", "Fila de Espera"].includes(p.status ?? "");
     });
-    const totalFaltas = appts.filter((a: any) => a.status === "Falta").length;
-    const totalPresencas = appts.filter((a: any) => a.status === "Presente").length;
+    const totalFaltas = appts.filter(a => a.status === "Falta").length;
+    const totalPresencas = appts.filter(a => a.status === "Presente").length;
 
     const summary = {
       totalPacientes: patients.length,
@@ -53,13 +53,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       pacientesProximosLimiteIdade: agingPatients.length,
     };
 
-    const waitingBySpec = waiting.reduce((acc: Record<string, number>, w: any) => {
+    const waitingBySpec = waiting.reduce((acc, w) => {
       const s = w.specialty ?? "Geral";
       acc[s] = (acc[s] ?? 0) + 1;
       return acc;
     }, {});
 
-    const waitingByPriority = waiting.reduce((acc: Record<string, number>, w: any) => {
+    const waitingByPriority = waiting.reduce((acc, w) => {
       const p = w.priority ?? "sem_prioridade";
       acc[p] = (acc[p] ?? 0) + 1;
       return acc;
@@ -103,7 +103,7 @@ Responda APENAS com o JSON, sem markdown.`;
     const parsed = parseAIResponse(result.response.text());
 
     res.json({ success: true, analysis: parsed, summary });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[AI] full-analysis error:", err);
     res.status(500).json({ error: err.message ?? "Erro interno" });
   }

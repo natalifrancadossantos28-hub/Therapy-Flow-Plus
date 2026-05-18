@@ -1,7 +1,7 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getCompanyId, getSupabase, getModel, calcAge, todayStr, parseAIResponse, cors } from "./_helpers";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+import { getCompanyId, getSupabase, getModel, calcAge, todayStr, parseAIResponse, cors } from "./_helpers.mjs";
+
+export default async function handler(req, res) {
   if (cors(req, res)) return;
   try {
     const companyId = getCompanyId(req);
@@ -18,20 +18,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const patients = patientsData ?? [];
 
     // Get specialties per patient from appointments
-    const patientIds = patients.map((p: any) => p.id);
+    const patientIds = patients.map(p => p.id);
     const { data: apptsData } = patientIds.length > 0
       ? await sb.from("appointments").select("patient_id, professional_id").eq("company_id", companyId).in("patient_id", patientIds)
       : { data: [] };
     const appts = apptsData ?? [];
 
-    const profIds = [...new Set(appts.map((a: any) => a.professional_id).filter(Boolean))];
+    const profIds = [...new Set(appts.map(a => a.professional_id).filter(Boolean))];
     const { data: profsData } = profIds.length > 0
       ? await sb.from("professionals").select("id, specialty").in("id", profIds)
       : { data: [] };
     const profs = profsData ?? [];
-    const profMap = new Map(profs.map((p: any) => [p.id, p]));
+    const profMap = new Map(profs.map(p => [p.id, p]));
 
-    const patientSpecs = new Map<number, Set<string>>();
+    const patientSpecs = new Map();
     for (const a of appts) {
       if (!a.patient_id) continue;
       const prof = profMap.get(a.professional_id);
@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const patientData = patients
-      .map((p: any) => ({
+      .map(p => ({
         nome: p.name,
         dataNascimento: p.date_of_birth,
         idade: calcAge(p.date_of_birth),
@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         especialidades: [...(patientSpecs.get(p.id) ?? [])],
         dataEntrada: p.entry_date,
       }))
-      .filter((p) => p.idade !== null);
+      .filter(p => p.idade !== null);
 
     const model = getModel();
     const prompt = `Você é o cérebro de IA de uma clínica multidisciplinar infantil brasileira (atende crianças e adolescentes até 18 anos). Analise os pacientes e gere relatórios de limite de idade.
@@ -91,7 +91,7 @@ Responda APENAS com o JSON, sem markdown.`;
     const parsed = parseAIResponse(result.response.text());
 
     res.json({ success: true, analysis: parsed, totalPatients: patientData.length });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[AI] age-limit-report error:", err);
     res.status(500).json({ error: err.message ?? "Erro interno" });
   }
