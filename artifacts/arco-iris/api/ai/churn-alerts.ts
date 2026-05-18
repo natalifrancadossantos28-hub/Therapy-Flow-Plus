@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? await sb.from("professionals").select("id, name, specialty").in("id", profIds)
       : { data: [] };
     const profs = profsData ?? [];
-    const profMap = new Map(profs.map((p: any) => [p.id, p]));
+    const profMap = new Map<number, any>(profs.map((p: any) => [p.id, p]));
 
     const patientAppts = new Map<number, any[]>();
     for (const a of recentAppts) {

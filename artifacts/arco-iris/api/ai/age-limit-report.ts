@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? await sb.from("professionals").select("id, specialty").in("id", profIds)
       : { data: [] };
     const profs = profsData ?? [];
-    const profMap = new Map(profs.map((p: any) => [p.id, p]));
+    const profMap = new Map<number, any>(profs.map((p: any) => [p.id, p]));
 
     const patientSpecs = new Map<number, Set<string>>();
     for (const a of appts) {
@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         especialidades: [...(patientSpecs.get(p.id) ?? [])],
         dataEntrada: p.entry_date,
       }))
-      .filter((p) => p.idade !== null);
+      .filter((p: any) => p.idade !== null);
 
     const model = getModel();
     const prompt = `Você é o cérebro de IA de uma clínica multidisciplinar infantil brasileira (atende crianças e adolescentes até 18 anos). Analise os pacientes e gere relatórios de limite de idade.

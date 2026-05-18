@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? await sb.from("patients").select("id, name, date_of_birth, triagem_score, escola_publica, abrigo_casa_crianca").in("id", patientIds)
       : { data: [] };
     const patients = patientsData ?? [];
-    const patientMap = new Map(patients.map((p: any) => [p.id, p]));
+    const patientMap = new Map<number, any>(patients.map((p: any) => [p.id, p]));
 
     // Count active patients per professional
     const profCapacity = await Promise.all(
