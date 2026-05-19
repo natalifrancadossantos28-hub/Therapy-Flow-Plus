@@ -69,34 +69,34 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
   const virtual: T[] = [];
   for (const [, gApts] of groups) {
     const sorted = [...gApts].sort((a, b) => a.date.localeCompare(b.date));
-    const last = sorted[sorted.length - 1];
-    if (TERMINAL_STATUSES.includes(last.status.toLowerCase())) continue;
-    const refDow = new Date(sorted[0].date + "T12:00:00").getDay();
+    const allTerminal = sorted.every(a => TERMINAL_STATUSES.includes(a.status.toLowerCase()));
+    if (allTerminal) continue;
+    const activeApts = sorted.filter(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase()));
+    const refApt = activeApts[0] ?? sorted[0];
+    const refDow = new Date(refApt.date + "T12:00:00").getDay();
     const target = weekDates.find(d => new Date(d + "T12:00:00").getDay() === refDow);
     if (!target) continue;
-    if (target < sorted[0].date) continue;
+    if (target < refApt.date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
 
-    // ── Respeitar frequência: semanal=toda semana, quinzenal=semanas alternadas, mensal=1x/mês ──
-    const freq = (sorted[0] as any).frequency ?? "semanal";
+    const freq = (refApt as any).frequency ?? "semanal";
     if (freq === "quinzenal") {
-      const refWeek = isoWeekNumber(sorted[0].date);
+      const refWeek = isoWeekNumber(refApt.date);
       const targetWeek = isoWeekNumber(target);
       if ((targetWeek - refWeek) % 2 !== 0) continue;
     } else if (freq === "mensal") {
-      const refDay = new Date(sorted[0].date + "T12:00:00").getDate();
+      const refDay = new Date(refApt.date + "T12:00:00").getDate();
       const targetDate = new Date(target + "T12:00:00");
       const targetDay = targetDate.getDate();
       if (Math.abs(targetDay - refDay) > 3) continue;
     }
 
-    const key = `${target}|${sorted[0].time}|${sorted[0].patientId}`;
+    const key = `${target}|${refApt.time}|${refApt.patientId}`;
     if (existing.has(key)) continue;
     existing.add(key);
-    const ref = sorted.find(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase())) ?? sorted[0];
     const hasAtendimento = sorted.some(a => ["atendimento", "em_atendimento", "em atendimento"].includes(a.status.toLowerCase()));
     const virtualStatus = hasAtendimento ? "atendimento" : "agendado";
-    virtual.push({ ...ref, date: target, status: virtualStatus, id: stableVirtualId(target, sorted[0].time, sorted[0].patientId, sorted[0].recurrenceGroupId!) } as T);
+    virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!) } as T);
   }
   return [...allApts, ...virtual];
 }
@@ -378,10 +378,20 @@ export default function Agenda() {
   const weekDates = weekDays.map(d => format(d, "yyyy-MM-dd"));
   const today = format(new Date(), "yyyy-MM-dd");
 
-  const fetchAppointments = () => {
+  const loadedRangeRef = useRef<{ from: string; to: string } | null>(null);
+
+  const fetchAppointments = (refDate?: Date) => {
     if (!selectedProfId) return;
+    const ref = refDate ?? weekRef;
+    const rangeStart = addDays(startOfWeek(ref, { weekStartsOn: 1 }), -56);
+    const rangeEnd = addDays(startOfWeek(ref, { weekStartsOn: 1 }), 60);
+    const dateFrom = format(rangeStart, "yyyy-MM-dd");
+    const dateTo = format(rangeEnd, "yyyy-MM-dd");
+    loadedRangeRef.current = { from: dateFrom, to: dateTo };
     listAppointments({
       professionalId: parseInt(selectedProfId),
+      dateFrom,
+      dateTo,
     })
       .then((list) => setAppointments(withCiclo(list) as Appointment[]))
       .catch(console.error);
@@ -390,6 +400,21 @@ export default function Agenda() {
   useEffect(() => {
     if (canView && selectedProfId) fetchAppointments();
   }, [selectedProfId, canView]);
+
+  // Re-fetch when navigating outside the loaded date window
+  useEffect(() => {
+    if (!canView || !selectedProfId) return;
+    const range = loadedRangeRef.current;
+    if (!range) return;
+    const viewStart = weekDates[0];
+    const viewEnd = weekDates[weekDates.length - 1];
+    const margin = 14;
+    const marginFrom = format(addDays(new Date(range.from + "T12:00:00"), margin), "yyyy-MM-dd");
+    const marginTo = format(addDays(new Date(range.to + "T12:00:00"), -margin), "yyyy-MM-dd");
+    if (viewStart < marginFrom || viewEnd > marginTo) {
+      fetchAppointments(weekRef);
+    }
+  }, [weekRef, canView, selectedProfId]);
 
   // Realtime: recarrega a agenda quando qualquer appointment desse profissional muda
   // (agendamento, remanejamento pelo profissional, mudança de status, etc.).
