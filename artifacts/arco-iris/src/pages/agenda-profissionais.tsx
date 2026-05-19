@@ -741,8 +741,9 @@ export default function AgendaProfissionais() {
   // Usa a semana atualmente selecionada dentro do modal.
   const modalWeekDays = remanejFlow ? getWeekDays(remanejFlow.weekRef) : [];
   const modalWeekDates = modalWeekDays.map(d => format(d, "yyyy-MM-dd"));
+  const isPaula = selectedProf?.name?.toLowerCase().includes("paula");
   const modalAvailableSlots = modalWeekDates.flatMap(date =>
-    TIME_SLOTS.filter(t => t !== "12:10" && getApts(date, t).length === 0)
+    TIME_SLOTS.filter(t => (isPaula || t !== "12:10") && getApts(date, t).length === 0)
       .map(time => ({ date, time }))
   );
 
@@ -933,7 +934,8 @@ export default function AgendaProfissionais() {
                   </thead>
                   <tbody>
                     {TIME_SLOTS.map(time => {
-                      const isLunch = time === "12:10";
+                      const isPaulaProf = selectedProf?.name?.toLowerCase().includes("paula");
+                      const isLunch = time === "12:10" && !isPaulaProf;
                       return (
                         <tr key={time} className="border-b border-border/60 hover:bg-secondary/30 transition-colors">
                           <td className={cn("px-5 py-3 font-bold sticky left-0 bg-card z-10 border-r border-border", isLunch ? "text-muted-foreground" : "text-primary")}>
@@ -1205,7 +1207,7 @@ export default function AgendaProfissionais() {
                 <Clock className="w-4 h-4 text-primary" style={{ filter: "drop-shadow(0 0 6px rgba(0,240,255,0.5))" }} /> Resumo de Hoje — {format(new Date(), "dd/MM/yyyy")}
               </h3>
               <div className="space-y-2">
-                {TIME_SLOTS.filter(t => t !== "12:10").map(time => {
+                {TIME_SLOTS.filter(t => isPaula || t !== "12:10").map(time => {
                   const apts = getApts(today, time);
                   const apt = apts[0] ?? null;
                   return (

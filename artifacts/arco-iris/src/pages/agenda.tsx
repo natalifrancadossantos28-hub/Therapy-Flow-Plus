@@ -962,10 +962,11 @@ export default function Agenda() {
   const getApts = (date: string, time: string) =>
     expanded.filter(a => a.date === date && a.time === time);
   const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
+  const isPaula = selectedProf?.name?.toLowerCase().includes("paula");
 
   // Slots disponiveis para remanejar = sem qualquer paciente (vazio de verdade).
   const availableSlots = weekDates.flatMap(date =>
-    TIME_SLOTS.filter(t => t !== "12:10" && getApts(date, t).length === 0)
+    TIME_SLOTS.filter(t => (isPaula || t !== "12:10") && getApts(date, t).length === 0)
               .map(time => ({ date, time }))
   );
 
@@ -1084,7 +1085,7 @@ export default function Agenda() {
               </thead>
               <tbody>
                 {TIME_SLOTS.map(time => {
-                  const isLunch = time === "12:10";
+                  const isLunch = time === "12:10" && !isPaula;
                   return (
                     <tr key={time} className="border-b border-border hover:bg-secondary/10 transition-colors">
                       <td className="px-4 py-3 font-display font-bold text-primary sticky left-0 bg-card/90 backdrop-blur z-10 border-r border-border">{time}</td>
@@ -1351,7 +1352,7 @@ export default function Agenda() {
             <Clock className="w-4 h-4 text-primary" /> Resumo de Hoje — {format(new Date(), "dd/MM/yyyy")}
           </h3>
           <div className="space-y-2">
-            {TIME_SLOTS.filter(t => t !== "12:10").map(time => {
+            {TIME_SLOTS.filter(t => isPaula || t !== "12:10").map(time => {
               const apts = getApts(today, time);
               const apt = apts[0] ?? null;
               return (
