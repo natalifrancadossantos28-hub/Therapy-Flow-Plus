@@ -199,6 +199,10 @@ export default function AgendaProfissionais() {
   const [freqApt, setFreqApt] = useState<Appointment | null>(null);
   const [freqSending, setFreqSending] = useState(false);
 
+  // Exclusão administrativa
+  const [excluirConfirm, setExcluirConfirm] = useState<Appointment | null>(null);
+  const [excluirSending, setExcluirSending] = useState(false);
+
   const weekDays = getWeekDays(weekRef);
   const weekDates = weekDays.map(d => format(d, "yyyy-MM-dd"));
   const today = format(new Date(), "yyyy-MM-dd");
@@ -482,7 +486,14 @@ export default function AgendaProfissionais() {
     if (!altaConfirm || !altaMotivo.trim()) return;
     const label = saidaTipo;
     try {
-      if (altaConfirm.id > 0) await deleteAppointmentAlta(altaConfirm.id);
+      if (altaConfirm.id > 0) {
+        await deleteAppointmentAlta(altaConfirm.id);
+      } else if (altaConfirm.recurrenceGroupId) {
+        const realSibling = appointments.find(
+          a => a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.id > 0
+        );
+        if (realSibling) await deleteAppointmentAlta(realSibling.id);
+      }
       await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}`);
 
       const todayStr = new Date().toISOString().split("T")[0];
@@ -525,13 +536,18 @@ export default function AgendaProfissionais() {
         }
       } catch { /* silencioso — fila pode estar vazia */ }
 
-      setAppointments(prev => prev.filter(a => a.id !== altaConfirm.id));
+      // Remove all appointments in the same recurrence group from local state
+      setAppointments(prev => prev.filter(a =>
+        a.id !== altaConfirm.id &&
+        !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId)
+      ));
       setAltaConfirm(null);
       setAltaMotivo("");
       const statusMsg = hasOtherActive
         ? `${altaConfirm.patientName} — removido desta especialidade. Permanece ativo em outras.`
         : `${altaConfirm.patientName} — status alterado para ${label}.`;
       toast({ title: `${label} aplicada`, description: statusMsg });
+      fetchAppointments();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha inesperada.";
       toast({ title: `Erro ao aplicar ${label.toLowerCase()}`, description: msg, variant: "destructive" });
@@ -586,7 +602,16 @@ export default function AgendaProfissionais() {
         });
       } catch { /* fila já registra o motivo como fallback */ }
       if (!encManterAgenda) {
-        try { if (encApt.id > 0) await deleteAppointmentAlta(encApt.id); } catch { /* best-effort */ }
+        try {
+          if (encApt.id > 0) {
+            await deleteAppointmentAlta(encApt.id);
+          } else if (encApt.recurrenceGroupId) {
+            const realSibling = appointments.find(
+              a => a.recurrenceGroupId === encApt.recurrenceGroupId && a.id > 0
+            );
+            if (realSibling) await deleteAppointmentAlta(realSibling.id);
+          }
+        } catch { /* best-effort */ }
       }
       setEncApt(null);
       toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.${encManterAgenda ? " Mantido na agenda atual." : " Removido da agenda atual."}` });
@@ -711,22 +736,63 @@ export default function AgendaProfissionais() {
     try {
       if (apt.recurrenceGroupId) {
         await updateRecurrenceFrequency(apt.recurrenceGroupId, newFreq);
-        setAppointments(prev => prev.map(a =>
-          a.recurrenceGroupId === apt.recurrenceGroupId ? { ...a, frequency: newFreq } : a
-        ));
       } else if (apt.id > 0) {
-        await updateAppointment(apt.id, { notes: apt.notes });
-        setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, frequency: newFreq } : a));
+        await updateAppointment(apt.id, { frequency: newFreq });
       }
+      setAppointments(prev => prev.map(a =>
+        (apt.recurrenceGroupId && a.recurrenceGroupId === apt.recurrenceGroupId) || a.id === apt.id
+          ? { ...a, frequency: newFreq }
+          : a
+      ));
       await logNotificacao(apt, `Periodicidade alterada para ${newFreq}`);
       toast({ title: "Periodicidade alterada", description: `${apt.patientName} agora é ${newFreq}.` });
       setFreqApt(null);
-      fetchAppointments();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha inesperada.";
       toast({ title: "Erro ao alterar periodicidade", description: msg, variant: "destructive" });
     } finally {
       setFreqSending(false);
+    }
+  };
+
+  // ── Exclusão administrativa ──
+  const handleExcluirAdmin = (apt: Appointment) => {
+    setActionMenuId(null);
+    setExcluirConfirm(apt);
+  };
+
+  const confirmExcluirAdmin = async () => {
+    if (!excluirConfirm) return;
+    setExcluirSending(true);
+    try {
+      if (excluirConfirm.id > 0) {
+        await deleteAppointmentAlta(excluirConfirm.id);
+      } else if (excluirConfirm.recurrenceGroupId) {
+        const realSibling = appointments.find(
+          a => a.recurrenceGroupId === excluirConfirm.recurrenceGroupId && a.id > 0
+        );
+        if (realSibling) await deleteAppointmentAlta(realSibling.id);
+      }
+      setAppointments(prev =>
+        prev.filter(a =>
+          a.id !== excluirConfirm.id &&
+          !(a.recurrenceGroupId && a.recurrenceGroupId === excluirConfirm.recurrenceGroupId)
+        )
+      );
+      toast({
+        title: "Agendamento excluído",
+        description: `${excluirConfirm.patientName} — todos os horários liberados.`,
+      });
+      setExcluirConfirm(null);
+      fetchAppointments();
+    } catch (err: any) {
+      toast({
+        title: "Erro ao excluir",
+        description: err?.message ?? "Não foi possível excluir o agendamento.",
+        variant: "destructive",
+      });
+    } finally {
+      setExcluirSending(false);
     }
   };
 
@@ -1159,6 +1225,11 @@ export default function AgendaProfissionais() {
                                               <UserPlus className="w-3.5 h-3.5" /> Atendimento Multi
                                             </button>
 
+                                            <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                            <button style={NEON.red} onClick={() => handleExcluirAdmin(apt)}>
+                                              <Trash2 className="w-3.5 h-3.5" /> Excluir Agendamento
+                                            </button>
+
                                             {/* ── Referral info if exists ── */}
                                             {apt.notes && apt.notes.includes("Encaminhamento") && (
                                               <div className="rounded-lg p-2 mt-1" style={{ background: "rgba(192,38,211,0.08)", border: "1px solid rgba(192,38,211,0.2)" }}>
@@ -1225,6 +1296,44 @@ export default function AgendaProfissionais() {
           </>
         )}
       </div>
+
+      {/* ── Modal de Exclusão Administrativa ── */}
+      {excluirConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444" }}>
+                  <Trash2 className="w-5 h-5" style={{ color: "#f87171" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>Excluir Agendamento</p>
+                  <p className="text-xs text-white/50">Limpeza administrativa</p>
+                </div>
+              </div>
+              <p className="text-sm text-white/80 mb-1">
+                <strong className="text-white">{excluirConfirm.patientName}</strong> — {excluirConfirm.date} às {excluirConfirm.time}.
+              </p>
+              <p className="text-xs text-white/60 mt-2">
+                O horário voltará a ficar disponível (+ Agendar). <strong className="text-white/80">Não</strong> gera alta, falta nem registro no prontuário.
+              </p>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={confirmExcluirAdmin}
+                  disabled={excluirSending}
+                  style={{ ...NEON.red, flex: 1, justifyContent: "center", padding: "10px", opacity: excluirSending ? 0.4 : 1, cursor: excluirSending ? "not-allowed" : "pointer" }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {excluirSending ? "Excluindo..." : "Confirmar Exclusão"}
+                </button>
+                <button className="flex-1 rounded-lg border border-white/10 text-white/60 hover:text-white hover:bg-white/5 text-sm" onClick={() => setExcluirConfirm(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal de Saída (Alta / Óbito / Desistência) ── */}
       {altaConfirm && (
