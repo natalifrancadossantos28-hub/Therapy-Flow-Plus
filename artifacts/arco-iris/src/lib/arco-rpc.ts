@@ -1162,6 +1162,7 @@ export type UpdateAppointmentPayload = {
   notes?: string | null;
   date?: string;
   time?: string;
+  frequency?: AppointmentFrequency;
 };
 
 export type UpdateAppointmentResult = {
@@ -1205,6 +1206,7 @@ export async function updateAppointment(
     p_notes: payload.notes ?? null,
     p_date: payload.date ?? null,
     p_time: payload.time ?? null,
+    p_frequency: payload.frequency ?? null,
   });
   if (error) throw error;
   return data as UpdateAppointmentResult;

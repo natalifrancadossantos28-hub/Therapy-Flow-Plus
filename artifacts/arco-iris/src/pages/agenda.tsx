@@ -612,11 +612,20 @@ export default function Agenda() {
     if (!excluirConfirm) return;
     setExcluirSending(true);
     try {
-      if (excluirConfirm.id > 0) await deleteAppointmentAlta(excluirConfirm.id);
+      if (excluirConfirm.id > 0) {
+        await deleteAppointmentAlta(excluirConfirm.id);
+      } else if (excluirConfirm.recurrenceGroupId) {
+        // Virtual appointment: find any real appointment in the same group to delete via RPC
+        const realSibling = appointments.find(
+          a => a.recurrenceGroupId === excluirConfirm.recurrenceGroupId && a.id > 0
+        );
+        if (realSibling) await deleteAppointmentAlta(realSibling.id);
+      }
+      // Remove from local state: all appointments in the same recurrence group
       setAppointments(prev =>
         prev.filter(a =>
           a.id !== excluirConfirm.id &&
-          !(a.recurrenceGroupId && a.recurrenceGroupId === excluirConfirm.recurrenceGroupId && a.date >= excluirConfirm.date)
+          !(a.recurrenceGroupId && a.recurrenceGroupId === excluirConfirm.recurrenceGroupId)
         )
       );
       // Re-adiciona o paciente à fila de espera da especialidade do profissional
@@ -627,10 +636,11 @@ export default function Agenda() {
         }
       } catch { /* se falhar a re-inserção na fila, não bloqueia */ }
       toast({
-        title: "🗑️ Agendamento excluído",
-        description: `${excluirConfirm.patientName} — todos os horários futuros liberados. Paciente retornou à fila de espera.`,
+        title: "Agendamento excluído",
+        description: `${excluirConfirm.patientName} — todos os horários liberados. Paciente retornou à fila de espera.`,
       });
       setExcluirConfirm(null);
+      fetchAppointments();
     } catch (err: any) {
       toast({
         title: "Erro ao excluir",
@@ -654,7 +664,14 @@ export default function Agenda() {
     if (!altaConfirm || !altaMotivo.trim()) return;
     const label = saidaTipo;
     try {
-      if (altaConfirm.id > 0) await deleteAppointmentAlta(altaConfirm.id);
+      if (altaConfirm.id > 0) {
+        await deleteAppointmentAlta(altaConfirm.id);
+      } else if (altaConfirm.recurrenceGroupId) {
+        const realSibling = appointments.find(
+          a => a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.id > 0
+        );
+        if (realSibling) await deleteAppointmentAlta(realSibling.id);
+      }
       await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}`);
 
       const todayStr = new Date().toISOString().split("T")[0];
@@ -697,9 +714,10 @@ export default function Agenda() {
         }
       } catch { /* silencioso — fila pode estar vazia */ }
 
+      // Remove all appointments in the same recurrence group from local state
       setAppointments(prev => prev.filter(a =>
         a.id !== altaConfirm.id &&
-        !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.date >= altaConfirm.date)
+        !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId)
       ));
       setAltaConfirm(null);
       setAltaMotivo("");
@@ -707,6 +725,7 @@ export default function Agenda() {
         ? `${altaConfirm.patientName} — removido desta especialidade. Permanece ativo em outras.`
         : `${altaConfirm.patientName} — status alterado para ${label}.`;
       toast({ title: `${label} aplicada`, description: statusMsg });
+      fetchAppointments();
     } catch {
       toast({ title: "Erro", description: `Não foi possível aplicar ${label.toLowerCase()}.`, variant: "destructive" });
     }
@@ -762,7 +781,16 @@ export default function Agenda() {
       } catch { /* fila já registra o motivo como fallback */ }
       // Se escolheu remover da agenda atual, deleta os agendamentos futuros
       if (!encManterAgenda) {
-        try { if (encApt.id > 0) await deleteAppointmentAlta(encApt.id); } catch { /* best-effort */ }
+        try {
+          if (encApt.id > 0) {
+            await deleteAppointmentAlta(encApt.id);
+          } else if (encApt.recurrenceGroupId) {
+            const realSibling = appointments.find(
+              a => a.recurrenceGroupId === encApt.recurrenceGroupId && a.id > 0
+            );
+            if (realSibling) await deleteAppointmentAlta(realSibling.id);
+          }
+        } catch { /* best-effort */ }
       }
       setEncApt(null);
       toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.${encManterAgenda ? " Mantido na agenda atual." : " Removido da agenda atual."}` });
@@ -840,17 +868,16 @@ export default function Agenda() {
     try {
       if (apt.recurrenceGroupId) {
         await updateRecurrenceFrequency(apt.recurrenceGroupId, newFreq);
-        setAppointments(prev => prev.map(a =>
-          a.recurrenceGroupId === apt.recurrenceGroupId ? { ...a, frequency: newFreq } : a
-        ));
       } else if (apt.id > 0) {
-        // Multi card sem recurrence group: atualiza frequency via update direto
-        await updateAppointment(apt.id, { notes: apt.notes });
-        setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, frequency: newFreq } : a));
+        await updateAppointment(apt.id, { frequency: newFreq });
       }
+      setAppointments(prev => prev.map(a =>
+        (apt.recurrenceGroupId && a.recurrenceGroupId === apt.recurrenceGroupId) || a.id === apt.id
+          ? { ...a, frequency: newFreq }
+          : a
+      ));
       await logNotificacao(apt, `Periodicidade alterada para ${newFreq}`);
       toast({ title: "Periodicidade alterada", description: `${apt.patientName} agora é ${newFreq}.` });
-      fetchAppointments();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha inesperada.";
       toast({ title: "Erro ao alterar periodicidade", description: msg, variant: "destructive" });
