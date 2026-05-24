@@ -226,12 +226,12 @@ router.get("/ai/churn-alerts", async (req, res) => {
 
     const patientData = activePatients.map((p) => {
       const appts = patientAppts.get(p.id) ?? [];
-      const faltas = appts.filter((a) => a.status === "Falta").length;
+      const faltas = appts.filter((a) => ["ausente", "falta_nao_justificada", "falta_justificada"].includes(a.status ?? "")).length;
       const presencas = appts.filter((a) =>
-        ["Presente", "Confirmado", "Em Espera"].includes(a.status ?? "")
+        ["presente", "atendimento"].includes(a.status ?? "")
       ).length;
       const ultimaPresenca = appts
-        .filter((a) => a.status === "Presente")
+        .filter((a) => ["presente", "atendimento"].includes(a.status ?? ""))
         .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))
         [0]?.date ?? null;
 
@@ -642,8 +642,8 @@ router.get("/ai/full-analysis", async (req, res) => {
       const age = calcAge(p.dateOfBirth);
       return age !== null && age >= 17 && ["Atendimento", "Fila de Espera"].includes(p.status ?? "");
     });
-    const totalFaltas = recentAppts.filter((a) => a.status === "Falta").length;
-    const totalPresencas = recentAppts.filter((a) => a.status === "Presente").length;
+    const totalFaltas = recentAppts.filter((a) => ["ausente", "falta_nao_justificada", "falta_justificada"].includes(a.status ?? "")).length;
+    const totalPresencas = recentAppts.filter((a) => ["presente", "atendimento"].includes(a.status ?? "")).length;
 
     const summary = {
       totalPacientes: patients.length,

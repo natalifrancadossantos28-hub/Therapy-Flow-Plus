@@ -52,6 +52,7 @@ const extractFields = (body: any) => ({
   tipoEscola: body.tipoEscola,
   trabalhoPais: body.trabalhoPais,
   outroAtendimento: body.outroAtendimento !== undefined ? !!body.outroAtendimento : null,
+  abrigoCasaCrianca: body.abrigoCasaCrianca !== undefined ? !!body.abrigoCasaCrianca : false,
   localAtendimento: body.localAtendimento || null,
   tipoRegistro: body.tipoRegistro || "Paciente da Unidade",
   profissional: body.profissional,
@@ -125,6 +126,7 @@ async function autoLinkTriagem(row: any, companyId: number | null) {
 
   const escolaPublica = ["Municipal", "Estadual"].includes(row.tipoEscola ?? "");
   const trabalhoNaRoca = ["Informal/Roça", "Desempregado"].includes(row.trabalhoPais ?? "");
+  const abrigoCasaCrianca = !!row.abrigoCasaCrianca;
 
   let patient: any = null;
 
@@ -148,7 +150,7 @@ async function autoLinkTriagem(row: any, companyId: number | null) {
   // Propagate tipoRegistro/localAtendimento from triagem to patient
   const triagemTipo = row.tipoRegistro ?? null;
   const patientTipo = patient.tipoRegistro ?? null;
-  const updateFields: Record<string, unknown> = { triagemScore, ...areaScores, escolaPublica, trabalhoNaRoca };
+  const updateFields: Record<string, unknown> = { triagemScore, ...areaScores, escolaPublica, trabalhoNaRoca, abrigoCasaCrianca };
   if (triagemTipo && !patientTipo) updateFields.tipoRegistro = triagemTipo;
   if (row.localAtendimento && !patient.localAtendimento) updateFields.localAtendimento = row.localAtendimento;
   await db.update(patientsTable).set(updateFields).where(eq(patientsTable.id, patient.id));
