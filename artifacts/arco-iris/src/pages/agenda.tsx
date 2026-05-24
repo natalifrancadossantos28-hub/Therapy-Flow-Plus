@@ -845,9 +845,8 @@ export default function Agenda() {
         time: multiApt.time,
         notes: `Atendimento Multi com ${currentProf.name} (${currentProf.specialty || "—"})`,
         frequency: (multiApt.frequency as "semanal" | "quinzenal" | "mensal") ?? "semanal",
-        noRecurrence: true,
       });
-      // Marca o appointment original como Multi também
+      // Marca o appointment original como Multi (propaga para toda a recorrência via DB)
       await updateAppointment(multiApt.id, { notes: `Atendimento Multi com ${secondProf.name} (${secondProf.specialty || "—"})` });
       await logNotificacao(multiApt, `Atendimento Multi — ${secondProf.name} (${secondProf.specialty || "—"}) adicionado ao horário de ${currentProf.name}`);
       setMultiApt(null);
