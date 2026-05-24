@@ -1279,6 +1279,24 @@ export async function deleteAppointment(id: number): Promise<void> {
   if (error) throw error;
 }
 
+export async function deleteRecurrenceForward(
+  recurrenceGroupId: string,
+  fromDate: string,
+  patientId?: number,
+): Promise<{ ok: true; deletedCount: number }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("delete_recurrence_forward", {
+    p_slug: slug,
+    p_password: password,
+    p_recurrence_group_id: recurrenceGroupId,
+    p_from_date: fromDate,
+    p_patient_id: patientId ?? null,
+  });
+  if (error) throw error;
+  return data as { ok: true; deletedCount: number };
+}
+
 // ── Notificacoes recepcao (Fase 4C) ─────────────────────────────────────────
 
 export type NotificacaoRecepcao = {

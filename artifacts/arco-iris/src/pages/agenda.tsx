@@ -19,6 +19,7 @@ import {
   listAppointments,
   updateAppointment,
   deleteAppointmentAlta,
+  deleteRecurrenceForward,
   createNotificacao,
   createAppointments,
   listWaitingList,
@@ -650,21 +651,24 @@ export default function Agenda() {
     if (!excluirConfirm) return;
     setExcluirSending(true);
     try {
-      if (excluirConfirm.id > 0) {
-        await deleteAppointmentAlta(excluirConfirm.id);
-      } else if (excluirConfirm.recurrenceGroupId) {
-        // Virtual appointment: find any real appointment in the same group to delete via RPC
-        const realSibling = appointments.find(
-          a => a.recurrenceGroupId === excluirConfirm.recurrenceGroupId && a.id > 0
+      if (excluirConfirm.recurrenceGroupId) {
+        // "Daqui para frente": deletes from selected date onward, preserves past history
+        await deleteRecurrenceForward(
+          excluirConfirm.recurrenceGroupId,
+          excluirConfirm.date,
+          excluirConfirm.patientId,
         );
-        if (realSibling) await deleteAppointmentAlta(realSibling.id);
+      } else if (excluirConfirm.id > 0) {
+        await deleteAppointmentAlta(excluirConfirm.id);
       }
-      // Remove from local state: all appointments in the same recurrence group
+      // Remove from local state: appointments in the same recurrence group from this date onward
       setAppointments(prev =>
-        prev.filter(a =>
-          a.id !== excluirConfirm.id &&
-          !(a.recurrenceGroupId && a.recurrenceGroupId === excluirConfirm.recurrenceGroupId)
-        )
+        prev.filter(a => {
+          if (a.recurrenceGroupId && a.recurrenceGroupId === excluirConfirm.recurrenceGroupId) {
+            return a.date < excluirConfirm.date;
+          }
+          return a.id !== excluirConfirm.id;
+        })
       );
       // Re-adiciona o paciente à fila de espera da especialidade do profissional
       try {
@@ -675,7 +679,7 @@ export default function Agenda() {
       } catch { /* se falhar a re-inserção na fila, não bloqueia */ }
       toast({
         title: "Agendamento excluído",
-        description: `${excluirConfirm.patientName} — todos os horários liberados. Paciente retornou à fila de espera.`,
+        description: `${excluirConfirm.patientName} — horários de ${excluirConfirm.date} em diante excluídos. Histórico anterior preservado.`,
       });
       setExcluirConfirm(null);
       fetchAppointments();
@@ -1486,7 +1490,7 @@ export default function Agenda() {
               </p>
               {excluirConfirm.recurrenceGroupId && (
                 <p className="text-xs text-orange-400/80 mt-2">
-                  ⚠ Apenas este horário será excluído. Os próximos da recorrência permanecem.
+                  ⚠ Todos os horários de {excluirConfirm.date} em diante serão excluídos. O histórico anterior será preservado.
                 </p>
               )}
               <div className="flex gap-3 mt-4">
