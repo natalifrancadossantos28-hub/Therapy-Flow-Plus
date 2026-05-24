@@ -1084,6 +1084,7 @@ export default function AgendaProfissionais() {
                                     const isFaltaNaoJust  = s === "falta_nao_justificada" || s === "ausente";
                                     const isMulti = !!(apt.notes && apt.notes.startsWith("Atendimento Multi com "));
                                     const multiPartner = isMulti ? apt.notes!.replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "") : null;
+                                    const multiPartnerSpec = isMulti ? (apt.notes!.match(/\(([^)]+)\)\s*$/) || [])[1] || null : null;
                                     const isGhost = !apt.patientName || apt.patientName.trim() === "";
 
                                     return (
@@ -1140,8 +1141,8 @@ export default function AgendaProfissionais() {
                                           </div>
                                           <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
                                           {isMulti && multiPartner && (
-                                            <span className="text-[9px] text-violet-400 font-semibold flex items-center gap-0.5">
-                                              <Users className="w-2.5 h-2.5" /> Multi: {selectedProf?.name?.split(" ")[0]} & {multiPartner.split(" ")[0]}
+                                            <span className="text-[9px] text-violet-400 font-semibold flex items-center gap-0.5 flex-wrap">
+                                              <Users className="w-2.5 h-2.5 shrink-0" /> Multi: {selectedProf?.name} {selectedProf?.specialty ? `(${selectedProf.specialty})` : ""} & {multiPartner} {multiPartnerSpec ? `(${multiPartnerSpec})` : ""}
                                             </span>
                                           )}
                                           {isDesmarcado && (
