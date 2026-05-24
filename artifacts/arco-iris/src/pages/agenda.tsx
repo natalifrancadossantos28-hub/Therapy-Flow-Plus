@@ -1195,6 +1195,7 @@ export default function Agenda() {
                                     const isFaltaNaoJustificada = apt.status?.toLowerCase() === "falta_nao_justificada" || apt.status?.toLowerCase() === "ausente";
                                     const isMulti = !!(apt.notes && apt.notes.startsWith("Atendimento Multi com "));
                                     const multiPartner = isMulti ? apt.notes!.replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "") : null;
+                                    const multiPartnerSpec = isMulti ? (apt.notes!.match(/\(([^)]+)\)\s*$/) || [])[1] || null : null;
                                     const isMenuOpen = actionMenuId === apt.id;
                                     const isPastDate = date < today;
                                     const isGhost = !apt.patientName || apt.patientName.trim() === "";
@@ -1252,8 +1253,8 @@ export default function Agenda() {
                                       <span className="text-[9px] text-yellow-400 font-semibold">✎ remarcado</span>
                                     )}
                                     {isMulti && multiPartner && (
-                                      <span className="text-[9px] text-violet-400 font-semibold flex items-center gap-0.5">
-                                        <Users className="w-2.5 h-2.5" /> Multi: {selectedProf?.name?.split(" ")[0]} & {multiPartner.split(" ")[0]}
+                                      <span className="text-[9px] text-violet-400 font-semibold flex items-center gap-0.5 flex-wrap">
+                                        <Users className="w-2.5 h-2.5 shrink-0" /> Multi: {selectedProf?.name} {selectedProf?.specialty ? `(${selectedProf.specialty})` : ""} & {multiPartner} {multiPartnerSpec ? `(${multiPartnerSpec})` : ""}
                                       </span>
                                     )}
                                     {(apt.recurrenceGroupId || isMulti) && !isDesmarcado && !isRescheduled && (
