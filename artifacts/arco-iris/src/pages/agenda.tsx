@@ -838,6 +838,22 @@ export default function Agenda() {
         setMultiSending(false);
         return;
       }
+
+      // Se o appointment é virtual (projeção), materializar antes de prosseguir
+      let realId = multiApt.id;
+      if (multiApt.id < 0 && selectedProfId) {
+        const mat = await materializeVirtualAppointment({
+          patientId: multiApt.patientId,
+          professionalId: parseInt(selectedProfId),
+          date: multiApt.date,
+          time: multiApt.time,
+          recurrenceGroupId: multiApt.recurrenceGroupId,
+          frequency: (multiApt.frequency as "semanal" | "quinzenal" | "mensal") ?? "semanal",
+          notes: multiApt.notes,
+        });
+        realId = mat.id;
+      }
+
       await createAppointments({
         patientId: multiApt.patientId,
         professionalId: secondProf.id,
@@ -847,7 +863,7 @@ export default function Agenda() {
         frequency: (multiApt.frequency as "semanal" | "quinzenal" | "mensal") ?? "semanal",
       });
       // Marca o appointment original como Multi (propaga para toda a recorrência via DB)
-      await updateAppointment(multiApt.id, { notes: `Atendimento Multi com ${secondProf.name} (${secondProf.specialty || "—"})` });
+      await updateAppointment(realId, { notes: `Atendimento Multi com ${secondProf.name} (${secondProf.specialty || "—"})` });
       await logNotificacao(multiApt, `Atendimento Multi — ${secondProf.name} (${secondProf.specialty || "—"}) adicionado ao horário de ${currentProf.name}`);
       setMultiApt(null);
       toast({ title: "Atendimento Multi criado", description: `${secondProf.name} adicionado ao horário de ${multiApt.patientName} às ${multiApt.time}.` });
