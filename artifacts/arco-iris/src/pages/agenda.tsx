@@ -886,13 +886,9 @@ export default function Agenda() {
       } else if (apt.id > 0) {
         await updateAppointment(apt.id, { frequency: newFreq });
       }
-      setAppointments(prev => prev.map(a =>
-        (apt.recurrenceGroupId && a.recurrenceGroupId === apt.recurrenceGroupId) || a.id === apt.id
-          ? { ...a, frequency: newFreq }
-          : a
-      ));
       await logNotificacao(apt, `Periodicidade alterada para ${newFreq}`);
       toast({ title: "Periodicidade alterada", description: `${apt.patientName} agora é ${newFreq}.` });
+      fetchAppointments();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha inesperada.";
       toast({ title: "Erro ao alterar periodicidade", description: msg, variant: "destructive" });
