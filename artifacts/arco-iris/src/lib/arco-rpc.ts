@@ -180,7 +180,7 @@ export async function verifyProfessionalPinWithSlug(
   });
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
-  if (!row) return null;
+  if (!row || row.id == null) return null;
   return { id: Number(row.id), name: row.name, specialty: row.specialty };
 }
 
