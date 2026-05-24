@@ -112,8 +112,9 @@ export default function BookingModal({
     try {
       const apts = await listAppointments({ professionalId, dateFrom: today });
       const ids = new Set<number>();
+      const activeStatuses = ["agendado", "atendimento", "em_atendimento", "em atendimento", "presente"];
       for (const a of apts) {
-        if (a.status === "agendado" || a.status === "em_atendimento") {
+        if (activeStatuses.includes(a.status.toLowerCase())) {
           ids.add(a.patientId);
         }
       }
