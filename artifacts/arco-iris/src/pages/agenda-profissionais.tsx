@@ -100,6 +100,10 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (target < refApt.date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
 
+    // Don't project beyond the last real appointment (respects "delete forward")
+    const lastDate = sorted[sorted.length - 1].date;
+    if (target > lastDate) continue;
+
     const freq = (refApt as any).frequency ?? "semanal";
     if (!isAllowedWeek(sorted[0].date, target, freq)) continue;
 
