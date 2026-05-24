@@ -56,6 +56,22 @@ function stableVirtualId(date: string, time: string, patientId: number, groupId:
   return h < 0 ? h : -(h || 1);
 }
 
+/** Number of whole weeks between two YYYY-MM-DD dates (robust across year boundaries). */
+function weeksBetween(dateA: string, dateB: string): number {
+  const msA = new Date(dateA + "T12:00:00").getTime();
+  const msB = new Date(dateB + "T12:00:00").getTime();
+  return Math.round((msB - msA) / (7 * 86_400_000));
+}
+
+/** Returns true if the target date is an "allowed" week for the given frequency relative to refDate. */
+function isAllowedWeek(refDate: string, targetDate: string, freq: string): boolean {
+  if (freq === "semanal") return true;
+  const weeks = weeksBetween(refDate, targetDate);
+  if (freq === "quinzenal") return weeks % 2 === 0;
+  if (freq === "mensal") return weeks % 4 === 0;
+  return true;
+}
+
 /** Projects recurring appointments into weeks that have no real DB row yet. */
 function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string; frequency?: string | null }>(
   allApts: T[],
@@ -73,10 +89,8 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
   const virtual: T[] = [];
   for (const [, gApts] of groups) {
     const sorted = [...gApts].sort((a, b) => a.date.localeCompare(b.date));
-    // Skip only if every appointment in the group has a terminal status
     const allTerminal = sorted.every(a => TERMINAL_STATUSES.includes(a.status.toLowerCase()));
     if (allTerminal) continue;
-    // Use the latest non-terminal appointment as reference for day-of-week
     const activeApts = sorted.filter(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase()));
     const refApt = activeApts[0] ?? sorted[0];
     const refDow = new Date(refApt.date + "T12:00:00").getDay();
@@ -86,16 +100,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (gApts.some(a => weekDates.includes(a.date))) continue;
 
     const freq = (refApt as any).frequency ?? "semanal";
-    if (freq === "quinzenal") {
-      const refWeek = isoWeekNumber(refApt.date);
-      const targetWeek = isoWeekNumber(target);
-      if ((targetWeek - refWeek) % 2 !== 0) continue;
-    } else if (freq === "mensal") {
-      const refDay = new Date(refApt.date + "T12:00:00").getDate();
-      const targetDate = new Date(target + "T12:00:00");
-      const targetDay = targetDate.getDate();
-      if (Math.abs(targetDay - refDay) > 3) continue;
-    }
+    if (!isAllowedWeek(sorted[0].date, target, freq)) continue;
 
     const key = `${target}|${refApt.time}|${refApt.patientId}`;
     if (existing.has(key)) continue;
@@ -105,6 +110,37 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!) } as T);
   }
   return [...allApts, ...virtual];
+}
+
+/**
+ * Filters out real DB appointments that fall on "wrong" weeks for their frequency.
+ * Only hides "agendado" appointments — any that were interacted with (atendimento, falta, etc.) stay visible.
+ */
+function applyFrequencyFilter<T extends { date: string; recurrenceGroupId?: string | null; status: string; frequency?: string | null }>(
+  allApts: T[],
+  weekDates: string[],
+): T[] {
+  if (weekDates.length === 0) return allApts;
+  const groups = new Map<string, T[]>();
+  for (const a of allApts) {
+    if (!a.recurrenceGroupId) continue;
+    const g = groups.get(a.recurrenceGroupId) ?? [];
+    g.push(a);
+    groups.set(a.recurrenceGroupId, g);
+  }
+  const hide = new Set<T>();
+  for (const [, gApts] of groups) {
+    const sorted = [...gApts].sort((a, b) => a.date.localeCompare(b.date));
+    const freq = (sorted[0] as any).frequency ?? "semanal";
+    if (freq === "semanal") continue;
+    const refDate = sorted[0].date;
+    for (const apt of gApts) {
+      if (!weekDates.includes(apt.date)) continue;
+      if (apt.status.toLowerCase() !== "agendado") continue;
+      if (!isAllowedWeek(refDate, apt.date, freq)) hide.add(apt);
+    }
+  }
+  return allApts.filter(a => !hide.has(a));
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
@@ -793,7 +829,8 @@ export default function AgendaProfissionais() {
   };
 
   // Expande recorrência: projeta agendamentos recorrentes em semanas sem linha real no banco.
-  const expanded = expandRecurrence(appointments, weekDates);
+  // Depois filtra: se frequência é quinzenal/mensal, esconde "agendado" nas semanas erradas.
+  const expanded = applyFrequencyFilter(expandRecurrence(appointments, weekDates), weekDates);
 
   // Fase 5A: slots em grupo — o mesmo horario pode ter varios pacientes.
   const getApts = (date: string, time: string) =>
