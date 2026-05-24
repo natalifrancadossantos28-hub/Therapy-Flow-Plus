@@ -65,7 +65,7 @@ router.get("/ai/waiting-list-optimization", async (req, res) => {
         scorePsicologia: patientsTable.scorePsicologia,
         scorePsicomotricidade: patientsTable.scorePsicomotricidade,
         scoreFisioterapia: patientsTable.scoreFisioterapia,
-        scoreTo: patientsTable.scoreTo,
+        scoreTO: patientsTable.scoreTO,
         scoreFonoaudiologia: patientsTable.scoreFonoaudiologia,
         scoreNutricionista: patientsTable.scoreNutricionista,
         scorePsicopedagogia: patientsTable.scorePsicopedagogia,
@@ -185,7 +185,7 @@ router.get("/ai/churn-alerts", async (req, res) => {
         and(
           eq(patientsTable.companyId, companyId),
           or(
-            eq(patientsTable.status, "Em Atendimento"),
+            eq(patientsTable.status, "Atendimento"),
             eq(patientsTable.status, "Fila de Espera"),
             eq(patientsTable.status, "Aguardando Triagem")
           )
@@ -317,7 +317,7 @@ router.get("/ai/age-limit-report", async (req, res) => {
         and(
           eq(patientsTable.companyId, companyId),
           or(
-            eq(patientsTable.status, "Em Atendimento"),
+            eq(patientsTable.status, "Atendimento"),
             eq(patientsTable.status, "Fila de Espera")
           )
         )
@@ -414,14 +414,14 @@ router.get("/ai/system-health", async (req, res) => {
     const companyId = getCompanyId(req);
     if (!companyId) return res.status(400).json({ error: "x-company-id required" });
 
-    // 1. Pacientes "Em Atendimento" sem agendamentos
+    // 1. Pacientes "Atendimento" sem agendamentos
     const emAtendimento = await db
       .select({ id: patientsTable.id, name: patientsTable.name })
       .from(patientsTable)
       .where(
         and(
           eq(patientsTable.companyId, companyId),
-          eq(patientsTable.status, "Em Atendimento")
+          eq(patientsTable.status, "Atendimento")
         )
       );
 
@@ -454,7 +454,7 @@ router.get("/ai/system-health", async (req, res) => {
       .where(
         and(
           eq(waitingListTable.companyId, companyId),
-          eq(patientsTable.status, "Em Atendimento")
+          eq(patientsTable.status, "Atendimento")
         )
       );
 
@@ -520,7 +520,7 @@ router.get("/ai/system-health", async (req, res) => {
       .having(sql`count(*) > 1`);
 
     const healthData = {
-      orphanPatients: orphanPatients.map((p) => ({ nome: p.name, issue: "Em Atendimento sem agendamentos" })),
+      orphanPatients: orphanPatients.map((p) => ({ nome: p.name, issue: "Atendimento sem agendamentos" })),
       filaAndAtendimento: filaAndAtendimento.map((r) => ({
         nome: r.patientName,
         especialidadeNaFila: r.specialty,
@@ -636,11 +636,11 @@ router.get("/ai/full-analysis", async (req, res) => {
 
     // Montar resumo rápido sem IA (dados brutos)
     const activePatients = patients.filter((p) =>
-      ["Em Atendimento", "Fila de Espera"].includes(p.status ?? "")
+      ["Atendimento", "Fila de Espera"].includes(p.status ?? "")
     );
     const agingPatients = patients.filter((p) => {
       const age = calcAge(p.dateOfBirth);
-      return age !== null && age >= 17 && ["Em Atendimento", "Fila de Espera"].includes(p.status ?? "");
+      return age !== null && age >= 17 && ["Atendimento", "Fila de Espera"].includes(p.status ?? "");
     });
     const totalFaltas = recentAppts.filter((a) => a.status === "Falta").length;
     const totalPresencas = recentAppts.filter((a) => a.status === "Presente").length;
