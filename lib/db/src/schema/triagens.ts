@@ -47,6 +47,7 @@ export const triagens = pgTable("triagens", {
   tipoEscola: text("tipo_escola"),
   trabalhoPais: text("trabalho_pais"),
   outroAtendimento: boolean("outro_atendimento"),
+  abrigoCasaCrianca: boolean("abrigo_casa_crianca").default(false),
   localAtendimento: text("local_atendimento"),
   // Censo PCD
   tipoRegistro: text("tipo_registro"),

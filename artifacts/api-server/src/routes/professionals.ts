@@ -126,7 +126,7 @@ router.get("/professionals/:id/capacity", async (req, res) => {
 
   const activePatients = await db.select({ count: sql<number>`count(*)::int` })
     .from(patientsTable)
-    .where(and(eq(patientsTable.professionalId, id), eq(patientsTable.status, "ativo")));
+    .where(and(eq(patientsTable.professionalId, id), eq(patientsTable.status, "Atendimento")));
   const count = activePatients[0]?.count ?? 0;
   const maxCapacity = getMaxCapacity(prof.cargaHoraria ?? "30h");
 
@@ -197,7 +197,7 @@ router.get("/professionals/:id/vacancy-alert", async (req, res) => {
 
   const activePatients = await db.select({ count: sql<number>`count(*)::int` })
     .from(patientsTable)
-    .where(and(eq(patientsTable.professionalId, id), eq(patientsTable.status, "ativo")));
+    .where(and(eq(patientsTable.professionalId, id), eq(patientsTable.status, "Atendimento")));
   const count = activePatients[0]?.count ?? 0;
   const available = Math.max(0, maxCapacityVacancy - count);
 

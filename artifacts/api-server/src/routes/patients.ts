@@ -70,6 +70,7 @@ router.post("/patients", async (req, res) => {
     scoreNutricionista: body.scoreNutricionista !== undefined ? Number(body.scoreNutricionista) : null,
     escolaPublica: body.escolaPublica !== undefined ? Boolean(body.escolaPublica) : null,
     trabalhoNaRoca: body.trabalhoNaRoca !== undefined ? Boolean(body.trabalhoNaRoca) : null,
+    abrigoCasaCrianca: body.abrigoCasaCrianca !== undefined ? Boolean(body.abrigoCasaCrianca) : null,
     tipoRegistro: body.tipoRegistro ?? "Paciente da Unidade",
     localAtendimento: body.localAtendimento ?? null,
   }).returning();
@@ -145,6 +146,7 @@ router.put("/patients/:id", async (req, res) => {
   if (body.scoreNutricionista !== undefined) updateData.scoreNutricionista = body.scoreNutricionista !== null ? Number(body.scoreNutricionista) : null;
   if (body.escolaPublica !== undefined) updateData.escolaPublica = body.escolaPublica !== null ? Boolean(body.escolaPublica) : null;
   if (body.trabalhoNaRoca !== undefined) updateData.trabalhoNaRoca = body.trabalhoNaRoca !== null ? Boolean(body.trabalhoNaRoca) : null;
+  if (body.abrigoCasaCrianca !== undefined) updateData.abrigoCasaCrianca = body.abrigoCasaCrianca !== null ? Boolean(body.abrigoCasaCrianca) : null;
   if (body.tipoRegistro !== undefined) updateData.tipoRegistro = body.tipoRegistro;
   if (body.localAtendimento !== undefined) updateData.localAtendimento = body.localAtendimento || null;
 

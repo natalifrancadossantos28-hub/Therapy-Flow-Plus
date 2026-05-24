@@ -34,6 +34,7 @@ export const patientsTable = pgTable("patients", {
   scoreNutricionista: integer("score_nutricionista"),
   escolaPublica: boolean("escola_publica"),
   trabalhoNaRoca: boolean("trabalho_na_roca"),
+  abrigoCasaCrianca: boolean("abrigo_casa_crianca"),
   tipoRegistro: text("tipo_registro"),
   localAtendimento: text("local_atendimento"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
