@@ -109,8 +109,9 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
 }
 
 /**
- * Filters out real DB appointments that fall on "wrong" weeks for their frequency.
- * Only hides "agendado" appointments — any that were interacted with (atendimento, falta, etc.) stay visible.
+ * Filters out appointments that fall on "wrong" weeks for their frequency.
+ * Hides ALL appointments in wrong weeks (regardless of status) so quinzenal/mensal
+ * patients only appear on the correct weeks.
  */
 function applyFrequencyFilter<T extends { date: string; recurrenceGroupId?: string | null; status: string; frequency?: string | null }>(
   allApts: T[],
@@ -132,7 +133,6 @@ function applyFrequencyFilter<T extends { date: string; recurrenceGroupId?: stri
     const refDate = sorted[0].date;
     for (const apt of gApts) {
       if (!weekDates.includes(apt.date)) continue;
-      if (apt.status.toLowerCase() !== "agendado") continue;
       if (!isAllowedWeek(refDate, apt.date, freq)) hide.add(apt);
     }
   }
