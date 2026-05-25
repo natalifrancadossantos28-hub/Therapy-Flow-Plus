@@ -602,8 +602,8 @@ export default function AgendaProfissionais() {
       const profId = selectedProfId ? Number(selectedProfId) : null;
       const allApts = await listAppointments({ patientId: apt.patientId, professionalId: profId });
       const completed = allApts.filter(a => a.status === "atendimento").length;
-      if (completed < 10) {
-        toast({ title: "Encaminhamento bloqueado", description: `Só é possível encaminhar após 10 atendimentos concluídos. Atualmente: ${completed}/10.`, variant: "destructive" });
+      if (completed < 2) {
+        toast({ title: "Encaminhamento bloqueado", description: `Só é possível encaminhar após 2 atendimentos concluídos. Atualmente: ${completed}/2.`, variant: "destructive" });
         setActionMenuId(null);
         return;
       }
@@ -721,8 +721,8 @@ export default function AgendaProfissionais() {
     try {
       const allApts = await listAppointments({ patientId: apt.patientId, professionalId: Number(selectedProfId) });
       const completed = allApts.filter(a => a.status === "atendimento").length;
-      if (completed < 10) {
-        toast({ title: "Atendimento Multi bloqueado", description: `Só é possível após 10 atendimentos concluídos. Atualmente: ${completed}/10.`, variant: "destructive" });
+      if (completed < 2) {
+        toast({ title: "Atendimento Multi bloqueado", description: `Só é possível após 2 atendimentos concluídos. Atualmente: ${completed}/2.`, variant: "destructive" });
         setActionMenuId(null);
         return;
       }
