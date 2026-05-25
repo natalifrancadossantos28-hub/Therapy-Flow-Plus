@@ -1194,18 +1194,21 @@ export default function AgendaProfissionais() {
                                             {isGhost && (
                                               <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⚠ Paciente sem dados — solicite exclusão ao admin</p>
                                             )}
-                                            {!isAtendimento && !isPresente && (
-                                              <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                                <Activity className="w-3.5 h-3.5" /> Em Atendimento
-                                              </button>
+                                            {(isFaltaJust || isFaltaNaoJust) && !isAdminViewing ? (
+                                              <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">🔒 Falta registrada — apenas Admin/Recepção pode alterar</p>
+                                            ) : (
+                                              <>
+                                                <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
+                                                  <Activity className="w-3.5 h-3.5" /> Em Atendimento
+                                                </button>
+                                                <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
+                                                  <CheckCircle className="w-3.5 h-3.5" /> Falta Justificada
+                                                </button>
+                                                <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
+                                                  <AlertTriangle className="w-3.5 h-3.5" /> Falta N. Justificada
+                                                </button>
+                                              </>
                                             )}
-
-                                            <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
-                                              <CheckCircle className="w-3.5 h-3.5" /> Falta Justificada
-                                            </button>
-                                            <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
-                                              <AlertTriangle className="w-3.5 h-3.5" /> Falta N. Justificada
-                                            </button>
                                             <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                             {isAdminViewing && (
                                               <button style={NEON.red} onClick={() => handleDesmarcado(apt)}>
