@@ -1279,6 +1279,25 @@ export async function deleteAppointment(id: number): Promise<void> {
   if (error) throw error;
 }
 
+// ── Faltas por especialidade (Recepção) ──────────────────────────────────────
+
+export type AbsenceBySpecialty = {
+  patient_id: number;
+  specialty: string;
+  absence_count: number;
+};
+
+export async function countAbsencesBySpecialty(): Promise<AbsenceBySpecialty[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("count_absences_by_specialty", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return (data ?? []) as AbsenceBySpecialty[];
+}
+
 export async function deleteRecurrenceForward(
   recurrenceGroupId: string,
   fromDate: string,
