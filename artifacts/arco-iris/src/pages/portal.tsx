@@ -172,11 +172,14 @@ export default function Portal() {
     }
   };
 
-  const CARD_STYLE: React.CSSProperties = {
-    background: "linear-gradient(135deg, rgba(6,14,24,0.95), rgba(3,8,16,0.98))",
-    border: "1px solid rgba(0,240,255,0.25)",
-    boxShadow: "0 0 40px rgba(0,240,255,0.08), 0 0 80px rgba(0,0,0,0.6)",
-  };
+  const neonCard = (color: string, rgb: string): React.CSSProperties => ({
+    background: "linear-gradient(145deg, rgba(6,14,30,0.92), rgba(2,6,14,0.98))",
+    border: `2px solid ${color}`,
+    borderRadius: "1.25rem",
+    boxShadow: `0 0 15px ${rgb}, 0 0 40px ${rgb}, inset 0 0 30px rgba(0,0,0,0.5)`,
+  });
+
+  const CARD_STYLE = neonCard("rgba(0,240,255,0.5)", "rgba(0,240,255,0.15)");
 
   // Tela dos 3 cards.
   if (!active) {
@@ -186,29 +189,30 @@ export default function Portal() {
           <img
             src={`${import.meta.env.BASE_URL}images/logo.png`}
             alt="NFs"
-            className="w-20 h-20 rounded-2xl mx-auto mb-4 shadow-[0_0_30px_rgba(0,240,255,0.25)]"
+            className="w-20 h-20 rounded-2xl mx-auto mb-4"
+            style={{ boxShadow: "0 0 30px rgba(0,200,255,0.35), 0 0 60px rgba(0,200,255,0.15)" }}
           />
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2" style={{ textShadow: "0 0 20px rgba(0,240,255,0.5)" }}>
-            NFs Gestao Terapeutica
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2" style={{ textShadow: "0 0 25px rgba(0,200,255,0.6), 0 0 50px rgba(0,200,255,0.3)" }}>
+            NFs Gest\u00e3o Terap\u00eautica
           </h1>
-          <p className="text-sm text-white/60">Selecione o tipo de acesso</p>
+          <p className="text-sm text-white/50">Selecione o tipo de acesso</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full max-w-5xl">
           {/* Card 1 - Recepcao */}
           <button
             onClick={() => setActive("reception")}
-            className="group rounded-2xl p-6 text-left transition-all hover:scale-[1.02] hover:border-cyan-400/60"
-            style={CARD_STYLE}
+            className="group rounded-2xl p-6 text-left transition-all hover:scale-[1.03] active:scale-[0.98]"
+            style={neonCard("#22c55e", "rgba(34,197,94,0.25)")}
           >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(0,240,255,0.12)", border: "1px solid rgba(0,240,255,0.4)", boxShadow: "0 0 20px rgba(0,240,255,0.25)" }}>
-              <Building2 className="w-7 h-7" style={{ color: "#67e8f9" }} />
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.6)", boxShadow: "0 0 20px rgba(34,197,94,0.35)" }}>
+              <Building2 className="w-7 h-7" style={{ color: "#86efac" }} />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2" style={{ textShadow: "0 0 10px rgba(0,240,255,0.4)" }}>Recepcao</h2>
+            <h2 className="text-xl font-bold text-white mb-2" style={{ textShadow: "0 0 12px rgba(34,197,94,0.5)" }}>Recep\u00e7\u00e3o</h2>
             <p className="text-sm text-white/55 leading-relaxed">
-              Agendamentos, presencas e recepcao de pacientes.
+              Agendamentos, presen\u00e7as e recep\u00e7\u00e3o de pacientes.
             </p>
-            <p className="text-[11px] text-cyan-300/70 mt-4 font-semibold uppercase tracking-wider">
+            <p className="text-[11px] mt-4 font-bold uppercase tracking-wider" style={{ color: "#86efac", textShadow: "0 0 8px rgba(34,197,94,0.6)" }}>
               Acesso direto
             </p>
           </button>
@@ -216,17 +220,17 @@ export default function Portal() {
           {/* Card 2 - Profissional de Saude */}
           <button
             onClick={() => setActive("professional")}
-            className="group rounded-2xl p-6 text-left transition-all hover:scale-[1.02] hover:border-emerald-400/60"
-            style={{ ...CARD_STYLE, border: "1px solid rgba(16,185,129,0.25)" }}
+            className="group rounded-2xl p-6 text-left transition-all hover:scale-[1.03] active:scale-[0.98]"
+            style={neonCard("#06b6d4", "rgba(6,182,212,0.25)")}
           >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.4)", boxShadow: "0 0 20px rgba(16,185,129,0.25)" }}>
-              <UserRound className="w-7 h-7" style={{ color: "#6ee7b7" }} />
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(6,182,212,0.12)", border: "1px solid rgba(6,182,212,0.6)", boxShadow: "0 0 20px rgba(6,182,212,0.35)" }}>
+              <UserRound className="w-7 h-7" style={{ color: "#67e8f9" }} />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2" style={{ textShadow: "0 0 10px rgba(16,185,129,0.4)" }}>Profissional de Saude</h2>
+            <h2 className="text-xl font-bold text-white mb-2" style={{ textShadow: "0 0 12px rgba(6,182,212,0.5)" }}>Profissional de Sa\u00fade</h2>
             <p className="text-sm text-white/55 leading-relaxed">
               Agenda pessoal e atendimentos.
             </p>
-            <p className="text-[11px] text-emerald-300/70 mt-4 font-semibold uppercase tracking-wider">
+            <p className="text-[11px] mt-4 font-bold uppercase tracking-wider" style={{ color: "#67e8f9", textShadow: "0 0 8px rgba(6,182,212,0.6)" }}>
               Acesso: seu nome + PIN
             </p>
           </button>
@@ -234,17 +238,17 @@ export default function Portal() {
           {/* Card 3 - Administracao */}
           <button
             onClick={() => setActive("admin")}
-            className="group rounded-2xl p-6 text-left transition-all hover:scale-[1.02] hover:border-fuchsia-400/60"
-            style={{ ...CARD_STYLE, border: "1px solid rgba(217,70,239,0.25)" }}
+            className="group rounded-2xl p-6 text-left transition-all hover:scale-[1.03] active:scale-[0.98]"
+            style={neonCard("#a855f7", "rgba(168,85,247,0.25)")}
           >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(217,70,239,0.12)", border: "1px solid rgba(217,70,239,0.4)", boxShadow: "0 0 20px rgba(217,70,239,0.25)" }}>
-              <ShieldCheck className="w-7 h-7" style={{ color: "#f0abfc" }} />
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(168,85,247,0.12)", border: "1px solid rgba(168,85,247,0.6)", boxShadow: "0 0 20px rgba(168,85,247,0.35)" }}>
+              <ShieldCheck className="w-7 h-7" style={{ color: "#d8b4fe" }} />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2" style={{ textShadow: "0 0 10px rgba(217,70,239,0.4)" }}>Administracao</h2>
+            <h2 className="text-xl font-bold text-white mb-2" style={{ textShadow: "0 0 12px rgba(168,85,247,0.5)" }}>Administra\u00e7\u00e3o</h2>
             <p className="text-sm text-white/55 leading-relaxed">
-              Gestao total, dashboards e configuracoes do sistema.
+              Gest\u00e3o total, dashboards e configura\u00e7\u00f5es do sistema.
             </p>
-            <p className="text-[11px] text-fuchsia-300/70 mt-4 font-semibold uppercase tracking-wider">
+            <p className="text-[11px] mt-4 font-bold uppercase tracking-wider" style={{ color: "#d8b4fe", textShadow: "0 0 8px rgba(168,85,247,0.6)" }}>
               Acesso direto
             </p>
           </button>
@@ -259,7 +263,7 @@ export default function Portal() {
           Painel Master (Multi-Empresa)
         </button>
 
-        <p className="text-xs text-white/30 mt-6">&copy; 2026 NFs Systems &middot; Gestao Terapeutica</p>
+        <p className="text-xs text-white/30 mt-6">&copy; 2026 NFs Systems &middot; Gest\u00e3o Terap\u00eautica</p>
       </div>
     );
   }
@@ -271,13 +275,13 @@ export default function Portal() {
     const accentBg = isRecep ? "rgba(0,240,255,0.12)" : "rgba(217,70,239,0.12)";
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-[#020612] via-[#040a18] to-[#010408]">
-        <div className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl" style={CARD_STYLE}>
+        <div className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl" style={neonCard(isRecep ? "rgba(34,197,94,0.5)" : "rgba(168,85,247,0.5)", isRecep ? "rgba(34,197,94,0.15)" : "rgba(168,85,247,0.15)")}>
           <div className="p-6 text-center" style={{ borderBottom: `1px solid ${accent}33` }}>
             <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3" style={{ background: accentBg, border: `1px solid ${accent}`, boxShadow: `0 0 20px ${accent}40` }}>
               {isRecep ? <Building2 className="w-7 h-7" style={{ color: accent }} /> : <ShieldCheck className="w-7 h-7" style={{ color: accent }} />}
             </div>
-            <h2 className="text-lg font-bold text-white" style={{ textShadow: `0 0 10px ${accent}66` }}>{isRecep ? "Recepcao" : "Administracao"}</h2>
-            <p className="text-xs text-white/50 mt-1">Confirme o identificador da empresa</p>
+            <h2 className="text-lg font-bold text-white" style={{ textShadow: `0 0 10px ${accent}66` }}>{isRecep ? "Recep\u00e7\u00e3o" : "Administra\u00e7\u00e3o"}</h2>
+            <p className="text-xs text-white/50 mt-1">Confirme a senha da empresa</p>
           </div>
 
           <form onSubmit={(e) => { e.preventDefault(); submitCompany(isRecep ? "reception" : "admin"); }} className="p-6 space-y-4">
