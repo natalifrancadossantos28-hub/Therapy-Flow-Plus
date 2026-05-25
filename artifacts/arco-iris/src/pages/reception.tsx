@@ -7,8 +7,10 @@ import {
   listPatients,
   updateAppointment,
   deletePatient,
+  countAbsencesBySpecialty,
   type Professional as ArcoProfessional,
   type AppointmentToday,
+  type AbsenceBySpecialty,
 } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom";
@@ -16,7 +18,7 @@ import { getStatusColor, getStatusLabel, cn } from "@/lib/utils";
 import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
-  UserPlus, PhoneOff, FileCheck, Bell,
+  UserPlus, PhoneOff, FileCheck, Bell, MessageSquare, Copy,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
@@ -133,8 +135,97 @@ function VacancyModal({ alert, onClose }: { alert: VacancyAlert; onClose: () => 
   );
 }
 
+function FirstAppointmentMessageModal({
+  apt, onClose,
+}: { apt: Appointment; onClose: () => void }) {
+  const dateFormatted = (() => {
+    try {
+      const [y, m, d] = apt.date.split("-");
+      return `${d}/${m}/${y}`;
+    } catch { return apt.date; }
+  })();
+
+  const msgDetailed = `Olá! Confirmamos o primeiro agendamento do(a) ${apt.patientName} para o dia ${dateFormatted} às ${apt.time}. Lembramos que este primeiro encontro é exclusivo para uma entrevista com os pais/responsáveis, portanto, não é necessário trazer a criança. Contamos com sua presença!`;
+  const msgShort = `Aviso importante sobre o primeiro agendamento de ${apt.patientName} em ${dateFormatted} às ${apt.time}: Este atendimento inicial será realizado apenas com o responsável. Favor não trazer a criança neste dia. Obrigado!`;
+
+  const sanitizePhone = (p: string | null) => {
+    if (!p) return "";
+    const digits = p.replace(/\D/g, "");
+    return digits.startsWith("55") ? digits : `55${digits}`;
+  };
+
+  const sendViaWhatsApp = (msg: string) => {
+    const phone = sanitizePhone(apt.patientPhone);
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+      : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    onClose();
+  };
+
+  const copyToClipboard = (msg: string) => {
+    navigator.clipboard.writeText(msg).catch(() => {});
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <MotionCard
+        className="w-full max-w-lg p-6 shadow-2xl space-y-5"
+        initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+            <MessageSquare className="w-5 h-5 text-green-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold">Mensagem do 1º Agendamento</h2>
+            <p className="text-sm text-muted-foreground">{apt.patientName} — {dateFormatted} às {apt.time}</p>
+          </div>
+        </div>
+
+        {/* Opção 1: Mensagem completa */}
+        <div className="rounded-lg border border-border/60 p-4 space-y-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Opção 1 — Completa</p>
+          <p className="text-sm leading-relaxed">{msgDetailed}</p>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => sendViaWhatsApp(msgDetailed)}
+            >
+              <MessageSquare className="w-4 h-4" /> Enviar via WhatsApp
+            </Button>
+            <Button variant="outline" className="gap-1" onClick={() => copyToClipboard(msgDetailed)} title="Copiar">
+              <Copy className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Opção 2: Mensagem curta */}
+        <div className="rounded-lg border border-border/60 p-4 space-y-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Opção 2 — Curta (WhatsApp)</p>
+          <p className="text-sm leading-relaxed">{msgShort}</p>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => sendViaWhatsApp(msgShort)}
+            >
+              <MessageSquare className="w-4 h-4" /> Enviar via WhatsApp
+            </Button>
+            <Button variant="outline" className="gap-1" onClick={() => copyToClipboard(msgShort)} title="Copiar">
+              <Copy className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        <Button variant="ghost" className="w-full" onClick={onClose}>Fechar</Button>
+      </MotionCard>
+    </div>
+  );
+}
+
 function AppointmentRow({
-  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating,
+  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg,
 }: {
   apt: Appointment;
   index: number;
@@ -143,6 +234,8 @@ function AppointmentRow({
   onDischargeRequest: (apt: Appointment, count: number) => void;
   onAbonarClick: (apt: Appointment, atestado: Atestado) => void;
   isUpdating: boolean;
+  specialtyAbsences: Map<string, number>;
+  onFirstApptMsg: (apt: Appointment) => void;
 }) {
   const handleAbsent = async () => {
     const newCount = await onStatusChange(apt.id, "falta_nao_justificada");
@@ -153,7 +246,8 @@ function AppointmentRow({
     await onStatusChange(apt.id, "falta_justificada");
   };
 
-  const hasWarning = apt.patientAbsenceCount >= 3;
+  const specAbsCount = specialtyAbsences.get(`${apt.patientId}::${apt.professionalSpecialty}`) ?? 0;
+  const hasWarning = specAbsCount >= 2;
   const statusLower = apt.status?.toLowerCase() ?? "";
   const isFalta = statusLower === "ausente" || statusLower === "falta_nao_justificada";
   const isJustificado = statusLower === "falta_justificada" || statusLower === "justificado" || statusLower === "abonado";
@@ -181,9 +275,12 @@ function AppointmentRow({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className={cn("font-bold text-lg", isFalta ? "text-red-400" : isJustificado ? "text-yellow-400" : "text-foreground")}>{apt.prontuario ? `${apt.prontuario} - ${apt.patientName}` : apt.patientName}</h3>
-              {hasWarning && (
-                <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-rose-200 text-rose-700">
-                  <AlertCircle className="w-3 h-3" /> {apt.patientAbsenceCount} faltas
+              {specAbsCount > 0 && (
+                <span className={cn(
+                  "inline-flex items-center gap-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded",
+                  specAbsCount >= 3 ? "bg-rose-200 text-rose-700" : specAbsCount >= 2 ? "bg-amber-200 text-amber-800" : "bg-orange-100 text-orange-700"
+                )}>
+                  <Bell className="w-3 h-3" /> {specAbsCount}ª falta — {apt.professionalSpecialty}
                 </span>
               )}
             </div>
@@ -283,6 +380,21 @@ function AppointmentRow({
                 Abonar
               </button>
             )}
+
+            {/* 1º Agendamento — mensagem WhatsApp */}
+            <button
+              className="h-9 w-9 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
+              style={{
+                background: "rgba(34,197,94,0.08)",
+                border: "1px solid rgba(34,197,94,0.35)",
+                color: "#22c55e",
+              }}
+              onClick={() => onFirstApptMsg(apt)}
+              disabled={isUpdating}
+              title="Mensagem do 1º Agendamento"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
@@ -298,14 +410,27 @@ export default function Reception() {
   const [prontuarioMap, setProntuarioMap] = useState<Map<number, string>>(new Map());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMutating, setIsMutating] = useState<boolean>(false);
+  const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
   const { toast } = useToast();
+
+  const reloadAbsences = useCallback(() => {
+    countAbsencesBySpecialty()
+      .then((rows) => {
+        const map = new Map<string, number>();
+        for (const r of rows) {
+          map.set(`${r.patient_id}::${r.specialty}`, r.absence_count);
+        }
+        setSpecialtyAbsences(map);
+      })
+      .catch(console.error);
+  }, []);
 
   const reloadAppointments = useCallback(() => {
     const opts = profIdFilter ? { professionalId: parseInt(profIdFilter) } : undefined;
     return listAppointmentsToday(opts)
-      .then((data) => { setAppointments(data); setIsLoading(false); })
+      .then((data) => { setAppointments(data); setIsLoading(false); reloadAbsences(); })
       .catch((e) => { console.error(e); setIsLoading(false); });
-  }, [profIdFilter]);
+  }, [profIdFilter, reloadAbsences]);
 
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
@@ -372,6 +497,7 @@ export default function Reception() {
   const [, navigate] = useLocation();
   const [dischargeAlert, setDischargeAlert] = useState<DischargeAlert | null>(null);
   const [vacancyAlert, setVacancyAlert] = useState<VacancyAlert | null>(null);
+  const [firstApptMsgApt, setFirstApptMsgApt] = useState<Appointment | null>(null);
   const [vacancyProfId, setVacancyProfId] = useState<number>(0);
   const [atestados, setAtestados] = useState<Atestado[]>([]);
   const [desconhecidos, setDesconhecidos] = useState<ContatoDesconhecido[]>([]);
@@ -729,6 +855,8 @@ export default function Reception() {
                 onDischargeRequest={handleDischargeRequest}
                 onAbonarClick={handleAbonarClick}
                 isUpdating={isMutating}
+                specialtyAbsences={specialtyAbsences}
+                onFirstApptMsg={setFirstApptMsgApt}
               />
             );})
           )}
@@ -741,6 +869,9 @@ export default function Reception() {
         )}
         {vacancyAlert && (
           <VacancyModal alert={vacancyAlert} onClose={() => setVacancyAlert(null)} />
+        )}
+        {firstApptMsgApt && (
+          <FirstAppointmentMessageModal apt={firstApptMsgApt} onClose={() => setFirstApptMsgApt(null)} />
         )}
       </AnimatePresence>
 
