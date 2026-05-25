@@ -821,6 +821,22 @@ export async function deleteWaitingListEntry(id: number): Promise<void> {
   if (error) throw error;
 }
 
+export async function syncWaitingListWithAgenda(): Promise<{
+  ok: boolean;
+  duplicatesRemoved: number;
+  syncedRemoved: number;
+  statusFixed: number;
+}> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("sync_waiting_list_with_agenda", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; duplicatesRemoved: number; syncedRemoved: number; statusFixed: number };
+}
+
 // ── Appointments (Fase 4C) ──────────────────────────────────────────────────
 
 export type AppointmentStatus =
