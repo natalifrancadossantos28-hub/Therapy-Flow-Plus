@@ -1207,9 +1207,11 @@ export default function AgendaProfissionais() {
                                               <AlertTriangle className="w-3.5 h-3.5" /> Falta N. Justificada
                                             </button>
                                             <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
-                                            <button style={NEON.red} onClick={() => handleDesmarcado(apt)}>
-                                              <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
-                                            </button>
+                                            {isAdminViewing && (
+                                              <button style={NEON.red} onClick={() => handleDesmarcado(apt)}>
+                                                <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
+                                              </button>
+                                            )}
 
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
                                               <RotateCcw className="w-3.5 h-3.5" /> Remanejar (nesta semana)
@@ -1278,9 +1280,11 @@ export default function AgendaProfissionais() {
                                             </button>
 
                                             <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
-                                            <button style={NEON.red} onClick={() => handleExcluirAdmin(apt)}>
-                                              <Trash2 className="w-3.5 h-3.5" /> Excluir Agendamento
-                                            </button>
+                                            {isAdminViewing && (
+                                              <button style={NEON.red} onClick={() => handleExcluirAdmin(apt)}>
+                                                <Trash2 className="w-3.5 h-3.5" /> Excluir Agendamento
+                                              </button>
+                                            )}
 
                                             {/* ── Referral info if exists ── */}
                                             {apt.notes && apt.notes.includes("Encaminhamento") && (
