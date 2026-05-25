@@ -39,6 +39,7 @@ function getWeekDays(ref: Date): Date[] {
 }
 
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
+const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
 
 function isoWeekNumber(dateStr: string): number {
   const d = new Date(dateStr + "T12:00:00");
@@ -90,9 +91,9 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
   const virtual: T[] = [];
   for (const [, gApts] of groups) {
     const sorted = [...gApts].sort((a, b) => a.date.localeCompare(b.date));
-    const allTerminal = sorted.every(a => TERMINAL_STATUSES.includes(a.status.toLowerCase()));
-    if (allTerminal) continue;
-    const activeApts = sorted.filter(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase()));
+    const allInactive = sorted.every(a => INACTIVE_STATUSES.includes(a.status.toLowerCase()));
+    if (allInactive) continue;
+    const activeApts = sorted.filter(a => !INACTIVE_STATUSES.includes(a.status.toLowerCase()));
     const refApt = activeApts[0] ?? sorted[0];
     const refDow = new Date(refApt.date + "T12:00:00").getDay();
     const target = weekDates.find(d => new Date(d + "T12:00:00").getDay() === refDow);
@@ -100,9 +101,9 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (target < refApt.date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
 
-    // Don't project beyond the last real appointment (respects "delete forward")
-    const lastDate = sorted[sorted.length - 1].date;
-    if (target > lastDate) continue;
+    // Don't project beyond the last ACTIVE appointment (respects "delete forward" and desmarcado)
+    const lastActiveDate = activeApts.length > 0 ? activeApts[activeApts.length - 1].date : sorted[sorted.length - 1].date;
+    if (target > lastActiveDate) continue;
 
     const freq = (refApt as any).frequency ?? "semanal";
     if (!isAllowedWeek(sorted[0].date, target, freq)) continue;
@@ -110,7 +111,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     const key = `${target}|${refApt.time}|${refApt.patientId}`;
     if (existing.has(key)) continue;
     existing.add(key);
-    const hasAtendimento = sorted.some(a => ["atendimento", "em_atendimento", "em atendimento"].includes(a.status.toLowerCase()));
+    const hasAtendimento = activeApts.some(a => ["atendimento", "em_atendimento", "em atendimento"].includes(a.status.toLowerCase()));
     const virtualStatus = hasAtendimento ? "atendimento" : "agendado";
     virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!) } as T);
   }

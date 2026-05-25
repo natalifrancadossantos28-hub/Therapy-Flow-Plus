@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { X, Calendar, Clock, AlertCircle, Search, UserCog } from "lucide-react";
+import { X, Calendar, Clock, AlertCircle, Search, UserCog, ArrowRightLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { MotionCard, Button, Label } from "@/components/ui-custom";
 import { listWaitingList, listPatients, createAppointments, listAppointments, deleteWaitingListEntry, listProfessionals, createNotificacao, type Patient } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
@@ -12,6 +12,8 @@ type WaitingEntry = {
   id: number; patientId: number; patientName: string;
   patientProntuario?: string | null; priority: string;
   specialty?: string | null;
+  notes?: string | null;
+  referringProfessional?: string | null;
 };
 
 type Props = {
@@ -88,6 +90,7 @@ export default function BookingModal({
   const [bookedAtSlotIds, setBookedAtSlotIds] = useState<Set<number>>(new Set());
   // Mapa professionalId → specialty para validação de duplicidade
   const [profSpecialtyMap, setProfSpecialtyMap] = useState<Map<number, string>>(new Map());
+  const [notesExpanded, setNotesExpanded] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -99,6 +102,8 @@ export default function BookingModal({
         patientProntuario: e.patientProntuario ?? null,
         priority: e.priority,
         specialty: e.specialty ?? null,
+        notes: e.notes ?? null,
+        referringProfessional: e.professionalName ?? null,
       })));
     } catch (err) { console.error(err); }
 
@@ -423,6 +428,37 @@ export default function BookingModal({
                       {PRIORITY_LABELS[nextPatient.priority] || nextPatient.priority.toUpperCase()}
                     </span>
                   </div>
+                  {/* Encaminhamento Interno info */}
+                  {nextPatient.notes && (
+                    <div className="mt-3 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/5 p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <ArrowRightLeft className="w-3.5 h-3.5 text-fuchsia-400 shrink-0" />
+                        <span className="text-xs font-bold text-fuchsia-400">
+                          {nextPatient.referringProfessional
+                            ? `Encaminhamento Interno — ${nextPatient.referringProfessional}`
+                            : "Observação da Fila"}
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <p className={cn(
+                          "text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed",
+                          !notesExpanded && nextPatient.notes.length > 120 && "line-clamp-2"
+                        )}>
+                          {nextPatient.notes}
+                        </p>
+                        {nextPatient.notes.length > 120 && (
+                          <button
+                            type="button"
+                            onClick={() => setNotesExpanded(v => !v)}
+                            className="flex items-center gap-1 text-[10px] font-semibold text-fuchsia-400 hover:text-fuchsia-300 mt-1 transition-colors"
+                          >
+                            {notesExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            {notesExpanded ? "Recolher" : "Ler mais"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
