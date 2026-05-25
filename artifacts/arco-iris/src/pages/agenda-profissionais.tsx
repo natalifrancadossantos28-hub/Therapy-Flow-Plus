@@ -821,6 +821,13 @@ export default function AgendaProfissionais() {
           return a.id !== excluirConfirm.id;
         })
       );
+      // Re-adiciona o paciente à fila de espera da especialidade do profissional
+      try {
+        const prof = professionals.find(p => p.id === excluirConfirm.professionalId);
+        if (prof?.specialty) {
+          await addPatientToFila(excluirConfirm.patientId, prof.specialty, null, true);
+        }
+      } catch { /* se falhar a re-inserção na fila, não bloqueia */ }
       toast({
         title: "Agendamento excluído",
         description: `${excluirConfirm.patientName} — horários de ${excluirConfirm.date} em diante excluídos. Histórico anterior preservado.`,

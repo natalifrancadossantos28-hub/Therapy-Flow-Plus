@@ -329,10 +329,22 @@ export default function Reception() {
   } | null>(null);
   const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Realtime: recarrega agenda quando qualquer appointment muda (INSERT/UPDATE/DELETE)
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => { void reloadAppointments(); }, 400);
+  }, [reloadAppointments]);
+
   useEffect(() => {
     if (!supabase) return;
     const channel = supabase
-      .channel("recepcao-notificacoes")
+      .channel("recepcao-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointments" },
+        scheduleReload
+      )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notificacoes_recepcao" },
@@ -351,10 +363,11 @@ export default function Reception() {
       )
       .subscribe();
     return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
       if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
       void supabase.removeChannel(channel);
     };
-  }, [reloadAppointments]);
+  }, [reloadAppointments, scheduleReload]);
 
   const [, navigate] = useLocation();
   const [dischargeAlert, setDischargeAlert] = useState<DischargeAlert | null>(null);
