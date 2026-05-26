@@ -19,6 +19,7 @@ import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
   UserPlus, PhoneOff, FileCheck, Bell, MessageSquare, Copy,
+  BellRing,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
@@ -224,8 +225,176 @@ function FirstAppointmentMessageModal({
   );
 }
 
+// ── Sininho de Faltas — Modal de Ausência com WhatsApp ──
+function isAvaliacao(apt: Appointment): boolean {
+  const n = (apt.notes ?? "").toLowerCase();
+  return /avalia[çc][aã]o|triagem|entrevista\s+inicial|primeira\s+consulta|1[ºª]\s*sess[aã]o/.test(n);
+}
+
+function AbsenceBellModal({
+  apt,
+  absenceCount,
+  onClose,
+}: {
+  apt: Appointment;
+  absenceCount: number;
+  onClose: () => void;
+}) {
+  const isEval = isAvaliacao(apt);
+  const [tab, setTab] = useState<"avaliacao" | "regular">(isEval ? "avaliacao" : "regular");
+  const [reagDate, setReagDate] = useState("");
+  const [reagTime, setReagTime] = useState("");
+
+  const sanitizePhone = (p: string | null) => {
+    if (!p) return "";
+    const digits = p.replace(/\D/g, "");
+    return digits.startsWith("55") ? digits : `55${digits}`;
+  };
+
+  const sendViaWhatsApp = (msg: string) => {
+    const phone = sanitizePhone(apt.patientPhone);
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+      : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    onClose();
+  };
+
+  const copyToClipboard = (msg: string) => {
+    navigator.clipboard.writeText(msg).catch(() => {});
+  };
+
+  const formatDateBR = (d: string) => {
+    try { const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; } catch { return d; }
+  };
+
+  // Mensagem avaliação
+  const reagDateFormatted = reagDate ? formatDateBR(reagDate) : "[dia/mês/ano]";
+  const reagTimeFormatted = reagTime || "[hora]";
+  const msgAvaliacao = `Olá! Aqui é da Recepção. Sentimos a falta de ${apt.patientName} na avaliação agendada para hoje. Reagendamos a nova Avaliação para o dia ${reagDateFormatted} às ${reagTimeFormatted}.`;
+
+  // Mensagens regulares
+  const msg1 = `Olá! Notamos que ${apt.patientName} não pôde comparecer à terapia hoje. E estamos passando para avisar que registramos esta como a primeira falta. Qualquer dúvida estamos a disposição. Atenciosamente, Recepção.`;
+  const msg2 = `Olá! Sentimos a falta de ${apt.patientName} hoje novamente. Estamos registrando essa como a segunda falta dos atendimentos. Queremos lembrar que, se houver uma terceira falta, teremos que encerrar o atendimento com a especialidade ${apt.professionalSpecialty}.`;
+  const msg3 = `Olá! Infelizmente, devido à terceira falta consecutiva de ${apt.patientName}, conforme as regras da unidade, estamos encerrando o ciclo de atendimentos. E o paciente ${apt.patientName} estará retornando à fila de espera.`;
+
+  const regularMsg = absenceCount >= 3 ? msg3 : absenceCount === 2 ? msg2 : msg1;
+  const regularLabel = absenceCount >= 3 ? "3ª Falta — Alta/Desligamento" : absenceCount === 2 ? "2ª Falta — Aviso" : "1ª Falta — Registro";
+  const regularColor = absenceCount >= 3 ? "text-rose-400" : absenceCount === 2 ? "text-amber-400" : "text-orange-400";
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <MotionCard
+        className="w-full max-w-lg p-6 shadow-2xl space-y-5"
+        initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(251,146,60,0.15)", color: "#fb923c" }}>
+            <BellRing className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold">Sininho de Faltas</h2>
+            <p className="text-sm text-muted-foreground">{apt.patientName} — {apt.professionalSpecialty}</p>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2">
+          <button
+            className={cn(
+              "flex-1 px-3 py-2 rounded-lg text-sm font-bold transition-colors border",
+              tab === "avaliacao"
+                ? "bg-cyan-500/10 border-cyan-400 text-cyan-400"
+                : "border-border/40 text-muted-foreground hover:border-border"
+            )}
+            onClick={() => setTab("avaliacao")}
+          >
+            Avaliação Inicial
+          </button>
+          <button
+            className={cn(
+              "flex-1 px-3 py-2 rounded-lg text-sm font-bold transition-colors border",
+              tab === "regular"
+                ? "bg-orange-500/10 border-orange-400 text-orange-400"
+                : "border-border/40 text-muted-foreground hover:border-border"
+            )}
+            onClick={() => setTab("regular")}
+          >
+            Atendimento Regular
+          </button>
+        </div>
+
+        {tab === "avaliacao" ? (
+          <div className="rounded-lg border border-cyan-400/30 p-4 space-y-4" style={{ background: "rgba(6,182,212,0.04)" }}>
+            <p className="text-xs font-bold uppercase text-cyan-400">Falta na Avaliação — Reagendamento</p>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="text-xs text-muted-foreground mb-1 block">Nova Data</label>
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  value={reagDate}
+                  onChange={(e) => setReagDate(e.target.value)}
+                />
+              </div>
+              <div className="w-28">
+                <label className="text-xs text-muted-foreground mb-1 block">Horário</label>
+                <input
+                  type="time"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  value={reagTime}
+                  onChange={(e) => setReagTime(e.target.value)}
+                />
+              </div>
+            </div>
+            <p className="text-sm leading-relaxed border border-border/30 rounded-lg p-3 bg-background/50">{msgAvaliacao}</p>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => sendViaWhatsApp(msgAvaliacao)}
+              >
+                <MessageSquare className="w-4 h-4" /> Enviar via WhatsApp
+              </Button>
+              <Button variant="outline" className="gap-1" onClick={() => copyToClipboard(msgAvaliacao)} title="Copiar">
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-orange-400/30 p-4 space-y-3" style={{ background: "rgba(251,146,60,0.04)" }}>
+            <p className={cn("text-xs font-bold uppercase", regularColor)}>{regularLabel}</p>
+            {absenceCount >= 3 && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-400/30">
+                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                <p className="text-xs text-rose-300 font-semibold">Paciente será encaminhado para a fila de espera</p>
+              </div>
+            )}
+            <p className="text-sm leading-relaxed border border-border/30 rounded-lg p-3 bg-background/50">{regularMsg}</p>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => sendViaWhatsApp(regularMsg)}
+              >
+                <MessageSquare className="w-4 h-4" /> Enviar via WhatsApp
+              </Button>
+              <Button variant="outline" className="gap-1" onClick={() => copyToClipboard(regularMsg)} title="Copiar">
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <Button variant="ghost" className="w-full" onClick={onClose}>Fechar</Button>
+      </MotionCard>
+    </div>
+  );
+}
+
 function AppointmentRow({
-  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg,
+  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell,
 }: {
   apt: Appointment;
   index: number;
@@ -236,6 +405,7 @@ function AppointmentRow({
   isUpdating: boolean;
   specialtyAbsences: Map<string, number>;
   onFirstApptMsg: (apt: Appointment) => void;
+  onAbsenceBell: (apt: Appointment, absenceCount: number) => void;
 }) {
   const handleAbsent = async () => {
     const newCount = await onStatusChange(apt.id, "falta_nao_justificada");
@@ -395,6 +565,40 @@ function AppointmentRow({
             >
               <MessageSquare className="w-4 h-4" />
             </button>
+
+            {/* 🔔 Sininho de Faltas — marca ausente + abre WhatsApp */}
+            <button
+              className="h-9 w-9 rounded-lg flex items-center justify-center transition-all disabled:opacity-40 relative"
+              style={{
+                background: "rgba(251,146,60,0.10)",
+                border: "1px solid rgba(251,146,60,0.45)",
+                color: "#fb923c",
+                boxShadow: specAbsCount > 0 ? "0 0 12px rgba(251,146,60,0.35)" : "none",
+              }}
+              onClick={async () => {
+                let newCount = specAbsCount;
+                const sLower = apt.status?.toLowerCase() ?? "";
+                const alreadyAbsent = sLower === "ausente" || sLower === "falta_nao_justificada";
+                if (!alreadyAbsent) {
+                  await onStatusChange(apt.id, "falta_nao_justificada");
+                  newCount = specAbsCount + 1;
+                }
+                onAbsenceBell(apt, newCount);
+              }}
+              disabled={isUpdating}
+              title="Sininho de Faltas — Registrar ausência e notificar"
+            >
+              <BellRing className="w-4 h-4" />
+              {specAbsCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white"
+                  style={{
+                    background: specAbsCount >= 3 ? "#ef4444" : specAbsCount >= 2 ? "#f59e0b" : "#fb923c",
+                    boxShadow: "0 0 6px rgba(0,0,0,0.3)",
+                  }}>
+                  {specAbsCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -498,6 +702,7 @@ export default function Reception() {
   const [dischargeAlert, setDischargeAlert] = useState<DischargeAlert | null>(null);
   const [vacancyAlert, setVacancyAlert] = useState<VacancyAlert | null>(null);
   const [firstApptMsgApt, setFirstApptMsgApt] = useState<Appointment | null>(null);
+  const [absenceBellData, setAbsenceBellData] = useState<{ apt: Appointment; absenceCount: number } | null>(null);
   const [vacancyProfId, setVacancyProfId] = useState<number>(0);
   const [atestados, setAtestados] = useState<Atestado[]>([]);
   const [desconhecidos, setDesconhecidos] = useState<ContatoDesconhecido[]>([]);
@@ -857,6 +1062,7 @@ export default function Reception() {
                 isUpdating={isMutating}
                 specialtyAbsences={specialtyAbsences}
                 onFirstApptMsg={setFirstApptMsgApt}
+                onAbsenceBell={(a, count) => setAbsenceBellData({ apt: a, absenceCount: count })}
               />
             );})
           )}
@@ -872,6 +1078,13 @@ export default function Reception() {
         )}
         {firstApptMsgApt && (
           <FirstAppointmentMessageModal apt={firstApptMsgApt} onClose={() => setFirstApptMsgApt(null)} />
+        )}
+        {absenceBellData && (
+          <AbsenceBellModal
+            apt={absenceBellData.apt}
+            absenceCount={absenceBellData.absenceCount}
+            onClose={() => setAbsenceBellData(null)}
+          />
         )}
       </AnimatePresence>
 
