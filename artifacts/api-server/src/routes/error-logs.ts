@@ -37,10 +37,10 @@ router.post("/error-logs", async (req, res) => {
       context: context ? JSON.stringify(context) : null,
     }).returning();
 
-    res.status(201).json(row);
+    return res.status(201).json(row);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erro ao registrar log" });
+    return res.status(500).json({ error: "Erro ao registrar log" });
   }
 });
 
@@ -62,10 +62,10 @@ router.get("/error-logs", async (req, res) => {
       ? await db.select().from(nfsErrorLogsTable).where(and(...conditions)).orderBy(desc(nfsErrorLogsTable.createdAt)).limit(200)
       : await db.select().from(nfsErrorLogsTable).orderBy(desc(nfsErrorLogsTable.createdAt)).limit(200);
 
-    res.json(rows);
+    return res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erro ao buscar logs" });
+    return res.status(500).json({ error: "Erro ao buscar logs" });
   }
 });
 
@@ -73,10 +73,10 @@ router.delete("/error-logs/:id", async (req, res) => {
   try {
     if (!isMaster(req)) return res.status(401).json({ error: "Acesso negado" });
     await db.delete(nfsErrorLogsTable).where(eq(nfsErrorLogsTable.id, Number(req.params.id)));
-    res.status(204).end();
+    return res.status(204).end();
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erro ao excluir log" });
+    return res.status(500).json({ error: "Erro ao excluir log" });
   }
 });
 

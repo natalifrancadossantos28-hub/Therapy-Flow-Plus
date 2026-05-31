@@ -235,10 +235,10 @@ router.get("/triagens/:id", async (req, res) => {
     if (companyId) conditions.push(eq(triagens.companyId, companyId));
     const [row] = await db.select().from(triagens).where(and(...conditions));
     if (!row) return res.status(404).json({ error: "Triagem não encontrada" });
-    res.json(row);
+    return res.json(row);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erro ao buscar triagem" });
+    return res.status(500).json({ error: "Erro ao buscar triagem" });
   }
 });
 
@@ -278,10 +278,10 @@ router.put("/triagens/:id", async (req, res) => {
       console.error("Erro na vinculação automática da triagem (PUT):", e);
     });
 
-    res.json(row);
+    return res.json(row);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erro ao atualizar triagem" });
+    return res.status(500).json({ error: "Erro ao atualizar triagem" });
   }
 });
 

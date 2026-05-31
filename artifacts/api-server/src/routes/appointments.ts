@@ -191,7 +191,7 @@ router.get("/appointments/next", async (req, res) => {
   // Calcula Semana A ou B
   const week = isoWeekNumber(next.date);
   const ciclo = (next.frequency === "quinzenal") ? (week % 2 === 1 ? "A" : "B") : null;
-  res.json({ ...next, ciclo });
+  return res.json({ ...next, ciclo });
 });
 
 router.post("/appointments", async (req, res) => {
@@ -250,14 +250,14 @@ router.post("/appointments", async (req, res) => {
     await db.delete(waitingListTable).where(eq(waitingListTable.patientId, Number(patientId)));
   }
 
-  res.status(201).json({ ...firstRow, totalCreated: inserted.length });
+  return res.status(201).json({ ...firstRow, totalCreated: inserted.length });
 });
 
 router.get("/appointments/:id", async (req, res) => {
   const id = Number(req.params.id);
   const [row] = await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, id));
   if (!row) return res.status(404).json({ error: "Appointment not found" });
-  res.json(row);
+  return res.json(row);
 });
 
 router.patch("/appointments/:id", async (req, res) => {
@@ -340,7 +340,7 @@ router.patch("/appointments/:id", async (req, res) => {
     patientAfter = p;
   }
 
-  res.json({
+  return res.json({
     ...row,
     consecutiveUnjustifiedAbsences: patientAfter?.consecutiveUnjustifiedAbsences ?? 0,
     escolaPublica: patientAfter?.escolaPublica ?? false,
@@ -373,7 +373,7 @@ router.delete("/appointments/:id/alta", async (req, res) => {
     deletedCount = 1;
   }
 
-  res.json({ ok: true, deletedCount });
+  return res.json({ ok: true, deletedCount });
 });
 
 router.delete("/appointments/:id", async (req, res) => {

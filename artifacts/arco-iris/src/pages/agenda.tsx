@@ -481,7 +481,7 @@ export default function Agenda() {
       .subscribe();
     return () => {
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
-      void supabase.removeChannel(channel);
+      void supabase?.removeChannel(channel);
     };
   }, [selectedProfId, canView]);
 

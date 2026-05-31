@@ -155,10 +155,10 @@ Responda APENAS com o JSON, sem markdown.`;
       parsed = { resumo: text, alertas: [], sugestoes: [], metricas: {} };
     }
 
-    res.json({ success: true, analysis: parsed, rawPatientCount: waitingData.length });
+    return res.json({ success: true, analysis: parsed, rawPatientCount: waitingData.length });
   } catch (err: any) {
     console.error("[AI Brain] waiting-list-optimization error:", err);
-    res.status(500).json({ error: err.message ?? "Erro interno" });
+    return res.status(500).json({ error: err.message ?? "Erro interno" });
   }
 });
 
@@ -289,10 +289,10 @@ Responda APENAS com o JSON, sem markdown.`;
       parsed = { resumo: text, riscoAlto: [], riscoModerado: [], metricas: {} };
     }
 
-    res.json({ success: true, analysis: parsed, totalPatients: patientData.length });
+    return res.json({ success: true, analysis: parsed, totalPatients: patientData.length });
   } catch (err: any) {
     console.error("[AI Brain] churn-alerts error:", err);
-    res.status(500).json({ error: err.message ?? "Erro interno" });
+    return res.status(500).json({ error: err.message ?? "Erro interno" });
   }
 });
 
@@ -399,10 +399,10 @@ Responda APENAS com o JSON, sem markdown.`;
       parsed = { resumo: text, proximosDoLimite: [], foraDoLimite: [], faixasEtarias: {}, alertas: [] };
     }
 
-    res.json({ success: true, analysis: parsed, totalPatients: patientData.length });
+    return res.json({ success: true, analysis: parsed, totalPatients: patientData.length });
   } catch (err: any) {
     console.error("[AI Brain] age-limit-report error:", err);
-    res.status(500).json({ error: err.message ?? "Erro interno" });
+    return res.status(500).json({ error: err.message ?? "Erro interno" });
   }
 });
 
@@ -584,10 +584,10 @@ Responda APENAS com o JSON, sem markdown.`;
       parsed = { resumo: text, saude: "desconhecido", problemas: [], metricas: {}, recomendacoes: [] };
     }
 
-    res.json({ success: true, analysis: parsed, rawIssues: totalIssues });
+    return res.json({ success: true, analysis: parsed, rawIssues: totalIssues });
   } catch (err: any) {
     console.error("[AI Brain] system-health error:", err);
-    res.status(500).json({ error: err.message ?? "Erro interno" });
+    return res.status(500).json({ error: err.message ?? "Erro interno" });
   }
 });
 
@@ -719,10 +719,10 @@ Responda APENAS com o JSON, sem markdown.`;
       parsed = { saudacao: text, statusGeral: "desconhecido", insights: [], acoesPrioritarias: [], indicadores: {} };
     }
 
-    res.json({ success: true, analysis: parsed, summary });
+    return res.json({ success: true, analysis: parsed, summary });
   } catch (err: any) {
     console.error("[AI Brain] full-analysis error:", err);
-    res.status(500).json({ error: err.message ?? "Erro interno" });
+    return res.status(500).json({ error: err.message ?? "Erro interno" });
   }
 });
 

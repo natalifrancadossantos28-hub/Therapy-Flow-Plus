@@ -31,7 +31,7 @@ router.post("/contractors", async (req, res) => {
     valorPorAtendimento: Number(valorPorAtendimento) || 30,
     ...(companyId ? { companyId } : {}),
   }).returning();
-  res.status(201).json(row);
+  return res.status(201).json(row);
 });
 
 router.put("/contractors/:id", async (req, res) => {
@@ -49,7 +49,7 @@ router.put("/contractors/:id", async (req, res) => {
     .where(condition!)
     .returning();
   if (!row) return res.status(404).json({ error: "Contratante não encontrado" });
-  res.json(row);
+  return res.json(row);
 });
 
 router.delete("/contractors/:id", async (req, res) => {
