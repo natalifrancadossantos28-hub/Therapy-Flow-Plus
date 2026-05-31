@@ -6,7 +6,7 @@ import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2
+  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
@@ -29,6 +29,7 @@ import {
   getPatient,
   updateRecurrenceFrequency,
   materializeVirtualAppointment,
+  setAppointmentPaused,
   type Professional as ArcoProfessional,
 } from "@/lib/arco-rpc";
 
@@ -87,19 +88,22 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
   const virtual: T[] = [];
   for (const [, gApts] of groups) {
     const sorted = [...gApts].sort((a, b) => a.date.localeCompare(b.date));
-    const allInactive = sorted.every(a => INACTIVE_STATUSES.includes(a.status.toLowerCase()));
-    if (allInactive) continue;
+    const allTerminal = sorted.every(a => TERMINAL_STATUSES.includes(a.status.toLowerCase()));
+    if (allTerminal) continue;
+    const nonTerminalApts = sorted.filter(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase()));
     const activeApts = sorted.filter(a => !INACTIVE_STATUSES.includes(a.status.toLowerCase()));
-    const refApt = activeApts[0] ?? sorted[0];
+    const refApt = activeApts[0] ?? nonTerminalApts[0] ?? sorted[0];
     const refDow = new Date(refApt.date + "T12:00:00").getDay();
     const target = weekDates.find(d => new Date(d + "T12:00:00").getDay() === refDow);
     if (!target) continue;
     if (target < refApt.date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
 
-    // Don't project beyond the last ACTIVE appointment (respects "delete forward" and desmarcado)
-    const lastActiveDate = activeApts.length > 0 ? activeApts[activeApts.length - 1].date : sorted[sorted.length - 1].date;
-    if (target > lastActiveDate) continue;
+    // Don't project beyond the last non-terminal appointment.
+    // remanejado/remarcado/desmarcado/cancelado are point-in-time exceptions,
+    // NOT chain-breakers — recurrence continues past them.
+    const lastNonTerminalDate = nonTerminalApts.length > 0 ? nonTerminalApts[nonTerminalApts.length - 1].date : sorted[sorted.length - 1].date;
+    if (target > lastNonTerminalDate) continue;
 
     const freq = (refApt as any).frequency ?? "semanal";
     if (!isAllowedWeek(sorted[0].date, target, freq)) continue;
@@ -187,6 +191,10 @@ type Appointment = {
   consecutiveUnjustifiedAbsences?: number | null;
   prontuario?: string | null;
   notes?: string | null;
+  paused?: boolean;
+  pausedAt?: string | null;
+  pausedReason?: string | null;
+  pausedReturnDate?: string | null;
 };
 
 type AbsenceAlert = {
@@ -392,6 +400,10 @@ export default function Agenda() {
   const [remanejDone, setRemanejDone] = useState(false);
   const [excluirConfirm, setExcluirConfirm] = useState<Appointment | null>(null);
   const [excluirSending, setExcluirSending] = useState(false);
+  const [pauseModal, setPauseModal] = useState<Appointment | null>(null);
+  const [pauseReason, setPauseReason] = useState("");
+  const [pauseReturnDate, setPauseReturnDate] = useState("");
+  const [pauseSending, setPauseSending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const { toast } = useToast();
@@ -655,6 +667,42 @@ export default function Agenda() {
       toast({ title: "Falta cancelada", description: `${apt.patientName} voltou para status "Agendado".` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível cancelar a falta.", variant: "destructive" });
+    }
+  };
+
+  // ── Pausar / Despausar agendamento ──
+  const handleOpenPauseModal = (apt: Appointment) => {
+    setActionMenuId(null);
+    setPauseReason("");
+    setPauseReturnDate("");
+    setPauseModal(apt);
+  };
+
+  const confirmPause = async () => {
+    if (!pauseModal) return;
+    setPauseSending(true);
+    try {
+      await setAppointmentPaused(pauseModal.id, true, pauseReason || "Pausa temporária", pauseReturnDate || null);
+      await logNotificacao(pauseModal, "Pausa Temporária");
+      setAppointments(prev => prev.map(a => a.id === pauseModal.id ? { ...a, paused: true, pausedAt: new Date().toISOString(), pausedReason: pauseReason || "Pausa temporária", pausedReturnDate: pauseReturnDate || null } : a));
+      toast({ title: "⏸️ Pausado", description: `${pauseModal.patientName} foi pausado temporariamente.` });
+      setPauseModal(null);
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível pausar.", variant: "destructive" });
+    } finally {
+      setPauseSending(false);
+    }
+  };
+
+  const handleUnpause = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await setAppointmentPaused(apt.id, false);
+      await logNotificacao(apt, "Retorno de Pausa");
+      setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, paused: false, pausedAt: null, pausedReason: null, pausedReturnDate: null } : a));
+      toast({ title: "▶️ Retomado", description: `${apt.patientName} voltou ao status normal.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível retomar.", variant: "destructive" });
     }
   };
 
@@ -1260,6 +1308,11 @@ export default function Agenda() {
                                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
                                       {getStatusLabel(apt.status)}
                                     </span>
+                                    {apt.paused && (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
+                                        <Snowflake className="w-2.5 h-2.5" /> Pausado
+                                      </span>
+                                    )}
                                     {isDesmarcado && (
                                       <span className="text-[9px] text-orange-400 font-semibold">⚠ só esta data</span>
                                     )}
@@ -1376,6 +1429,17 @@ export default function Agenda() {
                                             })}
                                           </div>
                                         </>
+                                      )}
+
+                                      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                      {apt.paused ? (
+                                        <button style={NEON.green} onClick={() => handleUnpause(apt)}>
+                                          <Play className="w-3.5 h-3.5" /> Retomar Atendimento
+                                        </button>
+                                      ) : (
+                                        <button style={NEON.cyan} onClick={() => handleOpenPauseModal(apt)}>
+                                          <Snowflake className="w-3.5 h-3.5" /> Pausar Atendimento
+                                        </button>
                                       )}
 
                                       <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
@@ -1529,6 +1593,66 @@ export default function Agenda() {
                   {excluirSending ? "Excluindo..." : "Confirmar Exclusão"}
                 </button>
                 <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setExcluirConfirm(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Pausa Temporária ── */}
+      {pauseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,20,0.97)", border: "1px solid rgba(56,189,248,0.3)" }}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(56,189,248,0.15)", border: "1px solid #38bdf8" }}>
+                  <Snowflake className="w-5 h-5" style={{ color: "#7dd3fc" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar Atendimento</p>
+                  <p className="text-xs text-white/50">Suspender temporariamente sem cancelar</p>
+                </div>
+              </div>
+              <p className="text-sm text-white/80 mb-3">
+                <strong className="text-white">{pauseModal.patientName}</strong> — {pauseModal.date} às {pauseModal.time}.
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Motivo da Pausa</label>
+                  <input
+                    type="text"
+                    value={pauseReason}
+                    onChange={e => setPauseReason(e.target.value)}
+                    placeholder="Ex: Licença, Viagem, Transição de profissional..."
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Data de Retorno Prevista (opcional)</label>
+                  <input
+                    type="date"
+                    value={pauseReturnDate}
+                    onChange={e => setPauseReturnDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={confirmPause}
+                  disabled={pauseSending}
+                  style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: pauseSending ? 0.4 : 1, cursor: pauseSending ? "not-allowed" : "pointer" }}
+                >
+                  <Snowflake className="w-4 h-4" />
+                  {pauseSending ? "Pausando..." : "Confirmar Pausa"}
+                </button>
+                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setPauseModal(null)}>
                   Cancelar
                 </Button>
               </div>

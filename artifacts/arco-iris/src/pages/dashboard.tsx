@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   listPatients,
   listProfessionals,
@@ -8,16 +8,18 @@ import {
   getAppointmentsStats,
   listProfessionalsCapacity,
   listLongAttendancePatients,
+  listPausedOverview,
   type Patient,
   type Professional as ArcoProfessional,
   type AppointmentToday,
   type WaitingListEntry,
   type LongAttendancePatient,
+  type PausedOverviewItem,
 } from "@/lib/arco-rpc";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3 } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3, Snowflake, Clock } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
-import { cn, getStatusColor, calcIdade } from "@/lib/utils";
+import { cn, getStatusColor, calcIdade, formatDate } from "@/lib/utils";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
@@ -667,6 +669,9 @@ export default function Dashboard() {
         </Card>
       )}
 
+      {/* Pacientes Pausados — Fila + Agenda */}
+      <PausedOverviewWidget />
+
       {/* Alertas de Faltas — por profissional */}
       {absentByPatient.length > 0 && (
         <Card className="p-6 border-[rgba(255,30,90,0.3)] shadow-[0_0_24px_rgba(255,30,90,0.08)]">
@@ -696,6 +701,108 @@ export default function Dashboard() {
         </Card>
       )}
     </div>
+  );
+}
+
+// ── PausedOverviewWidget ────────────────────────────────────────────────────
+// Widget centralizado de pacientes pausados (Fila de Espera + Agenda).
+// Exibe motivo, data de retorno prevista e alertas visuais.
+
+function PausedOverviewWidget() {
+  const [items, setItems] = useState<{ fila: PausedOverviewItem[]; agenda: PausedOverviewItem[] }>({ fila: [], agenda: [] });
+  const [loading, setLoading] = useState(true);
+
+  const fetchPaused = useCallback(() => {
+    listPausedOverview()
+      .then(setItems)
+      .catch(() => setItems({ fila: [], agenda: [] }))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { fetchPaused(); }, [fetchPaused]);
+  useVisibleInterval(fetchPaused, 30_000);
+
+  const all = [...items.fila, ...items.agenda];
+  if (loading || all.length === 0) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const isNearReturn = (d: string | null) => {
+    if (!d) return false;
+    const diff = (new Date(d + "T12:00:00").getTime() - new Date(today + "T12:00:00").getTime()) / 86_400_000;
+    return diff >= 0 && diff <= 7;
+  };
+
+  return (
+    <Card className="p-6 border-sky-500/30 shadow-[0_0_24px_rgba(56,189,248,0.08)]">
+      <h2 className="text-xl font-bold font-display flex items-center gap-2 text-sky-400 mb-2" style={{ textShadow: "0 0 12px rgba(56,189,248,0.5)" }}>
+        <Snowflake className="w-5 h-5" />
+        Pacientes Pausados ({all.length})
+      </h2>
+      <p className="text-xs text-muted-foreground mb-4">
+        Consolidação de pausas na Fila de Espera (Busca Ativa) e Agenda (Pausa Temporária).
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {all.map((item) => {
+          const overdue = item.returnOverdue;
+          const near = isNearReturn(item.pausedReturnDate);
+          const borderColor = overdue ? "rgba(239,68,68,0.4)" : near ? "rgba(234,179,8,0.4)" : "rgba(56,189,248,0.2)";
+          const bgColor = overdue ? "rgba(239,68,68,0.06)" : near ? "rgba(234,179,8,0.06)" : "rgba(56,189,248,0.04)";
+
+          return (
+            <div
+              key={`${item.source}-${item.id}`}
+              className="p-4 rounded-xl flex flex-col gap-2"
+              style={{ background: bgColor, border: `1px solid ${borderColor}` }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold text-foreground text-sm">{item.patientName}</p>
+                <Badge className={cn(
+                  "text-[10px] px-1.5 py-0.5 uppercase font-bold",
+                  item.source === "fila" ? "bg-sky-500/20 text-sky-300 border border-sky-500/30" : "bg-violet-500/20 text-violet-300 border border-violet-500/30"
+                )}>
+                  {item.source === "fila" ? "Fila" : "Agenda"}
+                </Badge>
+              </div>
+
+              {item.professionalName && (
+                <p className="text-xs text-muted-foreground">
+                  Profissional: <span className="text-foreground font-medium">{item.professionalName}</span>
+                  {item.specialty && <span className="text-muted-foreground"> ({item.specialty})</span>}
+                </p>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Motivo: <span className="text-foreground font-medium">{item.pausedReason || "—"}</span>
+              </p>
+
+              {item.pausedAt && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Snowflake className="w-3 h-3 text-sky-400" />
+                  Pausado em: {formatDate(item.pausedAt)}
+                </p>
+              )}
+
+              {item.pausedReturnDate && (
+                <p className={cn("text-xs font-semibold flex items-center gap-1", overdue ? "text-red-400" : near ? "text-yellow-400" : "text-muted-foreground")}>
+                  <Clock className="w-3 h-3" />
+                  Retorno: {formatDate(item.pausedReturnDate)}
+                  {overdue && <span className="ml-1">⚠ VENCIDO</span>}
+                  {near && !overdue && <span className="ml-1">⏰ Próximo</span>}
+                </p>
+              )}
+
+              <Link href={`/patients/${item.patientId}`}>
+                <Button variant="outline" className="w-full text-xs h-8 mt-1 border-sky-500/40 text-sky-400 hover:bg-sky-500/8 hover:shadow-[0_0_14px_rgba(56,189,248,0.35)]">
+                  Ver Ficha
+                </Button>
+              </Link>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
