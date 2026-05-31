@@ -19,7 +19,7 @@ import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
   UserPlus, PhoneOff, FileCheck, Bell, MessageSquare, Copy,
-  BellRing,
+  BellRing, Undo2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
@@ -599,6 +599,25 @@ function AppointmentRow({
                 </span>
               )}
             </button>
+
+            {/* ↩ Cancelar Falta (só quando falta foi aplicada) */}
+            {(isFalta || isJustificado) && (
+              <button
+                className="h-9 px-3 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
+                style={{
+                  background: "rgba(6,182,212,0.08)",
+                  border: "1px solid rgba(6,182,212,0.40)",
+                  color: "#22d3ee",
+                  boxShadow: "0 0 8px rgba(6,182,212,0.20)",
+                }}
+                onClick={() => onStatusChange(apt.id, "agendado")}
+                disabled={isUpdating}
+                title="Cancelar Falta — voltar para Agendado"
+              >
+                <Undo2 className="w-4 h-4 inline mr-1" />
+                Cancelar Falta
+              </button>
+            )}
           </div>
         </div>
       </div>
