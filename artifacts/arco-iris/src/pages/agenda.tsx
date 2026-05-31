@@ -6,7 +6,7 @@ import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat
+  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
@@ -643,6 +643,18 @@ export default function Agenda() {
       }
     } catch {
       toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
+    }
+  };
+
+  // ── Cancelar Falta (Admin/Recepção) ──
+  const handleCancelarFalta = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "agendado");
+      await logNotificacao(apt, "Falta Cancelada");
+      toast({ title: "Falta cancelada", description: `${apt.patientName} voltou para status "Agendado".` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível cancelar a falta.", variant: "destructive" });
     }
   };
 
@@ -1313,6 +1325,14 @@ export default function Agenda() {
                                           <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
                                             <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
                                           </button>
+                                          {(isFaltaJustificada || isFaltaNaoJustificada) && (
+                                            <>
+                                              <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                              <button style={NEON.cyan} onClick={() => handleCancelarFalta(apt)}>
+                                                <Undo2 className="w-3.5 h-3.5" /> Cancelar Falta
+                                              </button>
+                                            </>
+                                          )}
                                         </>
                                       )}
 
