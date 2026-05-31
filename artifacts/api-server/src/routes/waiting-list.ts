@@ -53,6 +53,9 @@ router.get("/waiting-list", async (req, res) => {
     priority: waitingListTable.priority,
     notes: waitingListTable.notes,
     entryDate: waitingListTable.entryDate,
+    paused: waitingListTable.paused,
+    pausedAt: waitingListTable.pausedAt,
+    pausedReason: waitingListTable.pausedReason,
     createdAt: waitingListTable.createdAt,
     updatedAt: waitingListTable.updatedAt,
   })
@@ -60,7 +63,8 @@ router.get("/waiting-list", async (req, res) => {
     .leftJoin(patientsTable, eq(waitingListTable.patientId, patientsTable.id))
     .leftJoin(professionalsTable, eq(waitingListTable.professionalId, professionalsTable.id))
     .where(and(...conditions))
-    .orderBy(priorityOrder, asc(waitingListTable.entryDate));
+    // Congelados (busca ativa) sempre por ultimo; nao ocupam posicao prioritaria.
+    .orderBy(asc(waitingListTable.paused), priorityOrder, asc(waitingListTable.entryDate));
 
   res.json(rows.map(r => ({
     ...r,
@@ -162,6 +166,26 @@ router.post("/waiting-list/cleanup", async (req, res) => {
       specialty: r.specialty ?? null,
     })),
   });
+});
+
+// Busca ativa: congela/descongela uma entrada. Congelados saem da disputa por
+// vaga prioritaria sem serem removidos da fila.
+router.patch("/waiting-list/:id/pause", async (req, res) => {
+  const id = Number(req.params.id);
+  const paused = Boolean(req.body?.paused);
+  const reason = typeof req.body?.reason === "string" ? req.body.reason : null;
+
+  const [row] = await db.update(waitingListTable)
+    .set({
+      paused,
+      pausedAt: paused ? new Date() : null,
+      pausedReason: paused ? reason : null,
+    })
+    .where(eq(waitingListTable.id, id))
+    .returning();
+
+  if (!row) return res.status(404).json({ error: "Entrada não encontrada" });
+  return res.json({ id: row.id, paused: row.paused, pausedAt: row.pausedAt, pausedReason: row.pausedReason });
 });
 
 router.put("/waiting-list/:id", async (req, res) => {

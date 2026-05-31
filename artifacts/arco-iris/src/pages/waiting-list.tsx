@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-custom";
-import { Trash2, ListTodo, ListPlus } from "lucide-react";
+import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate } from "@/lib/utils";
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import {
   listWaitingList,
   deleteWaitingListEntry,
+  setWaitingListPaused,
   addPatientToFila,
   listPatients,
   syncWaitingListWithAgenda,
@@ -177,26 +178,68 @@ export default function WaitingList() {
     }
   };
 
+  const handlePause = async (entry: WaitingListEntry) => {
+    const reason = prompt(
+      `Congelar ${entry.patientName} para busca ativa?\n\nMotivo (opcional):`,
+      "Busca ativa"
+    );
+    if (reason === null) return; // cancelou
+    try {
+      await setWaitingListPaused(entry.id, true, reason.trim() || "Busca ativa");
+      setWaitingList(prev => prev.map(e =>
+        e.id === entry.id
+          ? { ...e, paused: true, pausedAt: new Date().toISOString(), pausedReason: reason.trim() || "Busca ativa" }
+          : e
+      ));
+      toast({ title: "🔵 Em busca ativa", description: `${entry.patientName} saiu da disputa por vaga prioritária.` });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message || "Falha ao congelar.", variant: "destructive" });
+    }
+  };
+
+  const handleUnpause = async (entry: WaitingListEntry) => {
+    try {
+      await setWaitingListPaused(entry.id, false);
+      setWaitingList(prev => prev.map(e =>
+        e.id === entry.id ? { ...e, paused: false, pausedAt: null, pausedReason: null } : e
+      ));
+      toast({ title: "Descongelado", description: `${entry.patientName} voltou à fila na posição original.` });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message || "Falha ao descongelar.", variant: "destructive" });
+    }
+  };
+
+  // Pacientes em busca ativa (congelados) saem da disputa por vaga prioritaria.
+  const activeList = waitingList.filter(e => !e.paused);
+  const pausedList = waitingList.filter(e => e.paused);
+
   // Server ja retorna ORDER BY (score_clinico_100 + score_social) DESC (Fase 5C).
   // Aqui so calculamos a posicao dentro de cada especialidade preservando a ordem recebida.
+  // A numeracao considera apenas os pacientes ativos (congelados nao ocupam posicao).
   const perSpecialtyPosition = new Map<number, number>();
   const specialtyOptions: string[] = [];
   {
-    const counters = new Map<string, number>();
+    const seen = new Set<string>();
     for (const entry of waitingList) {
       const sp: string = entry.specialty ?? "__null__";
-      if (!counters.has(sp)) { counters.set(sp, 0); specialtyOptions.push(sp); }
+      if (!seen.has(sp)) { seen.add(sp); specialtyOptions.push(sp); }
+    }
+    const counters = new Map<string, number>();
+    for (const entry of activeList) {
+      const sp: string = entry.specialty ?? "__null__";
       const next = (counters.get(sp) ?? 0) + 1;
       counters.set(sp, next);
       perSpecialtyPosition.set(entry.id, next);
     }
   }
 
-  const displayList = waitingList.filter(entry => {
+  const matchesFilter = (entry: WaitingListEntry) => {
     if (filterSpecialty === "__all__") return true;
     const sp: string = entry.specialty ?? "__null__";
     return sp === filterSpecialty;
-  });
+  };
+  const displayList = activeList.filter(matchesFilter);
+  const displayPausedList = pausedList.filter(matchesFilter);
 
   return (
     <div className="space-y-8">
@@ -265,7 +308,7 @@ export default function WaitingList() {
             <tbody>
               {isLoading ? (
                 <tr><td colSpan={7} className="text-center py-12 animate-pulse">Carregando fila...</td></tr>
-              ) : waitingList.length === 0 ? (
+              ) : activeList.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-16">
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
@@ -377,13 +420,24 @@ export default function WaitingList() {
                       </td>
                       <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
                       <td className="px-6 py-4 text-right">
-                        <Button
-                          variant="ghost"
-                          className="text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
-                          onClick={() => handleRemove(entry.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            title="Congelar (busca ativa) — tira da disputa por vaga sem remover"
+                            className="text-sky-400 hover:bg-sky-400/10 h-8 w-8 p-0"
+                            onClick={() => handlePause(entry)}
+                          >
+                            <Snowflake className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            title="Remover da fila"
+                            className="text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                            onClick={() => handleRemove(entry.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -393,6 +447,88 @@ export default function WaitingList() {
           </table>
         </div>
       </Card>
+
+      {pausedList.length > 0 && (
+        <Card className="p-0 overflow-hidden border-sky-500/30">
+          <div className="flex items-center gap-2 px-6 py-4 bg-sky-500/10 border-b border-sky-500/20">
+            <Search className="w-4 h-4 text-sky-400" />
+            <h2 className="text-sm font-bold uppercase tracking-wide text-sky-300">
+              Em Busca Ativa ({pausedList.length})
+            </h2>
+            <span className="text-xs text-muted-foreground">
+              Congelados — fora da disputa por vaga prioritária. Descongele para voltar à posição original.
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
+                <tr>
+                  <th className="px-6 py-4">Paciente</th>
+                  <th className="px-6 py-4">Especialidade</th>
+                  <th className="px-6 py-4">Motivo</th>
+                  <th className="px-6 py-4">Congelado em</th>
+                  <th className="px-6 py-4 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayPausedList.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                      Nenhum paciente em busca ativa nesta especialidade.
+                    </td>
+                  </tr>
+                ) : (
+                  displayPausedList.map((entry) => (
+                    <tr key={entry.id} className="border-b border-border hover:bg-secondary/20 transition-colors opacity-90">
+                      <td className="px-6 py-4 font-semibold text-foreground">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Snowflake className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                          {entry.patientName}
+                          {entry.specialty && (() => {
+                            const tone = specialtyTone(entry.specialty);
+                            return (
+                              <span
+                                className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md leading-none"
+                                style={{ background: tone.bg, color: tone.fg, border: `1px solid ${tone.border}` }}
+                              >
+                                {specialtyShortLabel(entry.specialty)}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">
+                          {entry.patientProntuario || `#${String(entry.patientId).padStart(4, "0")}`}
+                        </div>
+                        {entry.patientPhone && (
+                          <div className="text-xs text-muted-foreground font-normal mt-0.5">{entry.patientPhone}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {entry.specialty || "Qualquer especialidade"}
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground italic">
+                        {entry.pausedReason || "Busca ativa"}
+                      </td>
+                      <td className="px-6 py-4 font-medium">
+                        {entry.pausedAt ? formatDate(entry.pausedAt) : "—"}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          variant="outline"
+                          className="h-8 gap-1.5 text-xs border-sky-500/40 text-sky-300 hover:bg-sky-500/10"
+                          onClick={() => handleUnpause(entry)}
+                        >
+                          <Undo2 className="w-3.5 h-3.5" /> Descongelar
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {isDialogOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">

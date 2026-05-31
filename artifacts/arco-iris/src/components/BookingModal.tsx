@@ -14,6 +14,7 @@ type WaitingEntry = {
   specialty?: string | null;
   notes?: string | null;
   referringProfessional?: string | null;
+  paused?: boolean | null;
 };
 
 type Props = {
@@ -104,6 +105,7 @@ export default function BookingModal({
         specialty: e.specialty ?? null,
         notes: e.notes ?? null,
         referringProfessional: e.professionalName ?? null,
+        paused: e.paused ?? false,
       })));
     } catch (err) { console.error(err); }
 
@@ -179,7 +181,8 @@ export default function BookingModal({
     };
   }, [loadData]);
 
-  const matchedBySpec = waitingList.filter(e => matchesSpecialty(e.specialty, professionalSpecialty));
+  // Pacientes em busca ativa (congelados) nao entram na disputa por vaga.
+  const matchedBySpec = waitingList.filter(e => !e.paused && matchesSpecialty(e.specialty, professionalSpecialty));
   // Filtro de Disponibilidade: remove pacientes já agendados neste horário com outro profissional.
   // No Portal do Profissional (adminMode=false) também remove quem já tem horário com ESTE profissional.
   const filteredList = matchedBySpec.filter(e => {

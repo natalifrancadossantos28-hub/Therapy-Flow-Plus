@@ -769,6 +769,12 @@ export type WaitingListEntry = {
   ageBonus?: number | null;
   /** Data de nascimento do paciente (ISO). */
   dateOfBirth?: string | null;
+  /** Busca ativa: paciente congelado, fora da disputa por vaga prioritária. */
+  paused?: boolean | null;
+  /** Quando foi congelado (ISO). */
+  pausedAt?: string | null;
+  /** Motivo do congelamento (ex.: "busca ativa"). */
+  pausedReason?: string | null;
 };
 
 export async function listWaitingList(opts?: {
@@ -819,6 +825,28 @@ export async function deleteWaitingListEntry(id: number): Promise<void> {
     p_id: id,
   });
   if (error) throw error;
+}
+
+/**
+ * Congela (busca ativa) ou descongela uma entrada da fila. Entradas congeladas
+ * saem da disputa por vaga prioritária mas continuam na fila com o histórico.
+ */
+export async function setWaitingListPaused(
+  id: number,
+  paused: boolean,
+  reason?: string | null
+): Promise<{ id: number; paused: boolean; pausedAt: string | null; pausedReason: string | null }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("set_waiting_list_paused", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_paused: paused,
+    p_reason: reason ?? null,
+  });
+  if (error) throw error;
+  return data as { id: number; paused: boolean; pausedAt: string | null; pausedReason: string | null };
 }
 
 export async function syncWaitingListWithAgenda(): Promise<{
