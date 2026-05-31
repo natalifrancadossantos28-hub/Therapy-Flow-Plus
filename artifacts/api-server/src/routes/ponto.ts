@@ -46,7 +46,7 @@ function effectiveExitMinutes(exitTime: string, breakMinutes: number): number {
 router.post("/ponto/auth/master", (req, res) => {
   const { password } = req.body;
   if (password === MASTER_PASSWORD) return res.json({ ok: true });
-  res.status(401).json({ error: "Senha master incorreta." });
+  return res.status(401).json({ error: "Senha master incorreta." });
 });
 
 router.post("/ponto/auth/company", async (req, res) => {
@@ -58,7 +58,7 @@ router.post("/ponto/auth/company", async (req, res) => {
     return res.status(401).json({ error: "Empresa ou senha incorretos." });
   }
   const { adminPassword: _, ...safeCompany } = company;
-  res.json(safeCompany);
+  return res.json(safeCompany);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -82,7 +82,7 @@ router.get("/ponto/companies", async (req, res) => {
     createdAt: pontoCompaniesTable.createdAt,
     employeeCount: sql<number>`(SELECT COUNT(*)::int FROM ponto_employees WHERE company_id = ponto_companies.id)`,
   }).from(pontoCompaniesTable).orderBy(pontoCompaniesTable.name);
-  res.json(rows);
+  return res.json(rows);
 });
 
 router.post("/ponto/companies", async (req, res) => {
@@ -105,7 +105,7 @@ router.post("/ponto/companies", async (req, res) => {
     moduleArcoIris: moduleArcoIris !== undefined ? Boolean(moduleArcoIris) : false,
   }).returning();
   const { adminPassword: _, ...safe } = row;
-  res.status(201).json(safe);
+  return res.status(201).json(safe);
 });
 
 router.put("/ponto/companies/:id", async (req, res) => {
@@ -127,7 +127,7 @@ router.put("/ponto/companies/:id", async (req, res) => {
   const [row] = await db.update(pontoCompaniesTable).set(upd).where(eq(pontoCompaniesTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Empresa não encontrada." });
   const { adminPassword: _, ...safe } = row;
-  res.json(safe);
+  return res.json(safe);
 });
 
 router.delete("/ponto/companies/:id", async (req, res) => {
@@ -140,7 +140,7 @@ router.delete("/ponto/companies/:id", async (req, res) => {
   }
   await db.delete(pontoEmployeesTable).where(eq(pontoEmployeesTable.companyId, id));
   await db.delete(pontoCompaniesTable).where(eq(pontoCompaniesTable.id, id));
-  res.status(204).send();
+  return res.status(204).send();
 });
 
 // Public: get company by slug (used by kiosk)
@@ -154,7 +154,7 @@ router.get("/ponto/companies/slug/:slug", async (req, res) => {
   }).from(pontoCompaniesTable)
     .where(and(eq(pontoCompaniesTable.slug, req.params.slug), eq(pontoCompaniesTable.active, true)));
   if (!company) return res.status(404).json({ error: "Empresa não encontrada." });
-  res.json(company);
+  return res.json(company);
 });
 
 // Company settings (company admin or master)
@@ -174,7 +174,7 @@ router.get("/ponto/companies/:id/settings", async (req, res) => {
     logoUrl: pontoCompaniesTable.logoUrl,
   }).from(pontoCompaniesTable).where(eq(pontoCompaniesTable.id, id));
   if (!row) return res.status(404).json({ error: "Empresa não encontrada." });
-  res.json(row);
+  return res.json(row);
 });
 
 router.put("/ponto/companies/:id/settings", async (req, res) => {
@@ -193,7 +193,7 @@ router.put("/ponto/companies/:id/settings", async (req, res) => {
   const [row] = await db.update(pontoCompaniesTable).set(upd).where(eq(pontoCompaniesTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Empresa não encontrada." });
   const { adminPassword: _, ...safe } = row;
-  res.json(safe);
+  return res.json(safe);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -208,7 +208,7 @@ router.get("/ponto/employees", async (req, res) => {
         .where(eq(pontoEmployeesTable.companyId, companyId))
         .orderBy(pontoEmployeesTable.name)
     : await db.select().from(pontoEmployeesTable).orderBy(pontoEmployeesTable.name);
-  res.json(rows);
+  return res.json(rows);
 });
 
 router.post("/ponto/employees", async (req, res) => {
@@ -236,7 +236,7 @@ router.post("/ponto/employees", async (req, res) => {
     exitTime: exitTime ?? null,
     breakMinutes: breakMinutes !== undefined ? Number(breakMinutes) : 60,
   }).returning();
-  res.status(201).json(row);
+  return res.status(201).json(row);
 });
 
 router.get("/ponto/employees/cpf/:cpf", async (req, res) => {
@@ -247,7 +247,7 @@ router.get("/ponto/employees/cpf/:cpf", async (req, res) => {
     : eq(pontoEmployeesTable.cpf, cpf);
   const [row] = await db.select().from(pontoEmployeesTable).where(condition);
   if (!row) return res.status(404).json({ error: "Funcionário não encontrado" });
-  res.json(row);
+  return res.json(row);
 });
 
 router.get("/ponto/employees/:id", async (req, res) => {
@@ -258,7 +258,7 @@ router.get("/ponto/employees/:id", async (req, res) => {
     : eq(pontoEmployeesTable.id, id);
   const [row] = await db.select().from(pontoEmployeesTable).where(condition);
   if (!row) return res.status(404).json({ error: "Funcionário não encontrado" });
-  res.json(row);
+  return res.json(row);
 });
 
 router.put("/ponto/employees/:id", async (req, res) => {
@@ -283,7 +283,7 @@ router.put("/ponto/employees/:id", async (req, res) => {
     .where(and(eq(pontoEmployeesTable.id, id), eq(pontoEmployeesTable.companyId, companyId)))
     .returning();
   if (!row) return res.status(404).json({ error: "Funcionário não encontrado" });
-  res.json(row);
+  return res.json(row);
 });
 
 router.delete("/ponto/employees/:id", async (req, res) => {
@@ -295,7 +295,7 @@ router.delete("/ponto/employees/:id", async (req, res) => {
   await db.delete(pontoRecordsTable).where(eq(pontoRecordsTable.employeeId, id));
   await db.delete(pontoEmployeesTable)
     .where(and(eq(pontoEmployeesTable.id, id), eq(pontoEmployeesTable.companyId, companyId)));
-  res.status(204).send();
+  return res.status(204).send();
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -498,7 +498,7 @@ router.post("/ponto/records", async (req, res) => {
     date,
   }).returning();
 
-  res.status(201).json({
+  return res.status(201).json({
     ...row,
     employeeName: employee.name,
     employeePhoto: employee.photo ?? null,

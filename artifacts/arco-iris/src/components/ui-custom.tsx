@@ -19,8 +19,8 @@ export const MotionCard = ({ className, children, ...props }: HTMLMotionProps<"d
   </motion.div>
 );
 
-export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost" | "destructive" | "secondary" }>(
-  ({ className, variant = "default", ...props }, ref) => {
+export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost" | "destructive" | "secondary"; size?: "default" | "sm" | "lg" | "icon" }>(
+  ({ className, variant = "default", size = "default", ...props }, ref) => {
     const variants = {
       default: "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground border-primary/50 hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(0,240,255,0.45),0_0_40px_rgba(0,240,255,0.15)]",
       outline: "bg-transparent border-2 border-primary/60 text-primary hover:bg-primary/8 hover:border-primary hover:shadow-[0_0_16px_rgba(0,240,255,0.4),0_0_30px_rgba(0,240,255,0.12)]",
@@ -28,11 +28,18 @@ export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttrib
       destructive: "bg-destructive/15 text-destructive border-destructive/40 hover:bg-destructive/20 hover:shadow-[0_0_16px_rgba(255,30,90,0.4)]",
       secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 border-secondary/50",
     };
+    const sizes = {
+      default: "px-4 py-2 text-sm",
+      sm: "px-3 py-1.5 text-xs",
+      lg: "px-8 py-2.5 text-sm",
+      icon: "h-9 w-9",
+    };
     return (
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none border",
+          "inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none border",
+          sizes[size],
           variants[variant],
           className
         )}

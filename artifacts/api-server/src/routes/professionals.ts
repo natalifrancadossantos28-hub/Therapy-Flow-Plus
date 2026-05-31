@@ -42,7 +42,7 @@ router.post("/professionals/:id/verify-pin", async (req, res) => {
   if (!prof) return res.status(404).json({ error: "Profissional não encontrado" });
   if (!prof.pin) return res.status(400).json({ error: "PIN não configurado para este profissional" });
   if (prof.pin !== String(pin)) return res.status(401).json({ error: "PIN incorreto" });
-  res.json({ ok: true });
+  return res.json({ ok: true });
 });
 
 const INACTIVE = ["Alta", "Óbito", "Desistência"];
@@ -89,7 +89,7 @@ router.get("/professionals/:id", async (req, res) => {
   const id = Number(req.params.id);
   const [row] = await db.select().from(professionalsTable).where(eq(professionalsTable.id, id));
   if (!row) return res.status(404).json({ error: "Professional not found" });
-  res.json(row);
+  return res.json(row);
 });
 
 router.put("/professionals/:id", async (req, res) => {
@@ -110,7 +110,7 @@ router.put("/professionals/:id", async (req, res) => {
   if (salario !== undefined) updateData.salario = salario != null ? Number(salario) : null;
   const [row] = await db.update(professionalsTable).set(updateData).where(eq(professionalsTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Professional not found" });
-  res.json(row);
+  return res.json(row);
 });
 
 router.delete("/professionals/:id", async (req, res) => {
@@ -130,7 +130,7 @@ router.get("/professionals/:id/capacity", async (req, res) => {
   const count = activePatients[0]?.count ?? 0;
   const maxCapacity = getMaxCapacity(prof.cargaHoraria ?? "30h");
 
-  res.json({
+  return res.json({
     professionalId: id,
     professionalName: prof.name,
     cargaHoraria: prof.cargaHoraria ?? "30h",

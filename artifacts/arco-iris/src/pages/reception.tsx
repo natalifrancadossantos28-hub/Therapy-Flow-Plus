@@ -694,7 +694,7 @@ export default function Reception() {
     return () => {
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
       if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
-      void supabase.removeChannel(channel);
+      void supabase?.removeChannel(channel);
     };
   }, [reloadAppointments, scheduleReload]);
 

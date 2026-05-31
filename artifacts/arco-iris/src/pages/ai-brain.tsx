@@ -81,7 +81,7 @@ function ResumoTab({ data }: { data: Record<string, unknown> }) {
         <Brain className="w-6 h-6 text-violet-400 mt-0.5 shrink-0" />
         <div>
           <p className="text-sm text-zinc-200">{analysis.saudacao as string}</p>
-          {analysis.statusGeral && (
+          {!!analysis.statusGeral && (
             <div className="mt-2"><StatusBadge status={analysis.statusGeral as string} /></div>
           )}
         </div>
@@ -158,8 +158,8 @@ function FilaTab({ data }: { data: Record<string, unknown> }) {
 
       {metricas && (
         <div className="grid grid-cols-3 gap-3">
-          {metricas.tempoMedioEspera && <MiniCard icon={CalendarClock} label="Tempo Médio" value={String(metricas.tempoMedioEspera)} />}
-          {metricas.especialidadeMaisDemandada && <MiniCard icon={Zap} label="Mais Demandada" value={String(metricas.especialidadeMaisDemandada)} />}
+          {!!metricas.tempoMedioEspera && <MiniCard icon={CalendarClock} label="Tempo Médio" value={String(metricas.tempoMedioEspera)} />}
+          {!!metricas.especialidadeMaisDemandada && <MiniCard icon={Zap} label="Mais Demandada" value={String(metricas.especialidadeMaisDemandada)} />}
           {metricas.pacientesUrgentes != null && <MiniCard icon={AlertTriangle} label="Urgentes" value={String(metricas.pacientesUrgentes)} />}
         </div>
       )}
@@ -207,7 +207,7 @@ function ChurnTab({ data }: { data: Record<string, unknown> }) {
 
       {metricas && (
         <div className="grid grid-cols-3 gap-3">
-          {metricas.taxaPresencaMedia && <MiniCard icon={TrendingUp} label="Presença Média" value={String(metricas.taxaPresencaMedia)} />}
+          {!!metricas.taxaPresencaMedia && <MiniCard icon={TrendingUp} label="Presença Média" value={String(metricas.taxaPresencaMedia)} />}
           {metricas.pacientesEmRisco != null && <MiniCard icon={AlertTriangle} label="Em Risco" value={String(metricas.pacientesEmRisco)} />}
           {metricas.pacientesSemAgendamento30dias != null && <MiniCard icon={CalendarClock} label="Sem Agenda 30d" value={String(metricas.pacientesSemAgendamento30dias)} />}
         </div>
@@ -350,7 +350,7 @@ function SaudeTab({ data }: { data: Record<string, unknown> }) {
         <HeartPulse className="w-6 h-6 text-emerald-400 mt-0.5 shrink-0" />
         <div>
           <p className="text-sm text-zinc-200">{analysis.resumo as string}</p>
-          {analysis.saude && <div className="mt-2"><StatusBadge status={analysis.saude as string} /></div>}
+          {!!analysis.saude && <div className="mt-2"><StatusBadge status={analysis.saude as string} /></div>}
         </div>
       </div>
 

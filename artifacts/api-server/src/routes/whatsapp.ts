@@ -67,8 +67,8 @@ router.get("/atestados", (req, res) => {
   try {
     if (!fs.existsSync(ATESTADOS_FILE)) return res.json([]);
     const lista = JSON.parse(fs.readFileSync(ATESTADOS_FILE, "utf8"));
-    res.json(lista.filter((a: any) => !a.processado));
-  } catch { res.json([]); }
+    return res.json(lista.filter((a: any) => !a.processado));
+  } catch { return res.json([]); }
 });
 
 const CONTATOS_FILE = "/tmp/contatos_nfs.json";
@@ -83,8 +83,8 @@ router.get("/contatos", (req, res) => {
       if (aK !== bK) return bK ? 1 : -1;
       return (a.label || "").localeCompare(b.label || "");
     });
-    res.json(lista);
-  } catch { res.json([]); }
+    return res.json(lista);
+  } catch { return res.json([]); }
 });
 
 router.post("/identificar-contato", async (req, res) => {

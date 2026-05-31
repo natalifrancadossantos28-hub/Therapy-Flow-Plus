@@ -92,7 +92,7 @@ export default function NotificationBell() {
       )
       .subscribe();
     return () => {
-      void supabase.removeChannel(channel);
+      void supabase?.removeChannel(channel);
     };
   }, [reload]);
 

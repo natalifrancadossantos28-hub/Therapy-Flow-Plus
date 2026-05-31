@@ -112,7 +112,7 @@ export default function AgendaMensal() {
       .subscribe();
     return () => {
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
-      void supabase.removeChannel(channel);
+      void supabase?.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profFilter, monthRef]);

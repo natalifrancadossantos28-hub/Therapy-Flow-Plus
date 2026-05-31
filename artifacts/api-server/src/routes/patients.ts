@@ -112,7 +112,7 @@ router.get("/patients/:id", async (req, res) => {
   const id = Number(req.params.id);
   const [row] = await db.select().from(patientsTable).where(eq(patientsTable.id, id));
   if (!row) return res.status(404).json({ error: "Patient not found" });
-  res.json(row);
+  return res.json(row);
 });
 
 router.put("/patients/:id", async (req, res) => {
@@ -152,7 +152,7 @@ router.put("/patients/:id", async (req, res) => {
 
   const [row] = await db.update(patientsTable).set(updateData).where(eq(patientsTable.id, id)).returning();
   if (!row) return res.status(404).json({ error: "Patient not found" });
-  res.json(row);
+  return res.json(row);
 });
 
 router.delete("/patients/:id", async (req, res) => {
@@ -219,7 +219,7 @@ router.post("/patients/:id/add-to-fila", async (req, res) => {
     .set({ status: "Fila de Espera" })
     .where(eq(patientsTable.id, id));
 
-  res.status(201).json({
+  return res.status(201).json({
     ...entry,
     priority,
     patientName: patient.name,
@@ -244,7 +244,7 @@ router.get("/patients/:id/absences", async (req, res) => {
     .from(appointmentsTable)
     .where(and(eq(appointmentsTable.patientId, id), eq(appointmentsTable.status, "ausente")));
 
-  res.json({
+  return res.json({
     patientId: id,
     patientName: patient.name,
     absenceCount: patient.absenceCount,
@@ -275,7 +275,7 @@ router.get("/patients/:id/pdf", async (req, res) => {
     .orderBy(sql`date desc`)
     .limit(1);
 
-  res.json({
+  return res.json({
     patient,
     professional,
     absenceCount: patient.absenceCount,

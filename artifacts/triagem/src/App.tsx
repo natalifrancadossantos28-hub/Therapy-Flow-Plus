@@ -275,6 +275,7 @@ function triSalvaToFormData(t: TriagemSalva): FormData {
     tipoEscola: t.tipoEscola || "", trabalhoPais: t.trabalhoPais || "",
     outroAtendimento: t.outroAtendimento !== false,
     abrigoCasaCrianca: !!t.abrigoCasaCrianca,
+    cognitivoNaoPreservado: false,
     localAtendimento: t.localAtendimento || "",
     tipoRegistro: t.tipoRegistro || "Paciente da Unidade",
     profissional: t.profissional || "", especialidade: t.especialidade || "",
@@ -479,7 +480,7 @@ function Formulario({ onSubmit, initialData, noHeader }: { onSubmit: (f: FormDat
       tipoEscola, trabalhoPais, outroAtendimento,
       abrigoCasaCrianca, cognitivoNaoPreservado,
       localAtendimento, tipoRegistro,
-      profissional,
+      profissional, especialidade: "",
     });
   };
 

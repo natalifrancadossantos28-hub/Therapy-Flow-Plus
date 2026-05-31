@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { waitingListTable, patientsTable, professionalsTable } from "@workspace/db";
-import { eq, and, asc, sql } from "drizzle-orm";
+import { waitingListTable, patientsTable, professionalsTable, appointmentsTable } from "@workspace/db";
+import { eq, and, asc, inArray, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -11,6 +11,21 @@ function getCompanyId(req: any): number | null {
   const n = Number(h);
   return isNaN(n) ? null : n;
 }
+
+function todaySaoPaulo(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+// Statuses that mean the appointment no longer occupies an active agenda slot.
+const INACTIVE_STATUSES = [
+  "desmarcado", "cancelado", "alta", "falta", "falta_justificada",
+  "falta_nao_justificada", "ausente", "desistência", "desistencia", "óbito",
+];
 
 const priorityOrder = sql`CASE priority WHEN 'elevado' THEN 1 WHEN 'alta' THEN 1 WHEN 'moderado' THEN 2 WHEN 'media' THEN 2 WHEN 'leve' THEN 3 WHEN 'baixo' THEN 4 WHEN 'baixa' THEN 4 ELSE 5 END`;
 
@@ -93,11 +108,59 @@ router.post("/waiting-list", async (req, res) => {
   const patientInfo = await db.select({ name: patientsTable.name, phone: patientsTable.phone })
     .from(patientsTable).where(eq(patientsTable.id, row.patientId));
 
-  res.status(201).json({
+  return res.status(201).json({
     ...row,
     patientName: patientInfo[0]?.name ?? "",
     patientPhone: patientInfo[0]?.phone ?? null,
     specialty: row.specialty ?? null,
+  });
+});
+
+// Limpeza da fila de espera: remove pacientes que já estão na agenda, ou seja,
+// que possuem um agendamento ativo e futuro na mesma especialidade.
+router.post("/waiting-list/cleanup", async (req, res) => {
+  const companyId = getCompanyId(req);
+  const today = todaySaoPaulo();
+
+  const conditions = [];
+  if (companyId) conditions.push(eq(waitingListTable.companyId, companyId));
+
+  const hasActiveAppointment = sql`EXISTS (
+    SELECT 1 FROM ${appointmentsTable} a
+      JOIN ${professionalsTable} p ON p.id = a.professional_id AND p.company_id = a.company_id
+     WHERE a.patient_id = ${waitingListTable.patientId}
+       AND a.company_id = ${waitingListTable.companyId}
+       AND a."date" >= ${today}
+       AND lower(coalesce(a.status, 'agendado')) NOT IN (${sql.join(INACTIVE_STATUSES.map((s) => sql`${s}`), sql`, `)})
+       AND (
+         ${waitingListTable.specialty} IS NULL
+         OR lower(btrim(coalesce(p.specialty, ''))) = lower(btrim(coalesce(${waitingListTable.specialty}, '')))
+       )
+  )`;
+
+  const toRemove = await db.select({
+    id: waitingListTable.id,
+    patientId: waitingListTable.patientId,
+    patientName: patientsTable.name,
+    specialty: waitingListTable.specialty,
+  })
+    .from(waitingListTable)
+    .leftJoin(patientsTable, eq(waitingListTable.patientId, patientsTable.id))
+    .where(and(...conditions, hasActiveAppointment));
+
+  if (toRemove.length > 0) {
+    await db.delete(waitingListTable).where(inArray(waitingListTable.id, toRemove.map((r) => r.id)));
+  }
+
+  return res.json({
+    ok: true,
+    removed: toRemove.length,
+    patients: toRemove.map((r) => ({
+      id: r.id,
+      patientId: r.patientId,
+      patientName: r.patientName ?? "",
+      specialty: r.specialty ?? null,
+    })),
   });
 });
 
@@ -115,7 +178,7 @@ router.put("/waiting-list/:id", async (req, res) => {
   const patient = await db.select({ name: patientsTable.name, phone: patientsTable.phone })
     .from(patientsTable).where(eq(patientsTable.id, row.patientId));
 
-  res.json({
+  return res.json({
     ...row,
     patientName: patient[0]?.name ?? "",
     patientPhone: patient[0]?.phone ?? null,

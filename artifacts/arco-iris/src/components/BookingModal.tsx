@@ -175,7 +175,7 @@ export default function BookingModal({
       .subscribe();
     return () => {
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
-      void supabase.removeChannel(channel);
+      void supabase?.removeChannel(channel);
     };
   }, [loadData]);
 

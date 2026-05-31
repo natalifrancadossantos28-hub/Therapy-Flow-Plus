@@ -30,7 +30,7 @@ router.post("/colaboradores", async (req, res) => {
     salario: Number(salario) || 0,
     ...(companyId ? { companyId } : {}),
   }).returning();
-  res.status(201).json(row);
+  return res.status(201).json(row);
 });
 
 router.put("/colaboradores/:id", async (req, res) => {
@@ -46,7 +46,7 @@ router.put("/colaboradores/:id", async (req, res) => {
     .where(condition!)
     .returning();
   if (!row) return res.status(404).json({ error: "Colaborador não encontrado" });
-  res.json(row);
+  return res.json(row);
 });
 
 router.delete("/colaboradores/:id", async (req, res) => {
