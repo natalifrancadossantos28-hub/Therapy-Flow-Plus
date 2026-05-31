@@ -92,19 +92,22 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
   const virtual: T[] = [];
   for (const [, gApts] of groups) {
     const sorted = [...gApts].sort((a, b) => a.date.localeCompare(b.date));
-    const allInactive = sorted.every(a => INACTIVE_STATUSES.includes(a.status.toLowerCase()));
-    if (allInactive) continue;
+    const allTerminal = sorted.every(a => TERMINAL_STATUSES.includes(a.status.toLowerCase()));
+    if (allTerminal) continue;
+    const nonTerminalApts = sorted.filter(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase()));
     const activeApts = sorted.filter(a => !INACTIVE_STATUSES.includes(a.status.toLowerCase()));
-    const refApt = activeApts[0] ?? sorted[0];
+    const refApt = activeApts[0] ?? nonTerminalApts[0] ?? sorted[0];
     const refDow = new Date(refApt.date + "T12:00:00").getDay();
     const target = weekDates.find(d => new Date(d + "T12:00:00").getDay() === refDow);
     if (!target) continue;
     if (target < refApt.date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
 
-    // Don't project beyond the last ACTIVE appointment (respects "delete forward" and desmarcado)
-    const lastActiveDate = activeApts.length > 0 ? activeApts[activeApts.length - 1].date : sorted[sorted.length - 1].date;
-    if (target > lastActiveDate) continue;
+    // Don't project beyond the last non-terminal appointment.
+    // remanejado/remarcado/desmarcado/cancelado are point-in-time exceptions,
+    // NOT chain-breakers — recurrence continues past them.
+    const lastNonTerminalDate = nonTerminalApts.length > 0 ? nonTerminalApts[nonTerminalApts.length - 1].date : sorted[sorted.length - 1].date;
+    if (target > lastNonTerminalDate) continue;
 
     const freq = (refApt as any).frequency ?? "semanal";
     if (!isAllowedWeek(sorted[0].date, target, freq)) continue;
