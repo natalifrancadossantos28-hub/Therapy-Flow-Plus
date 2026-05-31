@@ -47,6 +47,15 @@ function getWeekDays(ref: Date): Date[] {
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
 const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
 
+/** Abbreviate long names: "Isis Godinho Lima" → "Isis G. L." */
+function abbreviateName(name: string | undefined | null, maxLen = 18): string {
+  if (!name) return "";
+  if (name.length <= maxLen) return name;
+  const parts = name.trim().split(/\s+/);
+  if (parts.length <= 1) return name.slice(0, maxLen);
+  return parts[0] + " " + parts.slice(1).map(p => p[0]?.toUpperCase() + ".").join(" ");
+}
+
 /** Deterministic negative ID for virtual appointments so menus stay open across re-renders. */
 function stableVirtualId(date: string, time: string, patientId: number, groupId: string): number {
   let h = 0;
@@ -92,18 +101,22 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (allTerminal) continue;
     const nonTerminalApts = sorted.filter(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase()));
     const activeApts = sorted.filter(a => !INACTIVE_STATUSES.includes(a.status.toLowerCase()));
-    const refApt = activeApts[0] ?? nonTerminalApts[0] ?? sorted[0];
+    // "Schedule reference" = active OR remanejado (definitivo). Excludes remarcado (pontual).
+    const PONTUAL_STATUSES = ["remarcado", "desmarcado", "cancelado"];
+    const scheduleRefApts = nonTerminalApts.filter(a => !PONTUAL_STATUSES.includes(a.status.toLowerCase()));
+    // Use LAST schedule-reference appointment for day/time so remanejamentos propagate forward.
+    const refApt = scheduleRefApts.at(-1) ?? activeApts.at(-1) ?? nonTerminalApts.at(-1) ?? sorted.at(-1)!;
     const refDow = new Date(refApt.date + "T12:00:00").getDay();
     const target = weekDates.find(d => new Date(d + "T12:00:00").getDay() === refDow);
     if (!target) continue;
-    if (target < refApt.date) continue;
+    if (target < (activeApts[0] ?? nonTerminalApts[0] ?? sorted[0]).date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
 
-    // Don't project beyond the last non-terminal appointment.
-    // remanejado/remarcado/desmarcado/cancelado are point-in-time exceptions,
-    // NOT chain-breakers — recurrence continues past them.
-    const lastNonTerminalDate = nonTerminalApts.length > 0 ? nonTerminalApts[nonTerminalApts.length - 1].date : sorted[sorted.length - 1].date;
-    if (target > lastNonTerminalDate) continue;
+    // Allow projection up to 4 weeks beyond the last schedule-reference appointment.
+    const lastRefDate = (scheduleRefApts.at(-1) ?? nonTerminalApts.at(-1) ?? sorted.at(-1)!).date;
+    const lastRefMs = new Date(lastRefDate + "T12:00:00").getTime();
+    const targetMs = new Date(target + "T12:00:00").getTime();
+    if (targetMs > lastRefMs + 28 * 86_400_000) continue;
 
     const freq = (refApt as any).frequency ?? "semanal";
     if (!isAllowedWeek(sorted[0].date, target, freq)) continue;
@@ -111,7 +124,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     const key = `${target}|${refApt.time}|${refApt.patientId}`;
     if (existing.has(key)) continue;
     existing.add(key);
-    const hasAtendimento = activeApts.some(a => ["atendimento", "em_atendimento", "em atendimento"].includes(a.status.toLowerCase()));
+    const hasAtendimento = (scheduleRefApts.length > 0 ? scheduleRefApts : activeApts).some(a => ["atendimento", "em_atendimento", "em atendimento", "remanejado"].includes(a.status.toLowerCase()));
     const virtualStatus = hasAtendimento ? "atendimento" : "agendado";
     virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!) } as T);
   }
@@ -215,7 +228,9 @@ type CancelDialog = {
 
 type RemanejFlow = {
   apt: Appointment;
+  kind: "remanejar" | "remarcar";
   step: "slot" | "carla";
+  weekRef: Date;
   newDate?: string;
   newTime?: string;
 };
@@ -1004,10 +1019,16 @@ export default function Agenda() {
     }
   };
 
-  // ── Remanejar ──
+  // ── Remanejar (definitivo) / Remarcar (pontual) ──
   const handleStartRemanejar = (apt: Appointment) => {
     setActionMenuId(null);
-    setRemanejFlow({ apt, step: "slot" });
+    setRemanejFlow({ apt, kind: "remanejar", step: "slot", weekRef });
+    setRemanejDone(false);
+  };
+
+  const handleStartRemarcar = (apt: Appointment) => {
+    setActionMenuId(null);
+    setRemanejFlow({ apt, kind: "remarcar", step: "slot", weekRef: new Date(apt.date + "T12:00:00") });
     setRemanejDone(false);
   };
 
@@ -1018,16 +1039,19 @@ export default function Agenda() {
 
   const confirmRemanejar = async (notifyCarla: boolean) => {
     if (!remanejFlow?.newDate || !remanejFlow?.newTime) return;
+    const isRemarcar = remanejFlow.kind === "remarcar";
+    const newStatus = isRemarcar ? "remarcado" : "remanejado";
+    const acao = isRemarcar ? "Remarcado" : "Remanejado";
     setRemanejSending(true);
     try {
       await updateAppointment(remanejFlow.apt.id, {
         date: remanejFlow.newDate,
         time: remanejFlow.newTime,
-        status: "remanejado",
+        status: newStatus,
       });
       setAppointments(prev => prev.map(a =>
         a.id === remanejFlow.apt.id
-          ? { ...a, date: remanejFlow.newDate!, time: remanejFlow.newTime!, status: "remanejado" }
+          ? { ...a, date: remanejFlow.newDate!, time: remanejFlow.newTime!, status: newStatus }
           : a
       ));
       if (notifyCarla && remanejFlow.apt.guardianPhone) {
@@ -1047,7 +1071,7 @@ export default function Agenda() {
       }
       await logNotificacao(
         { ...remanejFlow.apt, date: remanejFlow.newDate, time: remanejFlow.newTime },
-        "Remanejado"
+        acao
       );
       setRemanejDone(true);
     } catch (err: any) {
@@ -1055,11 +1079,11 @@ export default function Agenda() {
       if (raw.includes("JA_REMANEJADO_HOJE")) {
         toast({
           title: "🚫 Limite diário",
-          description: `${remanejFlow.apt.patientName ?? "Este paciente"} já foi remanejado hoje. Tente novamente amanhã.`,
+          description: `${remanejFlow.apt.patientName ?? "Este paciente"} já foi ${acao.toLowerCase()} hoje. Tente novamente amanhã.`,
           variant: "destructive",
         });
       } else {
-        toast({ title: "Erro", description: "Não foi possível remanejar.", variant: "destructive" });
+        toast({ title: "Erro", description: `Não foi possível ${acao.toLowerCase()}.`, variant: "destructive" });
       }
     } finally {
       setRemanejSending(false);
@@ -1115,6 +1139,19 @@ export default function Agenda() {
     TIME_SLOTS.filter(t => (isPaula || t !== "12:10") && getApts(date, t).length === 0)
               .map(time => ({ date, time }))
   );
+
+  // ── Modal week for Remarcar (navigable) ──
+  const modalWeekStart = remanejFlow?.kind === "remarcar" && remanejFlow.weekRef
+    ? startOfWeek(remanejFlow.weekRef, { weekStartsOn: 1 })
+    : startOfWeek(weekRef, { weekStartsOn: 1 });
+  const modalWeekDays = Array.from({ length: 5 }, (_, i) => addDays(modalWeekStart, i));
+  const modalWeekDates = modalWeekDays.map(d => format(d, "yyyy-MM-dd"));
+  const modalAvailableSlots = remanejFlow?.kind === "remarcar"
+    ? modalWeekDates.flatMap(date =>
+        TIME_SLOTS.filter(t => (isPaula || t !== "12:10") && getApts(date, t).length === 0)
+                  .map(time => ({ date, time }))
+      )
+    : availableSlots;
 
   return (
     <div className="space-y-8">
@@ -1217,14 +1254,14 @@ export default function Agenda() {
             </div>
           )}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left min-w-[700px]">
+            <table className="w-full text-sm text-left" style={{ tableLayout: "fixed" }}>
               <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
                 <tr>
-                  <th className="px-4 py-4 w-24 sticky left-0 bg-secondary/90 backdrop-blur z-10 border-r border-border">Horário</th>
+                  <th className="px-2 py-2 sticky left-0 bg-secondary/90 backdrop-blur z-10 border-r border-border" style={{ width: "60px" }}>Horário</th>
                   {weekDays.map((d, i) => (
-                    <th key={i} className="px-4 py-4 text-center min-w-[150px]">
-                      <span className="font-bold text-foreground capitalize">{format(d, "EEEE", { locale: ptBR })}</span>
-                      <div className="font-normal mt-0.5">{format(d, "dd/MM")}</div>
+                    <th key={i} className="px-1 py-2 text-center">
+                      <span className="font-bold text-foreground capitalize text-xs">{format(d, "EEE", { locale: ptBR })}</span>
+                      <div className="font-normal text-[10px]">{format(d, "dd/MM")}</div>
                     </th>
                   ))}
                 </tr>
@@ -1234,7 +1271,7 @@ export default function Agenda() {
                   const isLunch = time === "12:10" && !isPaula;
                   return (
                     <tr key={time} className="border-b border-border hover:bg-secondary/10 transition-colors">
-                      <td className="px-4 py-3 font-display font-bold text-primary sticky left-0 bg-card/90 backdrop-blur z-10 border-r border-border">{time}</td>
+                      <td className="px-2 py-1 font-display font-bold text-primary text-xs sticky left-0 bg-card/90 backdrop-blur z-10 border-r border-border">{time}</td>
                       {isLunch ? (
                         <td colSpan={5} className="px-4 py-3 bg-slate-50/50 text-center text-muted-foreground italic font-medium">Almoço — Pausa</td>
                       ) : (
@@ -1242,7 +1279,7 @@ export default function Agenda() {
                           const apts = getApts(date, time);
                           const isGroup = apts.length > 1;
                           return (
-                            <td key={i} className="px-3 py-2 relative align-top">
+                            <td key={i} className="px-1 py-1 relative align-top">
                               {apts.length > 0 ? (
                                 <div className="flex flex-col gap-1.5">
                                   {isGroup && (
@@ -1270,7 +1307,7 @@ export default function Agenda() {
                                   <div
                                     onClick={() => setActionMenuId(isMenuOpen ? null : apt.id)}
                                     className={cn(
-                                      "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
+                                      "p-1.5 rounded-lg border flex flex-col gap-0.5 cursor-pointer transition-all select-none",
                                       isGhost && "bg-amber-950/20 border-amber-500/60 animate-pulse",
                                       !isGhost && isDesmarcado && "bg-red-950/10 border-red-500/40",
                                       !isGhost && isFaltaNaoJustificada && "bg-red-950/10 border-red-500/40",
@@ -1297,39 +1334,39 @@ export default function Agenda() {
                                       background: isFaltaJustificada ? "rgba(6,182,212,0.04)" : undefined,
                                     }}
                                   >
-                                    <span className="font-bold text-foreground truncate text-xs leading-tight">
-                                      {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
+                                    <span className="font-bold text-foreground truncate text-[10px] leading-tight" title={apt.patientName || undefined}>
+                                      {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-0.5">[{apt.prontuario}]</span>}
                                       {isGhost ? (
-                                        <span className="text-amber-400">⚠ Sem dados do paciente</span>
+                                        <span className="text-amber-400">⚠ Sem dados</span>
                                       ) : (
-                                        apt.patientName || `Paciente #${apt.patientId}`
+                                        abbreviateName(apt.patientName) || `#${apt.patientId}`
                                       )}
                                     </span>
-                                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
+                                    <span className={cn("px-1 py-px rounded text-[8px] uppercase font-bold w-max", getStatusColor(apt.status))}>
                                       {getStatusLabel(apt.status)}
                                     </span>
                                     {apt.paused && (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
-                                        <Snowflake className="w-2.5 h-2.5" /> Pausado
+                                      <span className="px-1 py-px rounded text-[8px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
+                                        <Snowflake className="w-2 h-2" /> Pausado
                                       </span>
                                     )}
                                     {isDesmarcado && (
-                                      <span className="text-[9px] text-orange-400 font-semibold">⚠ só esta data</span>
+                                      <span className="text-[8px] text-orange-400 font-semibold">⚠ só esta data</span>
                                     )}
                                     {isRemanejado && (
-                                      <span className="text-[9px] text-orange-400 font-semibold">↩ remanejado</span>
+                                      <span className="text-[8px] text-orange-400 font-semibold">↩ remanejado</span>
                                     )}
                                     {isRemarcado && (
-                                      <span className="text-[9px] text-yellow-400 font-semibold">✎ remarcado</span>
+                                      <span className="text-[8px] text-yellow-400 font-semibold">✎ remarcado</span>
                                     )}
                                     {isMulti && multiPartner && (
-                                      <span className="text-[9px] text-violet-400 font-semibold flex items-center gap-0.5 flex-wrap">
-                                        <Users className="w-2.5 h-2.5 shrink-0" /> Multi: {selectedProf?.name} {selectedProf?.specialty ? `(${selectedProf.specialty})` : ""} & {multiPartner} {multiPartnerSpec ? `(${multiPartnerSpec})` : ""}
+                                      <span className="text-[8px] text-violet-400 font-semibold flex items-center gap-0.5 flex-wrap">
+                                        <Users className="w-2.5 h-2.5 shrink-0" /> Multi
                                       </span>
                                     )}
                                     {(apt.recurrenceGroupId || isMulti) && !isDesmarcado && !isRescheduled && (
-                                      <span className="text-[9px] text-muted-foreground/50">
-                                        {apt.frequency === "quinzenal" ? "↺ quinzenal" : apt.frequency === "mensal" ? "↺ mensal" : "↺ semanal"}
+                                      <span className="text-[8px] text-muted-foreground/50">
+                                        {apt.frequency === "quinzenal" ? "↺ quinz." : apt.frequency === "mensal" ? "↺ mensal" : ""}
                                       </span>
                                     )}
                                     {/* Psicologia Parental: show guardian/mother name */}
@@ -1391,6 +1428,9 @@ export default function Agenda() {
 
                                       <button style={NEON.orange} onClick={() => handleStartRemanejar(apt)}>
                                         <RotateCcw className="w-3.5 h-3.5" /> Remanejar
+                                      </button>
+                                      <button style={NEON.yellow} onClick={() => handleStartRemarcar(apt)}>
+                                        <CalendarIcon className="w-3.5 h-3.5" /> Remarcar
                                       </button>
 
                                       {/* ── Periodicidade (Frequência) Cards ── */}
@@ -1975,7 +2015,7 @@ export default function Agenda() {
         </div>
       )}
 
-      {/* ── Remanejar: Pick Slot ── */}
+      {/* ── Remanejar / Remarcar: Pick Slot ── */}
       {remanejFlow?.step === "slot" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,5,15,0.97)", border: "1px solid rgba(59,130,246,0.3)" }}>
@@ -1986,23 +2026,55 @@ export default function Agenda() {
                     <RotateCcw className="w-4 h-4" style={{ color: "#60a5fa" }} />
                   </div>
                   <div>
-                    <p className="font-bold" style={{ color: "#60a5fa", textShadow: "0 0 8px rgba(96,165,250,0.8)" }}>Remanejar</p>
+                    <p className="font-bold" style={{ color: "#60a5fa", textShadow: "0 0 8px rgba(96,165,250,0.8)" }}>
+                      {remanejFlow.kind === "remarcar" ? "Remarcar" : "Remanejar"}
+                    </p>
                     <p className="text-xs text-white/50">{remanejFlow.apt.patientName}</p>
                   </div>
                 </div>
                 <button onClick={() => setRemanejFlow(null)} className="text-white/30 hover:text-white/70"><X className="w-5 h-5" /></button>
               </div>
 
-              <p className="text-sm text-white/60 mb-4">Escolha um novo horário disponível nesta semana:</p>
+              {remanejFlow.kind === "remarcar" && (
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <button
+                    type="button"
+                    onClick={() => setRemanejFlow({ ...remanejFlow, weekRef: addDays(remanejFlow.weekRef, -7) })}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}
+                    aria-label="Semana anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <p className="text-xs font-bold text-white/80 text-center">
+                    {format(modalWeekDays[0], "dd/MM")} a {format(modalWeekDays[4], "dd/MM/yyyy")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setRemanejFlow({ ...remanejFlow, weekRef: addDays(remanejFlow.weekRef, 7) })}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}
+                    aria-label="Próxima semana"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
 
-              {availableSlots.length === 0 ? (
+              <p className="text-sm text-white/60 mb-4">
+                {remanejFlow.kind === "remarcar"
+                  ? "Navegue entre as semanas e escolha um horário livre:"
+                  : "Escolha um novo horário disponível nesta semana:"}
+              </p>
+
+              {modalAvailableSlots.length === 0 ? (
                 <p className="text-center text-white/40 py-8">Nenhum horário disponível nesta semana.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
-                  {weekDates.map(date => {
-                    const daySlots = availableSlots.filter(s => s.date === date);
+                  {(remanejFlow.kind === "remarcar" ? modalWeekDates : weekDates).map(date => {
+                    const daySlots = modalAvailableSlots.filter(s => s.date === date);
                     if (daySlots.length === 0) return null;
-                    const dayLabel = weekDays.find(d => format(d, "yyyy-MM-dd") === date);
+                    const dayLabel = (remanejFlow.kind === "remarcar" ? modalWeekDays : weekDays).find(d => format(d, "yyyy-MM-dd") === date);
                     return (
                       <div key={date}>
                         <p className="text-[10px] text-white/40 uppercase font-bold mb-1">
@@ -2028,7 +2100,7 @@ export default function Agenda() {
         </div>
       )}
 
-      {/* ── Remanejar: Carla Notify ── */}
+      {/* ── Remanejar / Remarcar: Carla Notify ── */}
       {remanejFlow?.step === "carla" && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
@@ -2044,9 +2116,12 @@ export default function Agenda() {
               {remanejDone ? (
                 <div className="flex flex-col items-center gap-3 py-4 text-center">
                   <CheckCircle className="w-10 h-10 text-blue-500" />
-                  <p className="font-semibold">Remanejamento concluído!</p>
+                  <p className="font-semibold">
+                    {remanejFlow.kind === "remarcar" ? "Remarcação concluída!" : "Remanejamento concluído!"}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {remanejFlow.apt.patientName} movido(a) para {remanejFlow.newTime} do dia {remanejFlow.newDate}.
+                    {remanejFlow.kind === "remarcar" && " Na semana seguinte, retorna ao horário original."}
                   </p>
                   <Button onClick={() => setRemanejFlow(null)} className="mt-2 w-full">Fechar</Button>
                 </div>
@@ -2054,19 +2129,24 @@ export default function Agenda() {
                 <>
                   <div className="bg-blue-50 border border-blue-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
                     <p className="text-sm text-foreground leading-relaxed">
-                      Vi que você remanejou a sessão de{" "}
+                      Vi que você {remanejFlow.kind === "remarcar" ? "remarcou" : "remanejou"} a sessão de{" "}
                       <strong>{remanejFlow.apt.patientName}</strong> para{" "}
                       <strong>{remanejFlow.newTime} — {
-                        weekDays.find(d => format(d, "yyyy-MM-dd") === remanejFlow.newDate)
-                          ? format(weekDays.find(d => format(d, "yyyy-MM-dd") === remanejFlow.newDate)!, "EEEE dd/MM", { locale: ptBR })
-                          : remanejFlow.newDate
+                        (() => {
+                          const allDays = [...weekDays, ...modalWeekDays];
+                          const match = allDays.find(d => format(d, "yyyy-MM-dd") === remanejFlow.newDate);
+                          return match ? format(match, "EEEE dd/MM", { locale: ptBR }) : remanejFlow.newDate;
+                        })()
                       }</strong>.{" "}
+                      {remanejFlow.kind === "remarcar"
+                        ? "Essa mudança é pontual — na semana seguinte, volta ao horário original. "
+                        : "Essa mudança é definitiva — o novo horário vale para as próximas semanas. "}
                       Posso avisar o responsável pelo WhatsApp?
                     </p>
                   </div>
                   {!remanejFlow.apt.guardianPhone && (
                     <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
-                      ⚠️ Responsável sem telefone cadastrado.
+                      Responsável sem telefone cadastrado.
                     </p>
                   )}
                   <div className="flex gap-3">
@@ -2079,7 +2159,7 @@ export default function Agenda() {
                       {remanejSending ? "Processando..." : "Confirmar e Avisar Mãe"}
                     </Button>
                     <Button variant="outline" className="flex-1" onClick={() => confirmRemanejar(false)} disabled={remanejSending}>
-                      Só remanejar
+                      {remanejFlow.kind === "remarcar" ? "Só remarcar" : "Só remanejar"}
                     </Button>
                   </div>
                 </>

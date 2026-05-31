@@ -96,18 +96,19 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (allTerminal) continue;
     const nonTerminalApts = sorted.filter(a => !TERMINAL_STATUSES.includes(a.status.toLowerCase()));
     const activeApts = sorted.filter(a => !INACTIVE_STATUSES.includes(a.status.toLowerCase()));
-    const refApt = activeApts[0] ?? nonTerminalApts[0] ?? sorted[0];
+    const PONTUAL_STATUSES = ["remarcado", "desmarcado", "cancelado"];
+    const scheduleRefApts = nonTerminalApts.filter(a => !PONTUAL_STATUSES.includes(a.status.toLowerCase()));
+    const refApt = scheduleRefApts.at(-1) ?? activeApts.at(-1) ?? nonTerminalApts.at(-1) ?? sorted.at(-1)!;
     const refDow = new Date(refApt.date + "T12:00:00").getDay();
     const target = weekDates.find(d => new Date(d + "T12:00:00").getDay() === refDow);
     if (!target) continue;
-    if (target < refApt.date) continue;
+    if (target < (activeApts[0] ?? nonTerminalApts[0] ?? sorted[0]).date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
 
-    // Don't project beyond the last non-terminal appointment.
-    // remanejado/remarcado/desmarcado/cancelado are point-in-time exceptions,
-    // NOT chain-breakers — recurrence continues past them.
-    const lastNonTerminalDate = nonTerminalApts.length > 0 ? nonTerminalApts[nonTerminalApts.length - 1].date : sorted[sorted.length - 1].date;
-    if (target > lastNonTerminalDate) continue;
+    const lastRefDate = (scheduleRefApts.at(-1) ?? nonTerminalApts.at(-1) ?? sorted.at(-1)!).date;
+    const lastRefMs = new Date(lastRefDate + "T12:00:00").getTime();
+    const targetMs = new Date(target + "T12:00:00").getTime();
+    if (targetMs > lastRefMs + 28 * 86_400_000) continue;
 
     const freq = (refApt as any).frequency ?? "semanal";
     if (!isAllowedWeek(sorted[0].date, target, freq)) continue;
@@ -115,7 +116,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     const key = `${target}|${refApt.time}|${refApt.patientId}`;
     if (existing.has(key)) continue;
     existing.add(key);
-    const hasAtendimento = activeApts.some(a => ["atendimento", "em_atendimento", "em atendimento"].includes(a.status.toLowerCase()));
+    const hasAtendimento = (scheduleRefApts.length > 0 ? scheduleRefApts : activeApts).some(a => ["atendimento", "em_atendimento", "em atendimento", "remanejado"].includes(a.status.toLowerCase()));
     const virtualStatus = hasAtendimento ? "atendimento" : "agendado";
     virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!) } as T);
   }
@@ -468,13 +469,13 @@ export default function AgendaProfissionais() {
 
   const handleRemarcar = (apt: Appointment) => {
     setActionMenuId(null);
-    // Remarcar abre o seletor de horarios com navegacao entre semanas (agenda infinita)
+    // Remarcar = mudança pontual: reposição de um dia, volta ao horário original na semana seguinte
     setRemanejFlow({ apt, kind: "remarcar", weekRef: new Date(apt.date + "T12:00:00") });
   };
 
   const handleRemanejar = (apt: Appointment) => {
     setActionMenuId(null);
-    // Remanejar: move o paciente dentro da semana atual (sem navegacao)
+    // Remanejar = mudança definitiva: novo dia/horário fixo para as próximas semanas
     setRemanejFlow({ apt, kind: "remanejar", weekRef });
   };
 
@@ -1269,10 +1270,10 @@ export default function AgendaProfissionais() {
                                             )}
 
                                             <button style={NEON.orange} onClick={() => handleRemanejar(apt)}>
-                                              <RotateCcw className="w-3.5 h-3.5" /> Remanejar (nesta semana)
+                                              <RotateCcw className="w-3.5 h-3.5" /> Remanejar
                                             </button>
                                             <button style={NEON.yellow} onClick={() => handleRemarcar(apt)}>
-                                              <CalendarIcon className="w-3.5 h-3.5" /> Remarcar (qualquer semana)
+                                              <CalendarIcon className="w-3.5 h-3.5" /> Remarcar
                                             </button>
 
                                             {/* ── Periodicidade (Frequência) Cards ── */}
@@ -1803,6 +1804,7 @@ export default function AgendaProfissionais() {
                   </p>
                   <p className="text-sm text-white/60">
                     {remanejFlow.apt.patientName} movido(a) para {remanejFlow.newTime} do dia {remanejFlow.newDate}.
+                    {remanejFlow.kind === "remarcar" && " Na semana seguinte, retorna ao horário original."}
                   </p>
                   <button onClick={() => setRemanejFlow(null)} className="mt-2 w-full py-2 rounded-xl font-bold text-sm" style={{ background: "rgba(59,130,246,0.15)", border: "1px solid #3b82f6", color: "#60a5fa" }}>
                     Fechar
