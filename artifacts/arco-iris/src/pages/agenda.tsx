@@ -47,6 +47,15 @@ function getWeekDays(ref: Date): Date[] {
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
 const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
 
+/** Abbreviate long names: "Isis Godinho Lima" → "Isis G. L." */
+function abbreviateName(name: string | undefined | null, maxLen = 18): string {
+  if (!name) return "";
+  if (name.length <= maxLen) return name;
+  const parts = name.trim().split(/\s+/);
+  if (parts.length <= 1) return name.slice(0, maxLen);
+  return parts[0] + " " + parts.slice(1).map(p => p[0]?.toUpperCase() + ".").join(" ");
+}
+
 /** Deterministic negative ID for virtual appointments so menus stay open across re-renders. */
 function stableVirtualId(date: string, time: string, patientId: number, groupId: string): number {
   let h = 0;
@@ -1245,14 +1254,14 @@ export default function Agenda() {
             </div>
           )}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left min-w-[700px]">
+            <table className="w-full text-sm text-left" style={{ tableLayout: "fixed" }}>
               <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
                 <tr>
-                  <th className="px-4 py-4 w-24 sticky left-0 bg-secondary/90 backdrop-blur z-10 border-r border-border">Horário</th>
+                  <th className="px-2 py-2 sticky left-0 bg-secondary/90 backdrop-blur z-10 border-r border-border" style={{ width: "60px" }}>Horário</th>
                   {weekDays.map((d, i) => (
-                    <th key={i} className="px-4 py-4 text-center min-w-[150px]">
-                      <span className="font-bold text-foreground capitalize">{format(d, "EEEE", { locale: ptBR })}</span>
-                      <div className="font-normal mt-0.5">{format(d, "dd/MM")}</div>
+                    <th key={i} className="px-1 py-2 text-center">
+                      <span className="font-bold text-foreground capitalize text-xs">{format(d, "EEE", { locale: ptBR })}</span>
+                      <div className="font-normal text-[10px]">{format(d, "dd/MM")}</div>
                     </th>
                   ))}
                 </tr>
@@ -1262,7 +1271,7 @@ export default function Agenda() {
                   const isLunch = time === "12:10" && !isPaula;
                   return (
                     <tr key={time} className="border-b border-border hover:bg-secondary/10 transition-colors">
-                      <td className="px-4 py-3 font-display font-bold text-primary sticky left-0 bg-card/90 backdrop-blur z-10 border-r border-border">{time}</td>
+                      <td className="px-2 py-1 font-display font-bold text-primary text-xs sticky left-0 bg-card/90 backdrop-blur z-10 border-r border-border">{time}</td>
                       {isLunch ? (
                         <td colSpan={5} className="px-4 py-3 bg-slate-50/50 text-center text-muted-foreground italic font-medium">Almoço — Pausa</td>
                       ) : (
@@ -1270,7 +1279,7 @@ export default function Agenda() {
                           const apts = getApts(date, time);
                           const isGroup = apts.length > 1;
                           return (
-                            <td key={i} className="px-3 py-2 relative align-top">
+                            <td key={i} className="px-1 py-1 relative align-top">
                               {apts.length > 0 ? (
                                 <div className="flex flex-col gap-1.5">
                                   {isGroup && (
@@ -1298,7 +1307,7 @@ export default function Agenda() {
                                   <div
                                     onClick={() => setActionMenuId(isMenuOpen ? null : apt.id)}
                                     className={cn(
-                                      "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
+                                      "p-1.5 rounded-lg border flex flex-col gap-0.5 cursor-pointer transition-all select-none",
                                       isGhost && "bg-amber-950/20 border-amber-500/60 animate-pulse",
                                       !isGhost && isDesmarcado && "bg-red-950/10 border-red-500/40",
                                       !isGhost && isFaltaNaoJustificada && "bg-red-950/10 border-red-500/40",
@@ -1325,39 +1334,39 @@ export default function Agenda() {
                                       background: isFaltaJustificada ? "rgba(6,182,212,0.04)" : undefined,
                                     }}
                                   >
-                                    <span className="font-bold text-foreground truncate text-xs leading-tight">
-                                      {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
+                                    <span className="font-bold text-foreground truncate text-[10px] leading-tight" title={apt.patientName || undefined}>
+                                      {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-0.5">[{apt.prontuario}]</span>}
                                       {isGhost ? (
-                                        <span className="text-amber-400">⚠ Sem dados do paciente</span>
+                                        <span className="text-amber-400">⚠ Sem dados</span>
                                       ) : (
-                                        apt.patientName || `Paciente #${apt.patientId}`
+                                        abbreviateName(apt.patientName) || `#${apt.patientId}`
                                       )}
                                     </span>
-                                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
+                                    <span className={cn("px-1 py-px rounded text-[8px] uppercase font-bold w-max", getStatusColor(apt.status))}>
                                       {getStatusLabel(apt.status)}
                                     </span>
                                     {apt.paused && (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
-                                        <Snowflake className="w-2.5 h-2.5" /> Pausado
+                                      <span className="px-1 py-px rounded text-[8px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
+                                        <Snowflake className="w-2 h-2" /> Pausado
                                       </span>
                                     )}
                                     {isDesmarcado && (
-                                      <span className="text-[9px] text-orange-400 font-semibold">⚠ só esta data</span>
+                                      <span className="text-[8px] text-orange-400 font-semibold">⚠ só esta data</span>
                                     )}
                                     {isRemanejado && (
-                                      <span className="text-[9px] text-orange-400 font-semibold">↩ remanejado</span>
+                                      <span className="text-[8px] text-orange-400 font-semibold">↩ remanejado</span>
                                     )}
                                     {isRemarcado && (
-                                      <span className="text-[9px] text-yellow-400 font-semibold">✎ remarcado</span>
+                                      <span className="text-[8px] text-yellow-400 font-semibold">✎ remarcado</span>
                                     )}
                                     {isMulti && multiPartner && (
-                                      <span className="text-[9px] text-violet-400 font-semibold flex items-center gap-0.5 flex-wrap">
-                                        <Users className="w-2.5 h-2.5 shrink-0" /> Multi: {selectedProf?.name} {selectedProf?.specialty ? `(${selectedProf.specialty})` : ""} & {multiPartner} {multiPartnerSpec ? `(${multiPartnerSpec})` : ""}
+                                      <span className="text-[8px] text-violet-400 font-semibold flex items-center gap-0.5 flex-wrap">
+                                        <Users className="w-2.5 h-2.5 shrink-0" /> Multi
                                       </span>
                                     )}
                                     {(apt.recurrenceGroupId || isMulti) && !isDesmarcado && !isRescheduled && (
-                                      <span className="text-[9px] text-muted-foreground/50">
-                                        {apt.frequency === "quinzenal" ? "↺ quinzenal" : apt.frequency === "mensal" ? "↺ mensal" : "↺ semanal"}
+                                      <span className="text-[8px] text-muted-foreground/50">
+                                        {apt.frequency === "quinzenal" ? "↺ quinz." : apt.frequency === "mensal" ? "↺ mensal" : ""}
                                       </span>
                                     )}
                                     {/* Psicologia Parental: show guardian/mother name */}
