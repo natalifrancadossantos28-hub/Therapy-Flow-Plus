@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,7 @@ import {
   getPatient,
   updateRecurrenceFrequency,
   materializeVirtualAppointment,
+  setAppointmentPaused,
 } from "@/lib/arco-rpc";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
@@ -150,7 +151,7 @@ function applyFrequencyFilter<T extends { date: string; recurrenceGroupId?: stri
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
-type Appointment = { id: number; patientId: number; patientName?: string; guardianName?: string | null; professionalName?: string | null; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; };
+type Appointment = { id: number; patientId: number; patientName?: string; guardianName?: string | null; professionalName?: string | null; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; paused?: boolean; pausedAt?: string | null; pausedReason?: string | null; pausedReturnDate?: string | null; };
 
 type AbsenceAlert = { patientName: string; professionalName: string; professionalSpecialty: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
@@ -171,6 +172,7 @@ const NEON: Record<string, React.CSSProperties> = {
   orange: { background: "rgba(10,5,0,0.92)", border: "1px solid #f97316", color: "#fb923c", boxShadow: "0 0 14px rgba(249,115,22,0.55)", textShadow: "0 0 8px rgba(251,146,60,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
   blue: { background: "rgba(0,5,15,0.92)", border: "1px solid #3b82f6", color: "#60a5fa", boxShadow: "0 0 14px rgba(59,130,246,0.55)", textShadow: "0 0 8px rgba(96,165,250,0.9)", borderRadius: "10px", padding: "6px 10px", fontWeight: 700, fontSize: "11px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s", justifyContent: "center" },
   fuchsia: { background: "rgba(10,0,10,0.92)", border: "1px solid #c026d3", color: "#e879f9", boxShadow: "0 0 14px rgba(192,38,211,0.55)", textShadow: "0 0 8px rgba(232,121,249,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
+  cyan: { background: "rgba(0,5,10,0.92)", border: "1px solid #06b6d4", color: "#22d3ee", boxShadow: "0 0 14px rgba(6,182,212,0.55)", textShadow: "0 0 8px rgba(34,211,238,0.9)", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", width: "100%", transition: "all 0.15s" },
 };
 
 const SPECIALTIES = [
@@ -244,6 +246,12 @@ export default function AgendaProfissionais() {
   // Exclusão administrativa
   const [excluirConfirm, setExcluirConfirm] = useState<Appointment | null>(null);
   const [excluirSending, setExcluirSending] = useState(false);
+
+  // Pausa temporária
+  const [pauseModal, setPauseModal] = useState<Appointment | null>(null);
+  const [pauseReason, setPauseReason] = useState("");
+  const [pauseReturnDate, setPauseReturnDate] = useState("");
+  const [pauseSending, setPauseSending] = useState(false);
 
   const weekDays = getWeekDays(weekRef);
   const weekDates = weekDays.map(d => format(d, "yyyy-MM-dd"));
@@ -793,6 +801,42 @@ export default function AgendaProfissionais() {
     }
   };
 
+  // ── Pausar / Despausar agendamento ──
+  const handleOpenPauseModal = (apt: Appointment) => {
+    setActionMenuId(null);
+    setPauseReason("");
+    setPauseReturnDate("");
+    setPauseModal(apt);
+  };
+
+  const confirmPause = async () => {
+    if (!pauseModal) return;
+    setPauseSending(true);
+    try {
+      await setAppointmentPaused(pauseModal.id, true, pauseReason || "Pausa temporária", pauseReturnDate || null);
+      await createNotificacao({ patientName: pauseModal.patientName || "", professionalName: pauseModal.professionalName, acao: "Pausa Temporária" });
+      setAppointments(prev => prev.map(a => a.id === pauseModal.id ? { ...a, paused: true, pausedAt: new Date().toISOString(), pausedReason: pauseReason || "Pausa temporária", pausedReturnDate: pauseReturnDate || null } : a));
+      toast({ title: "⏸️ Pausado", description: `${pauseModal.patientName} foi pausado temporariamente.` });
+      setPauseModal(null);
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível pausar.", variant: "destructive" });
+    } finally {
+      setPauseSending(false);
+    }
+  };
+
+  const handleUnpause = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await setAppointmentPaused(apt.id, false);
+      await createNotificacao({ patientName: apt.patientName || "", professionalName: apt.professionalName, acao: "Retorno de Pausa" });
+      setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, paused: false, pausedAt: null, pausedReason: null, pausedReturnDate: null } : a));
+      toast({ title: "▶️ Retomado", description: `${apt.patientName} voltou ao status normal.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível retomar.", variant: "destructive" });
+    }
+  };
+
   // ── Exclusão administrativa ──
   const handleExcluirAdmin = (apt: Appointment) => {
     setActionMenuId(null);
@@ -1152,6 +1196,11 @@ export default function AgendaProfissionais() {
                                             )}
                                           </div>
                                           <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
+                                          {apt.paused && (
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
+                                              <Snowflake className="w-2.5 h-2.5" /> Pausado
+                                            </span>
+                                          )}
                                           {isMulti && multiPartner && (
                                             <span className="text-[9px] text-violet-400 font-semibold flex items-center gap-0.5 flex-wrap">
                                               <Users className="w-2.5 h-2.5 shrink-0" /> Multi: {selectedProf?.name} {selectedProf?.specialty ? `(${selectedProf.specialty})` : ""} & {multiPartner} {multiPartnerSpec ? `(${multiPartnerSpec})` : ""}
@@ -1262,6 +1311,17 @@ export default function AgendaProfissionais() {
                                             )}
 
                                             <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                            {apt.paused ? (
+                                              <button style={NEON.green} onClick={() => handleUnpause(apt)}>
+                                                <Play className="w-3.5 h-3.5" /> Retomar Atendimento
+                                              </button>
+                                            ) : (
+                                              <button style={NEON.cyan} onClick={() => handleOpenPauseModal(apt)}>
+                                                <Snowflake className="w-3.5 h-3.5" /> Pausar Atendimento
+                                              </button>
+                                            )}
+
+                                            <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                             <p className="text-[9px] text-white/40 uppercase font-bold px-1">Saída</p>
                                             <button style={NEON.red} onClick={() => handleSaida(apt, "Alta")}>
                                               <LogOut className="w-3.5 h-3.5" /> Dar Alta
@@ -1355,6 +1415,69 @@ export default function AgendaProfissionais() {
           </>
         )}
       </div>
+
+      {/* ── Modal de Pausa Temporária ── */}
+      {pauseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,20,0.97)", border: "1px solid rgba(56,189,248,0.3)" }}>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(56,189,248,0.15)", border: "1px solid #38bdf8" }}>
+                  <Snowflake className="w-5 h-5" style={{ color: "#7dd3fc" }} />
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar Atendimento</p>
+                  <p className="text-xs text-white/50">Suspender temporariamente sem cancelar</p>
+                </div>
+              </div>
+              <p className="text-sm text-white/80 mb-3">
+                <strong className="text-white">{pauseModal.patientName}</strong> — {pauseModal.date} às {pauseModal.time}.
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Motivo da Pausa</label>
+                  <input
+                    type="text"
+                    value={pauseReason}
+                    onChange={e => setPauseReason(e.target.value)}
+                    placeholder="Ex: Licença, Viagem, Transição de profissional..."
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Data de Retorno Prevista (opcional)</label>
+                  <input
+                    type="date"
+                    value={pauseReturnDate}
+                    onChange={e => setPauseReturnDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={confirmPause}
+                  disabled={pauseSending}
+                  style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: pauseSending ? 0.4 : 1, cursor: pauseSending ? "not-allowed" : "pointer" }}
+                >
+                  <Snowflake className="w-4 h-4" />
+                  {pauseSending ? "Pausando..." : "Confirmar Pausa"}
+                </button>
+                <button
+                  className="flex-1 rounded-lg border border-white/10 text-white/60 hover:text-white hover:bg-white/5 px-4 py-2 text-sm font-medium transition-colors"
+                  onClick={() => setPauseModal(null)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal de Exclusão Administrativa ── */}
       {excluirConfirm && (

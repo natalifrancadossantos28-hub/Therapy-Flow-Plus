@@ -981,6 +981,10 @@ export type AppointmentListItem = {
   trabalhoNaRoca: boolean;
   consecutiveUnjustifiedAbsences: number;
   prontuario: string | null;
+  paused: boolean;
+  pausedAt: string | null;
+  pausedReason: string | null;
+  pausedReturnDate: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -1005,6 +1009,10 @@ type AppointmentListRow = {
   trabalho_na_roca: boolean | null;
   consecutive_unjustified_absences: number | string | null;
   prontuario: string | null;
+  paused: boolean | null;
+  paused_at: string | null;
+  paused_reason: string | null;
+  paused_return_date: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1030,6 +1038,10 @@ function mapAppointmentListItem(r: AppointmentListRow): AppointmentListItem {
     trabalhoNaRoca: !!r.trabalho_na_roca,
     consecutiveUnjustifiedAbsences: Number(r.consecutive_unjustified_absences ?? 0),
     prontuario: r.prontuario ?? null,
+    paused: !!r.paused,
+    pausedAt: r.paused_at ?? null,
+    pausedReason: r.paused_reason ?? null,
+    pausedReturnDate: r.paused_return_date ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -1505,4 +1517,51 @@ export function getAIAgeLimitReport(): Promise<AIAnalysis> {
 
 export function getAISystemHealth(): Promise<AIAnalysis> {
   return fetchAI("system-health");
+}
+
+// ── Pausa Temporária (Agenda) ────────────────────────────────────────────────────────
+
+export async function setAppointmentPaused(
+  id: number,
+  paused: boolean,
+  reason?: string | null,
+  returnDate?: string | null
+): Promise<{ id: number; paused: boolean; pausedAt: string | null; pausedReason: string | null; pausedReturnDate: string | null }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("set_appointment_paused", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_paused: paused,
+    p_reason: reason ?? null,
+    p_return_date: returnDate ?? null,
+  });
+  if (error) throw error;
+  return data as { id: number; paused: boolean; pausedAt: string | null; pausedReason: string | null; pausedReturnDate: string | null };
+}
+
+export type PausedOverviewItem = {
+  source: 'fila' | 'agenda';
+  id: number;
+  patientId: number;
+  patientName: string;
+  specialty: string;
+  professionalName: string;
+  pausedReason: string;
+  pausedAt: string | null;
+  pausedReturnDate: string | null;
+  returnOverdue: boolean;
+};
+
+export async function listPausedOverview(): Promise<{ fila: PausedOverviewItem[]; agenda: PausedOverviewItem[] }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_paused_overview", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  const result = data as { fila: PausedOverviewItem[]; agenda: PausedOverviewItem[] };
+  return result;
 }
