@@ -185,33 +185,47 @@ export default function Dashboard() {
   const isCurrentMonth = format(dashMonth, "yyyy-MM") === format(new Date(), "yyyy-MM");
 
   const monthlyStats = useMemo(() => {
-    const ACTIVE = ["agendado", "atendimento", "em_atendimento", "em atendimento", "presente", "alta",
-                    "ausente", "falta_justificada", "falta_nao_justificada",
-                    "remanejado", "remarcado", "pausado"];
-    const monthApts = monthAppointments.filter(a => {
-      const st = (a.status || "").toLowerCase();
-      return ACTIVE.includes(st);
+    // Só conta atendimentos que REALMENTE aconteceram ou foram registrados —
+    // NÃO inclui "agendado" (futuro/pendente), "remanejado", "remarcado", "pausado"
+    // que são status transitórios e inflam a contagem.
+    const REALIZADOS_ST = ["atendimento", "em_atendimento", "em atendimento", "presente", "alta"];
+    const FALTAS_ST = ["ausente", "falta_justificada", "falta_nao_justificada"];
+    const CANCELADOS_ST = ["cancelado", "desmarcado"];
+
+    // Deduplica: mesmo paciente+data+hora conta uma vez (evita dupla do Multi)
+    const seen = new Set<string>();
+    const unique = monthAppointments.filter(a => {
+      const key = `${a.patientId}-${a.date}-${a.time}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
-    const realizados = monthApts.filter(a => {
-      const st = (a.status || "").toLowerCase();
-      return st === "atendimento" || st === "em_atendimento" || st === "em atendimento" || st === "presente" || st === "alta";
-    }).length;
-    const faltas = monthApts.filter(a => {
-      const st = (a.status || "").toLowerCase();
-      return st === "ausente" || st === "falta_justificada" || st === "falta_nao_justificada";
-    }).length;
-    const total = monthApts.length;
-    return { total, realizados, faltas, pendente: total - realizados - faltas };
+
+    const realizados = unique.filter(a => REALIZADOS_ST.includes((a.status || "").toLowerCase())).length;
+    const faltas = unique.filter(a => FALTAS_ST.includes((a.status || "").toLowerCase())).length;
+    const cancelados = unique.filter(a => CANCELADOS_ST.includes((a.status || "").toLowerCase())).length;
+    const agendados = unique.filter(a => (a.status || "").toLowerCase() === "agendado").length;
+
+    return { total: realizados + faltas, realizados, faltas, cancelados, agendados };
   }, [monthAppointments]);
 
   // ── Relatorio Multi por profissional ────────────────────────────────────
   const multiReport = useMemo(() => {
+    // Só conta Multi de atendimentos REALIZADOS (não agendados futuros)
+    const REALIZADOS_ST = ["atendimento", "em_atendimento", "em atendimento", "presente", "alta"];
     const multiApts = monthAppointments.filter(a => {
       const notes = (a.notes || "").toLowerCase();
-      return notes.includes("atendimento multi") || notes.includes("multi com") || notes.includes("multi:");
+      const st = (a.status || "").toLowerCase();
+      return REALIZADOS_ST.includes(st) &&
+        (notes.includes("atendimento multi") || notes.includes("multi com") || notes.includes("multi:"));
     });
+    // Deduplica por profissional+paciente+data (evita contar o mesmo atendimento 2x)
+    const seen = new Set<string>();
     const byProf = new Map<number, { name: string; count: number }>();
     for (const a of multiApts) {
+      const key = `${a.professionalId}-${a.patientId}-${a.date}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       const entry = byProf.get(a.professionalId) || { name: a.professionalName, count: 0 };
       entry.count++;
       byProf.set(a.professionalId, entry);
@@ -490,8 +504,8 @@ export default function Dashboard() {
             <p className="text-xs font-semibold text-muted-foreground mt-1">Faltas</p>
           </div>
           <div className="bg-amber-500/10 rounded-2xl p-4 text-center border border-amber-500/20">
-            <p className="text-2xl font-bold font-display text-amber-400">{monthlyStats.pendente}</p>
-            <p className="text-xs font-semibold text-muted-foreground mt-1">Pendentes</p>
+            <p className="text-2xl font-bold font-display text-amber-400">{monthlyStats.agendados}</p>
+            <p className="text-xs font-semibold text-muted-foreground mt-1">Agendados</p>
           </div>
         </div>
       </Card>
