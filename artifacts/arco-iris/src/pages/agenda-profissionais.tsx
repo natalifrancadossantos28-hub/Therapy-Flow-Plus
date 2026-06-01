@@ -42,6 +42,16 @@ function getWeekDays(ref: Date): Date[] {
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
 const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
 
+/** Abbreviate long names keeping first + second name: "Isis Godinho Lima" → "Isis Godinho L." */
+function abbreviateName(name: string | undefined | null, maxLen = 22): string {
+  if (!name) return "";
+  if (name.length <= maxLen) return name;
+  const parts = name.trim().split(/\s+/);
+  if (parts.length <= 2) return name;
+  const abbreviated = parts[0] + " " + parts[1] + " " + parts.slice(2).map(p => p[0]?.toUpperCase() + ".").join(" ");
+  return abbreviated;
+}
+
 function isoWeekNumber(dateStr: string): number {
   const d = new Date(dateStr + "T12:00:00");
   const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -1082,16 +1092,16 @@ export default function AgendaProfissionais() {
             {/* Weekly grid */}
             <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[700px]">
+                <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
                   <thead className="bg-muted/60 border-b border-border">
                     <tr>
-                      <th className="px-5 py-4 w-24 sticky left-0 bg-muted/80 backdrop-blur z-10 border-r border-border text-left text-xs text-primary uppercase font-bold">Horário</th>
+                      <th className="px-2 py-2 sticky left-0 bg-muted/80 backdrop-blur z-10 border-r border-border text-left text-sm text-primary uppercase font-bold" style={{ width: "60px" }}>Horário</th>
                       {weekDays.map((d, i) => {
                         const isToday = format(d, "yyyy-MM-dd") === today;
                         return (
-                          <th key={i} className={cn("px-4 py-4 text-center min-w-[140px] text-xs uppercase font-bold", isToday ? "text-primary bg-primary/8" : "text-muted-foreground")}>
-                            <span className="capitalize">{format(d, "EEEE", { locale: ptBR })}</span>
-                            <div className={cn("font-normal mt-0.5 text-[11px]", isToday && "text-primary font-bold")}>{format(d, "dd/MM")}</div>
+                          <th key={i} className={cn("px-1 py-2 text-center text-xs uppercase font-bold", isToday ? "text-primary bg-primary/8" : "text-muted-foreground")}>
+                            <span className="font-bold text-foreground capitalize text-sm">{format(d, "EEE", { locale: ptBR })}</span>
+                            <div className={cn("font-normal text-xs", isToday && "text-primary font-bold")}>{format(d, "dd/MM")}</div>
                           </th>
                         );
                       })}
@@ -1103,7 +1113,7 @@ export default function AgendaProfissionais() {
                       const isLunch = time === "12:10" && !isPaulaProf;
                       return (
                         <tr key={time} className="border-b border-border/60 hover:bg-secondary/30 transition-colors">
-                          <td className={cn("px-5 py-3 font-bold sticky left-0 bg-card z-10 border-r border-border", isLunch ? "text-muted-foreground" : "text-primary")}>
+                          <td className={cn("px-2 py-2 font-bold text-sm sticky left-0 bg-card z-10 border-r border-border", isLunch ? "text-muted-foreground" : "text-primary")}>
                             {time}
                           </td>
                           {isLunch ? (
@@ -1116,7 +1126,7 @@ export default function AgendaProfissionais() {
                               const isToday = date === today;
                               const isGroup = apts.length > 1;
                               return (
-                                <td key={i} className={cn("px-4 py-2.5 relative align-top", isToday && "bg-primary/5")}>
+                                <td key={i} className={cn("px-1.5 py-1.5 relative align-top", isToday && "bg-primary/5")}>
                                   {apts.length === 0 ? (
                                     <button
                                       onClick={() => setBookingSlot({ date, time })}
@@ -1186,14 +1196,14 @@ export default function AgendaProfissionais() {
                                           }}
                                         >
                                           <div className="flex items-center justify-between gap-1">
-                                            <p className="font-bold text-foreground truncate text-xs leading-tight">
+                                            <span className="font-bold text-foreground truncate text-xs leading-tight" title={apt.patientName || undefined}>
                                               {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
                                               {isGhost ? (
                                                 <span className="text-amber-400">⚠ Sem dados</span>
                                               ) : (
-                                                apt.patientName || `Paciente #${apt.patientId}`
+                                                abbreviateName(apt.patientName) || `#${apt.patientId}`
                                               )}
-                                            </p>
+                                            </span>
                                             {/* Cadeado visível quando Presente — status vem da recepção */}
                                             {isPresente && (
                                               <Lock className="w-3 h-3 shrink-0" style={{ color: "#22d3ee", filter: "drop-shadow(0 0 4px rgba(6,182,212,0.7))" }} />
