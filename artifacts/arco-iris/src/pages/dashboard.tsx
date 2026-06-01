@@ -73,6 +73,7 @@ export default function Dashboard() {
   const [histFilter, setHistFilter] = useState<"ano" | "acumulado">("ano");
   const [dashMonth, setDashMonth] = useState<Date>(new Date());
   const [allAppointments, setAllAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
+  const [monthAppointments, setMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
 
   // Faltas por profissional (não geral)
   type AbsenceByProf = { patientId: number; patientName: string; professionalName: string; specialty: string; count: number };
@@ -119,6 +120,16 @@ export default function Dashboard() {
       });
     }).catch(() => setAbsencesByProf([]));
   }, []);
+
+  // ── Fetch appointments do mês selecionado (com dateFrom/dateTo para trazer TODOS) ──
+  useEffect(() => {
+    const mFrom = format(startOfMonth(dashMonth), "yyyy-MM-dd");
+    const mTo = format(endOfMonth(dashMonth), "yyyy-MM-dd");
+    listAppointments({ dateFrom: mFrom, dateTo: mTo })
+      .then(apts => setMonthAppointments(apts))
+      .catch(() => setMonthAppointments([]));
+  }, [dashMonth]);
+
   const fetchOcupacao = useCallback(() => {
     listProfessionalsCapacity()
       .then((rows) => {
@@ -171,17 +182,15 @@ export default function Dashboard() {
 
   // ── Navegação Mensal ─────────────────────────────────────────────────────
   const dashMonthLabel = format(dashMonth, "MMMM yyyy", { locale: ptBR });
-  const dashMonthFrom = format(startOfMonth(dashMonth), "yyyy-MM-dd");
-  const dashMonthTo = format(endOfMonth(dashMonth), "yyyy-MM-dd");
   const isCurrentMonth = format(dashMonth, "yyyy-MM") === format(new Date(), "yyyy-MM");
 
   const monthlyStats = useMemo(() => {
     const ACTIVE = ["agendado", "atendimento", "em_atendimento", "em atendimento", "presente", "alta",
                     "ausente", "falta_justificada", "falta_nao_justificada",
-                    "remanejado", "remarcado"];
-    const monthApts = allAppointments.filter(a => {
-      if (!a.date) return false;
-      return a.date >= dashMonthFrom && a.date <= dashMonthTo && ACTIVE.includes((a.status || "").toLowerCase());
+                    "remanejado", "remarcado", "pausado"];
+    const monthApts = monthAppointments.filter(a => {
+      const st = (a.status || "").toLowerCase();
+      return ACTIVE.includes(st);
     });
     const realizados = monthApts.filter(a => {
       const st = (a.status || "").toLowerCase();
@@ -193,17 +202,13 @@ export default function Dashboard() {
     }).length;
     const total = monthApts.length;
     return { total, realizados, faltas, pendente: total - realizados - faltas };
-  }, [allAppointments, dashMonthFrom, dashMonthTo]);
+  }, [monthAppointments]);
 
   // ── Relatorio Multi por profissional ────────────────────────────────────
   const multiReport = useMemo(() => {
-    const monthApts = allAppointments.filter(a => {
-      if (!a.date) return false;
-      return a.date >= dashMonthFrom && a.date <= dashMonthTo;
-    });
-    const multiApts = monthApts.filter(a => {
+    const multiApts = monthAppointments.filter(a => {
       const notes = (a.notes || "").toLowerCase();
-      return notes.includes("atendimento multi") || notes.includes("multi com");
+      return notes.includes("atendimento multi") || notes.includes("multi com") || notes.includes("multi:");
     });
     const byProf = new Map<number, { name: string; count: number }>();
     for (const a of multiApts) {
@@ -212,7 +217,7 @@ export default function Dashboard() {
       byProf.set(a.professionalId, entry);
     }
     return Array.from(byProf.values()).sort((a, b) => b.count - a.count);
-  }, [allAppointments, dashMonthFrom, dashMonthTo]);
+  }, [monthAppointments]);
 
   // ── Batimento cardíaco da clínica (hoje) ─────────────────────────────────
   // Realizado: atendimento concluído (em andamento, presente ou alta naquele dia).
