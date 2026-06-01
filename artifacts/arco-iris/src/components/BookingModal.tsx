@@ -163,7 +163,7 @@ export default function BookingModal({
       reloadTimerRef.current = setTimeout(() => { void loadData(); }, 400);
     };
     const channel = supabase
-      .channel("booking-modal-realtime")
+      .channel(`booking-modal-realtime-${professionalId}-${date}-${time}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "waiting_list" },
@@ -175,11 +175,14 @@ export default function BookingModal({
         scheduleReload
       )
       .subscribe();
+    // Fallback polling: garante sincronização mesmo se Realtime falhar
+    const pollInterval = setInterval(() => { void loadData(); }, 5000);
     return () => {
+      clearInterval(pollInterval);
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
       void supabase?.removeChannel(channel);
     };
-  }, [loadData]);
+  }, [loadData, professionalId, date, time]);
 
   // Pacientes em busca ativa (congelados) nao entram na disputa por vaga.
   const matchedBySpec = waitingList.filter(e => !e.paused && matchesSpecialty(e.specialty, professionalSpecialty));

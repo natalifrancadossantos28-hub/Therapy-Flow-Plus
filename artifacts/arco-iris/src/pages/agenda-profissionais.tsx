@@ -336,6 +336,11 @@ export default function AgendaProfissionais() {
         { event: "*", schema: "public", table: "appointments", filter: `professional_id=eq.${profId}` },
         scheduleReload
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "waiting_list" },
+        scheduleReload
+      )
       .subscribe();
     return () => {
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
@@ -832,8 +837,16 @@ export default function AgendaProfissionais() {
       setAppointments(prev => prev.map(a => a.id === pauseModal.id ? { ...a, paused: true, pausedAt: new Date().toISOString(), pausedReason: pauseReason || "Pausa temporária", pausedReturnDate: pauseReturnDate || null } : a));
       toast({ title: "⏸️ Pausado", description: `${pauseModal.patientName} foi pausado temporariamente.` });
       setPauseModal(null);
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível pausar.", variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isRpcMissing = msg.includes("set_appointment_paused") || msg.includes("Could not find");
+      toast({
+        title: "Erro ao pausar",
+        description: isRpcMissing
+          ? "Função set_appointment_paused não encontrada no banco. Execute a migration 0063_appointment_pause.sql no Supabase."
+          : `Não foi possível pausar: ${msg}`,
+        variant: "destructive",
+      });
     } finally {
       setPauseSending(false);
     }
