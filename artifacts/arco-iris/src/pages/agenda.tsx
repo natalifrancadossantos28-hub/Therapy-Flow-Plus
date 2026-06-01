@@ -465,7 +465,10 @@ export default function Agenda() {
       dateTo,
     })
       .then((list) => setAppointments(withCiclo(list) as Appointment[]))
-      .catch(console.error);
+      .catch((err) => {
+        console.error("fetchAppointments error:", err);
+        toast({ title: "Erro ao carregar agenda", description: err?.message || String(err), variant: "destructive" });
+      });
   };
 
   useEffect(() => {

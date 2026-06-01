@@ -298,7 +298,10 @@ export default function AgendaProfissionais() {
     loadedRangeRef.current = { from: dateFrom, to: dateTo };
     listAppointments({ professionalId: parseInt(selectedProfId), dateFrom, dateTo })
       .then(setAppointments)
-      .catch(console.error);
+      .catch((err) => {
+        console.error("fetchAppointments error:", err);
+        toast({ title: "Erro ao carregar agenda", description: err?.message || String(err), variant: "destructive" });
+      });
   };
 
   useEffect(() => { if (pinVerified) fetchAppointments(); }, [selectedProfId, pinVerified]);
