@@ -16,7 +16,7 @@ import {
   type LongAttendancePatient,
   type PausedOverviewItem,
 } from "@/lib/arco-rpc";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3, Snowflake, Clock } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3, Snowflake, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor, calcIdade, formatDate } from "@/lib/utils";
@@ -24,6 +24,8 @@ import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Responsi
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 // ── Faixas Etárias ────────────────────────────────────────────────────────────
 const FAIXAS = [
@@ -69,6 +71,8 @@ export default function Dashboard() {
   const [longAttendance, setLongAttendance] = useState<LongAttendancePatient[]>([]);
   const [perfFilter, setPerfFilter] = useState<"mes" | "total">("mes");
   const [histFilter, setHistFilter] = useState<"ano" | "acumulado">("ano");
+  const [dashMonth, setDashMonth] = useState<Date>(new Date());
+  const [allAppointments, setAllAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
 
   // Faltas por profissional (não geral)
   type AbsenceByProf = { patientId: number; patientName: string; professionalName: string; specialty: string; count: number };
@@ -81,12 +85,14 @@ export default function Dashboard() {
     listWaitingList().then(setWaitingList).catch(console.error);
     getAppointmentsStats().then(setAptStats).catch(console.error);
     listLongAttendancePatients(12).then(setLongAttendance).catch(() => setLongAttendance([]));
-    // Faltas POR PROFISSIONAL — só alerta quando >= 3 com o MESMO profissional
-    listAppointments().then(allApts => {
+    // Carrega todos agendamentos para cálculos mensais e Multi
+    listAppointments().then(apts => {
+      setAllAppointments(apts);
+      // Faltas POR PROFISSIONAL — só alerta quando >= 3 com o MESMO profissional
       const ABSENCE = ["ausente", "falta_nao_justificada"];
       const key = (pid: number, profId: number) => `${pid}|${profId}`;
       const map = new Map<string, { patientId: number; patientName: string; professionalName: string; count: number }>();
-      for (const a of allApts) {
+      for (const a of apts) {
         const st = (a.status || "").toLowerCase();
         if (!ABSENCE.includes(st)) continue;
         const k = key(a.patientId, a.professionalId);
@@ -162,6 +168,51 @@ export default function Dashboard() {
     }
     return Array.from(grouped.values());
   }, [absencesByProf]);
+
+  // ── Navegação Mensal ─────────────────────────────────────────────────────
+  const dashMonthLabel = format(dashMonth, "MMMM yyyy", { locale: ptBR });
+  const dashMonthFrom = format(startOfMonth(dashMonth), "yyyy-MM-dd");
+  const dashMonthTo = format(endOfMonth(dashMonth), "yyyy-MM-dd");
+  const isCurrentMonth = format(dashMonth, "yyyy-MM") === format(new Date(), "yyyy-MM");
+
+  const monthlyStats = useMemo(() => {
+    const ACTIVE = ["agendado", "atendimento", "em_atendimento", "em atendimento", "presente", "alta",
+                    "ausente", "falta_justificada", "falta_nao_justificada",
+                    "remanejado", "remarcado"];
+    const monthApts = allAppointments.filter(a => {
+      if (!a.date) return false;
+      return a.date >= dashMonthFrom && a.date <= dashMonthTo && ACTIVE.includes((a.status || "").toLowerCase());
+    });
+    const realizados = monthApts.filter(a => {
+      const st = (a.status || "").toLowerCase();
+      return st === "atendimento" || st === "em_atendimento" || st === "em atendimento" || st === "presente" || st === "alta";
+    }).length;
+    const faltas = monthApts.filter(a => {
+      const st = (a.status || "").toLowerCase();
+      return st === "ausente" || st === "falta_justificada" || st === "falta_nao_justificada";
+    }).length;
+    const total = monthApts.length;
+    return { total, realizados, faltas, pendente: total - realizados - faltas };
+  }, [allAppointments, dashMonthFrom, dashMonthTo]);
+
+  // ── Relatorio Multi por profissional ────────────────────────────────────
+  const multiReport = useMemo(() => {
+    const monthApts = allAppointments.filter(a => {
+      if (!a.date) return false;
+      return a.date >= dashMonthFrom && a.date <= dashMonthTo;
+    });
+    const multiApts = monthApts.filter(a => {
+      const notes = (a.notes || "").toLowerCase();
+      return notes.includes("atendimento multi") || notes.includes("multi com");
+    });
+    const byProf = new Map<number, { name: string; count: number }>();
+    for (const a of multiApts) {
+      const entry = byProf.get(a.professionalId) || { name: a.professionalName, count: 0 };
+      entry.count++;
+      byProf.set(a.professionalId, entry);
+    }
+    return Array.from(byProf.values()).sort((a, b) => b.count - a.count);
+  }, [allAppointments, dashMonthFrom, dashMonthTo]);
 
   // ── Batimento cardíaco da clínica (hoje) ─────────────────────────────────
   // Realizado: atendimento concluído (em andamento, presente ou alta naquele dia).
@@ -385,6 +436,91 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+      </Card>
+
+      {/* Navegação Mensal */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-bold font-display">Visão Mensal</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setDashMonth(prev => subMonths(prev, 1))}
+              className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors"
+              title="Mês anterior"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-bold capitalize min-w-[120px] text-center">{dashMonthLabel}</span>
+            <button
+              onClick={() => setDashMonth(prev => addMonths(prev, 1))}
+              className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors"
+              title="Próximo mês"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+            {!isCurrentMonth && (
+              <button
+                onClick={() => setDashMonth(new Date())}
+                className="text-xs text-primary hover:underline ml-2"
+              >
+                Hoje
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-secondary/30 rounded-2xl p-4 text-center border border-border/50">
+            <p className="text-2xl font-bold font-display text-foreground">{monthlyStats.total}</p>
+            <p className="text-xs font-semibold text-muted-foreground mt-1">Total</p>
+          </div>
+          <div className="bg-emerald-500/10 rounded-2xl p-4 text-center border border-emerald-500/20">
+            <p className="text-2xl font-bold font-display text-emerald-400">{monthlyStats.realizados}</p>
+            <p className="text-xs font-semibold text-muted-foreground mt-1">Realizados</p>
+          </div>
+          <div className="bg-red-500/10 rounded-2xl p-4 text-center border border-red-500/20">
+            <p className="text-2xl font-bold font-display text-red-400">{monthlyStats.faltas}</p>
+            <p className="text-xs font-semibold text-muted-foreground mt-1">Faltas</p>
+          </div>
+          <div className="bg-amber-500/10 rounded-2xl p-4 text-center border border-amber-500/20">
+            <p className="text-2xl font-bold font-display text-amber-400">{monthlyStats.pendente}</p>
+            <p className="text-xs font-semibold text-muted-foreground mt-1">Pendentes</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Relatório Multi */}
+      <Card className="p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="w-5 h-5 text-cyan-400" />
+          <h2 className="text-xl font-bold font-display">Atendimentos Multi</h2>
+          <span className="ml-auto text-xs text-muted-foreground font-semibold capitalize">{dashMonthLabel}</span>
+        </div>
+        {multiReport.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Users className="w-10 h-10 text-muted-foreground/40 mb-2" />
+            <p className="text-sm text-muted-foreground">Nenhum atendimento Multi registrado neste mês.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-3 py-1 text-xs font-bold uppercase text-muted-foreground">
+              <span>Profissional</span>
+              <span>Atend. Multi</span>
+            </div>
+            {multiReport.map((r, i) => (
+              <div key={i} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/10">
+                <span className="text-sm font-semibold text-foreground">{r.name}</span>
+                <span className="text-sm font-bold text-cyan-400">{r.count}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between px-3 py-2 border-t border-border mt-2 pt-3">
+              <span className="text-sm font-bold text-muted-foreground">Total Multi</span>
+              <span className="text-lg font-bold text-cyan-400">{multiReport.reduce((s, r) => s + r.count, 0)}</span>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Perfil Multidisciplinar – Teia de Aranha */}

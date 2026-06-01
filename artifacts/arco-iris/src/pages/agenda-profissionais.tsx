@@ -23,7 +23,6 @@ import {
   getPatient,
   updateRecurrenceFrequency,
   materializeVirtualAppointment,
-  setAppointmentPaused,
 } from "@/lib/arco-rpc";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
@@ -334,6 +333,11 @@ export default function AgendaProfissionais() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "appointments", filter: `professional_id=eq.${profId}` },
+        scheduleReload
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "waiting_list" },
         scheduleReload
       )
       .subscribe();
@@ -827,13 +831,39 @@ export default function AgendaProfissionais() {
     if (!pauseModal) return;
     setPauseSending(true);
     try {
-      await setAppointmentPaused(pauseModal.id, true, pauseReason || "Pausa temporária", pauseReturnDate || null);
+      const today = new Date().toISOString().slice(0, 10);
+      const reason = pauseReason || "Pausa temporária";
+      const returnDate = pauseReturnDate || null;
+
+      // 1. Busca TODOS os appointments futuros desse paciente+profissional
+      const futureApts = await listAppointments({
+        professionalId: pauseModal.professionalId,
+        dateFrom: today,
+      });
+      const toUpdate = futureApts.filter(
+        a => a.patientId === pauseModal.patientId &&
+             !["cancelado", "desmarcado", "alta", "desistencia", "obito"].includes((a.status || "").toLowerCase())
+      );
+
+      // 2. Marca cada um como "pausado"
+      for (const a of toUpdate) {
+        await updateAppointment(a.id, { status: "pausado" });
+      }
+
+      // 3. Adiciona paciente na fila de espera com motivo e data de retorno
+      const profSpec = professionals.find(p => p.id === pauseModal.professionalId)?.specialty || null;
+      const notaFila = `Pausa: ${reason}${returnDate ? `. Retorno previsto: ${returnDate}` : ""}`;
+      try {
+        await addPatientToFila(pauseModal.patientId, profSpec, notaFila, true);
+      } catch { /* Se já está na fila, ignora */ }
+
       await createNotificacao({ patientName: pauseModal.patientName || "", professionalName: pauseModal.professionalName, acao: "Pausa Temporária" });
-      setAppointments(prev => prev.map(a => a.id === pauseModal.id ? { ...a, paused: true, pausedAt: new Date().toISOString(), pausedReason: pauseReason || "Pausa temporária", pausedReturnDate: pauseReturnDate || null } : a));
-      toast({ title: "⏸️ Pausado", description: `${pauseModal.patientName} foi pausado temporariamente.` });
+      fetchAppointments();
+      toast({ title: "⏸ Pausado", description: `${pauseModal.patientName} foi pausado e movido para a fila de espera.` });
       setPauseModal(null);
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível pausar.", variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: "Erro ao pausar", description: msg, variant: "destructive" });
     } finally {
       setPauseSending(false);
     }
@@ -842,10 +872,38 @@ export default function AgendaProfissionais() {
   const handleUnpause = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      await setAppointmentPaused(apt.id, false);
+      const today = new Date().toISOString().slice(0, 10);
+
+      // 1. Busca appointments pausados desse paciente+profissional
+      const allApts = await listAppointments({
+        professionalId: apt.professionalId,
+        dateFrom: today,
+      });
+      const pausedApts = allApts.filter(
+        a => a.patientId === apt.patientId && (a.status || "").toLowerCase() === "pausado"
+      );
+
+      // 2. Volta cada um para "agendado"
+      for (const a of pausedApts) {
+        await updateAppointment(a.id, { status: "agendado" });
+      }
+
+      // 3. Remove da fila de espera
+      const profSpec = professionals.find(p => p.id === apt.professionalId)?.specialty || null;
+      try {
+        const fila = await listWaitingList();
+        const entries = fila.filter(e =>
+          e.patientId === apt.patientId &&
+          (!profSpec || (e.specialty || "").toLowerCase().includes((profSpec || "").toLowerCase().slice(0, 5)))
+        );
+        for (const e of entries) {
+          try { await deleteWaitingListEntry(e.id); } catch { /* silencioso */ }
+        }
+      } catch { /* silencioso */ }
+
       await createNotificacao({ patientName: apt.patientName || "", professionalName: apt.professionalName, acao: "Retorno de Pausa" });
-      setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, paused: false, pausedAt: null, pausedReason: null, pausedReturnDate: null } : a));
-      toast({ title: "▶️ Retomado", description: `${apt.patientName} voltou ao status normal.` });
+      fetchAppointments();
+      toast({ title: "▶ Retomado", description: `${apt.patientName} voltou para a agenda com status "Agendado".` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível retomar.", variant: "destructive" });
     }
