@@ -651,7 +651,13 @@ export default function Reception() {
   const reloadAppointments = useCallback(() => {
     const opts = profIdFilter ? { professionalId: parseInt(profIdFilter) } : undefined;
     return listAppointmentsToday(opts)
-      .then((data) => { setAppointments(data); setIsLoading(false); reloadAbsences(); })
+      .then((data) => {
+        // Oculta pacientes com status terminal (Alta/Óbito/Desistência) da recepção.
+        const TERMINAL = ["alta", "óbito", "obito", "desistência", "desistencia"];
+        setAppointments(data.filter(a => !TERMINAL.includes((a.patientStatus ?? "").toLowerCase())));
+        setIsLoading(false);
+        reloadAbsences();
+      })
       .catch((e) => { console.error(e); setIsLoading(false); });
   }, [profIdFilter, reloadAbsences]);
 

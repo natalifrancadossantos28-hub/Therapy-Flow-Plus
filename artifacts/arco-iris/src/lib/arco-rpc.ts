@@ -890,6 +890,7 @@ export type AppointmentToday = {
   recurrenceGroupId: string | null;
   frequency: AppointmentFrequency | string;
   patientName: string;
+  patientStatus: string;
   patientPhone: string | null;
   patientAbsenceCount: number;
   professionalName: string;
@@ -912,6 +913,7 @@ type AppointmentTodayRow = {
   recurrence_group_id: string | null;
   frequency: string;
   patient_name: string;
+  patient_status: string | null;
   patient_phone: string | null;
   patient_absence_count: number | string;
   professional_name: string;
@@ -935,6 +937,7 @@ function mapAppointmentToday(r: AppointmentTodayRow): AppointmentToday {
     recurrenceGroupId: r.recurrence_group_id,
     frequency: r.frequency,
     patientName: r.patient_name,
+    patientStatus: r.patient_status ?? "",
     patientPhone: r.patient_phone,
     patientAbsenceCount: Number(r.patient_absence_count ?? 0),
     professionalName: r.professional_name,
@@ -974,6 +977,7 @@ export type AppointmentListItem = {
   recurrenceGroupId: string | null;
   frequency: AppointmentFrequency | string;
   patientName: string;
+  patientStatus: string;
   guardianName: string | null;
   guardianPhone: string | null;
   professionalName: string;
@@ -1002,6 +1006,7 @@ type AppointmentListRow = {
   recurrence_group_id: string | null;
   frequency: string;
   patient_name: string;
+  patient_status: string | null;
   guardian_name: string | null;
   guardian_phone: string | null;
   professional_name: string;
@@ -1031,6 +1036,7 @@ function mapAppointmentListItem(r: AppointmentListRow): AppointmentListItem {
     recurrenceGroupId: r.recurrence_group_id,
     frequency: r.frequency,
     patientName: r.patient_name,
+    patientStatus: r.patient_status ?? "",
     guardianName: r.guardian_name,
     guardianPhone: r.guardian_phone,
     professionalName: r.professional_name,
