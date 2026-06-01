@@ -279,14 +279,16 @@ router.patch("/appointments/:id", async (req, res) => {
     .where(eq(appointmentsTable.id, id))
     .returning();
 
-  const ABSENCE_STATUSES = ["ausente", "falta_justificada", "falta_nao_justificada"];
-  const wasAbsence = ABSENCE_STATUSES.includes(existing.status ?? "");
-  const isAbsence  = ABSENCE_STATUSES.includes(status ?? "");
+  // Apenas faltas NÃO justificadas contam no histórico/limite de faltas.
+  // 'falta_justificada' é abonada: não soma em absence_count e zera a sequência.
+  const COUNTED_ABSENCES = ["ausente", "falta_nao_justificada"];
+  const wasCounted = COUNTED_ABSENCES.includes(existing.status ?? "");
+  const isCounted  = COUNTED_ABSENCES.includes(status ?? "");
+  const isJustified = status === "falta_justificada";
 
   let patientAfter: any = null;
 
-  if (status && isAbsence && !wasAbsence) {
-    // Registrar nova falta
+  if (status && (isCounted !== wasCounted || isJustified)) {
     const [patient] = await db.select({
       absenceCount: patientsTable.absenceCount,
       consecutiveUnjustifiedAbsences: patientsTable.consecutiveUnjustifiedAbsences,
@@ -294,34 +296,22 @@ router.patch("/appointments/:id", async (req, res) => {
       trabalhoNaRoca: patientsTable.trabalhoNaRoca,
     }).from(patientsTable).where(eq(patientsTable.id, existing.patientId));
 
-    const newAbsenceCount = (patient?.absenceCount ?? 0) + 1;
+    let newAbsenceCount = patient?.absenceCount ?? 0;
     let newConsecutive = patient?.consecutiveUnjustifiedAbsences ?? 0;
 
-    if (status === "falta_nao_justificada" || status === "ausente") {
-      newConsecutive += 1;
-    } else if (status === "falta_justificada") {
-      newConsecutive = 0; // justificada zera a sequência
+    if (isCounted && !wasCounted) {
+      // Nova falta não justificada
+      newAbsenceCount = (patient?.absenceCount ?? 0) + 1;
+      newConsecutive = (patient?.consecutiveUnjustifiedAbsences ?? 0) + 1;
+    } else if (wasCounted && !isCounted) {
+      // Saindo de uma falta não justificada (revertida ou abonada)
+      newAbsenceCount = Math.max(0, (patient?.absenceCount ?? 1) - 1);
+      newConsecutive = Math.max(0, (patient?.consecutiveUnjustifiedAbsences ?? 0) - 1);
     }
 
-    const [updated] = await db.update(patientsTable)
-      .set({ absenceCount: newAbsenceCount, consecutiveUnjustifiedAbsences: newConsecutive })
-      .where(eq(patientsTable.id, existing.patientId))
-      .returning();
-    patientAfter = updated;
-
-  } else if (wasAbsence && status && !isAbsence) {
-    // Revertendo falta
-    const [patient] = await db.select({
-      absenceCount: patientsTable.absenceCount,
-      consecutiveUnjustifiedAbsences: patientsTable.consecutiveUnjustifiedAbsences,
-      escolaPublica: patientsTable.escolaPublica,
-      trabalhoNaRoca: patientsTable.trabalhoNaRoca,
-    }).from(patientsTable).where(eq(patientsTable.id, existing.patientId));
-
-    const newAbsenceCount = Math.max(0, (patient?.absenceCount ?? 1) - 1);
-    let newConsecutive = patient?.consecutiveUnjustifiedAbsences ?? 0;
-    if (existing.status === "falta_nao_justificada" || existing.status === "ausente") {
-      newConsecutive = Math.max(0, newConsecutive - 1);
+    if (isJustified) {
+      // Falta justificada (abonada) zera a sequência de faltas não justificadas
+      newConsecutive = 0;
     }
 
     const [updated] = await db.update(patientsTable)
