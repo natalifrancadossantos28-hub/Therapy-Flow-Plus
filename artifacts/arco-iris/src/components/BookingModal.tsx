@@ -114,10 +114,11 @@ export default function BookingModal({
     }
 
     // Trava de selecao: carrega pacientes que ja tem horario ativo futuro
-    // com esse profissional para nao aparecerem como "disponiveis".
+    // com QUALQUER profissional para nao aparecerem como "disponiveis" na fila.
+    // Regra global: se paciente ja esta agendado, nao pode aparecer na fila de ninguem.
     const today = new Date().toISOString().slice(0, 10);
     try {
-      const apts = await listAppointments({ professionalId, dateFrom: today });
+      const apts = await listAppointments({ dateFrom: today });
       const ids = new Set<number>();
       const activeStatuses = ["agendado", "atendimento", "em_atendimento", "em atendimento", "presente"];
       for (const a of apts) {
@@ -186,11 +187,12 @@ export default function BookingModal({
 
   // Pacientes em busca ativa (congelados) nao entram na disputa por vaga.
   const matchedBySpec = waitingList.filter(e => !e.paused && matchesSpecialty(e.specialty, professionalSpecialty));
-  // Filtro de Disponibilidade: remove pacientes já agendados neste horário com outro profissional.
-  // No Portal do Profissional (adminMode=false) também remove quem já tem horário com ESTE profissional.
+  // Filtro Global: remove pacientes que já têm agendamento ativo com QUALQUER profissional.
+  // Regra: se já está agendado em qualquer agenda, não pode aparecer na fila de nenhum profissional.
+  // Isso evita duplicidade (ex: Isis agendada com Isabela aparecendo na fila da Bianca).
   const filteredList = matchedBySpec.filter(e => {
     if (bookedAtSlotIds.has(e.patientId)) return false;
-    if (!adminMode && alreadyScheduledIds.has(e.patientId)) return false;
+    if (alreadyScheduledIds.has(e.patientId)) return false;
     return true;
   });
   const nextPatient = filteredList[0] ?? null;
@@ -222,21 +224,38 @@ export default function BookingModal({
 
     const targetPatientId = isDirect ? selectedDirect!.id : nextPatient!.patientId;
     const targetPatientName = isDirect ? selectedDirect!.name : nextPatient!.patientName;
-    // Trava final: no Portal do Profissional, nao permite agendar paciente
-    // que ja tem horario ativo com esse profissional. Admin (adminMode=true)
-    // passa direto e pode adicionar 2o/3o horario.
-    if (!adminMode && alreadyScheduledIds.has(targetPatientId)) {
+    // Trava final: nao permite agendar paciente que ja tem horario ativo
+    // com QUALQUER profissional. Admin pode forçar em Busca Direta.
+    if (alreadyScheduledIds.has(targetPatientId) && !(adminMode && isDirect)) {
       setError(
-        `${targetPatientName} já tem horário ativo com você. Solicite à Recepção para agendar um segundo horário.`
+        `${targetPatientName} já possui agendamento ativo com outro profissional. ` +
+        `Não é possível agendar novamente pela fila.`
       );
       return;
     }
 
     setLoading(true);
     try {
+      // Re-validação global: verifica se o paciente foi agendado por outro
+      // profissional enquanto o modal estava aberto.
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const freshGlobalApts = await listAppointments({ patientId: targetPatientId, dateFrom: todayStr });
+      const activeStatuses = ["agendado", "atendimento", "em_atendimento", "em atendimento", "presente"];
+      const hasActiveAnywhere = freshGlobalApts.some(a =>
+        activeStatuses.includes(a.status.toLowerCase())
+      );
+      if (hasActiveAnywhere && !(adminMode && isDirect)) {
+        setError(
+          `${targetPatientName} já foi agendado por outro profissional. ` +
+          `A lista será atualizada automaticamente.`
+        );
+        void loadData();
+        setLoading(false);
+        return;
+      }
+
       // Bloqueio de Duplicidade: re-valida se o paciente ainda está disponível
-      // neste horário antes de confirmar. Protege contra dois profissionais
-      // clicando no mesmo paciente ao mesmo tempo.
+      // neste horário antes de confirmar.
       const freshApts = await listAppointments({ date });
       const alreadyTaken = freshApts.some(
         a => a.patientId === targetPatientId && a.time === time &&
@@ -250,28 +269,6 @@ export default function BookingModal({
         void loadData();
         setLoading(false);
         return;
-      }
-
-      // Validação de Duplicidade por Especialidade: impede novo agendamento
-      // para o mesmo paciente se já tem agendamento ativo/recorrente com
-      // qualquer profissional da mesma especialidade.
-      // Admin pode forçar (ex: transferir paciente entre profissionais da mesma especialidade).
-      if (professionalSpecialty && !adminMode) {
-        const today = new Date().toISOString().slice(0, 10);
-        const patientApts = await listAppointments({ patientId: targetPatientId, dateFrom: today });
-        const hasActiveInSpecialty = patientApts.some(a => {
-          if (a.status !== "agendado" && a.status !== "atendimento") return false;
-          const aptSpec = profSpecialtyMap.get(a.professionalId) ?? "";
-          return aptSpec.trim().toLowerCase() === professionalSpecialty.trim().toLowerCase();
-        });
-        if (hasActiveInSpecialty) {
-          setError(
-            `${targetPatientName} já possui um agendamento ativo/recorrente em ${professionalSpecialty}. ` +
-            `Não é possível criar outro agendamento para a mesma especialidade.`
-          );
-          setLoading(false);
-          return;
-        }
       }
 
       await createAppointments({
@@ -402,14 +399,14 @@ export default function BookingModal({
                     {waitingList.length === 0
                       ? "Fila de espera vazia"
                       : queueBlockedCount > 0
-                        ? `Todos os pacientes de ${professionalSpecialty} na fila já têm horário com você`
+                        ? `Todos os pacientes na fila já possuem agendamento ativo`
                         : `Nenhum paciente de ${professionalSpecialty} na fila`}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {waitingList.length === 0
                       ? "Não há pacientes aguardando vaga."
                       : queueBlockedCount > 0
-                        ? "Fale com a Recepção se precisar de um segundo horário para o mesmo paciente."
+                        ? `${queueBlockedCount} paciente(s) oculto(s) pois já possuem agendamento com outro profissional.`
                         : "Pacientes de outras especialidades foram filtrados."}
                   </p>
                   {adminMode && (
