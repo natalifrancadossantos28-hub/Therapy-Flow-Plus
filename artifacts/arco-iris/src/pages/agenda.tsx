@@ -189,6 +189,7 @@ type Appointment = {
   id: number;
   patientId: number;
   patientName?: string | null;
+  patientStatus?: string | null;
   guardianName?: string | null;
   guardianPhone?: string | null;
   professionalName?: string | null;
@@ -464,7 +465,13 @@ export default function Agenda() {
       dateFrom,
       dateTo,
     })
-      .then((list) => setAppointments(withCiclo(list) as Appointment[]))
+      .then((list) => setAppointments(
+        withCiclo(
+          // Oculta pacientes com status terminal (Alta/Óbito/Desistência):
+          // mesmo com agendamento, não devem aparecer na agenda (evita "fantasmas").
+          list.filter(a => !TERMINAL_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))
+        ) as Appointment[]
+      ))
       .catch((err) => {
         console.error("fetchAppointments error:", err);
         toast({ title: "Erro ao carregar agenda", description: err?.message || String(err), variant: "destructive" });

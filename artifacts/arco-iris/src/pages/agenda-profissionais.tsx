@@ -164,7 +164,7 @@ function applyFrequencyFilter<T extends { date: string; recurrenceGroupId?: stri
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
-type Appointment = { id: number; patientId: number; patientName?: string; guardianName?: string | null; professionalName?: string | null; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; paused?: boolean; pausedAt?: string | null; pausedReason?: string | null; pausedReturnDate?: string | null; };
+type Appointment = { id: number; patientId: number; patientName?: string; patientStatus?: string | null; guardianName?: string | null; professionalName?: string | null; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; paused?: boolean; pausedAt?: string | null; pausedReason?: string | null; pausedReturnDate?: string | null; };
 
 type AbsenceAlert = { patientName: string; professionalName: string; professionalSpecialty: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
@@ -297,7 +297,8 @@ export default function AgendaProfissionais() {
     const dateTo = format(rangeEnd, "yyyy-MM-dd");
     loadedRangeRef.current = { from: dateFrom, to: dateTo };
     listAppointments({ professionalId: parseInt(selectedProfId), dateFrom, dateTo })
-      .then(setAppointments)
+      // Oculta pacientes com status terminal (Alta/Óbito/Desistência) da agenda.
+      .then((list) => setAppointments(list.filter(a => !TERMINAL_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))))
       .catch((err) => {
         console.error("fetchAppointments error:", err);
         toast({ title: "Erro ao carregar agenda", description: err?.message || String(err), variant: "destructive" });
