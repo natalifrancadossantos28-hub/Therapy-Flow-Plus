@@ -176,8 +176,11 @@ export default function BookingModal({
         scheduleReload
       )
       .subscribe();
-    // Fallback polling: garante sincronização mesmo se Realtime falhar
-    const pollInterval = setInterval(() => { void loadData(); }, 5000);
+    // Fallback polling: garante sincronização mesmo se Realtime falhar.
+    // O Realtime acima já recarrega em ~400ms a cada mudança, então este é só
+    // uma rede de segurança — 30s evita refetch pesado (agendamentos/pacientes)
+    // a cada 5s enquanto o modal está aberto.
+    const pollInterval = setInterval(() => { void loadData(); }, 30_000);
     return () => {
       clearInterval(pollInterval);
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
