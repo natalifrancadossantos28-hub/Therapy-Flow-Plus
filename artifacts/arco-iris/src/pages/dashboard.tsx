@@ -74,6 +74,9 @@ export default function Dashboard() {
   const [dashMonth, setDashMonth] = useState<Date>(new Date());
   const [allAppointments, setAllAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
   const [monthAppointments, setMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
+  // Mês corrente (fixo em "hoje"), independente do navegador da Visão Mensal —
+  // usado na Performance dos Profissionais (aba "Mês Atual").
+  const [currentMonthAppointments, setCurrentMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
 
   // Faltas por profissional (não geral)
   type AbsenceByProf = { patientId: number; patientName: string; professionalName: string; specialty: string; count: number };
@@ -129,6 +132,16 @@ export default function Dashboard() {
       .then(apts => setMonthAppointments(apts))
       .catch(() => setMonthAppointments([]));
   }, [dashMonth]);
+
+  // ── Fetch appointments do mês corrente (fixo em hoje) ──
+  useEffect(() => {
+    const now = new Date();
+    const mFrom = format(startOfMonth(now), "yyyy-MM-dd");
+    const mTo = format(endOfMonth(now), "yyyy-MM-dd");
+    listAppointments({ dateFrom: mFrom, dateTo: mTo })
+      .then(apts => setCurrentMonthAppointments(apts))
+      .catch(() => setCurrentMonthAppointments([]));
+  }, []);
 
   const fetchOcupacao = useCallback(() => {
     listProfessionalsCapacity()
@@ -201,9 +214,14 @@ export default function Dashboard() {
       return true;
     });
 
-    const realizados = unique.filter(a => REALIZADOS_ST.includes((a.status || "").toLowerCase())).length;
-    const faltas = unique.filter(a => FALTAS_ST.includes((a.status || "").toLowerCase())).length;
-    const cancelados = unique.filter(a => CANCELADOS_ST.includes((a.status || "").toLowerCase())).length;
+    // Realizados/faltas só contam até hoje — agendamentos futuros (recorrências do mês)
+    // não devem inflar a contagem de já realizados (mesma regra da RPC, migração 0040).
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const upToToday = unique.filter(a => (a.date || "") <= todayStr);
+
+    const realizados = upToToday.filter(a => REALIZADOS_ST.includes((a.status || "").toLowerCase())).length;
+    const faltas = upToToday.filter(a => FALTAS_ST.includes((a.status || "").toLowerCase())).length;
+    const cancelados = upToToday.filter(a => CANCELADOS_ST.includes((a.status || "").toLowerCase())).length;
     const agendados = unique.filter(a => (a.status || "").toLowerCase() === "agendado").length;
 
     return { total: realizados + faltas, realizados, faltas, cancelados, agendados };
@@ -213,10 +231,13 @@ export default function Dashboard() {
   const multiReport = useMemo(() => {
     // Só conta Multi de atendimentos REALIZADOS (não agendados futuros)
     const REALIZADOS_ST = ["atendimento", "em_atendimento", "em atendimento", "presente", "alta"];
+    // Só conta até hoje — recorrências futuras não inflam o Multi do mês.
+    const todayStr = format(new Date(), "yyyy-MM-dd");
     const multiApts = monthAppointments.filter(a => {
       const notes = (a.notes || "").toLowerCase();
       const st = (a.status || "").toLowerCase();
-      return REALIZADOS_ST.includes(st) &&
+      return (a.date || "") <= todayStr &&
+        REALIZADOS_ST.includes(st) &&
         (notes.includes("atendimento multi") || notes.includes("multi com") || notes.includes("multi:"));
     });
     // Deduplica por profissional+paciente+data (evita contar o mesmo atendimento 2x)
@@ -304,22 +325,30 @@ export default function Dashboard() {
       }
     }
 
-    for (const a of todayAppointments || []) {
-      const st = (a.status || "").toLowerCase();
-      const profId = a.professionalId;
-      if (!profId || !profMap[profId]) continue;
-      if (st === "presente" || st === "atendimento") {
-        profMap[profId].atendimentos++;
-      }
-    }
-
     if (perfFilter === "total") {
+      // Total geral: caseload atual em atendimento por profissional.
       for (const p of patients || []) {
         if (!p.professionalId || !profMap[p.professionalId]) continue;
         const st = (p.status || "").toLowerCase();
         if (st === "atendimento" || st === "em atendimento") {
           profMap[p.professionalId].atendimentos++;
         }
+      }
+    } else {
+      // Mês atual: atendimentos REALIZADOS no mês, contando só até hoje
+      // (recorrências futuras não entram). Dedup por prof+paciente+data+hora.
+      const REALIZADOS_ST = ["atendimento", "em_atendimento", "em atendimento", "presente", "alta"];
+      const todayStr = format(new Date(), "yyyy-MM-dd");
+      const seenAtend = new Set<string>();
+      for (const a of currentMonthAppointments || []) {
+        const profId = a.professionalId;
+        if (!profId || !profMap[profId]) continue;
+        if ((a.date || "") > todayStr) continue;
+        if (!REALIZADOS_ST.includes((a.status || "").toLowerCase())) continue;
+        const key = `${profId}-${a.patientId}-${a.date}-${a.time}`;
+        if (seenAtend.has(key)) continue;
+        seenAtend.add(key);
+        profMap[profId].atendimentos++;
       }
     }
 
@@ -336,7 +365,7 @@ export default function Dashboard() {
     const byAtend = [...arr].sort((a, b) => b.atendimentos - a.atendimentos).filter(x => x.atendimentos > 0);
 
     return { byAltas, byAtend, chartData: arr.filter(x => x.altas > 0 || x.atendimentos > 0).sort((a, b) => (b.altas + b.atendimentos) - (a.altas + a.atendimentos)).slice(0, 10) };
-  }, [patients, professionals, todayAppointments, perfFilter]);
+  }, [patients, professionals, currentMonthAppointments, perfFilter]);
 
   // ── Perfil de pacientes por profissional ──────────────────────────────────
   const profPerfil = useMemo(() => {
