@@ -218,6 +218,10 @@ export default function AgendaProfissionais() {
     else if (dow === 6) d.setDate(d.getDate() + 2);
     return d;
   });
+  // Espelha weekRef num ref para que recargas de Realtime/polling/foco usem
+  // sempre a semana visível atual (evita closure "presa" numa semana antiga).
+  const weekRefLatest = useRef(weekRef);
+  weekRefLatest.current = weekRef;
   const goPrevWeek = () => setWeekRef(prev => addDays(prev, -7));
   const goNextWeek = () => setWeekRef(prev => addDays(prev, 7));
   const goThisWeek = () => {
@@ -330,7 +334,7 @@ export default function AgendaProfissionais() {
     const profId = parseInt(selectedProfId);
     const scheduleReload = () => {
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
-      reloadTimerRef.current = setTimeout(() => { fetchAppointments(); }, 400);
+      reloadTimerRef.current = setTimeout(() => { fetchAppointments(weekRefLatest.current); }, 400);
     };
     const channel = supabase
       .channel(`agenda-prof-${profId}`)
@@ -348,6 +352,25 @@ export default function AgendaProfissionais() {
     return () => {
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
       void supabase?.removeChannel(channel);
+    };
+  }, [selectedProfId, pinVerified]);
+
+  // Rede de segurança da sincronia: além do Realtime (instantâneo), garante que
+  // a agenda convirja mesmo se um evento Realtime se perder ou a aba ficar em
+  // segundo plano. Recarrega ao voltar o foco/visibilidade da aba e a cada 30s.
+  useEffect(() => {
+    if (!pinVerified || !selectedProfId) return;
+    const reloadNow = () => fetchAppointments(weekRefLatest.current);
+    const onVisible = () => { if (document.visibilityState === "visible") reloadNow(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", reloadNow);
+    const poll = setInterval(() => {
+      if (document.visibilityState === "visible") reloadNow();
+    }, 30_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", reloadNow);
+      clearInterval(poll);
     };
   }, [selectedProfId, pinVerified]);
 
