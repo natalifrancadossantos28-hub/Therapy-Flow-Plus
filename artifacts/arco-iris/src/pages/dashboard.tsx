@@ -72,53 +72,53 @@ export default function Dashboard() {
   const [perfFilter, setPerfFilter] = useState<"mes" | "total">("mes");
   const [histFilter, setHistFilter] = useState<"ano" | "acumulado">("ano");
   const [dashMonth, setDashMonth] = useState<Date>(new Date());
-  const [allAppointments, setAllAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
   const [monthAppointments, setMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
+  // Mês corrente (fixo em "hoje"), independente do navegador da Visão Mensal —
+  // usado na Performance dos Profissionais (aba "Mês Atual").
+  const [currentMonthAppointments, setCurrentMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
 
   // Faltas por profissional (não geral)
   type AbsenceByProf = { patientId: number; patientName: string; professionalName: string; specialty: string; count: number };
   const [absencesByProf, setAbsencesByProf] = useState<AbsenceByProf[]>([]);
 
-  const fetchAll = useCallback(() => {
-    listPatients().then(setPatients).catch(console.error);
-    listProfessionals().then(setProfessionals).catch(console.error);
+  // Dados "vivos" — atualizados a cada 30s (cards de hoje, fila e presença).
+  const fetchLive = useCallback(() => {
     listAppointmentsToday().then(setTodayAppointments).catch(console.error);
     listWaitingList().then(setWaitingList).catch(console.error);
     getAppointmentsStats().then(setAptStats).catch(console.error);
+  }, []);
+
+  // Dados que mudam pouco na sessão — carregados UMA vez (sem polling de 30s):
+  // pacientes, profissionais, longa permanência e os alertas de faltas.
+  useEffect(() => {
+    listPatients().then(setPatients).catch(console.error);
     listLongAttendancePatients(12).then(setLongAttendance).catch(() => setLongAttendance([]));
-    // Carrega todos agendamentos para cálculos mensais e Multi
-    listAppointments().then(apts => {
-      setAllAppointments(apts);
+
+    // Profissionais + leitura completa de agendamentos em paralelo, uma única vez.
+    // Antes isto rodava a cada 30s (incluindo um listProfessionals duplicado),
+    // o que deixava o Dashboard pesado.
+    Promise.allSettled([listProfessionals(), listAppointments()]).then(([pr, ar]) => {
+      const profs = pr.status === "fulfilled" ? pr.value : [];
+      setProfessionals(profs);
+      if (ar.status !== "fulfilled") { setAbsencesByProf([]); return; }
       // Faltas POR PROFISSIONAL — só alerta quando >= 3 com o MESMO profissional
       const ABSENCE = ["ausente", "falta_nao_justificada"];
-      const key = (pid: number, profId: number) => `${pid}|${profId}`;
+      const specMap = new Map(profs.map(p => [p.name, p.specialty || "—"]));
       const map = new Map<string, { patientId: number; patientName: string; professionalName: string; count: number }>();
-      for (const a of apts) {
+      for (const a of ar.value) {
         const st = (a.status || "").toLowerCase();
         if (!ABSENCE.includes(st)) continue;
-        const k = key(a.patientId, a.professionalId);
+        const k = `${a.patientId}|${a.professionalId}`;
         const entry = map.get(k) || { patientId: a.patientId, patientName: a.patientName, professionalName: a.professionalName, count: 0 };
         entry.count++;
         map.set(k, entry);
       }
-      // Enriquecer com especialidade do profissional
-      listProfessionals().then(profs => {
-        const specMap = new Map(profs.map(p => [p.name, p.specialty || "—"]));
-        const alerts: AbsenceByProf[] = [];
-        for (const v of map.values()) {
-          if (v.count >= 3) {
-            alerts.push({ ...v, specialty: specMap.get(v.professionalName) || "—" });
-          }
-        }
-        setAbsencesByProf(alerts);
-      }).catch(() => {
-        const alerts: AbsenceByProf[] = [];
-        for (const v of map.values()) {
-          if (v.count >= 3) alerts.push({ ...v, specialty: "—" });
-        }
-        setAbsencesByProf(alerts);
-      });
-    }).catch(() => setAbsencesByProf([]));
+      const alerts: AbsenceByProf[] = [];
+      for (const v of map.values()) {
+        if (v.count >= 3) alerts.push({ ...v, specialty: specMap.get(v.professionalName) || "—" });
+      }
+      setAbsencesByProf(alerts);
+    });
   }, []);
 
   // ── Fetch appointments do mês selecionado (com dateFrom/dateTo para trazer TODOS) ──
@@ -128,6 +128,20 @@ export default function Dashboard() {
     listAppointments({ dateFrom: mFrom, dateTo: mTo })
       .then(apts => setMonthAppointments(apts))
       .catch(() => setMonthAppointments([]));
+  }, [dashMonth]);
+
+  // ── Fetch appointments do mês corrente (fixo em hoje) ──
+  // Só busca quando a Visão Mensal está navegada para outro mês; quando está no
+  // mês atual (padrão), reusamos monthAppointments para evitar query duplicada.
+  useEffect(() => {
+    const now = new Date();
+    const sameMonth = format(dashMonth, "yyyy-MM") === format(now, "yyyy-MM");
+    if (sameMonth) { setCurrentMonthAppointments([]); return; }
+    const mFrom = format(startOfMonth(now), "yyyy-MM-dd");
+    const mTo = format(endOfMonth(now), "yyyy-MM-dd");
+    listAppointments({ dateFrom: mFrom, dateTo: mTo })
+      .then(apts => setCurrentMonthAppointments(apts))
+      .catch(() => setCurrentMonthAppointments([]));
   }, [dashMonth]);
 
   const fetchOcupacao = useCallback(() => {
@@ -158,7 +172,7 @@ export default function Dashboard() {
   }, []);
 
   // Visibility-aware: pausa polling quando a aba está oculta
-  useVisibleInterval(fetchAll, POLL_MS);
+  useVisibleInterval(fetchLive, POLL_MS);
   useVisibleInterval(fetchOcupacao, POLL_MS);
 
   const totalPatients = patients?.length || 0;
@@ -201,9 +215,14 @@ export default function Dashboard() {
       return true;
     });
 
-    const realizados = unique.filter(a => REALIZADOS_ST.includes((a.status || "").toLowerCase())).length;
-    const faltas = unique.filter(a => FALTAS_ST.includes((a.status || "").toLowerCase())).length;
-    const cancelados = unique.filter(a => CANCELADOS_ST.includes((a.status || "").toLowerCase())).length;
+    // Realizados/faltas só contam até hoje — agendamentos futuros (recorrências do mês)
+    // não devem inflar a contagem de já realizados (mesma regra da RPC, migração 0040).
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const upToToday = unique.filter(a => (a.date || "") <= todayStr);
+
+    const realizados = upToToday.filter(a => REALIZADOS_ST.includes((a.status || "").toLowerCase())).length;
+    const faltas = upToToday.filter(a => FALTAS_ST.includes((a.status || "").toLowerCase())).length;
+    const cancelados = upToToday.filter(a => CANCELADOS_ST.includes((a.status || "").toLowerCase())).length;
     const agendados = unique.filter(a => (a.status || "").toLowerCase() === "agendado").length;
 
     return { total: realizados + faltas, realizados, faltas, cancelados, agendados };
@@ -213,10 +232,13 @@ export default function Dashboard() {
   const multiReport = useMemo(() => {
     // Só conta Multi de atendimentos REALIZADOS (não agendados futuros)
     const REALIZADOS_ST = ["atendimento", "em_atendimento", "em atendimento", "presente", "alta"];
+    // Só conta até hoje — recorrências futuras não inflam o Multi do mês.
+    const todayStr = format(new Date(), "yyyy-MM-dd");
     const multiApts = monthAppointments.filter(a => {
       const notes = (a.notes || "").toLowerCase();
       const st = (a.status || "").toLowerCase();
-      return REALIZADOS_ST.includes(st) &&
+      return (a.date || "") <= todayStr &&
+        REALIZADOS_ST.includes(st) &&
         (notes.includes("atendimento multi") || notes.includes("multi com") || notes.includes("multi:"));
     });
     // Deduplica por profissional+paciente+data (evita contar o mesmo atendimento 2x)
@@ -304,22 +326,32 @@ export default function Dashboard() {
       }
     }
 
-    for (const a of todayAppointments || []) {
-      const st = (a.status || "").toLowerCase();
-      const profId = a.professionalId;
-      if (!profId || !profMap[profId]) continue;
-      if (st === "presente" || st === "atendimento") {
-        profMap[profId].atendimentos++;
-      }
-    }
-
     if (perfFilter === "total") {
+      // Total geral: caseload atual em atendimento por profissional.
       for (const p of patients || []) {
         if (!p.professionalId || !profMap[p.professionalId]) continue;
         const st = (p.status || "").toLowerCase();
         if (st === "atendimento" || st === "em atendimento") {
           profMap[p.professionalId].atendimentos++;
         }
+      }
+    } else {
+      // Mês atual: atendimentos REALIZADOS no mês, contando só até hoje
+      // (recorrências futuras não entram). Dedup por prof+paciente+data+hora.
+      const REALIZADOS_ST = ["atendimento", "em_atendimento", "em atendimento", "presente", "alta"];
+      const todayStr = format(new Date(), "yyyy-MM-dd");
+      // No mês atual reusa monthAppointments; se navegado, usa o dataset dedicado.
+      const perfApts = isCurrentMonth ? monthAppointments : currentMonthAppointments;
+      const seenAtend = new Set<string>();
+      for (const a of perfApts || []) {
+        const profId = a.professionalId;
+        if (!profId || !profMap[profId]) continue;
+        if ((a.date || "") > todayStr) continue;
+        if (!REALIZADOS_ST.includes((a.status || "").toLowerCase())) continue;
+        const key = `${profId}-${a.patientId}-${a.date}-${a.time}`;
+        if (seenAtend.has(key)) continue;
+        seenAtend.add(key);
+        profMap[profId].atendimentos++;
       }
     }
 
@@ -336,7 +368,7 @@ export default function Dashboard() {
     const byAtend = [...arr].sort((a, b) => b.atendimentos - a.atendimentos).filter(x => x.atendimentos > 0);
 
     return { byAltas, byAtend, chartData: arr.filter(x => x.altas > 0 || x.atendimentos > 0).sort((a, b) => (b.altas + b.atendimentos) - (a.altas + a.atendimentos)).slice(0, 10) };
-  }, [patients, professionals, todayAppointments, perfFilter]);
+  }, [patients, professionals, isCurrentMonth, monthAppointments, currentMonthAppointments, perfFilter]);
 
   // ── Perfil de pacientes por profissional ──────────────────────────────────
   const profPerfil = useMemo(() => {
