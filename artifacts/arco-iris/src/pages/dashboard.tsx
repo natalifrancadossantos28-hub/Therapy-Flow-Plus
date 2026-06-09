@@ -12,6 +12,7 @@ import {
   type Patient,
   type Professional as ArcoProfessional,
   type AppointmentToday,
+  type AppointmentListItem,
   type WaitingListEntry,
   type LongAttendancePatient,
   type PausedOverviewItem,
@@ -24,7 +25,7 @@ import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Responsi
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 // ── Faixas Etárias ────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ type Ocupacao = {
 };
 
 const POLL_MS = 30_000; // 30 s
+const TERMINAL_PT_STATUSES = new Set(["alta", "obito", "óbito", "desistencia", "desistência"]);
 
 export default function Dashboard() {
   useDocumentTitle("Dashboard");
@@ -72,6 +74,9 @@ export default function Dashboard() {
   const [perfFilter, setPerfFilter] = useState<"mes" | "total">("mes");
   const [histFilter, setHistFilter] = useState<"ano" | "acumulado">("ano");
   const [dashMonth, setDashMonth] = useState<Date>(new Date());
+  // Semana selecionada no card "Atendimentos da Semana" (segunda-feira)
+  const [multiWeek, setMultiWeek] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [weekAppointments, setWeekAppointments] = useState<AppointmentListItem[]>([]);
   const [monthAppointments, setMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
   // Mês corrente (fixo em "hoje"), independente do navegador da Visão Mensal —
   // usado na Performance dos Profissionais (aba "Mês Atual").
@@ -129,6 +134,15 @@ export default function Dashboard() {
       .then(apts => setMonthAppointments(apts))
       .catch(() => setMonthAppointments([]));
   }, [dashMonth]);
+
+  // ── Fetch appointments da semana selecionada (card Multi/Total semanal) ──
+  useEffect(() => {
+    const wFrom = format(multiWeek, "yyyy-MM-dd");
+    const wTo = format(addDays(multiWeek, 4), "yyyy-MM-dd"); // Seg–Sex
+    listAppointments({ dateFrom: wFrom, dateTo: wTo })
+      .then(apts => setWeekAppointments(apts))
+      .catch(() => setWeekAppointments([]));
+  }, [multiWeek]);
 
   // ── Fetch appointments do mês corrente (fixo em hoje) ──
   // Só busca quando a Visão Mensal está navegada para outro mês; quando está no
@@ -228,32 +242,21 @@ export default function Dashboard() {
     return { total: realizados + faltas, realizados, faltas, cancelados, agendados };
   }, [monthAppointments]);
 
-  // ── Relatorio Multi por profissional ────────────────────────────────────
-  const multiReport = useMemo(() => {
-    // Só conta Multi de atendimentos REALIZADOS (não agendados futuros)
-    const REALIZADOS_ST = ["atendimento", "em_atendimento", "em atendimento", "presente", "alta"];
-    // Só conta até hoje — recorrências futuras não inflam o Multi do mês.
-    const todayStr = format(new Date(), "yyyy-MM-dd");
-    const multiApts = monthAppointments.filter(a => {
+  // ── Relatório semanal por profissional (Total + Multi) ────────────────────
+  const weeklyReport = useMemo(() => {
+    const byProf = new Map<number, { name: string; total: number; multi: number }>();
+    for (const a of weekAppointments) {
+      if (TERMINAL_PT_STATUSES.has((a.patientStatus || "").toLowerCase())) continue;
+      const entry = byProf.get(a.professionalId) || { name: a.professionalName, total: 0, multi: 0 };
+      entry.total++;
       const notes = (a.notes || "").toLowerCase();
-      const st = (a.status || "").toLowerCase();
-      return (a.date || "") <= todayStr &&
-        REALIZADOS_ST.includes(st) &&
-        (notes.includes("atendimento multi") || notes.includes("multi com") || notes.includes("multi:"));
-    });
-    // Deduplica por profissional+paciente+data (evita contar o mesmo atendimento 2x)
-    const seen = new Set<string>();
-    const byProf = new Map<number, { name: string; count: number }>();
-    for (const a of multiApts) {
-      const key = `${a.professionalId}-${a.patientId}-${a.date}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const entry = byProf.get(a.professionalId) || { name: a.professionalName, count: 0 };
-      entry.count++;
+      if (notes.startsWith("atendimento multi com")) entry.multi++;
       byProf.set(a.professionalId, entry);
     }
-    return Array.from(byProf.values()).sort((a, b) => b.count - a.count);
-  }, [monthAppointments]);
+    return Array.from(byProf.values()).sort((a, b) => b.total - a.total);
+  }, [weekAppointments]);
+  const multiWeekLabel = `${format(multiWeek, "dd/MM")} – ${format(addDays(multiWeek, 4), "dd/MM")}`;
+  const isCurrentWeek = format(multiWeek, "yyyy-MM-dd") === format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
 
   // ── Batimento cardíaco da clínica (hoje) ─────────────────────────────────
   // Realizado: atendimento concluído (em andamento, presente ou alta naquele dia).
@@ -542,33 +545,62 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      {/* Relatório Multi */}
+      {/* Relatório Semanal (Total + Multi) */}
       <Card className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Users className="w-5 h-5 text-cyan-400" />
-          <h2 className="text-xl font-bold font-display">Atendimentos Multi</h2>
-          <span className="ml-auto text-xs text-muted-foreground font-semibold capitalize">{dashMonthLabel}</span>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-xl font-bold font-display">Atendimentos da Semana</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMultiWeek(prev => addDays(prev, -7))}
+              className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors"
+              title="Semana anterior"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-bold min-w-[110px] text-center">{multiWeekLabel}</span>
+            <button
+              onClick={() => setMultiWeek(prev => addDays(prev, 7))}
+              className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors"
+              title="Próxima semana"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+            {!isCurrentWeek && (
+              <button
+                onClick={() => setMultiWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+                className="text-xs text-primary hover:underline ml-2"
+              >
+                Hoje
+              </button>
+            )}
+          </div>
         </div>
-        {multiReport.length === 0 ? (
+        {weeklyReport.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Users className="w-10 h-10 text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground">Nenhum atendimento Multi registrado neste mês.</p>
+            <p className="text-sm text-muted-foreground">Nenhum atendimento nesta semana.</p>
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="flex items-center justify-between px-3 py-1 text-xs font-bold uppercase text-muted-foreground">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-3 py-1 text-xs font-bold uppercase text-muted-foreground">
               <span>Profissional</span>
-              <span>Atend. Multi</span>
+              <span className="text-right w-16">Total</span>
+              <span className="text-right w-16">Multi</span>
             </div>
-            {multiReport.map((r, i) => (
-              <div key={i} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/10">
+            {weeklyReport.map((r, i) => (
+              <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-4 px-3 py-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/10">
                 <span className="text-sm font-semibold text-foreground">{r.name}</span>
-                <span className="text-sm font-bold text-cyan-400">{r.count}</span>
+                <span className="text-sm font-bold text-foreground text-right w-16">{r.total}</span>
+                <span className="text-sm font-bold text-cyan-400 text-right w-16">{r.multi}</span>
               </div>
             ))}
-            <div className="flex items-center justify-between px-3 py-2 border-t border-border mt-2 pt-3">
-              <span className="text-sm font-bold text-muted-foreground">Total Multi</span>
-              <span className="text-lg font-bold text-cyan-400">{multiReport.reduce((s, r) => s + r.count, 0)}</span>
+            <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-3 py-2 border-t border-border mt-2 pt-3">
+              <span className="text-sm font-bold text-muted-foreground">Totais</span>
+              <span className="text-lg font-bold text-foreground text-right w-16">{weeklyReport.reduce((s, r) => s + r.total, 0)}</span>
+              <span className="text-lg font-bold text-cyan-400 text-right w-16">{weeklyReport.reduce((s, r) => s + r.multi, 0)}</span>
             </div>
           </div>
         )}
