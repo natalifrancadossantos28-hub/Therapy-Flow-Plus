@@ -180,7 +180,7 @@ export default function WaitingList() {
 
   const handlePause = async (entry: WaitingListEntry) => {
     const reason = prompt(
-      `Congelar ${entry.patientName} para busca ativa?\n\nMotivo (opcional):`,
+      `Pausar atendimento de ${entry.patientName} (busca ativa)?\n\nMotivo (opcional):`,
       "Busca ativa"
     );
     if (reason === null) return; // cancelou
@@ -422,12 +422,12 @@ export default function WaitingList() {
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
-                            variant="ghost"
-                            title="Congelar (busca ativa) — tira da disputa por vaga sem remover"
-                            className="text-sky-400 hover:bg-sky-400/10 h-8 w-8 p-0"
+                            variant="outline"
+                            title="Pausar atendimento (busca ativa) — tira da disputa por vaga sem remover"
+                            className="h-8 gap-1.5 text-xs border-sky-500/40 text-sky-300 hover:bg-sky-500/10"
                             onClick={() => handlePause(entry)}
                           >
-                            <Snowflake className="w-4 h-4" />
+                            <Snowflake className="w-3.5 h-3.5" /> Pausar Atendimento
                           </Button>
                           <Button
                             variant="ghost"
