@@ -68,6 +68,21 @@ function matchesSpecialty(entrySpecialty: string | null | undefined, profSpecial
   return entryKey === profKey;
 }
 
+// Compara duas especialidades de forma robusta (mesma chave de especialidade).
+// Usado para escopar a trava "já agendado" por especialidade — puxar é
+// independente por especialidade: ter horário em outra especialidade não bloqueia.
+function isSameSpecialty(profSpecialty: string, otherSpecialty: string | null | undefined): boolean {
+  const a = (profSpecialty ?? "").trim().toLowerCase();
+  const b = (otherSpecialty ?? "").trim().toLowerCase();
+  if (!a || !b) return false;
+  const ak = specialtyKey(profSpecialty);
+  const bk = specialtyKey(otherSpecialty ?? "");
+  if (ak === "default" || bk === "default") {
+    return a === b || a.includes(b) || b.includes(a);
+  }
+  return ak === bk;
+}
+
 const FREQUENCY_OPTIONS = [
   { value: "semanal",   label: "Semanal",   desc: "Toda semana — 52 sessões/ano", icon: "📅" },
   { value: "quinzenal", label: "Quinzenal", desc: "A cada 14 dias — Semana A e B", icon: "🔄" },
@@ -113,30 +128,38 @@ export default function BookingModal({
       listPatients().then(setPatients).catch(console.error);
     }
 
-    // Trava de selecao: carrega pacientes que ja tem horario ativo futuro
-    // com QUALQUER profissional para nao aparecerem como "disponiveis" na fila.
-    // Regra global: se paciente ja esta agendado, nao pode aparecer na fila de ninguem.
+    // Carrega mapa de especialidades dos profissionais (necessário para escopar
+    // a trava "já agendado" por especialidade).
+    const specMap = new Map<number, string>();
+    try {
+      const profs = await listProfessionals();
+      for (const p of profs) {
+        if (p.specialty) specMap.set(p.id, p.specialty);
+      }
+      setProfSpecialtyMap(specMap);
+    } catch (err) { console.error(err); }
+
+    // Trava POR ESPECIALIDADE: carrega pacientes que já têm horário ativo futuro
+    // com um profissional DA MESMA ESPECIALIDADE deste slot — esses não reaparecem
+    // na fila desta especialidade (evita que dois profissionais da mesma
+    // especialidade puxem o mesmo paciente). Ter agendamento em OUTRA especialidade
+    // NÃO bloqueia: puxar é independente por especialidade.
     const today = new Date().toISOString().slice(0, 10);
     try {
       const apts = await listAppointments({ dateFrom: today });
       const ids = new Set<number>();
       const activeStatuses = ["agendado", "atendimento", "em_atendimento", "em atendimento", "presente"];
       for (const a of apts) {
-        if (activeStatuses.includes(a.status.toLowerCase())) {
-          ids.add(a.patientId);
-        }
+        if (!activeStatuses.includes(a.status.toLowerCase())) continue;
+        const aptSpec = a.professionalId === professionalId
+          ? professionalSpecialty
+          : (specMap.get(a.professionalId) ?? "");
+        const sameSpec = professionalSpecialty
+          ? isSameSpecialty(professionalSpecialty, aptSpec)
+          : a.professionalId === professionalId;
+        if (sameSpec) ids.add(a.patientId);
       }
       setAlreadyScheduledIds(ids);
-    } catch (err) { console.error(err); }
-
-    // Carrega mapa de especialidades dos profissionais para validação de duplicidade
-    try {
-      const profs = await listProfessionals();
-      const map = new Map<number, string>();
-      for (const p of profs) {
-        if (p.specialty) map.set(p.id, p.specialty);
-      }
-      setProfSpecialtyMap(map);
     } catch (err) { console.error(err); }
 
     // Filtro de Disponibilidade: busca TODOS os agendamentos no mesmo dia
@@ -151,7 +174,7 @@ export default function BookingModal({
       }
       setBookedAtSlotIds(bookedIds);
     } catch (err) { console.error(err); }
-  }, [adminMode, professionalId, date, time]);
+  }, [adminMode, professionalId, professionalSpecialty, date, time]);
 
   useEffect(() => { void loadData(); }, [loadData]);
 
@@ -190,9 +213,10 @@ export default function BookingModal({
 
   // Pacientes em busca ativa (congelados) nao entram na disputa por vaga.
   const matchedBySpec = waitingList.filter(e => !e.paused && matchesSpecialty(e.specialty, professionalSpecialty));
-  // Filtro Global: remove pacientes que já têm agendamento ativo com QUALQUER profissional.
-  // Regra: se já está agendado em qualquer agenda, não pode aparecer na fila de nenhum profissional.
-  // Isso evita duplicidade (ex: Isis agendada com Isabela aparecendo na fila da Bianca).
+  // Filtro por ESPECIALIDADE: remove pacientes que já têm agendamento ativo com um
+  // profissional DA MESMA ESPECIALIDADE (alreadyScheduledIds já vem escopado por
+  // especialidade). Ter horário em outra especialidade NÃO oculta o paciente aqui.
+  // Mantém também a trava física do mesmo horário (bookedAtSlotIds).
   const filteredList = matchedBySpec.filter(e => {
     if (bookedAtSlotIds.has(e.patientId)) return false;
     if (alreadyScheduledIds.has(e.patientId)) return false;
@@ -231,7 +255,7 @@ export default function BookingModal({
     // com QUALQUER profissional. Admin pode forçar em Busca Direta.
     if (alreadyScheduledIds.has(targetPatientId) && !(adminMode && isDirect)) {
       setError(
-        `${targetPatientName} já possui agendamento ativo com outro profissional. ` +
+        `${targetPatientName} já possui agendamento ativo nesta especialidade. ` +
         `Não é possível agendar novamente pela fila.`
       );
       return;
@@ -244,12 +268,20 @@ export default function BookingModal({
       const todayStr = new Date().toISOString().slice(0, 10);
       const freshGlobalApts = await listAppointments({ patientId: targetPatientId, dateFrom: todayStr });
       const activeStatuses = ["agendado", "atendimento", "em_atendimento", "em atendimento", "presente"];
-      const hasActiveAnywhere = freshGlobalApts.some(a =>
-        activeStatuses.includes(a.status.toLowerCase())
-      );
-      if (hasActiveAnywhere && !(adminMode && isDirect)) {
+      // Re-validação POR ESPECIALIDADE: só bloqueia se o paciente já foi agendado
+      // por um profissional da MESMA especialidade enquanto o modal estava aberto.
+      const hasActiveSameSpec = freshGlobalApts.some(a => {
+        if (!activeStatuses.includes(a.status.toLowerCase())) return false;
+        const aptSpec = a.professionalId === professionalId
+          ? professionalSpecialty
+          : (profSpecialtyMap.get(a.professionalId) ?? "");
+        return professionalSpecialty
+          ? isSameSpecialty(professionalSpecialty, aptSpec)
+          : a.professionalId === professionalId;
+      });
+      if (hasActiveSameSpec && !(adminMode && isDirect)) {
         setError(
-          `${targetPatientName} já foi agendado por outro profissional. ` +
+          `${targetPatientName} já foi agendado por outro profissional desta especialidade. ` +
           `A lista será atualizada automaticamente.`
         );
         void loadData();
@@ -402,14 +434,14 @@ export default function BookingModal({
                     {waitingList.length === 0
                       ? "Fila de espera vazia"
                       : queueBlockedCount > 0
-                        ? `Todos os pacientes na fila já possuem agendamento ativo`
+                        ? `Todos os pacientes na fila já possuem agendamento ativo nesta especialidade`
                         : `Nenhum paciente de ${professionalSpecialty} na fila`}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {waitingList.length === 0
                       ? "Não há pacientes aguardando vaga."
                       : queueBlockedCount > 0
-                        ? `${queueBlockedCount} paciente(s) oculto(s) pois já possuem agendamento com outro profissional.`
+                        ? `${queueBlockedCount} paciente(s) oculto(s) pois já possuem agendamento ativo nesta especialidade.`
                         : "Pacientes de outras especialidades foram filtrados."}
                   </p>
                   {adminMode && (
