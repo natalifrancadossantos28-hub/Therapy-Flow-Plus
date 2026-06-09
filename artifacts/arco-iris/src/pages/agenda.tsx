@@ -917,17 +917,37 @@ export default function Agenda() {
         toast({ title: "Aviso", description: "Motivo registrado na notificação, mas houve falha ao gravar no prontuário.", variant: "destructive" });
       }
 
-      // Remover apenas da fila da especialidade deste profissional (não de todas)
+      // Remover apenas da fila da especialidade deste profissional (não de todas).
+      // Comparação case-insensitive/trim para não deixar a entrada presa por diferença de formatação.
       try {
+        const specNorm = (profSpecialty || "").trim().toLowerCase();
         const filaAtual = await listWaitingList();
         const entradas = filaAtual.filter(e =>
           e.patientId === altaConfirm.patientId &&
-          (!profSpecialty || !e.specialty || e.specialty === profSpecialty)
+          (!specNorm || !(e.specialty || "").trim() || (e.specialty || "").trim().toLowerCase() === specNorm)
         );
         for (const entry of entradas) {
           await deleteWaitingListEntry(entry.id);
         }
       } catch { /* silencioso — fila pode estar vazia */ }
+
+      // Cascata: remove TODOS os agendamentos futuros do paciente com este profissional
+      // (não só o grupo de recorrência clicado) — evita "fantasmas" na agenda após a alta.
+      try {
+        const futuros = await listAppointments({
+          patientId: altaConfirm.patientId,
+          professionalId: altaConfirm.professionalId,
+          dateFrom: todayStr,
+        });
+        const gruposRemovidos = new Set<string>();
+        for (const a of futuros) {
+          if (a.id <= 0) continue;
+          const gid = a.recurrenceGroupId || `single:${a.id}`;
+          if (gruposRemovidos.has(gid)) continue;
+          gruposRemovidos.add(gid);
+          try { await deleteAppointmentAlta(a.id); } catch { /* best-effort */ }
+        }
+      } catch { /* best-effort */ }
 
       // Remove all appointments in the same recurrence group from local state
       setAppointments(prev => prev.filter(a =>
