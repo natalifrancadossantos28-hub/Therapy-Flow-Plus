@@ -1565,7 +1565,7 @@ export default function Agenda() {
                                       )}
 
                                       <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
-                                      {apt.paused ? (
+                                      {(apt.paused || (apt.status || "").toLowerCase() === "pausado") ? (
                                         <button style={NEON.green} onClick={() => handleUnpause(apt)}>
                                           <Play className="w-3.5 h-3.5" /> Retomar Atendimento
                                         </button>

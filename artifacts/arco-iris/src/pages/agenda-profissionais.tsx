@@ -1295,7 +1295,7 @@ export default function AgendaProfissionais() {
                                             )}
                                           </div>
                                           <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
-                                          {apt.paused && (
+                                          {(apt.paused || (apt.status || "").toLowerCase() === "pausado") && (
                                             <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
                                               <Snowflake className="w-2.5 h-2.5" /> Pausado
                                             </span>
@@ -1410,7 +1410,7 @@ export default function AgendaProfissionais() {
                                             )}
 
                                             <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
-                                            {apt.paused ? (
+                                            {(apt.paused || (apt.status || "").toLowerCase() === "pausado") ? (
                                               <button style={NEON.green} onClick={() => handleUnpause(apt)}>
                                                 <Play className="w-3.5 h-3.5" /> Retomar Atendimento
                                               </button>
