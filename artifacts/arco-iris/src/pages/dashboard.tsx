@@ -82,6 +82,11 @@ export default function Dashboard() {
   // usado na Performance dos Profissionais (aba "Mês Atual").
   const [currentMonthAppointments, setCurrentMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
 
+  // Leitura completa de agendamentos (carregada uma vez) — usada para o perfil
+  // de faixa etária por profissional, que deve refletir a MESMA base da ocupação
+  // (pacientes com agendamento ativo/futuro), não a atribuição bruta do cadastro.
+  const [allAppointments, setAllAppointments] = useState<AppointmentListItem[]>([]);
+
   // Faltas por profissional (não geral)
   type AbsenceByProf = { patientId: number; patientName: string; professionalName: string; specialty: string; count: number };
   const [absencesByProf, setAbsencesByProf] = useState<AbsenceByProf[]>([]);
@@ -105,7 +110,8 @@ export default function Dashboard() {
     Promise.allSettled([listProfessionals(), listAppointments()]).then(([pr, ar]) => {
       const profs = pr.status === "fulfilled" ? pr.value : [];
       setProfessionals(profs);
-      if (ar.status !== "fulfilled") { setAbsencesByProf([]); return; }
+      if (ar.status !== "fulfilled") { setAbsencesByProf([]); setAllAppointments([]); return; }
+      setAllAppointments(ar.value);
       // Faltas POR PROFISSIONAL — só alerta quando >= 3 com o MESMO profissional
       const ABSENCE = ["ausente", "falta_nao_justificada"];
       const specMap = new Map(profs.map(p => [p.name, p.specialty || "—"]));
@@ -381,20 +387,30 @@ export default function Dashboard() {
   }, [patients, professionals, isCurrentMonth, monthAppointments, currentMonthAppointments, perfFilter]);
 
   // ── Perfil de pacientes por profissional ──────────────────────────────────
+  // Reflete a MESMA base da ocupação (list_professionals_capacity): pacientes
+  // DISTINTOS com agendamento ATIVO e FUTURO (date >= hoje, status agendado/
+  // atendimento/presente) por profissional — não a atribuição bruta do cadastro.
+  // Assim, ao apagar os agendamentos, o perfil zera junto com a ocupação.
   const profPerfil = useMemo(() => {
     const perfil: Record<number, Record<string, number>> = {};
-    for (const p of patients || []) {
-      const profId = p.professionalId;
+    const patById = new Map((patients || []).map(p => [p.id, p]));
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const ACTIVE = ["agendado", "atendimento", "presente"];
+    const seen = new Set<string>();
+    for (const a of allAppointments || []) {
+      const profId = a.professionalId;
       if (!profId) continue;
-      if (!perfil[profId]) {
-        for (const f of FAIXAS) { perfil[profId] = {}; }
-        for (const f of FAIXAS) perfil[profId][f.key] = 0;
-      }
-      const faixa = faixaDeIdade(p.dateOfBirth);
+      if ((a.date || "") < todayStr) continue;
+      if (!ACTIVE.includes((a.status || "").toLowerCase())) continue;
+      const key = `${profId}-${a.patientId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!perfil[profId]) { for (const f of FAIXAS) perfil[profId] = { ...(perfil[profId] || {}), [f.key]: 0 }; }
+      const faixa = faixaDeIdade(patById.get(a.patientId)?.dateOfBirth);
       perfil[profId][faixa] = (perfil[profId][faixa] || 0) + 1;
     }
     return perfil;
-  }, [patients]);
+  }, [allAppointments, patients]);
 
   // Considera triado quem tem QUALQUER score por especialidade definido,
   // nao apenas o triagem_score agregado (que pode estar null em pacientes
