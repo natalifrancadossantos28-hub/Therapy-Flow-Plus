@@ -1274,6 +1274,46 @@ export async function updateAppointment(
   return data as UpdateAppointmentResult;
 }
 
+/**
+ * Remaneja (move DEFINITIVAMENTE) as ocorrências FUTURAS de uma recorrência para o
+ * novo dia-da-semana + horário, a partir da ocorrência clicada (exclusive).
+ *
+ * A ocorrência clicada em si é atualizada à parte (status 'remanejado'); aqui só
+ * deslocamos as ocorrências seguintes. Diferença para "remarcar" (pontual): remarcar
+ * NÃO chama esta função, então só muda 1 ocorrência.
+ *
+ * Mantém ocorrências passadas e exceções pontuais (remarcado/desmarcado/cancelado/
+ * terminais). Só altera date/time (sem status) → NÃO dispara a trava JA_REMANEJADO_HOJE.
+ */
+export async function remanejarRecurrenceForward(params: {
+  recurrenceGroupId: string;
+  patientId: number;
+  fromDate: string;
+  newDate: string;
+  newTime: string;
+  excludeId: number;
+}): Promise<{ moved: Array<{ id: number; date: string; time: string }> }> {
+  const INACTIVE = ["alta", "desistência", "desistencia", "óbito", "obito", "desmarcado", "cancelado", "remanejado", "remarcado"];
+  const dow = (d: string) => new Date(d + "T12:00:00").getDay();
+  const delta = dow(params.newDate) - dow(params.fromDate);
+  const all = await listAppointments({ patientId: params.patientId });
+  const future = all.filter(a =>
+    a.id !== params.excludeId &&
+    a.recurrenceGroupId === params.recurrenceGroupId &&
+    a.date > params.fromDate &&
+    !INACTIVE.includes((a.status || "").toLowerCase())
+  );
+  const moved: Array<{ id: number; date: string; time: string }> = [];
+  for (const a of future) {
+    const d = new Date(a.date + "T12:00:00");
+    d.setDate(d.getDate() + delta);
+    const nd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    await updateAppointment(a.id, { date: nd, time: params.newTime });
+    moved.push({ id: a.id, date: nd, time: params.newTime });
+  }
+  return { moved };
+}
+
 export async function updateRecurrenceFrequency(
   recurrenceGroupId: string,
   frequency: AppointmentFrequency

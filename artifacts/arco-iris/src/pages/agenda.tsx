@@ -29,6 +29,7 @@ import {
   getPatient,
   updateRecurrenceFrequency,
   materializeVirtualAppointment,
+  remanejarRecurrenceForward,
   type Professional as ArcoProfessional,
 } from "@/lib/arco-rpc";
 
@@ -1167,6 +1168,22 @@ export default function Agenda() {
           ? { ...a, date: remanejFlow.newDate!, time: remanejFlow.newTime!, status: newStatus }
           : a
       ));
+      // Remanejar = mudança DEFINITIVA: além da ocorrência clicada, move todas as
+      // ocorrências FUTURAS da mesma recorrência para o novo dia/horário.
+      if (!isRemarcar && remanejFlow.apt.recurrenceGroupId) {
+        const { moved } = await remanejarRecurrenceForward({
+          recurrenceGroupId: remanejFlow.apt.recurrenceGroupId,
+          patientId: remanejFlow.apt.patientId,
+          fromDate: remanejFlow.apt.date,
+          newDate: remanejFlow.newDate!,
+          newTime: remanejFlow.newTime!,
+          excludeId: remanejFlow.apt.id,
+        });
+        if (moved.length) {
+          const m = new Map(moved.map(x => [x.id, x]));
+          setAppointments(prev => prev.map(a => m.has(a.id) ? { ...a, date: m.get(a.id)!.date, time: m.get(a.id)!.time } : a));
+        }
+      }
       if (notifyCarla && remanejFlow.apt.guardianPhone) {
         const dayLabel = weekDays.find(d => format(d, "yyyy-MM-dd") === remanejFlow.newDate);
         const dayStr = dayLabel ? format(dayLabel, "EEEE dd/MM", { locale: ptBR }) : remanejFlow.newDate;
