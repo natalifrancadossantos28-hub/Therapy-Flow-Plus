@@ -328,21 +328,25 @@ export default function BookingModal({
         });
       } catch { /* silencioso — notificação não deve bloquear agendamento */ }
 
-      // Trigger de Remoção: ao agendar (fila OU direto), remove o paciente da
-      // fila de espera da mesma especialidade. Busca a fila atualizada para
-      // garantir que não fique "suja" com pacientes já agendados.
-      if (professionalSpecialty) {
-        try {
-          const currentFila = await listWaitingList();
-          const entriesToRemove = currentFila.filter(
-            e => e.patientId === targetPatientId &&
-                 matchesSpecialty(e.specialty, professionalSpecialty)
-          );
-          for (const entry of entriesToRemove) {
-            try { await deleteWaitingListEntry(entry.id); } catch { /* silencioso */ }
-          }
-        } catch { /* se falhar a limpeza da fila, não bloqueia o agendamento */ }
-      }
+      // Trigger de Remoção: ao agendar, remove o paciente da fila de espera da
+      // mesma especialidade. Busca a fila atualizada para garantir que não fique
+      // "suja" com pacientes já agendados.
+      try {
+        const currentFila = await listWaitingList();
+        const entriesToRemove = currentFila.filter(e => {
+          if (e.patientId !== targetPatientId) return false;
+          // Puxou da fila: remove SEMPRE a entrada exata que foi puxada
+          // (garante que o paciente saia da fila mesmo se a especialidade do
+          // profissional vier vazia). Em qualquer caso, remove também as
+          // entradas da mesma especialidade do profissional.
+          if (!isDirect && nextPatient && e.id === nextPatient.id) return true;
+          if (professionalSpecialty) return matchesSpecialty(e.specialty, professionalSpecialty);
+          return false;
+        });
+        for (const entry of entriesToRemove) {
+          try { await deleteWaitingListEntry(entry.id); } catch { /* silencioso */ }
+        }
+      } catch { /* se falhar a limpeza da fila, não bloqueia o agendamento */ }
 
       onSuccess();
     } catch (e: unknown) {
