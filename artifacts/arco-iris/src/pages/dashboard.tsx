@@ -237,7 +237,14 @@ export default function Dashboard() {
     const realizados = upToToday.filter(a => REALIZADOS_ST.includes((a.status || "").toLowerCase())).length;
     const faltas = upToToday.filter(a => FALTAS_ST.includes((a.status || "").toLowerCase())).length;
     const cancelados = upToToday.filter(a => CANCELADOS_ST.includes((a.status || "").toLowerCase())).length;
-    const agendados = unique.filter(a => (a.status || "").toLowerCase() === "agendado").length;
+    // "Agendados" conta por PACIENTE (criança), não por dia/ocorrência: um mesmo
+    // paciente com recorrência semanal aparece várias vezes no mês, mas deve
+    // contar 1. Deduplica pelo paciente.
+    const agendados = new Set(
+      unique
+        .filter(a => (a.status || "").toLowerCase() === "agendado")
+        .map(a => a.patientId)
+    ).size;
 
     return { total: realizados + faltas, realizados, faltas, cancelados, agendados };
   }, [monthAppointments]);
