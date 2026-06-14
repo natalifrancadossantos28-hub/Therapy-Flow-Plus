@@ -23,6 +23,7 @@ import {
   getPatient,
   updateRecurrenceFrequency,
   materializeVirtualAppointment,
+  remanejarRecurrenceForward,
 } from "@/lib/arco-rpc";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
@@ -537,6 +538,22 @@ export default function AgendaProfissionais() {
           ? { ...a, date: newDate, time: newTime, status: newStatus }
           : a
       ));
+      // Remanejar = mudança DEFINITIVA: move também as ocorrências FUTURAS da
+      // recorrência para o novo dia/horário. Remarcar (pontual) não propaga.
+      if (remanejFlow.kind === "remanejar" && remanejFlow.apt.recurrenceGroupId) {
+        const { moved } = await remanejarRecurrenceForward({
+          recurrenceGroupId: remanejFlow.apt.recurrenceGroupId,
+          patientId: remanejFlow.apt.patientId,
+          fromDate: remanejFlow.apt.date,
+          newDate,
+          newTime,
+          excludeId: remanejFlow.apt.id,
+        });
+        if (moved.length) {
+          const m = new Map(moved.map(x => [x.id, x]));
+          setAppointments(prev => prev.map(a => m.has(a.id) ? { ...a, date: m.get(a.id)!.date, time: m.get(a.id)!.time } : a));
+        }
+      }
       await logNotificacao(
         { ...remanejFlow.apt, date: newDate, time: newTime },
         acao
