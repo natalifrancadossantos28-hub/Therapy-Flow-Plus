@@ -528,14 +528,30 @@ export default function AgendaProfissionais() {
     const emoji = remanejFlow.kind === "remarcar" ? "🟡" : "🟠";
     setRemanejSending(true);
     try {
-      await updateAppointment(remanejFlow.apt.id, {
+      // Se a ocorrência clicada é virtual (projeção de semana futura, id negativo),
+      // materializa ANTES de mexer — senão a ação cai na ocorrência base e a semana
+      // de frente não pode ser editada de forma independente.
+      let realId = remanejFlow.apt.id;
+      if (remanejFlow.apt.id < 0 && selectedProf) {
+        const mat = await materializeVirtualAppointment({
+          patientId: remanejFlow.apt.patientId,
+          professionalId: selectedProf.id,
+          date: remanejFlow.apt.date,
+          time: remanejFlow.apt.time,
+          recurrenceGroupId: remanejFlow.apt.recurrenceGroupId,
+          frequency: (remanejFlow.apt.frequency as "semanal" | "quinzenal" | "mensal") ?? "semanal",
+          notes: remanejFlow.apt.notes,
+        });
+        realId = mat.id;
+      }
+      await updateAppointment(realId, {
         date: newDate,
         time: newTime,
         status: newStatus,
       });
       setAppointments(prev => prev.map(a =>
-        a.id === remanejFlow.apt.id
-          ? { ...a, date: newDate, time: newTime, status: newStatus }
+        (a.id === remanejFlow.apt.id || a.id === realId)
+          ? { ...a, id: realId, date: newDate, time: newTime, status: newStatus }
           : a
       ));
       // Remanejar = mudança DEFINITIVA: move também as ocorrências FUTURAS da
@@ -547,7 +563,7 @@ export default function AgendaProfissionais() {
           fromDate: remanejFlow.apt.date,
           newDate,
           newTime,
-          excludeId: remanejFlow.apt.id,
+          excludeId: realId,
         });
         if (moved.length) {
           const m = new Map(moved.map(x => [x.id, x]));
