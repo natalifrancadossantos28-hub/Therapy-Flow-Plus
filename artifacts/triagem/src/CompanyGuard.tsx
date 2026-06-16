@@ -4,6 +4,22 @@ import { isSupabaseConfigured, requireSupabase } from "./lib/supabase";
 
 const SESSION_KEY = "nfs_ponto_session";
 
+const DEFAULT_SLUG = (import.meta.env.VITE_DEFAULT_COMPANY_SLUG as string | undefined) || "clinica-nfs";
+
+// Senha fixa do app (igual à Gestão). Não usa a senha da empresa no banco,
+// então trocar aqui não afeta o login de outros módulos (ex.: Ponto).
+// Pode ser sobrescrita por env (VITE_PORTAL_PASSWORD).
+const PORTAL_PASSWORD =
+  (import.meta.env.VITE_PORTAL_PASSWORD as string | undefined) || "arcoiris2026";
+
+// Compara ignorando case, espaços e zero-width chars que o auto-complete costuma colar.
+function normalizePassword(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/[\s\u200b-\u200f\u2028\u2029\ufeff]/g, "")
+    .toLowerCase();
+}
+
 function describeAuthError(err: unknown): string {
   if (!isSupabaseConfigured) {
     return (
@@ -84,16 +100,17 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
     setLoading(true);
     setError("");
     try {
+      if (normalizePassword(password) !== normalizePassword(PORTAL_PASSWORD)) {
+        setError("Senha incorreta.");
+        return;
+      }
       const supabase = requireSupabase();
-      const { data, error: rpcError } = await supabase.rpc("authenticate_company", {
-        p_slug: slug.trim().toLowerCase(),
-        p_password: password,
+      const { data, error: rpcError } = await supabase.rpc("lookup_company_by_slug", {
+        p_slug: (slug.trim() || DEFAULT_SLUG).toLowerCase(),
       });
       if (rpcError) { setError(describeAuthError(rpcError)); return; }
-      // Wrong credentials: function returns null, which PostgREST may expose
-      // as a literal null OR a row of all-NULL columns. Treat both as invalid.
       const company = Array.isArray(data) ? data[0] : data;
-      if (!company?.id) { setError("Empresa ou senha incorretos."); return; }
+      if (!company?.id) { setError("Empresa não encontrada."); return; }
       // RPC returns snake_case columns; check the requested module by matching
       // on the camelCase prop the caller passed in ("moduleTriagem", etc.).
       const moduleCol = module.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
@@ -106,7 +123,8 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
         companyId: company.id,
         companyName: company.name,
         companySlug: company.slug,
-        adminToken: password,
+        // Token de bypass aceito pelas RPCs (senha real fica só no app).
+        adminToken: "__noauth__",
         moduleTriagem: company.module_triagem,
         moduleArcoIris: company.module_arco_iris,
         modulePonto: company.module_ponto,
