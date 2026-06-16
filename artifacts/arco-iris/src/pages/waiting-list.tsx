@@ -50,6 +50,7 @@ export default function WaitingList() {
   const [adding, setAdding] = useState(false);
   const [formPatientId, setFormPatientId] = useState("");
   const [filterSpecialty, setFilterSpecialty] = useState<string>("__all__");
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -233,7 +234,9 @@ export default function WaitingList() {
     }
   }
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
   const matchesFilter = (entry: WaitingListEntry) => {
+    if (normalizedQuery && !(entry.patientName ?? "").toLowerCase().includes(normalizedQuery)) return false;
     if (filterSpecialty === "__all__") return true;
     const sp: string = entry.specialty ?? "__null__";
     return sp === filterSpecialty;
@@ -248,9 +251,21 @@ export default function WaitingList() {
           <h1 className="text-3xl font-display font-bold text-foreground">Fila de Espera</h1>
           <p className="text-muted-foreground mt-1">Organização por prioridade calculada na triagem.</p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)} className="gap-2" disabled={eligiblePatients.length === 0}>
-          <ListPlus className="w-4 h-4" /> Adicionar Triado à Fila
-        </Button>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Buscar paciente..."
+              className="w-full sm:w-64 rounded-lg bg-secondary/40 border border-border pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors"
+            />
+          </div>
+          <Button onClick={() => setIsDialogOpen(true)} className="gap-2 whitespace-nowrap" disabled={eligiblePatients.length === 0}>
+            <ListPlus className="w-4 h-4" /> Adicionar Triado à Fila
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -321,7 +336,7 @@ export default function WaitingList() {
               ) : displayList.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-muted-foreground">
-                    Nenhum paciente nesta especialidade.
+                    {normalizedQuery ? "Nenhum paciente encontrado" : "Nenhum paciente nesta especialidade."}
                   </td>
                 </tr>
               ) : (
