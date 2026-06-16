@@ -96,6 +96,8 @@ export default function PatientDetail() {
   // Edição de dados pessoais
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
+  const [editProntuario, setEditProntuario] = useState("");
+  const [editEntryDate, setEditEntryDate] = useState("");
   const [editDob, setEditDob] = useState("");
   const [editCpf, setEditCpf] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -168,6 +170,8 @@ export default function PatientDetail() {
   const openEditModal = () => {
     if (!patient) return;
     setEditName(patient.name || "");
+    setEditProntuario(patient.prontuario || "");
+    setEditEntryDate(patient.entryDate || "");
     setEditDob(patient.dateOfBirth || "");
     setEditCpf(patient.cpf || "");
     setEditPhone(patient.phone || "");
@@ -185,6 +189,8 @@ export default function PatientDetail() {
     try {
       const updated = await upsertPatient(patientId, {
         name: editName.trim(),
+        prontuario: editProntuario.trim() || null,
+        entryDate: editEntryDate || null,
         dateOfBirth: editDob || null,
         cpf: editCpf || null,
         phone: editPhone || null,
@@ -811,6 +817,16 @@ export default function PatientDetail() {
                 <div>
                   <Label className="text-sm font-semibold">Nome *</Label>
                   <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Nome completo" className="mt-1" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-semibold">Número do Prontuário</Label>
+                    <Input value={editProntuario} onChange={e => setEditProntuario(e.target.value)} placeholder="Número do prontuário" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold">Data de Entrada</Label>
+                    <Input type="date" value={editEntryDate} onChange={e => setEditEntryDate(e.target.value)} className="mt-1" />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
