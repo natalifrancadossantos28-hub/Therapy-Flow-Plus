@@ -24,7 +24,7 @@ const DEFAULT_SLUG = (import.meta.env.VITE_DEFAULT_COMPANY_SLUG as string | unde
 // Senha compartilhada para Recepcao e Administracao. O profissional continua
 // usando PIN. Pode ser sobrescrita por env (VITE_PORTAL_PASSWORD) por empresa.
 const PORTAL_PASSWORD =
-  (import.meta.env.VITE_PORTAL_PASSWORD as string | undefined) || "clinica123";
+  (import.meta.env.VITE_PORTAL_PASSWORD as string | undefined) || "arcoiris2026";
 
 // Compara ignorando case, espacos e zero-width chars que o auto-complete
 // do celular costuma colar (ex.: "Clinica123 ", "clinica 123").
