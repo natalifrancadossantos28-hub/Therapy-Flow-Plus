@@ -878,14 +878,20 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
     "Educação Física": 0.9,
   };
 
+  // Todas as areas sao normalizadas para a mesma base (45 pontos), mantendo a
+  // porcentagem real. Assim o "Resultado Detalhado por Area" mostra X/45 em
+  // todas, independente do numero de perguntas de cada area.
+  const ESCALA_MAX = 45;
   const porArea = AREAS.map((area) => {
     const pergs = PERGUNTAS.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === area);
     const pontosRaw = pergs.reduce((a, p) => a + respostas[p.idx], 0);
     const peso = pesoArea[area] ?? 1.0;
-    const pontos = Math.round(pontosRaw * peso);
-    const max = Math.round(pergs.length * 3 * peso);
-    const pct = max > 0 ? Math.round((pontos / max) * 100) : 0;
-    return { area, pontos, max, pct, nivel: classificar(pontos, max) };
+    const pontosReal = Math.round(pontosRaw * peso);
+    const maxReal = Math.round(pergs.length * 3 * peso);
+    const pct = maxReal > 0 ? Math.round((pontosReal / maxReal) * 100) : 0;
+    const pontos = maxReal > 0 ? Math.round((pontosReal / maxReal) * ESCALA_MAX) : 0;
+    const max = ESCALA_MAX;
+    return { area, pontos, max, pct, nivel: classificar(pontosReal, maxReal) };
   });
 
   const ranking = [...porArea].sort((a, b) => b.pontos - a.pontos);
