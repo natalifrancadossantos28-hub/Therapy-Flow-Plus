@@ -236,7 +236,11 @@ export default function WaitingList() {
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const matchesFilter = (entry: WaitingListEntry) => {
-    if (normalizedQuery && !(entry.patientName ?? "").toLowerCase().includes(normalizedQuery)) return false;
+    if (normalizedQuery) {
+      const name = (entry.patientName ?? "").toLowerCase();
+      const prontuario = (entry.patientProntuario ?? "").toLowerCase();
+      if (!name.includes(normalizedQuery) && !prontuario.includes(normalizedQuery)) return false;
+    }
     if (filterSpecialty === "__all__") return true;
     const sp: string = entry.specialty ?? "__null__";
     return sp === filterSpecialty;
@@ -258,7 +262,7 @@ export default function WaitingList() {
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Buscar paciente..."
+              placeholder="Buscar por nome ou prontuário..."
               className="w-full sm:w-64 rounded-lg bg-secondary/40 border border-border pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors"
             />
           </div>
