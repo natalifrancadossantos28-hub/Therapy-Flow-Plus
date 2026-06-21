@@ -1418,6 +1418,68 @@ export async function deleteRecurrenceForward(
   return data as { ok: true; deletedCount: number };
 }
 
+/**
+ * Desfaz um "Atendimento Multi" removendo APENAS o profissional convidado e
+ * mantendo o atendimento do profissional que fica (o do card clicado) intacto.
+ *
+ * Por que não usar delete_recurrence_forward: aquela função, por design, também
+ * apaga o parceiro do Multi (derrubaria os dois). Aqui usamos delete_appointment
+ * (linha a linha, sem cascata) só nas ocorrências do convidado, e limpamos a
+ * etiqueta "Atendimento Multi com ..." das ocorrências do profissional que fica.
+ *
+ * Preserva o histórico: só remove ocorrências de hoje (ou da data clicada, se
+ * for passada) em diante.
+ */
+export async function undoMultiAppointment(params: {
+  patientId: number;
+  date: string;
+  time: string;
+  keepProfessionalId: number;
+}): Promise<{ removedNames: string[]; deletedCount: number }> {
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const cutoff = params.date < todayStr ? params.date : todayStr;
+  const all = await listAppointments({ patientId: params.patientId });
+
+  const MULTI = "Atendimento Multi com ";
+  // Parceiro(s) no MESMO horário da ocorrência clicada (mesma data+hora, outro
+  // profissional, com a etiqueta de Multi).
+  const slotPartners = all.filter(a =>
+    a.date === params.date &&
+    a.time === params.time &&
+    a.professionalId !== params.keepProfessionalId &&
+    (a.notes || "").startsWith(MULTI)
+  );
+  const partnerGroups = new Set(
+    slotPartners.map(a => a.recurrenceGroupId).filter((g): g is string => !!g && g.trim() !== "")
+  );
+  const partnerProfIds = new Set(slotPartners.map(a => a.professionalId));
+  const removedNames = new Set<string>();
+  slotPartners.forEach(a => { if (a.professionalName) removedNames.add(a.professionalName); });
+
+  // Todas as ocorrências FUTURAS do convidado (pela recorrência dele, ou, sem
+  // recorrência, pelo mesmo horário/profissional com etiqueta Multi).
+  const toDelete = all.filter(a => {
+    if (a.id <= 0) return false;          // ignora projeções virtuais
+    if (a.date < cutoff) return false;    // preserva histórico
+    const byGroup = !!a.recurrenceGroupId && partnerGroups.has(a.recurrenceGroupId);
+    const bySlot = partnerProfIds.has(a.professionalId) && a.time === params.time && (a.notes || "").startsWith(MULTI);
+    return byGroup || bySlot;
+  });
+  await Promise.all(toDelete.map(a => deleteAppointment(a.id)));
+
+  // Remove a etiqueta "Multi" das ocorrências futuras do profissional que fica.
+  const keepToClear = all.filter(a =>
+    a.id > 0 &&
+    a.date >= cutoff &&
+    a.professionalId === params.keepProfessionalId &&
+    a.time === params.time &&
+    (a.notes || "").startsWith(MULTI)
+  );
+  await Promise.all(keepToClear.map(a => updateAppointment(a.id, { notes: "" })));
+
+  return { removedNames: [...removedNames], deletedCount: toDelete.length };
+}
+
 // ── Notificacoes recepcao (Fase 4C) ─────────────────────────────────────────
 
 export type NotificacaoRecepcao = {

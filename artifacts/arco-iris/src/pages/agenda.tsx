@@ -30,6 +30,7 @@ import {
   updateRecurrenceFrequency,
   materializeVirtualAppointment,
   remanejarRecurrenceForward,
+  undoMultiAppointment,
   type Professional as ArcoProfessional,
 } from "@/lib/arco-rpc";
 
@@ -358,6 +359,23 @@ const NEON: Record<string, React.CSSProperties> = {
     width: "100%",
     transition: "all 0.15s",
   },
+  violet: {
+    background: "rgba(8,0,14,0.92)",
+    border: "1px solid #8b5cf6",
+    color: "#c4b5fd",
+    boxShadow: "0 0 14px rgba(139,92,246,0.55), inset 0 0 8px rgba(139,92,246,0.12)",
+    textShadow: "0 0 8px rgba(196,181,253,0.9)",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    fontWeight: 700,
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    width: "100%",
+    transition: "all 0.15s",
+  },
 };
 
 const SPECIALTIES = [
@@ -434,6 +452,8 @@ export default function Agenda() {
   const [multiProfId, setMultiProfId] = useState<string>("");
   const [multiSending, setMultiSending] = useState(false);
   const [multiErro, setMultiErro] = useState("");
+  const [undoMultiApt, setUndoMultiApt] = useState<Appointment | null>(null);
+  const [undoMultiSending, setUndoMultiSending] = useState(false);
 
   // Frequência (Periodicidade)
   const [freqSending, setFreqSending] = useState(false);
@@ -1112,6 +1132,35 @@ export default function Agenda() {
     }
   };
 
+  // ── Desfazer Multi (remove só o profissional convidado) ──
+  const handleStartDesfazerMulti = (apt: Appointment) => {
+    setActionMenuId(null);
+    setUndoMultiApt(apt);
+  };
+
+  const confirmDesfazerMulti = async () => {
+    if (!undoMultiApt) return;
+    setUndoMultiSending(true);
+    try {
+      const res = await undoMultiAppointment({
+        patientId: undoMultiApt.patientId,
+        date: undoMultiApt.date,
+        time: undoMultiApt.time,
+        keepProfessionalId: undoMultiApt.professionalId,
+      });
+      const nomes = res.removedNames.join(", ");
+      await logNotificacao(undoMultiApt, `Multi desfeito — ${nomes || "profissional convidado"} removido (${selectedProf?.name || ""} mantido)`);
+      setUndoMultiApt(null);
+      toast({ title: "Multi desfeito", description: nomes ? `${nomes} removido. ${selectedProf?.name || "O profissional principal"} mantido.` : "Profissional convidado removido." });
+      fetchAppointments();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha inesperada.";
+      toast({ title: "Erro ao desfazer Multi", description: msg, variant: "destructive" });
+    } finally {
+      setUndoMultiSending(false);
+    }
+  };
+
   // ── Alterar Periodicidade (Frequência) ──
   const handleChangeFrequency = async (apt: Appointment, newFreq: "semanal" | "quinzenal" | "mensal") => {
     if ((apt.frequency ?? "semanal") === newFreq) return;
@@ -1651,6 +1700,12 @@ export default function Agenda() {
                                         </button>
                                       )}
 
+                                      {isAdmin && isMulti && (
+                                        <button style={NEON.violet} onClick={() => handleStartDesfazerMulti(apt)}>
+                                          <UserX className="w-3.5 h-3.5" /> Desfazer Multi
+                                        </button>
+                                      )}
+
                                       {isAdmin && (
                                         <>
                                           <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
@@ -1993,6 +2048,48 @@ export default function Agenda() {
           </div>
         </div>
       )}
+
+      {/* ── Desfazer Multi (confirmação) ── */}
+      {undoMultiApt && (() => {
+        const partner = (undoMultiApt.notes || "").replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "").trim();
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => !undoMultiSending && setUndoMultiApt(null)}>
+            <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(8,0,14,0.97)", border: "1px solid rgba(139,92,246,0.4)" }} onClick={e => e.stopPropagation()}>
+              <div className="px-6 py-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(139,92,246,0.15)", border: "1px solid #8b5cf6" }}>
+                    <UserX className="w-5 h-5" style={{ color: "#c4b5fd" }} />
+                  </div>
+                  <div>
+                    <p className="font-bold" style={{ color: "#c4b5fd", textShadow: "0 0 8px rgba(196,181,253,0.8)" }}>Desfazer Multi</p>
+                    <p className="text-xs text-white/50">{undoMultiApt.patientName} — {undoMultiApt.time}</p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-white/80 mb-2 leading-relaxed">
+                  Remover o profissional convidado{partner ? <> <span className="font-bold text-violet-300">{partner}</span></> : ""} deste atendimento?
+                </p>
+                <p className="text-[11px] text-white/45 mb-4 leading-relaxed">
+                  {selectedProf?.name ? <><span className="font-semibold text-white/70">{selectedProf.name}</span> continua com o atendimento normalmente.</> : "O profissional principal continua com o atendimento normalmente."} As ocorrências passadas são preservadas.
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={confirmDesfazerMulti}
+                    disabled={undoMultiSending}
+                    style={{ ...NEON.violet, flex: 1, justifyContent: "center", padding: "10px", opacity: undoMultiSending ? 0.5 : 1, cursor: undoMultiSending ? "wait" : "pointer" }}
+                  >
+                    <UserX className="w-4 h-4" /> {undoMultiSending ? "Removendo..." : "Remover convidado"}
+                  </button>
+                  <Button variant="outline" disabled={undoMultiSending} className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setUndoMultiApt(null)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Atendimento Multi Modal ── */}
       {multiApt && (
