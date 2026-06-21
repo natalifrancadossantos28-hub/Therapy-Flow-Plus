@@ -104,19 +104,34 @@ export default function Dashboard() {
     listPatients().then(setPatients).catch(console.error);
     listLongAttendancePatients(12).then(setLongAttendance).catch(() => setLongAttendance([]));
 
-    // Profissionais + leitura completa de agendamentos em paralelo, uma única vez.
-    // Antes isto rodava a cada 30s (incluindo um listProfessionals duplicado),
-    // o que deixava o Dashboard pesado.
-    Promise.allSettled([listProfessionals(), listAppointments()]).then(([pr, ar]) => {
+    // Profissionais + agendamentos em paralelo, uma única vez.
+    // Em vez de puxar a tabela inteira de agendamentos (dezenas de milhares de
+    // linhas, incluindo recorrências futuras até anos à frente — o que deixava o
+    // Dashboard lento), buscamos só janelas relevantes:
+    //  - passado (faltas só acontecem em datas já passadas)
+    //  - futuro próximo (pacientes ativos para o perfil de faixa etária)
+    const hoje = new Date();
+    const histFrom = format(subMonths(hoje, 12), "yyyy-MM-dd");
+    const hojeStr = format(hoje, "yyyy-MM-dd");
+    const futTo = format(addMonths(hoje, 6), "yyyy-MM-dd");
+    Promise.allSettled([
+      listProfessionals(),
+      listAppointments({ dateFrom: histFrom, dateTo: hojeStr }),
+      listAppointments({ dateFrom: hojeStr, dateTo: futTo }),
+    ]).then(([pr, pastRes, futRes]) => {
       const profs = pr.status === "fulfilled" ? pr.value : [];
       setProfessionals(profs);
-      if (ar.status !== "fulfilled") { setAbsencesByProf([]); setAllAppointments([]); return; }
-      setAllAppointments(ar.value);
+      const pastApts = pastRes.status === "fulfilled" ? pastRes.value : [];
+      const futApts = futRes.status === "fulfilled" ? futRes.value : [];
+      if (pastRes.status !== "fulfilled" && futRes.status !== "fulfilled") {
+        setAbsencesByProf([]); setAllAppointments([]); return;
+      }
+      setAllAppointments([...pastApts, ...futApts]);
       // Faltas POR PROFISSIONAL — só alerta quando >= 3 com o MESMO profissional
       const ABSENCE = ["ausente", "falta_nao_justificada"];
       const specMap = new Map(profs.map(p => [p.name, p.specialty || "—"]));
       const map = new Map<string, { patientId: number; patientName: string; professionalName: string; count: number }>();
-      for (const a of ar.value) {
+      for (const a of pastApts) {
         const st = (a.status || "").toLowerCase();
         if (!ABSENCE.includes(st)) continue;
         const k = `${a.patientId}|${a.professionalId}`;
