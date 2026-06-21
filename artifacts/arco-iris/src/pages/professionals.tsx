@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
+  ArrowRightLeft,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ import {
   listProfessionals,
   upsertProfessional,
   deleteProfessional,
+  transferAppointments,
   type Professional,
 } from "@/lib/arco-rpc";
 import { SPECIALTIES, specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
@@ -119,6 +121,11 @@ export default function Professionals() {
   const [saving, setSaving] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  // Transferir Agenda
+  const [transferFrom, setTransferFrom] = useState<Professional | null>(null);
+  const [transferToId, setTransferToId] = useState<string>("");
+  const [transferScope, setTransferScope] = useState<"future" | "all">("future");
+  const [transferSending, setTransferSending] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     specialty: "",
@@ -200,6 +207,38 @@ export default function Professionals() {
 
   const updateProfessionalInList = (updated: Professional) => {
     setProfessionals(prev => prev.map(p => (p.id === updated.id ? updated : p)));
+  };
+
+  const startTransfer = (prof: Professional) => {
+    setTransferFrom(prof);
+    setTransferToId("");
+    setTransferScope("future");
+  };
+
+  const confirmTransfer = async () => {
+    if (!transferFrom || !transferToId) return;
+    const toProf = professionals.find(p => p.id === Number(transferToId));
+    setTransferSending(true);
+    try {
+      const res = await transferAppointments({
+        fromProfessionalId: transferFrom.id,
+        toProfessionalId: Number(transferToId),
+        onlyFuture: transferScope === "future",
+      });
+      toast({
+        title: "Agenda transferida",
+        description: `${res.movedCount} agendamento(s) de ${transferFrom.name} agora são de ${toProf?.name ?? "o novo profissional"}.`,
+      });
+      setTransferFrom(null);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao transferir agenda",
+        description: err?.message || "Falha inesperada.",
+        variant: "destructive",
+      });
+    } finally {
+      setTransferSending(false);
+    }
   };
 
   return (
@@ -301,8 +340,90 @@ export default function Professionals() {
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
+
+              <button
+                onClick={() => startTransfer(prof)}
+                className="mt-2 w-full flex items-center justify-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg transition-all"
+                style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)", color: "#c4b5fd" }}
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5" /> Transferir Agenda
+              </button>
             </MotionCard>
           ))}
+        </div>
+      )}
+
+      {transferFrom && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => !transferSending && setTransferFrom(null)}>
+          <MotionCard
+            className="w-full max-w-md p-6 max-h-[calc(100vh-2rem)] overflow-y-auto my-auto"
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.4)" }}>
+                <ArrowRightLeft className="w-5 h-5" style={{ color: "#c4b5fd" }} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-foreground leading-tight">Transferir Agenda</h2>
+                <p className="text-xs text-muted-foreground">De <span className="font-semibold text-foreground">{transferFrom.name}</span> para o novo profissional</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label>Profissional que vai assumir</Label>
+                <Select value={transferToId} onChange={e => setTransferToId(e.target.value)}>
+                  <option value="" disabled>Selecione…</option>
+                  {professionals.filter(p => p.id !== transferFrom.id).map(p => (
+                    <option key={p.id} value={String(p.id)}>{p.name}{p.specialty ? ` — ${p.specialty}` : ""}</option>
+                  ))}
+                </Select>
+              </div>
+
+              <div>
+                <Label>O que transferir</Label>
+                <div className="grid grid-cols-1 gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setTransferScope("future")}
+                    className={cn(
+                      "text-left px-3 py-2.5 rounded-xl border-2 text-sm transition-all",
+                      transferScope === "future" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-secondary/30 text-muted-foreground"
+                    )}
+                  >
+                    <span className="font-bold block">Só os agendamentos futuros</span>
+                    <span className="text-[11px] opacity-70">De hoje em diante. O histórico anterior continua no nome de {transferFrom.name}. (Recomendado)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTransferScope("all")}
+                    className={cn(
+                      "text-left px-3 py-2.5 rounded-xl border-2 text-sm transition-all",
+                      transferScope === "all" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-secondary/30 text-muted-foreground"
+                    )}
+                  >
+                    <span className="font-bold block">Toda a agenda (passado + futuro)</span>
+                    <span className="text-[11px] opacity-70">Move também os atendimentos já realizados para o novo profissional.</span>
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Os horários, pacientes e recorrências são mantidos — só muda o profissional responsável. Nada é apagado.
+              </p>
+
+              <div className="flex justify-end gap-3 mt-2">
+                <Button type="button" variant="ghost" disabled={transferSending} onClick={() => setTransferFrom(null)}>
+                  Cancelar
+                </Button>
+                <Button type="button" disabled={!transferToId || transferSending} onClick={confirmTransfer} className="gap-2">
+                  <ArrowRightLeft className="w-4 h-4" /> {transferSending ? "Transferindo…" : "Transferir"}
+                </Button>
+              </div>
+            </div>
+          </MotionCard>
         </div>
       )}
 

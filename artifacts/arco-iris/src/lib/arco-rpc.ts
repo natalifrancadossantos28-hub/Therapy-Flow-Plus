@@ -287,6 +287,32 @@ export async function deleteProfessional(id: number): Promise<void> {
 }
 
 /**
+ * Transfere (reatribui) os agendamentos de um profissional para outro, mantendo
+ * data/hora/paciente/recorrência. Usado quando um profissional sai e outro
+ * assume os pacientes — evita ter que excluir o antigo (que apagaria a agenda em
+ * cascata) e remontar a grade.
+ *
+ * onlyFuture=true move só de hoje em diante (preserva o histórico no nome antigo).
+ */
+export async function transferAppointments(params: {
+  fromProfessionalId: number;
+  toProfessionalId: number;
+  onlyFuture?: boolean;
+}): Promise<{ movedCount: number }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("transfer_appointments", {
+    p_slug: slug,
+    p_password: password,
+    p_from_professional_id: params.fromProfessionalId,
+    p_to_professional_id: params.toProfessionalId,
+    p_only_future: !!params.onlyFuture,
+  });
+  if (error) throw error;
+  return { movedCount: Number((data as { movedCount?: number })?.movedCount ?? 0) };
+}
+
+/**
  * PIN verification does not require the admin password - the agenda wing
  * uses it as a lightweight lock for each professional. The migration
  * restricts PIN lookup to (slug, professional_id, pin) so a wrong PIN
