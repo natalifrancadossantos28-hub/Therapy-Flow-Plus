@@ -108,6 +108,12 @@ export default function BookingModal({
   const [profSpecialtyMap, setProfSpecialtyMap] = useState<Map<number, string>>(new Map());
   const [notesExpanded, setNotesExpanded] = useState(false);
 
+  // Psicologia Parental: a mãe/responsável passa na orientação no MESMO horário em
+  // que a criança é atendida por outro profissional (ex.: Fisio). Como o prontuário
+  // é o mesmo da criança, liberamos o conflito de horário cross-especialidade só
+  // para esta especialidade.
+  const isParentalBooking = (professionalSpecialty || "").toLowerCase().includes("parental");
+
   const loadData = useCallback(async () => {
     try {
       const list = await listWaitingList();
@@ -218,7 +224,7 @@ export default function BookingModal({
   // especialidade). Ter horário em outra especialidade NÃO oculta o paciente aqui.
   // Mantém também a trava física do mesmo horário (bookedAtSlotIds).
   const filteredList = matchedBySpec.filter(e => {
-    if (bookedAtSlotIds.has(e.patientId)) return false;
+    if (!isParentalBooking && bookedAtSlotIds.has(e.patientId)) return false;
     if (alreadyScheduledIds.has(e.patientId)) return false;
     return true;
   });
@@ -292,10 +298,16 @@ export default function BookingModal({
       // Bloqueio de Duplicidade: re-valida se o paciente ainda está disponível
       // neste horário antes de confirmar.
       const freshApts = await listAppointments({ date });
-      const alreadyTaken = freshApts.some(
+      const slotConflicts = freshApts.filter(
         a => a.patientId === targetPatientId && a.time === time &&
              (a.status === "agendado" || a.status === "atendimento")
       );
+      // Psicologia Parental: permite o mesmo horário com OUTRO profissional
+      // (a criança em terapia + a mãe na orientação). Só bloqueia duplicata
+      // exata com o MESMO profissional parental.
+      const alreadyTaken = isParentalBooking
+        ? slotConflicts.some(a => a.professionalId === professionalId)
+        : slotConflicts.length > 0;
       if (alreadyTaken) {
         setError(
           `${targetPatientName} já foi puxado por outro profissional para este horário. ` +
@@ -561,9 +573,14 @@ export default function BookingModal({
                   Selecionado: {selectedDirect.name} — agendamento direto (ignora a fila).
                 </p>
               )}
-              {selectedDirect && selectedDirectBookedAtSlot && (
+              {selectedDirect && selectedDirectBookedAtSlot && !isParentalBooking && (
                 <p className="mt-2 text-xs font-semibold text-red-500 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
                   {selectedDirect.name} já está agendado neste horário ({time}) com outro profissional.
+                </p>
+              )}
+              {selectedDirect && selectedDirectBookedAtSlot && isParentalBooking && (
+                <p className="mt-2 text-xs font-semibold text-cyan-500 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-3 py-2">
+                  {selectedDirect.name} tem atendimento neste horário ({time}) com outro profissional — permitido na Psicologia Parental (orientação à mãe/responsável).
                 </p>
               )}
               {selectedDirect && selectedDirectAlreadyScheduled && !selectedDirectBookedAtSlot && (
