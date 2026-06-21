@@ -323,7 +323,7 @@ export default function Professionals() {
               <PinManager prof={prof} onUpdated={updateProfessionalInList} />
 
               <div className="mt-5 flex gap-2">
-                <Link href={`/professionals/${prof.id}`} className="flex-1">
+                <Link href={`/agenda-profissionais?prof=${prof.id}`} className="flex-1">
                   <Button
                     variant="outline"
                     className="w-full gap-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors"

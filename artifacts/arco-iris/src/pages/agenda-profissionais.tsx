@@ -205,9 +205,19 @@ export default function AgendaProfissionais() {
   const portalProf = getProfessionalSession();
   const isAdminViewing = portalScope === "admin";
   const isProfessionalSession = portalScope === "professional" && !!portalProf;
+  // Admin pode abrir a agenda de um profissional específico via ?prof=ID
+  // (usado pelo botão "Agenda" da tela de Profissionais).
+  const profFromQuery =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("prof") || ""
+      : "";
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [selectedProfId, setSelectedProfId] = useState(
-    isProfessionalSession ? String(portalProf!.professionalId) : ""
+    isProfessionalSession
+      ? String(portalProf!.professionalId)
+      : isAdminViewing
+        ? profFromQuery
+        : ""
   );
   const [pinInput, setPinInput] = useState("");
   const [pinVerified, setPinVerified] = useState(isAdminViewing || isProfessionalSession);
