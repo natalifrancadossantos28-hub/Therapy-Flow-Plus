@@ -2348,10 +2348,10 @@ export default function Agenda() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">C</div>
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">N</div>
               <div className="flex-1">
-                <p className="text-white font-bold text-sm">Carla — NFs Gestão</p>
-                <p className="text-white/70 text-xs">Assistente</p>
+                <p className="text-white font-bold text-sm">Assistente</p>
+                <p className="text-white/70 text-xs">NFs Gestão</p>
               </div>
               <button onClick={() => setRemanejFlow(null)} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
@@ -2359,10 +2359,10 @@ export default function Agenda() {
               {remanejDone ? (
                 <div className="flex flex-col items-center gap-3 py-4 text-center">
                   <CheckCircle className="w-10 h-10 text-blue-500" />
-                  <p className="font-semibold">
+                  <p className="font-semibold text-slate-800">
                     {remanejFlow.kind === "remarcar" ? "Remarcação concluída!" : "Remanejamento concluído!"}
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-slate-600">
                     {remanejFlow.apt.patientName} movido(a) para {remanejFlow.newTime} do dia {remanejFlow.newDate}.
                     {remanejFlow.kind === "remarcar" && " Na semana seguinte, retorna ao horário original."}
                   </p>
@@ -2371,7 +2371,7 @@ export default function Agenda() {
               ) : (
                 <>
                   <div className="bg-blue-50 border border-blue-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
-                    <p className="text-sm text-foreground leading-relaxed">
+                    <p className="text-sm text-slate-800 leading-relaxed">
                       Vi que você {remanejFlow.kind === "remarcar" ? "remarcou" : "remanejou"} a sessão de{" "}
                       <strong>{remanejFlow.apt.patientName}</strong> para{" "}
                       <strong>{remanejFlow.newTime} — {
@@ -2417,10 +2417,10 @@ export default function Agenda() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-violet-600 to-indigo-600">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">C</div>
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">N</div>
               <div className="flex-1 min-w-0">
-                <p className="text-white font-bold text-sm">Carla — NFs Gestão</p>
-                <p className="text-white/70 text-xs">Assistente</p>
+                <p className="text-white font-bold text-sm">Assistente</p>
+                <p className="text-white/70 text-xs">NFs Gestão</p>
               </div>
               <button onClick={() => setCancelDialog(null)} className="text-white/60 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
@@ -2430,8 +2430,8 @@ export default function Agenda() {
               {notifyDone ? (
                 <div className="flex flex-col items-center gap-3 py-4 text-center">
                   <CheckCircle className="w-10 h-10 text-green-500" />
-                  <p className="font-semibold text-foreground">Mensagem enviada!</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="font-semibold text-slate-800">Mensagem enviada!</p>
+                  <p className="text-sm text-slate-600">
                     O responsável de <strong>{cancelDialog.apt.patientName}</strong> foi avisado pelo WhatsApp.
                   </p>
                   <Button onClick={() => setCancelDialog(null)} className="mt-2 w-full">Fechar</Button>
@@ -2439,7 +2439,7 @@ export default function Agenda() {
               ) : (
                 <>
                   <div className="bg-violet-50 border border-violet-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
-                    <p className="text-sm text-foreground leading-relaxed">
+                    <p className="text-sm text-slate-800 leading-relaxed">
                       Vi que você desmarcou a sessão de <strong>{cancelDialog.profName}</strong>.{" "}
                       Posso avisar o responsável pelo(a) <strong>{cancelDialog.apt.patientName || "Paciente"}</strong> agora?
                     </p>
