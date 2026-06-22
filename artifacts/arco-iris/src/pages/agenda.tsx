@@ -1035,21 +1035,20 @@ export default function Agenda() {
           notes: `${prevNotes}[ENCAMINHAMENTO ${new Date().toLocaleDateString("pt-BR")}] ${encEspecialidade}${motivoTexto}`,
         });
       } catch { /* fila já registra o motivo como fallback */ }
-      // Se escolheu remover da agenda atual, deleta os agendamentos futuros
+      // Se escolheu remover da agenda atual, encerra o vínculo só de hoje em diante
+      // (mesma lógica do "Remover"/"Excluir": preserva o histórico de atendimentos passados).
       if (!encManterAgenda) {
         try {
-          if (encApt.id > 0) {
+          const today = new Date().toISOString().split("T")[0];
+          if (encApt.recurrenceGroupId) {
+            await deleteRecurrenceForward(encApt.recurrenceGroupId, today, encApt.patientId);
+          } else if (encApt.id > 0) {
             await deleteAppointmentAlta(encApt.id);
-          } else if (encApt.recurrenceGroupId) {
-            const realSibling = appointments.find(
-              a => a.recurrenceGroupId === encApt.recurrenceGroupId && a.id > 0
-            );
-            if (realSibling) await deleteAppointmentAlta(realSibling.id);
           }
         } catch { /* best-effort */ }
       }
       setEncApt(null);
-      toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.${encManterAgenda ? " Mantido na agenda atual." : " Removido da agenda atual."}` });
+      toast({ title: "Encaminhamento realizado", description: `${encApt.patientName} adicionado à fila de ${encEspecialidade}.${encManterAgenda ? " Mantido na agenda atual." : " Removido da agenda de hoje em diante (histórico preservado)."}` });
       fetchAppointments();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha inesperada.";
