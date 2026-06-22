@@ -1235,12 +1235,12 @@ export default function Reception() {
       {abonarDialog && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-            {/* Header Carla */}
+            {/* Header Assistente */}
             <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-amber-500 to-yellow-500">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">C</div>
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">N</div>
               <div className="flex-1 min-w-0">
-                <p className="text-white font-bold text-sm">Carla — NFs Gestão</p>
-                <p className="text-white/70 text-xs">Atestado Recebido</p>
+                <p className="text-white font-bold text-sm">Assistente</p>
+                <p className="text-white/70 text-xs">NFs Gestão</p>
               </div>
               <button onClick={() => setAbonarDialog(null)} className="text-white/60 hover:text-white">
                 <X className="w-5 h-5" />
@@ -1251,16 +1251,16 @@ export default function Reception() {
               {abonarDone ? (
                 <div className="flex flex-col items-center gap-3 py-4 text-center">
                   <CheckCircle className="w-10 h-10 text-yellow-500" />
-                  <p className="font-semibold text-foreground">Falta abonada com sucesso!</p>
-                  <p className="text-sm text-muted-foreground">
-                    Carla avisou <strong>{abonarDialog.apt.professionalName}</strong> sobre o atestado de <strong>{abonarDialog.apt.patientName}</strong>.
+                  <p className="font-semibold text-slate-800">Falta abonada com sucesso!</p>
+                  <p className="text-sm text-slate-600">
+                    O profissional <strong>{abonarDialog.apt.professionalName}</strong> foi avisado sobre o atestado de <strong>{abonarDialog.apt.patientName}</strong>.
                   </p>
                   <Button onClick={() => setAbonarDialog(null)} className="mt-2 w-full">Fechar</Button>
                 </div>
               ) : (
                 <>
                   <div className="bg-amber-50 border border-amber-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
-                    <p className="text-sm text-foreground leading-relaxed">
+                    <p className="text-sm text-slate-800 leading-relaxed">
                       Recebi um atestado de <strong>{abonarDialog.apt.patientName}</strong> via WhatsApp. Deseja abonar a falta na agenda de <strong>{abonarDialog.apt.professionalName}</strong>?
                     </p>
                     <p className="text-xs text-amber-700 mt-2">
