@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo, Menu, X, Building2, LogOut, Brain, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo, Menu, X, Building2, LogOut, Brain, DoorOpen, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
@@ -21,6 +21,7 @@ const navItems: NavItem[] = [
   { href: "/waiting-list", label: "Fila de Espera", icon: ListTodo, scopes: ["admin", "reception"] },
   { href: "/agenda", label: "Agenda Geral", icon: Calendar, scopes: ["admin", "reception"] },
   { href: "/agenda-mensal", label: "Agenda Mensal", icon: CalendarDays, scopes: ["admin"] },
+  { href: "/salas", label: "Gestão de Salas", icon: DoorOpen, scopes: ["admin"] },
   { href: "/gestao-contratos", label: "Gestão de Contratos", icon: Building2, scopes: ["admin"] },
   { href: "/ai-brain", label: "Cérebro IA", icon: Brain, scopes: ["admin"] },
 ];
