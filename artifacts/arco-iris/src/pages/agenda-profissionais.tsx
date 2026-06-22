@@ -92,6 +92,8 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
   weekDates: string[],
 ): T[] {
   if (weekDates.length === 0) return allApts;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const existing = new Set(allApts.filter(a => weekDates.includes(a.date)).map(a => `${a.date}|${a.time}|${a.patientId}`));
   const groups = new Map<string, T[]>();
   for (const a of allApts) {
@@ -115,6 +117,12 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (!target) continue;
     if (target < (activeApts[0] ?? nonTerminalApts[0] ?? sorted[0]).date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
+
+    // A recorrência cujas linhas reais já terminaram antes de hoje (ex.: foi cortada
+    // via "Remover" ou "Encaminhamento Interno" com "remover da agenda") NÃO deve ser
+    // projetada de volta para o presente/futuro. Recorrências ativas mantêm ~1 ano de
+    // linhas reais à frente, então isto só afeta séries encerradas/cortadas.
+    if (target >= todayStr && !gApts.some(a => a.date >= todayStr)) continue;
 
     const lastRefDate = (scheduleRefApts.at(-1) ?? nonTerminalApts.at(-1) ?? sorted.at(-1)!).date;
     const lastRefMs = new Date(lastRefDate + "T12:00:00").getTime();
