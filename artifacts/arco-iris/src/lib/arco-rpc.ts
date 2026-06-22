@@ -1699,3 +1699,123 @@ export async function listPausedOverview(): Promise<{ fila: PausedOverviewItem[]
   const result = data as { fila: PausedOverviewItem[]; agenda: PausedOverviewItem[] };
   return result;
 }
+
+// ── Salas (Gestão Inteligente de Salas) ─────────────────────────────────────
+
+export type Sala = {
+  id: number;
+  companyId: number;
+  numero: string;
+  professionalId: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type SalaRow = {
+  id: number | string;
+  company_id: number | string;
+  numero: string;
+  professional_id: number | string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function mapSala(r: SalaRow): Sala {
+  return {
+    id: Number(r.id),
+    companyId: Number(r.company_id),
+    numero: r.numero,
+    professionalId: r.professional_id == null ? null : Number(r.professional_id),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export async function listSalas(): Promise<Sala[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_salas", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return ((data ?? []) as SalaRow[]).map(mapSala);
+}
+
+export async function upsertSala(
+  id: number | null,
+  numero: string,
+  professionalId: number | null
+): Promise<Sala> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("upsert_sala", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_numero: numero,
+    p_professional_id: professionalId,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("Falha ao salvar sala.");
+  return mapSala(row as SalaRow);
+}
+
+export async function deleteSala(id: number): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("delete_sala", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+}
+
+export type SalaStatus = "Vermelho" | "Amarelo" | "Verde";
+
+export type StatusSala = {
+  salaId: number;
+  numeroDaSala: string;
+  professionalId: number | null;
+  profissionalResponsavel: string | null;
+  statusAtual: SalaStatus;
+  detalheStatus: string;
+  pacienteAtual: string | null;
+  horarioAtual: string | null;
+  horarioProximoAgendamento: string | null;
+};
+
+type StatusSalaRow = {
+  sala_id: number | string;
+  numero_da_sala: string;
+  professional_id: number | string | null;
+  profissional_responsavel: string | null;
+  status_atual: string;
+  detalhe_status: string;
+  paciente_atual: string | null;
+  horario_atual: string | null;
+  horario_proximo_agendamento: string | null;
+};
+
+export async function getStatusSalas(): Promise<StatusSala[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("get_status_salas", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return ((data ?? []) as StatusSalaRow[]).map((r) => ({
+    salaId: Number(r.sala_id),
+    numeroDaSala: r.numero_da_sala,
+    professionalId: r.professional_id == null ? null : Number(r.professional_id),
+    profissionalResponsavel: r.profissional_responsavel,
+    statusAtual: (r.status_atual as SalaStatus) ?? "Verde",
+    detalheStatus: r.detalhe_status,
+    pacienteAtual: r.paciente_atual,
+    horarioAtual: r.horario_atual,
+    horarioProximoAgendamento: r.horario_proximo_agendamento,
+  }));
+}
