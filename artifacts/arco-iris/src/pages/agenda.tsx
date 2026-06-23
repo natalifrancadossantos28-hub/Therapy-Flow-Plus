@@ -9,7 +9,7 @@ import {
   ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
+import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -88,8 +88,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
   weekDates: string[],
 ): T[] {
   if (weekDates.length === 0) return allApts;
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayStr = todayBR();
   const existing = new Set(allApts.filter(a => weekDates.includes(a.date)).map(a => `${a.date}|${a.time}|${a.patientId}`));
   const groups = new Map<string, T[]>();
   for (const a of allApts) {
@@ -918,7 +917,7 @@ export default function Agenda() {
       }
       await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}`);
 
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr = todayBR();
       const profSpecialty = selectedProf?.specialty ?? null;
 
       // Check if patient still has active appointments with OTHER professionals
@@ -1047,7 +1046,7 @@ export default function Agenda() {
       // (mesma lógica do "Remover"/"Excluir": preserva o histórico de atendimentos passados).
       if (!encManterAgenda) {
         try {
-          const today = new Date().toISOString().split("T")[0];
+          const today = todayBR();
           if (encApt.recurrenceGroupId) {
             await deleteRecurrenceForward(encApt.recurrenceGroupId, today, encApt.patientId);
           } else if (encApt.id > 0) {

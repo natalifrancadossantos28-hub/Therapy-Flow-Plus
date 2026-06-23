@@ -7,6 +7,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Data de "hoje" no fuso de Brasília (YYYY-MM-DD).
+ * NÃO use new Date().toISOString() para isso: à noite no Brasil o UTC já virou o
+ * dia seguinte, o que faz cortes "de hoje em diante" pularem a data de hoje.
+ */
+export function todayBR(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
 export function formatDate(dateStr: string | null | undefined, dateFormat = "dd/MM/yyyy") {
   if (!dateStr) return "-";
   try {
