@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play } from "lucide-react";
-import { cn, getStatusColor, getStatusLabel } from "@/lib/utils";
+import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -92,8 +92,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
   weekDates: string[],
 ): T[] {
   if (weekDates.length === 0) return allApts;
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayStr = todayBR();
   const existing = new Set(allApts.filter(a => weekDates.includes(a.date)).map(a => `${a.date}|${a.time}|${a.patientId}`));
   const groups = new Map<string, T[]>();
   for (const a of allApts) {
@@ -646,7 +645,7 @@ export default function AgendaProfissionais() {
       }
       await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}`);
 
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr = todayBR();
       const profSpecialty = selectedProf?.specialty ?? null;
 
       // Check if patient still has active appointments with OTHER professionals
@@ -775,7 +774,7 @@ export default function AgendaProfissionais() {
       // preserva o histórico de atendimentos passados).
       if (!encManterAgenda) {
         try {
-          const today = new Date().toISOString().split("T")[0];
+          const today = todayBR();
           if (encApt.recurrenceGroupId) {
             await deleteRecurrenceForward(encApt.recurrenceGroupId, today, encApt.patientId);
           } else if (encApt.id > 0) {
