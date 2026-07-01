@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { MotionCard, Button, Input, Label, Select } from "@/components/ui-custom";
-import { DoorOpen, Plus, Trash2, RefreshCw, Clock, UserRound, CircleDot } from "lucide-react";
+import { DoorOpen, Plus, Trash2, RefreshCw, Clock, CircleDot, Users, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   listSalas,
@@ -190,10 +190,12 @@ export default function SalasPage() {
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xl font-bold text-foreground">{s.numeroDaSala}</p>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <UserRound className="w-3.5 h-3.5" />
-                      {s.profissionalResponsavel ?? "Sem profissional"}
+                    <p className="text-xl font-bold text-foreground flex items-center gap-2">
+                      <DoorOpen className="w-5 h-5 text-muted-foreground" />
+                      {s.numeroDaSala}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {s.totalProfissionais} {s.totalProfissionais === 1 ? "profissional" : "profissionais"}
                     </p>
                   </div>
                   <span
@@ -207,12 +209,24 @@ export default function SalasPage() {
 
                 <p className="text-sm text-foreground/90 mt-3">{s.detalheStatus}</p>
 
-                <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                  <p className="flex items-start gap-1.5">
+                    <Users className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span><span className="text-foreground/80">Profissionais:</span> {s.profissionais ?? "Sem profissional"}</span>
+                  </p>
                   {s.pacienteAtual && (
-                    <p>Paciente: <span className="text-foreground/90 font-medium">{s.pacienteAtual}</span>{s.horarioAtual ? ` (${s.horarioAtual})` : ""}</p>
+                    <p className="flex items-start gap-1.5">
+                      <Activity className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span>
+                        <span className="text-foreground/80">Em atendimento:</span>{" "}
+                        <span className="text-foreground/90 font-medium">{s.pacienteAtual}</span>
+                        {s.horarioAtual ? ` (${s.horarioAtual})` : ""}
+                        {s.profissionalEmAtendimento ? ` — ${s.profissionalEmAtendimento}` : ""}
+                      </span>
+                    </p>
                   )}
-                  <p className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
+                  <p className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
                     Próximo agendamento: {s.horarioProximoAgendamento ?? "—"}
                   </p>
                 </div>
@@ -224,7 +238,10 @@ export default function SalasPage() {
 
       {/* Cadastro de salas */}
       <MotionCard className="p-6">
-        <h2 className="text-lg font-bold text-foreground mb-4">Cadastro de Salas</h2>
+        <h2 className="text-lg font-bold text-foreground mb-1">Cadastro de Salas</h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          Para uma sala compartilhada, cadastre o mesmo nome para cada profissional — o painel acima agrupa tudo num único card da sala física.
+        </p>
 
         <div className="flex flex-col sm:flex-row gap-3 sm:items-end mb-6">
           <div className="flex-1">
