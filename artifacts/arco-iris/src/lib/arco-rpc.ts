@@ -1625,7 +1625,16 @@ export type AIAnalysis = {
 };
 
 async function fetchAI(endpoint: string): Promise<AIAnalysis> {
-  const resp = await fetch(`/api/ai/${endpoint}`);
+  const session = readSession();
+  if (!session || session.type !== "company" || !session.companyId) {
+    throw new Error("Sessão de empresa expirada. Faça login novamente.");
+  }
+  const resp = await fetch(`/api/ai/${endpoint}`, {
+    headers: {
+      "x-company-id": String(session.companyId),
+      "x-company-auth": session.adminToken ?? "",
+    },
+  });
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({}));
     throw new Error((body as Record<string, string>).error ?? `Erro ${resp.status}`);
