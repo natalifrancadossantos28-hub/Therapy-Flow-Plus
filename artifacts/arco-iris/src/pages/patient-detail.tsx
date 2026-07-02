@@ -301,6 +301,36 @@ export default function PatientDetail() {
     setTriagemEdit(true);
   };
 
+  const SCORE_SPECIALTY_MAP: Array<{ field: keyof Patient; specialty: string }> = [
+    { field: "scorePsicologia",       specialty: "Psicologia"         },
+    { field: "scorePsicomotricidade", specialty: "Psicomotricidade"   },
+    { field: "scoreFisioterapia",     specialty: "Fisioterapia"       },
+    { field: "scoreTO",               specialty: "Terapia Ocupacional"},
+    { field: "scoreFonoaudiologia",   specialty: "Fonoaudiologia"     },
+    { field: "scoreNutricionista",    specialty: "Nutrição"           },
+    { field: "scorePsicopedagogia",   specialty: "Psicopedagogia"     },
+    { field: "scoreEdFisica",         specialty: "Educação Física"    },
+  ];
+
+  const enqueueScoredSpecialties = async (pat: Patient, allowNoScore: boolean) => {
+    const scoredSpecialties = SCORE_SPECIALTY_MAP
+      .filter(({ field }) => ((pat[field] as number | null) ?? 0) > 0)
+      .map(({ specialty }) => specialty);
+    const targets: (string | null)[] = scoredSpecialties.length > 0 ? scoredSpecialties : [null];
+    const added: string[] = [];
+    const skipped: string[] = [];
+    for (const sp of targets) {
+      try {
+        await addPatientToFila(patientId, sp, null, allowNoScore);
+        added.push(sp ?? "Geral");
+      } catch (err: any) {
+        if (err.message?.toLowerCase().includes("fila")) skipped.push(sp ?? "Geral");
+        else throw err;
+      }
+    }
+    return { added, skipped };
+  };
+
   const saveTriagem = async () => {
     const scores = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri].map(v => parseInt(v) || 0);
     if (scores.some(s => s < 0 || s > 45)) {
@@ -327,7 +357,22 @@ export default function PatientDetail() {
       });
       setPatient(updated);
       setTriagemEdit(false);
-      toast({ title: "Triagem registrada!", description: `Score total: ${toScoreDisplay(total, escolaPublica, trabalhoNaRoca)}/${SCORE_MAX_DISPLAY} (bônus vuln.: +${vulnBonus(escolaPublica, trabalhoNaRoca)}). Paciente apto para a fila.` });
+      const scoreMsg = `Score total: ${toScoreDisplay(total, escolaPublica, trabalhoNaRoca)}/${SCORE_MAX_DISPLAY} (bônus vuln.: +${vulnBonus(escolaPublica, trabalhoNaRoca)}).`;
+      const podeEntrarNaFila = updated.status !== "Fila de Espera"
+        && updated.status !== "Atendimento"
+        && updated.status !== "Alta"
+        && updated.tipoRegistro !== "Registro Censo Municipal";
+      if (podeEntrarNaFila) {
+        const { added, skipped } = await enqueueScoredSpecialties(updated, false);
+        if (added.length > 0) {
+          toast({ title: "✅ Triagem registrada e paciente na fila!", description: `${scoreMsg} Fila: ${added.join(", ")}${skipped.length > 0 ? ` · Já na fila: ${skipped.join(", ")}` : ""}` });
+          navigate("/waiting-list");
+        } else {
+          toast({ title: "Triagem registrada!", description: `${scoreMsg} Paciente já estava nas filas correspondentes.` });
+        }
+      } else {
+        toast({ title: "Triagem registrada!", description: `${scoreMsg} Paciente apto para a fila.` });
+      }
     } catch (err: any) {
       toast({
         title: "Erro",
@@ -339,39 +384,11 @@ export default function PatientDetail() {
     }
   };
 
-  const SCORE_SPECIALTY_MAP: Array<{ field: keyof Patient; specialty: string }> = [
-    { field: "scorePsicologia",       specialty: "Psicologia"         },
-    { field: "scorePsicomotricidade", specialty: "Psicomotricidade"   },
-    { field: "scoreFisioterapia",     specialty: "Fisioterapia"       },
-    { field: "scoreTO",               specialty: "Terapia Ocupacional"},
-    { field: "scoreFonoaudiologia",   specialty: "Fonoaudiologia"     },
-    { field: "scoreNutricionista",    specialty: "Nutrição"           },
-    { field: "scorePsicopedagogia",   specialty: "Psicopedagogia"     },
-    { field: "scoreEdFisica",         specialty: "Educação Física"    },
-  ];
-
   const handleAddToFila = async () => {
     if (!patient) return;
     setAddingToFila(true);
-
-    const scoredSpecialties = SCORE_SPECIALTY_MAP
-      .filter(({ field }) => ((patient[field] as number | null) ?? 0) > 0)
-      .map(({ specialty }) => specialty);
-
-    const targets: (string | null)[] = scoredSpecialties.length > 0 ? scoredSpecialties : [null];
-
-    const added: string[] = [];
-    const skipped: string[] = [];
     try {
-      for (const sp of targets) {
-        try {
-          await addPatientToFila(patientId, sp, null, isProntuarioAntigo && !triagemFeita);
-          added.push(sp ?? "Geral");
-        } catch (err: any) {
-          if (err.message?.toLowerCase().includes("fila")) skipped.push(sp ?? "Geral");
-          else throw err;
-        }
-      }
+      const { added, skipped } = await enqueueScoredSpecialties(patient, isProntuarioAntigo && !triagemFeita);
       if (added.length > 0) {
         toast({
           title: added.length === 1 ? "✅ Adicionado à fila!" : `✅ ${added.length} filas adicionadas!`,
