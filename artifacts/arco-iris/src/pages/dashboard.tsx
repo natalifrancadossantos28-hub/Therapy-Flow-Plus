@@ -327,6 +327,16 @@ export default function Dashboard() {
     return buckets;
   }, [waitingList]);
 
+  // ── Fila por especialidade (contagem por área) ───────────────────────────
+  const filaPorEspecialidade = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const w of waitingList || []) {
+      const k = (w.specialty || "").trim() || "Sem especialidade";
+      map[k] = (map[k] || 0) + 1;
+    }
+    return map;
+  }, [waitingList]);
+
   const presencaDonut = [
     { name: "Realizados", value: heartbeat.realizado, fill: "#34d399" },
     { name: "Faltas", value: heartbeat.falta, fill: "#f87171" },
@@ -491,6 +501,7 @@ export default function Dashboard() {
         donutData={presencaDonut}
         porEspecialidade={heartbeat.porEspecialidade}
         filaPorCor={filaPorCor}
+        filaPorEspecialidade={filaPorEspecialidade}
         waitingCount={waitingCount}
       />
 
@@ -1080,6 +1091,7 @@ type HeartbeatProps = {
   donutData: Array<{ name: string; value: number; fill: string }>;
   porEspecialidade: Record<string, number>;
   filaPorCor: { maxima: number; vermelho: number; laranja: number; azul: number; verde: number; sem: number };
+  filaPorEspecialidade: Record<string, number>;
   waitingCount: number;
 };
 
@@ -1093,11 +1105,14 @@ function Heartbeat({
   donutData,
   porEspecialidade,
   filaPorCor,
+  filaPorEspecialidade,
   waitingCount,
 }: HeartbeatProps) {
   const especialidades = Object.entries(porEspecialidade)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6);
+  const filaEspecialidades = Object.entries(filaPorEspecialidade)
+    .sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1215,6 +1230,43 @@ function Heartbeat({
         )}
         <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-25" style={{ background: "rgba(255,30,90,0.35)" }} />
       </Card>
+
+      {/* Card: Fila de Espera por especialidade — full width */}
+      {filaEspecialidades.length > 0 && (
+        <Card className="p-6 lg:col-span-3 relative overflow-hidden border-[rgba(255,159,32,0.25)] shadow-[0_0_28px_rgba(255,159,32,0.08)]">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <ListTodo className="w-5 h-5 text-[#ff9f20]" style={{ filter: "drop-shadow(0 0 6px rgba(255,159,32,0.7))" }} />
+              <h2 className="text-base font-display font-bold text-foreground">Fila de espera por especialidade</h2>
+            </div>
+            <span className="text-xs text-muted-foreground">{waitingCount} na fila · cor neon de cada área</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {filaEspecialidades.map(([k, n]) => {
+              const tone = specialtyTone(k);
+              const lbl = specialtyShortLabel(k);
+              return (
+                <div
+                  key={k}
+                  className="px-3 py-2 rounded-xl flex items-center gap-2 transition-all"
+                  style={{
+                    background: tone.bg,
+                    border: `1px solid ${tone.border}`,
+                    boxShadow: `0 0 12px ${tone.glow}`,
+                  }}
+                >
+                  <span className="text-sm font-bold" style={{ color: tone.fg }}>
+                    {lbl}
+                  </span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-md" style={{ background: "rgba(0,0,0,0.3)", color: tone.fg }}>
+                    {n}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Card 4: Atendimentos do dia por especialidade — full width */}
       {especialidades.length > 0 && (
