@@ -148,13 +148,31 @@ export default function Portal() {
       // Restaura credenciais da empresa do enrollment do dispositivo para que
       // /agenda-profissionais consiga chamar as RPCs protegidas (listAppointments,
       // updateAppointment, etc). Se o dispositivo nunca teve um admin logado,
-      // avisa o usuario.
-      const restored = restoreCompanyFromDevice();
-      if (!restored) {
-        setError(
-          "Este dispositivo ainda nao foi configurado. Peca ao administrador para fazer login uma vez antes."
-        );
-        return;
+      // monta a sessao da empresa direto pelo slug (as RPCs aceitam o token de
+      // bypass __noauth__) — assim o profissional entra so com o PIN, sem
+      // precisar que o admin configure o dispositivo antes.
+      if (!restoreCompanyFromDevice()) {
+        const supabase = requireSupabase();
+        const { data, error: rpcError } = await supabase.rpc("lookup_company_by_slug", {
+          p_slug: DEFAULT_SLUG.trim().toLowerCase(),
+        });
+        if (rpcError) throw rpcError;
+        const company = Array.isArray(data) ? data[0] : data;
+        if (!company?.id) {
+          setError("Empresa nao encontrada.");
+          return;
+        }
+        setCompanySession({
+          type: "company",
+          scope: "reception", // escopo neutro; o scope real vem do professional.
+          companyId: Number(company.id),
+          companyName: company.name,
+          companySlug: company.slug,
+          adminToken: "__noauth__",
+          moduleArcoIris: Boolean(company.module_arco_iris),
+          moduleTriagem: Boolean(company.module_triagem),
+          modulePonto: Boolean(company.module_ponto),
+        });
       }
       setProfessionalSession({
         professionalId: prof.id,
