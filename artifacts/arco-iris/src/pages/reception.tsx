@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import NotificationBell from "@/components/NotificationBell";
+import { PatientAvatar } from "@/components/PatientAvatar";
 
 type Appointment = {
   id: number;
@@ -394,9 +395,10 @@ function AbsenceBellModal({
 }
 
 function AppointmentRow({
-  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell,
+  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, photoUrl,
 }: {
   apt: Appointment;
+  photoUrl?: string | null;
   index: number;
   atestado: Atestado | null;
   onStatusChange: (id: number, status: string) => Promise<number>;
@@ -442,6 +444,7 @@ function AppointmentRow({
           <div className="w-16 h-16 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-lg shrink-0">
             {apt.time}
           </div>
+          <PatientAvatar url={photoUrl} name={apt.patientName} size={44} />
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className={cn("font-bold text-lg", isFalta ? "text-red-400" : isJustificado ? "text-yellow-400" : "text-foreground")}>{apt.prontuario ? `${apt.prontuario} - ${apt.patientName}` : apt.patientName}</h3>
@@ -631,6 +634,7 @@ export default function Reception() {
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [appointments, setAppointments] = useState<AppointmentToday[]>([]);
   const [prontuarioMap, setProntuarioMap] = useState<Map<number, string>>(new Map());
+  const [photoMap, setPhotoMap] = useState<Map<number, string | null>>(new Map());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMutating, setIsMutating] = useState<boolean>(false);
   const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
@@ -665,8 +669,13 @@ export default function Reception() {
     listProfessionals().then(setProfessionals).catch(console.error);
     listPatients().then((patients) => {
       const map = new Map<number, string>();
-      for (const p of patients) if (p.prontuario) map.set(p.id, p.prontuario);
+      const photos = new Map<number, string | null>();
+      for (const p of patients) {
+        if (p.prontuario) map.set(p.id, p.prontuario);
+        if (p.photoUrl) photos.set(p.id, p.photoUrl);
+      }
       setProntuarioMap(map);
+      setPhotoMap(photos);
     }).catch(console.error);
   }, []);
 
@@ -1016,6 +1025,7 @@ export default function Reception() {
                       style={{ background: "rgba(251,146,60,0.12)", color: "#fb923c" }}>
                       {apt.time}
                     </div>
+                    <PatientAvatar url={photoMap.get(apt.patientId)} name={apt.patientName} size={36} />
                     <div className="min-w-0">
                       <p className="font-semibold text-sm truncate">
                         {enriched.prontuario ? `${enriched.prontuario} - ` : ""}{apt.patientName}
@@ -1197,6 +1207,7 @@ export default function Reception() {
               <AppointmentRow
                 key={apt.id}
                 apt={enriched}
+                photoUrl={photoMap.get(apt.patientId) ?? null}
                 index={i}
                 atestado={findAtestado(enriched)}
                 onStatusChange={handleStatusChange}
