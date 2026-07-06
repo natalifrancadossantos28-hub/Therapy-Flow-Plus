@@ -470,6 +470,7 @@ export type Patient = {
   abrigoCasaCrianca: boolean | null;
   tipoRegistro: string | null;
   localAtendimento: string | null;
+  photoUrl: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -509,6 +510,7 @@ type PatientRow = {
   abrigo_casa_crianca: boolean | null;
   tipo_registro: string | null;
   local_atendimento: string | null;
+  photo_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -555,6 +557,7 @@ function mapPatient(r: PatientRow): Patient {
     abrigoCasaCrianca: r.abrigo_casa_crianca,
     tipoRegistro: r.tipo_registro,
     localAtendimento: r.local_atendimento,
+    photoUrl: r.photo_url,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -609,6 +612,27 @@ export async function upsertPatient(
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new Error("Falha ao salvar paciente.");
   return mapPatient(row as PatientRow);
+}
+
+const PATIENT_PHOTO_BUCKET = "patient-photos";
+
+// Sobe a foto (ja comprimida) do paciente para o Storage e devolve a URL
+// publica. Path inclui companyId + patientId (ou "novo") para evitar colisao.
+export async function uploadPatientPhoto(
+  blob: Blob,
+  patientId: number | null
+): Promise<string> {
+  const supabase = requireSupabase();
+  const s = readSession();
+  if (!s?.companyId) throw new Error("Sessão de empresa expirada. Faça login novamente.");
+  const key = patientId != null ? String(patientId) : "novo";
+  const path = `${s.companyId}/${key}-${Date.now()}.jpg`;
+  const { error } = await supabase.storage
+    .from(PATIENT_PHOTO_BUCKET)
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage.from(PATIENT_PHOTO_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export async function deletePatient(id: number): Promise<void> {
