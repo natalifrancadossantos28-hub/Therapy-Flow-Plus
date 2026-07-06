@@ -77,6 +77,8 @@ export default function Dashboard() {
   // Semana selecionada no card "Atendimentos da Semana" (segunda-feira)
   const [multiWeek, setMultiWeek] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [weekAppointments, setWeekAppointments] = useState<AppointmentListItem[]>([]);
+  // Atendimentos do ano corrente (01/01 → hoje) — card "por especialidade no ano".
+  const [yearAppointments, setYearAppointments] = useState<AppointmentListItem[]>([]);
   const [monthAppointments, setMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
   // Mês corrente (fixo em "hoje"), independente do navegador da Visão Mensal —
   // usado na Performance dos Profissionais (aba "Mês Atual").
@@ -164,6 +166,16 @@ export default function Dashboard() {
       .then(apts => setWeekAppointments(apts))
       .catch(() => setWeekAppointments([]));
   }, [multiWeek]);
+
+  // ── Fetch appointments do ano corrente (01/01 → hoje) ──
+  useEffect(() => {
+    const now = new Date();
+    const yFrom = `${now.getFullYear()}-01-01`;
+    const yTo = format(now, "yyyy-MM-dd");
+    listAppointments({ dateFrom: yFrom, dateTo: yTo })
+      .then(apts => setYearAppointments(apts))
+      .catch(() => setYearAppointments([]));
+  }, []);
 
   // ── Fetch appointments do mês corrente (fixo em hoje) ──
   // Só busca quando a Visão Mensal está navegada para outro mês; quando está no
@@ -311,6 +323,29 @@ export default function Dashboard() {
     const taxaPresenca = fechados > 0 ? Math.round((realizado / fechados) * 100) : null;
     return { realizado, falta, pendente, cancelado, taxaPresenca, porEspecialidade };
   }, [todayAppointments]);
+
+  // ── Atendimentos por especialidade no ano (01/01 → hoje) ─────────────────
+  // Conta sessões realizadas de fato (atendimento/presente/alta); a especialidade
+  // vem do profissional do agendamento. Dedup por prof+paciente+data+hora.
+  const atendimentosAno = useMemo(() => {
+    const REALIZADOS_ST = ["atendimento", "em_atendimento", "em atendimento", "presente", "alta"];
+    const specById = new Map<number, string>();
+    for (const p of professionals || []) specById.set(p.id, (p.specialty || "").trim());
+    const porEspecialidade: Record<string, number> = {};
+    let total = 0;
+    const seen = new Set<string>();
+    for (const a of yearAppointments || []) {
+      if (!REALIZADOS_ST.includes((a.status || "").toLowerCase())) continue;
+      const key = `${a.professionalId}-${a.patientId}-${a.date}-${a.time}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const k = specById.get(a.professionalId) || "—";
+      const kk = k || "—";
+      porEspecialidade[kk] = (porEspecialidade[kk] || 0) + 1;
+      total++;
+    }
+    return { porEspecialidade, total };
+  }, [yearAppointments, professionals]);
 
   // ── Status da fila (cor por prioridade clínica) ──────────────────────────
   const filaPorCor = useMemo(() => {
@@ -499,7 +534,8 @@ export default function Dashboard() {
         cancelado={heartbeat.cancelado}
         taxaPresenca={heartbeat.taxaPresenca}
         donutData={presencaDonut}
-        porEspecialidade={heartbeat.porEspecialidade}
+        porEspecialidadeAno={atendimentosAno.porEspecialidade}
+        totalAno={atendimentosAno.total}
         filaPorCor={filaPorCor}
         filaPorEspecialidade={filaPorEspecialidade}
         waitingCount={waitingCount}
@@ -1089,7 +1125,8 @@ type HeartbeatProps = {
   cancelado: number;
   taxaPresenca: number | null;
   donutData: Array<{ name: string; value: number; fill: string }>;
-  porEspecialidade: Record<string, number>;
+  porEspecialidadeAno: Record<string, number>;
+  totalAno: number;
   filaPorCor: { maxima: number; vermelho: number; laranja: number; azul: number; verde: number; sem: number };
   filaPorEspecialidade: Record<string, number>;
   waitingCount: number;
@@ -1103,14 +1140,14 @@ function Heartbeat({
   cancelado,
   taxaPresenca,
   donutData,
-  porEspecialidade,
+  porEspecialidadeAno,
+  totalAno,
   filaPorCor,
   filaPorEspecialidade,
   waitingCount,
 }: HeartbeatProps) {
-  const especialidades = Object.entries(porEspecialidade)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6);
+  const especialidades = Object.entries(porEspecialidadeAno)
+    .sort((a, b) => b[1] - a[1]);
   const filaEspecialidades = Object.entries(filaPorEspecialidade)
     .sort((a, b) => b[1] - a[1]);
 
@@ -1268,12 +1305,12 @@ function Heartbeat({
         </Card>
       )}
 
-      {/* Card 4: Atendimentos do dia por especialidade — full width */}
+      {/* Card 4: Atendimentos no ano por especialidade — full width */}
       {especialidades.length > 0 && (
         <Card className="p-6 lg:col-span-3">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h2 className="text-base font-display font-bold text-foreground">Hoje por especialidade</h2>
-            <span className="text-xs text-muted-foreground">{total} atendimento{total !== 1 ? "s" : ""} · cor neon de cada área</span>
+            <h2 className="text-base font-display font-bold text-foreground">Atendimentos no ano por especialidade</h2>
+            <span className="text-xs text-muted-foreground">{totalAno} atendimento{totalAno !== 1 ? "s" : ""} desde 01/01 · cor neon de cada área</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {especialidades.map(([k, n]) => {
