@@ -5,6 +5,7 @@ import { generatePatientPdf } from "@/hooks/use-pdf";
 import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon, ShieldOff, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
+import { PatientPhotoUploader } from "@/components/PatientPhotoUploader";
 import {
   getPatient,
   getPatientPdf,
@@ -106,6 +107,7 @@ export default function PatientDetail() {
   const [editGuardianPhone, setEditGuardianPhone] = useState("");
   const [editDiagnosis, setEditDiagnosis] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [editPhotoUrl, setEditPhotoUrl] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Afastamento
@@ -180,6 +182,7 @@ export default function PatientDetail() {
     setEditGuardianPhone(patient.guardianPhone || "");
     setEditDiagnosis(patient.diagnosis || "");
     setEditNotes(patient.notes || "");
+    setEditPhotoUrl(patient.photoUrl || null);
     setEditOpen(true);
   };
 
@@ -199,6 +202,7 @@ export default function PatientDetail() {
         guardianPhone: editGuardianPhone || null,
         diagnosis: editDiagnosis || null,
         notes: editNotes || null,
+        photoUrl: editPhotoUrl,
       });
       setPatient(updated);
       setEditOpen(false);
@@ -433,6 +437,13 @@ export default function PatientDetail() {
             <ArrowLeft className="w-4 h-4" /> Voltar
           </Link>
           <div className="flex items-center gap-4 flex-wrap">
+            {patient.photoUrl && (
+              <img
+                src={patient.photoUrl}
+                alt={patient.name}
+                className="w-14 h-14 rounded-full object-cover border border-border shrink-0"
+              />
+            )}
             <h1 className="text-3xl font-display font-bold text-foreground">{patient.name}</h1>
             <Badge className={getStatusColor(patient.status)}>{patient.status}</Badge>
             {isCensoMunicipal && (
@@ -831,6 +842,17 @@ export default function PatientDetail() {
               </div>
 
               <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-semibold">Foto do Paciente</Label>
+                  <div className="mt-2">
+                    <PatientPhotoUploader
+                      value={editPhotoUrl}
+                      patientId={patientId}
+                      onChange={setEditPhotoUrl}
+                      onError={(msg) => toast({ title: "Erro na foto", description: msg, variant: "destructive" })}
+                    />
+                  </div>
+                </div>
                 <div>
                   <Label className="text-sm font-semibold">Nome *</Label>
                   <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Nome completo" className="mt-1" />

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
-import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download } from "lucide-react";
+import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getStatusColor, cn, calcIdade } from "@/lib/utils";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { PatientPhotoUploader } from "@/components/PatientPhotoUploader";
 import {
   listPatients,
   upsertPatient,
@@ -94,6 +95,7 @@ export default function Patients() {
     abrigoCasaCrianca: false,
     tipoRegistro: "Paciente da Unidade",
     localAtendimento: "",
+    photoUrl: null as string | null,
   });
 
   const [nextProntuario, setNextProntuario] = useState<string>("");
@@ -189,7 +191,7 @@ export default function Patients() {
       name: "", prontuario: next, cpf: "", cns: "", phone: "", dateOfBirth: "",
       motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
       entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
-      tipoRegistro: "Paciente da Unidade", localAtendimento: "",
+      tipoRegistro: "Paciente da Unidade", localAtendimento: "", photoUrl: null,
     });
     setIsDialogOpen(true);
   };
@@ -201,7 +203,7 @@ export default function Patients() {
       name: "", prontuario: "", cpf: "", cns: "", phone: "", dateOfBirth: "",
       motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
       entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
-      tipoRegistro: "Paciente da Unidade", localAtendimento: "",
+      tipoRegistro: "Paciente da Unidade", localAtendimento: "", photoUrl: null,
     });
   };
 
@@ -375,10 +377,19 @@ export default function Patients() {
                         {patient.prontuario || `#${String(patient.id).padStart(4, "0")}`}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="font-semibold text-foreground">{patient.name}</span>
-                        {isRede && (
-                          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">🏫 Mun.</span>
-                        )}
+                        <div className="flex items-center gap-2.5">
+                          {patient.photoUrl ? (
+                            <img src={patient.photoUrl} alt={patient.name} className="w-8 h-8 rounded-full object-cover border border-border shrink-0" />
+                          ) : (
+                            <span className="w-8 h-8 rounded-full flex items-center justify-center bg-secondary/40 border border-border shrink-0">
+                              <User className="w-4 h-4 text-muted-foreground" />
+                            </span>
+                          )}
+                          <span className="font-semibold text-foreground">{patient.name}</span>
+                          {isRede && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">🏫 Mun.</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{patient.motherName || "—"}</td>
                       <td className="px-4 py-3">
@@ -476,6 +487,17 @@ export default function Patients() {
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label>Foto do Paciente</Label>
+                  <div className="mt-2">
+                    <PatientPhotoUploader
+                      value={formData.photoUrl}
+                      patientId={null}
+                      onChange={(url) => setFormData({ ...formData, photoUrl: url })}
+                      onError={(msg) => toast({ title: "Erro na foto", description: msg, variant: "destructive" })}
+                    />
+                  </div>
+                </div>
                 <div className="col-span-2">
                   <Label>Nome Completo *</Label>
                   <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Nome completo" />
