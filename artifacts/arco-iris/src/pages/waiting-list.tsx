@@ -5,6 +5,7 @@ import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search } from "lucide-rea
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate } from "@/lib/utils";
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
+import { PatientAvatar } from "@/components/PatientAvatar";
 import { supabase } from "@/lib/supabase";
 import {
   listWaitingList,
@@ -210,6 +211,10 @@ export default function WaitingList() {
     }
   };
 
+  // Foto do paciente por id (para exibir a miniatura na fila).
+  const photoById = new Map<number, string | null>();
+  for (const p of patients) photoById.set(p.id, p.photoUrl);
+
   // Pacientes em busca ativa (congelados) saem da disputa por vaga prioritaria.
   const activeList = waitingList.filter(e => !e.paused);
   const pausedList = waitingList.filter(e => e.paused);
@@ -351,6 +356,7 @@ export default function WaitingList() {
                       <td className="px-6 py-4 font-display font-bold text-lg text-primary">#{pos}</td>
                       <td className="px-6 py-4 font-semibold text-foreground">
                         <div className="flex items-center gap-2 flex-wrap">
+                          <PatientAvatar url={photoById.get(entry.patientId)} name={entry.patientName} size={32} />
                           {entry.patientName}
                           {entry.specialty && (() => {
                             const tone = specialtyTone(entry.specialty);
@@ -501,6 +507,7 @@ export default function WaitingList() {
                     <tr key={entry.id} className="border-b border-border hover:bg-secondary/20 transition-colors opacity-90">
                       <td className="px-6 py-4 font-semibold text-foreground">
                         <div className="flex items-center gap-2 flex-wrap">
+                          <PatientAvatar url={photoById.get(entry.patientId)} name={entry.patientName} size={32} />
                           <Snowflake className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                           {entry.patientName}
                           {entry.specialty && (() => {

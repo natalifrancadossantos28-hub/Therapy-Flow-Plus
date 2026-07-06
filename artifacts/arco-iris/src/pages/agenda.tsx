@@ -13,9 +13,11 @@ import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
+import { PatientAvatar } from "@/components/PatientAvatar";
 import {
   listProfessionals,
   verifyProfessionalPin,
+  listPatients,
   listAppointments,
   updateAppointment,
   deleteAppointmentAlta,
@@ -452,6 +454,7 @@ export default function Agenda() {
   const [pauseSending, setPauseSending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
+  const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
   const { toast } = useToast();
 
   // Atendimento Multi
@@ -475,6 +478,11 @@ export default function Agenda() {
 
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
+    listPatients().then((ps) => {
+      const m = new Map<number, string | null>();
+      for (const p of ps) if (p.photoUrl) m.set(p.id, p.photoUrl);
+      setPhotoById(m);
+    }).catch(console.error);
   }, []);
 
   const canView = isAdmin || pinVerified;
@@ -1535,14 +1543,17 @@ export default function Agenda() {
                                       background: isFaltaJustificada ? "rgba(6,182,212,0.04)" : undefined,
                                     }}
                                   >
-                                    <span className="font-bold text-foreground truncate text-xs leading-tight" title={apt.patientName || undefined}>
-                                      {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
-                                      {isGhost ? (
-                                        <span className="text-amber-400">⚠ Sem dados</span>
-                                      ) : (
-                                        abbreviateName(apt.patientName) || `#${apt.patientId}`
-                                      )}
-                                    </span>
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={22} />
+                                      <span className="font-bold text-foreground truncate text-xs leading-tight" title={apt.patientName || undefined}>
+                                        {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
+                                        {isGhost ? (
+                                          <span className="text-amber-400">⚠ Sem dados</span>
+                                        ) : (
+                                          abbreviateName(apt.patientName) || `#${apt.patientId}`
+                                        )}
+                                      </span>
+                                    </div>
                                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
                                       {getStatusLabel(apt.status)}
                                     </span>

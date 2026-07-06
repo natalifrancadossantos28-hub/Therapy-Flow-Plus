@@ -6,10 +6,12 @@ import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
+import { PatientAvatar } from "@/components/PatientAvatar";
 import { supabase } from "@/lib/supabase";
 import {
   listProfessionals,
   verifyProfessionalPin,
+  listPatients,
   listAppointments,
   updateAppointment,
   deleteAppointmentAlta,
@@ -219,6 +221,7 @@ export default function AgendaProfissionais() {
       ? new URLSearchParams(window.location.search).get("prof") || ""
       : "";
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
   const [selectedProfId, setSelectedProfId] = useState(
     isProfessionalSession
       ? String(portalProf!.professionalId)
@@ -310,6 +313,11 @@ export default function AgendaProfissionais() {
         )
       )
       .catch(console.error);
+    listPatients().then((ps) => {
+      const m = new Map<number, string | null>();
+      for (const p of ps) if (p.photoUrl) m.set(p.id, p.photoUrl);
+      setPhotoById(m);
+    }).catch(console.error);
   }, []);
 
   const loadedRangeRef = useRef<{ from: string; to: string } | null>(null);
@@ -1384,13 +1392,16 @@ export default function AgendaProfissionais() {
                                           }}
                                         >
                                           <div className="flex items-center justify-between gap-1">
-                                            <span className="font-bold text-foreground truncate text-xs leading-tight" title={apt.patientName || undefined}>
-                                              {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
-                                              {isGhost ? (
-                                                <span className="text-amber-400">⚠ Sem dados</span>
-                                              ) : (
-                                                abbreviateName(apt.patientName) || `#${apt.patientId}`
-                                              )}
+                                            <span className="flex items-center gap-1.5 min-w-0 font-bold text-foreground text-xs leading-tight" title={apt.patientName || undefined}>
+                                              <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={22} />
+                                              <span className="truncate">
+                                                {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
+                                                {isGhost ? (
+                                                  <span className="text-amber-400">⚠ Sem dados</span>
+                                                ) : (
+                                                  abbreviateName(apt.patientName) || `#${apt.patientId}`
+                                                )}
+                                              </span>
                                             </span>
                                             {/* Cadeado visível quando Presente — status vem da recepção */}
                                             {isPresente && (
