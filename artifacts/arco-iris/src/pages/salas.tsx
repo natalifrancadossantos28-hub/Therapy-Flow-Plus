@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { MotionCard, Button, Input, Label, Select } from "@/components/ui-custom";
-import { DoorOpen, Plus, Trash2, RefreshCw, Clock, CircleDot, Users, Activity } from "lucide-react";
+import { DoorOpen, Plus, Trash2, RefreshCw, Clock, CircleDot, Users, Activity, CalendarDays } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   listSalas,
@@ -38,6 +38,19 @@ const STATUS_STYLE: Record<SalaStatus, { bg: string; border: string; dot: string
 
 const REFRESH_MS = 30_000;
 
+// ISO: 1=Segunda … 7=Domingo (bate com o extract(isodow) do banco).
+const WEEKDAYS: Array<{ n: number; label: string }> = [
+  { n: 1, label: "Seg" },
+  { n: 2, label: "Ter" },
+  { n: 3, label: "Qua" },
+  { n: 4, label: "Qui" },
+  { n: 5, label: "Sex" },
+  { n: 6, label: "Sáb" },
+  { n: 7, label: "Dom" },
+];
+
+type ScheduleEdit = { dias: number[]; inicio: string; fim: string };
+
 export default function SalasPage() {
   useDocumentTitle("Gestão de Salas");
   const { toast } = useToast();
@@ -51,6 +64,10 @@ export default function SalasPage() {
   const [novoNumero, setNovoNumero] = useState("");
   const [novoProfId, setNovoProfId] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Edição local de dias/horário por sala (chave = sala.id).
+  const [sched, setSched] = useState<Record<number, ScheduleEdit>>({});
+  const [savingSchedId, setSavingSchedId] = useState<number | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -82,6 +99,19 @@ export default function SalasPage() {
     fetchAll();
   }, [fetchAll]);
 
+  // Espelha os dias/horário salvos no estado de edição local.
+  useEffect(() => {
+    const next: Record<number, ScheduleEdit> = {};
+    for (const s of salas) {
+      next[s.id] = {
+        dias: s.diasSemana ?? [],
+        inicio: s.horaInicio ?? "",
+        fim: s.horaFim ?? "",
+      };
+    }
+    setSched(next);
+  }, [salas]);
+
   // Atualização automática do status em tempo real
   useEffect(() => {
     const poll = setInterval(fetchStatus, REFRESH_MS);
@@ -110,12 +140,47 @@ export default function SalasPage() {
 
   const handleReassign = async (sala: Sala, professionalId: number | null) => {
     try {
-      await upsertSala(sala.id, sala.numero, professionalId);
+      await upsertSala(sala.id, sala.numero, professionalId, sala.diasSemana, sala.horaInicio, sala.horaFim);
       await fetchAll();
       toast({ title: "Sala atualizada" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Falha ao atualizar sala.";
       toast({ title: "Erro", description: msg, variant: "destructive" });
+    }
+  };
+
+  const toggleDia = (salaId: number, dia: number) => {
+    setSched((prev) => {
+      const cur = prev[salaId] ?? { dias: [], inicio: "", fim: "" };
+      const has = cur.dias.includes(dia);
+      const dias = has ? cur.dias.filter((d) => d !== dia) : [...cur.dias, dia].sort((a, b) => a - b);
+      return { ...prev, [salaId]: { ...cur, dias } };
+    });
+  };
+
+  const setScheduleField = (salaId: number, field: "inicio" | "fim", value: string) => {
+    setSched((prev) => {
+      const cur = prev[salaId] ?? { dias: [], inicio: "", fim: "" };
+      return { ...prev, [salaId]: { ...cur, [field]: value } };
+    });
+  };
+
+  const handleSaveSchedule = async (sala: Sala) => {
+    const s = sched[sala.id] ?? { dias: [], inicio: "", fim: "" };
+    if ((s.inicio && !s.fim) || (!s.inicio && s.fim)) {
+      toast({ title: "Preencha início e fim do horário", variant: "destructive" });
+      return;
+    }
+    setSavingSchedId(sala.id);
+    try {
+      await upsertSala(sala.id, sala.numero, sala.professionalId, s.dias, s.inicio || null, s.fim || null);
+      await fetchAll();
+      toast({ title: "Dias/horário salvos" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Falha ao salvar dias/horário.";
+      toast({ title: "Erro", description: msg, variant: "destructive" });
+    } finally {
+      setSavingSchedId(null);
     }
   };
 
@@ -270,32 +335,92 @@ export default function SalasPage() {
         {salas.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhuma sala cadastrada.</p>
         ) : (
-          <div className="space-y-2">
-            {salas.map((sala) => (
+          <div className="space-y-3">
+            {salas.map((sala) => {
+              const s = sched[sala.id] ?? { dias: [], inicio: "", fim: "" };
+              return (
               <div
                 key={sala.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border border-border bg-secondary/30"
+                className="p-3 rounded-xl border border-border bg-secondary/30 space-y-3"
               >
-                <div className="flex-1 font-semibold text-foreground flex items-center gap-2">
-                  <DoorOpen className="w-4 h-4 text-muted-foreground" />
-                  {sala.numero}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 font-semibold text-foreground flex items-center gap-2">
+                    <DoorOpen className="w-4 h-4 text-muted-foreground" />
+                    {sala.numero}
+                  </div>
+                  <div className="sm:w-64">
+                    <Select
+                      value={sala.professionalId ? String(sala.professionalId) : ""}
+                      onChange={(e) => handleReassign(sala, e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">— Sem profissional —</option>
+                      {professionals.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Button variant="destructive" size="icon" onClick={() => handleDelete(sala)} title="Excluir sala">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
-                <div className="sm:w-64">
-                  <Select
-                    value={sala.professionalId ? String(sala.professionalId) : ""}
-                    onChange={(e) => handleReassign(sala, e.target.value ? Number(e.target.value) : null)}
+
+                {/* Dias + horário que o profissional usa esta sala */}
+                <div className="flex flex-col lg:flex-row lg:items-center gap-3 pl-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+                    {WEEKDAYS.map((d) => {
+                      const active = s.dias.includes(d.n);
+                      return (
+                        <button
+                          key={d.n}
+                          type="button"
+                          onClick={() => toggleDia(sala.id, d.n)}
+                          className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition-colors ${
+                            active
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-secondary/40 text-muted-foreground border-border hover:border-primary/40"
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <Input
+                      type="time"
+                      value={s.inicio}
+                      onChange={(e) => setScheduleField(sala.id, "inicio", e.target.value)}
+                      className="w-28"
+                    />
+                    <span className="text-muted-foreground">–</span>
+                    <Input
+                      type="time"
+                      value={s.fim}
+                      onChange={(e) => setScheduleField(sala.id, "fim", e.target.value)}
+                      className="w-28"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSaveSchedule(sala)}
+                    disabled={savingSchedId === sala.id}
                   >
-                    <option value="">— Sem profissional —</option>
-                    {professionals.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </Select>
+                    {savingSchedId === sala.id ? "Salvando…" : "Salvar dias/horário"}
+                  </Button>
                 </div>
-                <Button variant="destructive" size="icon" onClick={() => handleDelete(sala)} title="Excluir sala">
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <p className="text-[11px] text-muted-foreground pl-1">
+                  {s.dias.length === 0
+                    ? "Sem dias marcados = usa a sala todos os dias."
+                    : `Usa esta sala: ${s.dias.map((n) => WEEKDAYS.find((w) => w.n === n)?.label).join(", ")}${
+                        s.inicio && s.fim ? ` · ${s.inicio}–${s.fim}` : ""
+                      }`}
+                </p>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </MotionCard>

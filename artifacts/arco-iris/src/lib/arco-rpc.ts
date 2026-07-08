@@ -1740,6 +1740,9 @@ export type Sala = {
   companyId: number;
   numero: string;
   professionalId: number | null;
+  diasSemana: number[] | null;
+  horaInicio: string | null;
+  horaFim: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -1749,9 +1752,18 @@ type SalaRow = {
   company_id: number | string;
   numero: string;
   professional_id: number | string | null;
+  dias_semana: number[] | null;
+  hora_inicio: string | null;
+  hora_fim: string | null;
   created_at: string;
   updated_at: string;
 };
+
+/** "07:00:00" → "07:00" (aceita null). */
+function shortTime(t: string | null): string | null {
+  if (!t) return null;
+  return t.slice(0, 5);
+}
 
 function mapSala(r: SalaRow): Sala {
   return {
@@ -1759,6 +1771,9 @@ function mapSala(r: SalaRow): Sala {
     companyId: Number(r.company_id),
     numero: r.numero,
     professionalId: r.professional_id == null ? null : Number(r.professional_id),
+    diasSemana: r.dias_semana == null ? null : r.dias_semana.map(Number),
+    horaInicio: shortTime(r.hora_inicio),
+    horaFim: shortTime(r.hora_fim),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -1778,7 +1793,10 @@ export async function listSalas(): Promise<Sala[]> {
 export async function upsertSala(
   id: number | null,
   numero: string,
-  professionalId: number | null
+  professionalId: number | null,
+  diasSemana: number[] | null = null,
+  horaInicio: string | null = null,
+  horaFim: string | null = null
 ): Promise<Sala> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
@@ -1788,6 +1806,9 @@ export async function upsertSala(
     p_id: id,
     p_numero: numero,
     p_professional_id: professionalId,
+    p_dias: diasSemana && diasSemana.length > 0 ? diasSemana : null,
+    p_hora_inicio: horaInicio || null,
+    p_hora_fim: horaFim || null,
   });
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
