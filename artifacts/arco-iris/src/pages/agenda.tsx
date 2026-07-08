@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Card, Select, Button, Label } from "@/components/ui-custom";
-import { format, startOfWeek, addDays } from "date-fns";
+import { format, startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/lib/print-agenda";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play
+  ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
@@ -412,6 +413,7 @@ export default function Agenda() {
   const [pinVerified, setPinVerified] = useState(false);
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
+  const [printMenuOpen, setPrintMenuOpen] = useState(false);
   // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
   const [weekRef, setWeekRef] = useState(() => {
     const d = new Date();
@@ -1343,6 +1345,45 @@ export default function Agenda() {
   const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
   const isPaula = selectedProf?.name?.toLowerCase().includes("paula");
 
+  const buildPrintApts = (dates: string[]): PrintAppointment[] => {
+    const exp = applyFrequencyFilter(expandRecurrence(appointments, dates), dates);
+    return exp
+      .filter(a => dates.includes(a.date) && !INACTIVE_STATUSES.includes((a.status || "").toLowerCase()))
+      .map(a => ({
+        date: a.date,
+        time: a.time,
+        patientId: a.patientId,
+        patientName: a.patientName ?? null,
+        prontuario: a.prontuario ?? null,
+        status: a.status,
+      }));
+  };
+
+  const handlePrint = (mode: AgendaPrintMode = "dia") => {
+    setPrintMenuOpen(false);
+    let dates: string[] = [];
+    let refDate = weekRef;
+    if (mode === "dia") { dates = [today]; refDate = new Date(today + "T12:00:00"); }
+    else if (mode === "semana") { dates = weekDates; }
+    else if (mode === "mes") {
+      const first = startOfMonth(weekRef);
+      const last = endOfMonth(weekRef);
+      for (let d = new Date(first); d <= last; d = addDays(d, 1)) {
+        const dow = d.getDay();
+        if (dow >= 1 && dow <= 5) dates.push(format(d, "yyyy-MM-dd"));
+      }
+    }
+    openAgendaPrint({
+      mode,
+      professionalName: selectedProf?.name,
+      specialty: selectedProf?.specialty,
+      timeSlots: TIME_SLOTS,
+      appointments: mode === "rascunho" ? [] : buildPrintApts(dates),
+      refDate,
+      includeLunch: !isPaula,
+    });
+  };
+
   // Slots disponiveis para remanejar = sem qualquer paciente (vazio de verdade).
   const availableSlots = weekDates.flatMap(date =>
     TIME_SLOTS.filter(t => (isPaula || t !== "12:10") && getApts(date, t).length === 0)
@@ -1398,6 +1439,34 @@ export default function Agenda() {
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+          {canView && selectedProfId && (
+            <div className="relative">
+              <Button variant="outline" className="gap-2 text-sm" onClick={() => setPrintMenuOpen(o => !o)}>
+                <Printer className="w-4 h-4" /> Imprimir
+                <ChevronDown className={cn("w-4 h-4 transition-transform", printMenuOpen && "rotate-180")} />
+              </Button>
+              {printMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setPrintMenuOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                    <button onClick={() => handlePrint("dia")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                      <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Dia
+                    </button>
+                    <button onClick={() => handlePrint("semana")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                      <CalendarIcon className="w-4 h-4 text-primary" /> Agenda da Semana
+                    </button>
+                    <button onClick={() => handlePrint("mes")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                      <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Mês
+                    </button>
+                    <div className="border-t border-border my-1" />
+                    <button onClick={() => handlePrint("rascunho")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                      <Printer className="w-4 h-4 text-muted-foreground" /> Agenda em branco (rascunho)
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           <Link href="/agenda-profissionais">
             <Button variant="outline" className="gap-2 text-sm">
               <ExternalLink className="w-4 h-4" /> Portal do Profissional

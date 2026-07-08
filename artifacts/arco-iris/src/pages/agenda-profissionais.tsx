@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { format, startOfWeek, addDays } from "date-fns";
+import { format, startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play } from "lucide-react";
+import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/lib/print-agenda";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
@@ -233,6 +234,7 @@ export default function AgendaProfissionais() {
   const [pinVerified, setPinVerified] = useState(isAdminViewing || isProfessionalSession);
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
+  const [printMenuOpen, setPrintMenuOpen] = useState(false);
   // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
   const [weekRef, setWeekRef] = useState(() => {
     const d = new Date();
@@ -421,71 +423,48 @@ export default function AgendaProfissionais() {
     finally { setPinLoading(false); }
   };
 
-  const handlePrint = () => {
-    const todayApts = appointments.filter(a => a.date === today);
-    const doc = {
-      title: `Agenda do Dia – ${selectedProf?.name}`,
-      date: format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
-    };
+  const buildPrintApts = (dates: string[]): PrintAppointment[] => {
+    const exp = applyFrequencyFilter(expandRecurrence(appointments, dates), dates);
+    return exp
+      .filter(a => dates.includes(a.date) && !INACTIVE_STATUSES.includes((a.status || "").toLowerCase()))
+      .map(a => ({
+        date: a.date,
+        time: a.time,
+        patientId: a.patientId,
+        patientName: a.patientName ?? null,
+        prontuario: a.prontuario ?? null,
+        status: a.status,
+      }));
+  };
 
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
+  const monthWeekdays = (ref: Date): string[] => {
+    const first = startOfMonth(ref);
+    const last = endOfMonth(ref);
+    const out: string[] = [];
+    for (let d = new Date(first); d <= last; d = addDays(d, 1)) {
+      const dow = d.getDay();
+      if (dow >= 1 && dow <= 5) out.push(format(d, "yyyy-MM-dd"));
+    }
+    return out;
+  };
 
-    const rows = TIME_SLOTS.filter(t => t !== "12:10").map(time => {
-      const apt = todayApts.find(a => a.time === time);
-      return `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:700;color:#059669;">${time}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? `${apt.prontuario ? `<strong style="color:#06b6d4">[${apt.prontuario}]</strong> ` : ''}${apt.patientName || `Paciente #${apt.patientId}`}` : '<span style="color:#9ca3af;font-style:italic">Livre</span>'}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? apt.status : ""}</td>
-      </tr>`;
-    }).join("");
-
-    printWindow.document.write(`<!DOCTYPE html><html><head>
-      <meta charset="utf-8"><title>${doc.title}</title>
-      <style>
-        body{font-family:Arial,sans-serif;padding:32px;color:#111;}
-        h1{font-size:22px;margin-bottom:4px;}
-        .sub{color:#6b7280;font-size:14px;margin-bottom:24px;}
-        table{width:100%;border-collapse:collapse;font-size:14px;}
-        th{text-align:left;padding:10px 12px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:12px;text-transform:uppercase;letter-spacing:.05em;}
-        .section-row td{background:#fefce8;color:#92400e;font-size:11px;font-weight:700;padding:8px 12px;border-bottom:1px solid #e5e7eb;text-transform:uppercase;letter-spacing:.05em;}
-        .lunch-row td{background:#f1f5f9;color:#64748b;font-style:italic;padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;}
-        @media print{.no-print{display:none}}
-      </style>
-    </head><body>
-      <div class="no-print" style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
-        <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
-        <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
-      </div>
-      <h1>${doc.title}</h1>
-      <p class="sub">${doc.date} • ${selectedProf?.specialty}</p>
-      <table>
-        <thead><tr><th>Horário</th><th>Paciente</th><th>Status</th></tr></thead>
-        <tbody>
-          <tr class="section-row"><td colspan="3">Período da Manhã — 08:00 às 11:20</td></tr>
-          ${TIME_SLOTS.filter(t => t < "12:10").map(time => {
-            const apt = todayApts.find(a => a.time === time);
-            return `<tr>
-              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:700;color:#059669;">${time}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? `${apt.prontuario ? `<strong style="color:#06b6d4">[${apt.prontuario}]</strong> ` : ''}${apt.patientName || `Paciente #${apt.patientId}`}` : '<span style="color:#9ca3af;font-style:italic">Livre</span>'}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? apt.status : ""}</td>
-            </tr>`;
-          }).join("")}
-          <tr class="lunch-row"><td colspan="3">🍽 12:10 — Intervalo de Almoço</td></tr>
-          <tr class="section-row"><td colspan="3">Período da Tarde — 13:10 às 16:30</td></tr>
-          ${TIME_SLOTS.filter(t => t > "12:10").map(time => {
-            const apt = todayApts.find(a => a.time === time);
-            return `<tr>
-              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:700;color:#059669;">${time}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? `${apt.prontuario ? `<strong style="color:#06b6d4">[${apt.prontuario}]</strong> ` : ''}${apt.patientName || `Paciente #${apt.patientId}`}` : '<span style="color:#9ca3af;font-style:italic">Livre</span>'}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${apt ? apt.status : ""}</td>
-            </tr>`;
-          }).join("")}
-        </tbody>
-      </table>
-      <p style="margin-top:24px;font-size:11px;color:#94a3b8;">Encerramento: 17:20 | NFS – Gestão Terapêutica</p>
-    </body></html>`);
-    printWindow.document.close();
+  const handlePrint = (mode: AgendaPrintMode = "dia") => {
+    setPrintMenuOpen(false);
+    const isPaulaProf = selectedProf?.name?.toLowerCase().includes("paula");
+    let dates: string[] = [];
+    let refDate = weekRef;
+    if (mode === "dia") { dates = [today]; refDate = new Date(today + "T12:00:00"); }
+    else if (mode === "semana") { dates = weekDates; }
+    else if (mode === "mes") { dates = monthWeekdays(weekRef); }
+    openAgendaPrint({
+      mode,
+      professionalName: selectedProf?.name,
+      specialty: selectedProf?.specialty,
+      timeSlots: TIME_SLOTS,
+      appointments: mode === "rascunho" ? [] : buildPrintApts(dates),
+      refDate,
+      includeLunch: !isPaulaProf,
+    });
   };
 
   const patchStatus = async (apt: Appointment, status: string) => {
@@ -1147,12 +1126,35 @@ export default function AgendaProfissionais() {
             <ThemeToggle compact />
             {pinVerified && (
               <>
-                <button
-                  onClick={handlePrint}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-[0_0_16px_rgba(0,240,255,0.4)]"
-                >
-                  <Printer className="w-4 h-4" /> Imprimir Agenda do Dia
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setPrintMenuOpen(o => !o)}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-[0_0_16px_rgba(0,240,255,0.4)]"
+                  >
+                    <Printer className="w-4 h-4" /> Imprimir Agenda
+                    <ChevronDown className={cn("w-4 h-4 transition-transform", printMenuOpen && "rotate-180")} />
+                  </button>
+                  {printMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setPrintMenuOpen(false)} />
+                      <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                        <button onClick={() => handlePrint("dia")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Dia
+                        </button>
+                        <button onClick={() => handlePrint("semana")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <CalendarIcon className="w-4 h-4 text-primary" /> Agenda da Semana
+                        </button>
+                        <button onClick={() => handlePrint("mes")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Mês
+                        </button>
+                        <div className="border-t border-border my-1" />
+                        <button onClick={() => handlePrint("rascunho")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <Printer className="w-4 h-4 text-muted-foreground" /> Agenda em branco (rascunho)
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     // Admin volta pro dashboard; profissional e acesso direto voltam pro portal.
