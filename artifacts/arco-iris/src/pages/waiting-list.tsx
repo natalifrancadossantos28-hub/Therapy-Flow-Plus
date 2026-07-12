@@ -356,7 +356,7 @@ export default function WaitingList() {
                       <td className="px-6 py-4 font-display font-bold text-lg text-primary">#{pos}</td>
                       <td className="px-6 py-4 font-semibold text-foreground">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <PatientAvatar url={photoById.get(entry.patientId)} name={entry.patientName} size={32} />
+                          <PatientAvatar url={photoById.get(entry.patientId)} name={entry.patientName} size={48} />
                           {entry.patientName}
                           {entry.specialty && (() => {
                             const tone = specialtyTone(entry.specialty);
@@ -507,7 +507,7 @@ export default function WaitingList() {
                     <tr key={entry.id} className="border-b border-border hover:bg-secondary/20 transition-colors opacity-90">
                       <td className="px-6 py-4 font-semibold text-foreground">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <PatientAvatar url={photoById.get(entry.patientId)} name={entry.patientName} size={32} />
+                          <PatientAvatar url={photoById.get(entry.patientId)} name={entry.patientName} size={48} />
                           <Snowflake className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                           {entry.patientName}
                           {entry.specialty && (() => {

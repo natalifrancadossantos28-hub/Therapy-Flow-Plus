@@ -1421,7 +1421,7 @@ export default function AgendaProfissionais() {
                                         >
                                           <div className="flex items-center justify-between gap-1">
                                             <span className="flex items-center gap-1.5 min-w-0 font-bold text-foreground text-xs leading-tight" title={apt.patientName || undefined}>
-                                              <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={22} />
+                                              <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={40} />
                                               <span className="truncate">
                                                 {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
                                                 {isGhost ? (
