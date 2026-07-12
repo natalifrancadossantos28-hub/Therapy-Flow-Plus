@@ -24,6 +24,7 @@ const AgendaProfissionais = lazy(() => import("@/pages/agenda-profissionais"));
 const GestaoContratos = lazy(() => import("@/pages/gestao-contratos"));
 const Salas = lazy(() => import("@/pages/salas"));
 const Feriados = lazy(() => import("@/pages/feriados"));
+const DatasConscientizacao = lazy(() => import("@/pages/datas-conscientizacao"));
 const PainelMaster = lazy(() => import("@/pages/painel-master"));
 const AIBrain = lazy(() => import("@/pages/ai-brain"));
 
@@ -73,6 +74,7 @@ function Router() {
                 <Route path="/gestao-contratos">{() => <AdminGuard><GestaoContratos /></AdminGuard>}</Route>
                 <Route path="/salas">{() => <AdminGuard><Salas /></AdminGuard>}</Route>
                 <Route path="/feriados">{() => <AdminGuard><Feriados /></AdminGuard>}</Route>
+                <Route path="/datas-conscientizacao">{() => <AdminGuard><DatasConscientizacao /></AdminGuard>}</Route>
                 <Route path="/ai-brain">{() => <AdminGuard><AIBrain /></AdminGuard>}</Route>
                 <Route component={NotFound} />
               </Switch>
