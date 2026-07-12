@@ -8,10 +8,15 @@ import {
   updateAppointment,
   deletePatient,
   countAbsencesBySpecialty,
+  listFeriados,
+  listAusencias,
   type Professional as ArcoProfessional,
   type AppointmentToday,
   type AbsenceBySpecialty,
+  type Feriado,
+  type Ausencia,
 } from "@/lib/arco-rpc";
+import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { supabase } from "@/lib/supabase";
 import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom";
 import { getStatusColor, getStatusLabel, cn } from "@/lib/utils";
@@ -638,7 +643,13 @@ export default function Reception() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMutating, setIsMutating] = useState<boolean>(false);
   const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
+  const [feriados, setFeriados] = useState<Feriado[]>([]);
+  const feriadosRef = useRef<Feriado[]>([]);
+  const ausenciasRef = useRef<Ausencia[]>([]);
   const { toast } = useToast();
+
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const todayHoliday = holidayOn(today, feriados);
 
   const reloadAbsences = useCallback(() => {
     countAbsencesBySpecialty()
@@ -658,7 +669,11 @@ export default function Reception() {
       .then((data) => {
         // Oculta pacientes com status terminal (Alta/Óbito/Desistência) da recepção.
         const TERMINAL = ["alta", "óbito", "obito", "desistência", "desistencia"];
-        setAppointments(data.filter(a => !TERMINAL.includes((a.patientStatus ?? "").toLowerCase())));
+        // Oculta atendimentos em feriado ou quando o profissional está ausente (férias/folga/falta).
+        setAppointments(data.filter(a =>
+          !TERMINAL.includes((a.patientStatus ?? "").toLowerCase()) &&
+          !isBlocked(a.date, a.professionalId, feriadosRef.current, ausenciasRef.current)
+        ));
         setIsLoading(false);
         reloadAbsences();
       })
@@ -667,6 +682,14 @@ export default function Reception() {
 
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
+    Promise.all([listFeriados(), listAusencias()])
+      .then(([f, a]) => {
+        feriadosRef.current = f;
+        ausenciasRef.current = a;
+        setFeriados(f);
+        void reloadAppointments();
+      })
+      .catch(console.error);
     listPatients().then((patients) => {
       const map = new Map<number, string>();
       const photos = new Map<number, string | null>();
@@ -982,6 +1005,17 @@ export default function Reception() {
         </div>
         <NotificationBell />
       </div>
+
+      {/* ── Aviso de feriado (sem atendimentos hoje) ── */}
+      {todayHoliday && (
+        <div className="rounded-2xl border p-4 flex items-center gap-3"
+          style={{ background: "rgba(168,85,247,0.10)", border: "1px solid rgba(168,85,247,0.45)", color: "#c084fc" }}>
+          <CalendarClock className="w-5 h-5 shrink-0" />
+          <span className="font-semibold">
+            Hoje é feriado{todayHoliday.descricao ? ` — ${todayHoliday.descricao}` : ""}. Nenhum atendimento agendado.
+          </span>
+        </div>
+      )}
 
       {/* ── Painel de Faltosos Automáticos ── */}
       {visibleMissed.length > 0 && (
