@@ -17,12 +17,13 @@ import {
   type LongAttendancePatient,
   type PausedOverviewItem,
 } from "@/lib/arco-rpc";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3, Snowflake, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3, Snowflake, Clock, ChevronLeft, ChevronRight, HeartHandshake } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor, calcIdade, formatDate } from "@/lib/utils";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
+import { upcomingAwareness, dateLabel, CATEGORY_COLOR } from "@/lib/awareness-dates";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfWeek, addDays } from "date-fns";
@@ -518,6 +519,9 @@ export default function Dashboard() {
     { label: "Este ano", value: aptStats?.anual ?? "—" },
   ];
 
+  const awarenessTodayISO = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const awarenessUpcoming = upcomingAwareness(awarenessTodayISO, 3);
+
   return (
     <div className="space-y-8">
       <div>
@@ -559,7 +563,35 @@ export default function Dashboard() {
         ))}
       </div>
 
-
+      {/* Datas de conscientização — lembrete das próximas */}
+      <Link href="/datas-conscientizacao">
+        <MotionCard className="p-5 cursor-pointer">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-foreground flex items-center gap-2">
+              <HeartHandshake className="w-5 h-5 text-primary" />
+              Datas de Conscientização
+            </h3>
+            <span className="text-xs text-primary font-semibold">Ver calendário →</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {awarenessUpcoming.map(({ date, when, daysUntil }, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2.5 rounded-xl border border-border p-3"
+                style={daysUntil === 0 ? { borderColor: "rgba(168,85,247,0.5)", background: "rgba(168,85,247,0.06)" } : undefined}
+              >
+                <div className="rounded-lg px-2 py-1 text-white text-[11px] font-bold shrink-0" style={{ background: CATEGORY_COLOR[date.category] }}>
+                  {dateLabel(date)}
+                </div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-foreground text-xs leading-tight truncate" title={date.title}>{date.title}</div>
+                  <div className="text-[11px] text-muted-foreground">{when}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </MotionCard>
+      </Link>
 
       {/* Atendimentos Terapêuticos por período */}
       <Card className="p-6">
