@@ -34,8 +34,13 @@ import {
   materializeVirtualAppointment,
   remanejarRecurrenceForward,
   undoMultiAppointment,
+  listFeriados,
+  listAusencias,
   type Professional as ArcoProfessional,
+  type Feriado,
+  type Ausencia,
 } from "@/lib/arco-rpc";
+import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 
 const TIME_SLOTS = [
   "07:10", "08:00", "08:50", "09:40", "10:30", "11:20",
@@ -436,6 +441,8 @@ export default function Agenda() {
     setWeekRef(d);
   };
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [feriados, setFeriados] = useState<Feriado[]>([]);
+  const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [cancelDialog, setCancelDialog] = useState<CancelDialog | null>(null);
   const [notifySending, setNotifySending] = useState(false);
@@ -485,6 +492,8 @@ export default function Agenda() {
       for (const p of ps) if (p.photoUrl) m.set(p.id, p.photoUrl);
       setPhotoById(m);
     }).catch(console.error);
+    listFeriados().then(setFeriados).catch(console.error);
+    listAusencias().then(setAusencias).catch(console.error);
   }, []);
 
   const canView = isAdmin || pinVerified;
@@ -1337,12 +1346,22 @@ export default function Agenda() {
 
   // Expande recorrência: projeta agendamentos recorrentes em semanas sem linha real no banco.
   // Depois filtra: se frequência é quinzenal/mensal, esconde "agendado" nas semanas erradas.
-  const expanded = applyFrequencyFilter(expandRecurrence(appointments, weekDates), weekDates);
+  // Por fim, oculta feriados e ausências do profissional (férias/folga/falta).
+  const expanded = applyFrequencyFilter(expandRecurrence(appointments, weekDates), weekDates)
+    .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias));
 
   // Fase 5A: slots em grupo — um mesmo (date,time,profissional) pode ter varios pacientes.
   const getApts = (date: string, time: string) =>
     expanded.filter(a => a.date === date && a.time === time);
   const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
+  const selectedProfIdNum = selectedProfId ? parseInt(selectedProfId) : 0;
+  const dayBlock = (date: string): string | null => {
+    const h = holidayOn(date, feriados);
+    if (h) return h.descricao ? `Feriado — ${h.descricao}` : "Feriado";
+    const abs = ausencias.find(a => a.professionalId === selectedProfIdNum && date >= a.dataInicio && date <= a.dataFim);
+    if (abs) return abs.motivo ? `Ausente — ${abs.motivo}` : "Ausente";
+    return null;
+  };
   const isPaula = selectedProf?.name?.toLowerCase().includes("paula");
 
   const buildPrintApts = (dates: string[]): PrintAppointment[] => {
@@ -1536,12 +1555,20 @@ export default function Agenda() {
               <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
                 <tr>
                   <th className="px-2 py-2 sticky left-0 bg-secondary/90 backdrop-blur z-10 border-r border-border" style={{ width: "60px" }}>Horário</th>
-                  {weekDays.map((d, i) => (
+                  {weekDays.map((d, i) => {
+                    const block = dayBlock(weekDates[i]);
+                    return (
                     <th key={i} className="px-1 py-2 text-center">
                       <span className="font-bold text-foreground capitalize text-sm">{format(d, "EEE", { locale: ptBR })}</span>
                       <div className="font-normal text-xs">{format(d, "dd/MM")}</div>
+                      {block && (
+                        <div className="mt-0.5 text-[10px] font-bold normal-case" style={{ color: "#c084fc" }} title={block}>
+                          {block.length > 14 ? block.slice(0, 14) + "…" : block}
+                        </div>
+                      )}
                     </th>
-                  ))}
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>

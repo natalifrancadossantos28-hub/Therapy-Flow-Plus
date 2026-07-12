@@ -1876,3 +1876,140 @@ export async function getStatusSalas(): Promise<StatusSala[]> {
     horarioProximoAgendamento: r.horario_proximo_agendamento,
   }));
 }
+
+// ── Feriados + Ausências de profissional ───────────────────────────────────────
+
+export type Feriado = {
+  id: number;
+  companyId: number;
+  data: string;
+  descricao: string;
+};
+
+type FeriadoRow = {
+  id: number | string;
+  company_id: number | string;
+  data: string;
+  descricao: string | null;
+  created_at: string;
+};
+
+function mapFeriado(r: FeriadoRow): Feriado {
+  return {
+    id: Number(r.id),
+    companyId: Number(r.company_id),
+    data: r.data,
+    descricao: r.descricao ?? "",
+  };
+}
+
+export async function listFeriados(): Promise<Feriado[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_feriados", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return ((data ?? []) as FeriadoRow[]).map(mapFeriado);
+}
+
+export async function upsertFeriado(data: string, descricao: string): Promise<Feriado> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data: row, error } = await supabase.rpc("upsert_feriado", {
+    p_slug: slug,
+    p_password: password,
+    p_data: data,
+    p_descricao: descricao,
+  });
+  if (error) throw error;
+  const r = Array.isArray(row) ? row[0] : row;
+  if (!r) throw new Error("Falha ao salvar feriado.");
+  return mapFeriado(r as FeriadoRow);
+}
+
+export async function deleteFeriado(id: number): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("delete_feriado", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+}
+
+export type Ausencia = {
+  id: number;
+  companyId: number;
+  professionalId: number;
+  dataInicio: string;
+  dataFim: string;
+  motivo: string;
+};
+
+type AusenciaRow = {
+  id: number | string;
+  company_id: number | string;
+  professional_id: number | string;
+  data_inicio: string;
+  data_fim: string;
+  motivo: string | null;
+  created_at: string;
+};
+
+function mapAusencia(r: AusenciaRow): Ausencia {
+  return {
+    id: Number(r.id),
+    companyId: Number(r.company_id),
+    professionalId: Number(r.professional_id),
+    dataInicio: r.data_inicio,
+    dataFim: r.data_fim,
+    motivo: r.motivo ?? "",
+  };
+}
+
+export async function listAusencias(): Promise<Ausencia[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_ausencias", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return ((data ?? []) as AusenciaRow[]).map(mapAusencia);
+}
+
+export async function addAusencia(
+  professionalId: number,
+  dataInicio: string,
+  dataFim: string,
+  motivo: string
+): Promise<Ausencia> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("add_ausencia", {
+    p_slug: slug,
+    p_password: password,
+    p_professional_id: professionalId,
+    p_data_inicio: dataInicio,
+    p_data_fim: dataFim,
+    p_motivo: motivo,
+  });
+  if (error) throw error;
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r) throw new Error("Falha ao salvar ausência.");
+  return mapAusencia(r as AusenciaRow);
+}
+
+export async function deleteAusencia(id: number): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("delete_ausencia", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+}
