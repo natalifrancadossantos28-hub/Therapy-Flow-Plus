@@ -1640,7 +1640,7 @@ export default function Agenda() {
                                     }}
                                   >
                                     <div className="flex items-center gap-1.5 min-w-0">
-                                      <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={22} />
+                                      <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={40} />
                                       <span className="font-bold text-foreground truncate text-xs leading-tight" title={apt.patientName || undefined}>
                                         {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
                                         {isGhost ? (

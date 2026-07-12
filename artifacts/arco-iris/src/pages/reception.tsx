@@ -449,7 +449,7 @@ function AppointmentRow({
           <div className="w-16 h-16 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-lg shrink-0">
             {apt.time}
           </div>
-          <PatientAvatar url={photoUrl} name={apt.patientName} size={44} />
+          <PatientAvatar url={photoUrl} name={apt.patientName} size={72} />
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className={cn("font-bold text-lg", isFalta ? "text-red-400" : isJustificado ? "text-yellow-400" : "text-foreground")}>{apt.prontuario ? `${apt.prontuario} - ${apt.patientName}` : apt.patientName}</h3>
@@ -1059,7 +1059,7 @@ export default function Reception() {
                       style={{ background: "rgba(251,146,60,0.12)", color: "#fb923c" }}>
                       {apt.time}
                     </div>
-                    <PatientAvatar url={photoMap.get(apt.patientId)} name={apt.patientName} size={36} />
+                    <PatientAvatar url={photoMap.get(apt.patientId)} name={apt.patientName} size={56} />
                     <div className="min-w-0">
                       <p className="font-semibold text-sm truncate">
                         {enriched.prontuario ? `${enriched.prontuario} - ` : ""}{apt.patientName}
