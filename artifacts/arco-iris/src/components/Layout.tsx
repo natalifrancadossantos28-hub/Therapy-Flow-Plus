@@ -5,6 +5,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useThemeTick } from "@/lib/theme";
 
 type NavItem = {
   href: string;
@@ -29,6 +30,7 @@ const navItems: NavItem[] = [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  useThemeTick(); // re-renderiza as páginas quando o tema muda (cores via JS)
   const [location, setLocation] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
