@@ -41,6 +41,7 @@ import {
   type Ausencia,
 } from "@/lib/arco-rpc";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
+import { worksThroughLunch } from "@/lib/schedule";
 
 const TIME_SLOTS = [
   "07:10", "08:00", "08:50", "09:40", "10:30", "11:20",
@@ -1362,7 +1363,7 @@ export default function Agenda() {
     if (abs) return abs.motivo ? `Ausente — ${abs.motivo}` : "Ausente";
     return null;
   };
-  const isPaula = selectedProf?.name?.toLowerCase().includes("paula");
+  const isPaula = worksThroughLunch(selectedProf?.name);
 
   const buildPrintApts = (dates: string[]): PrintAppointment[] => {
     const exp = applyFrequencyFilter(expandRecurrence(appointments, dates), dates);

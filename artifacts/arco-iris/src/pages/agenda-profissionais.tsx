@@ -34,6 +34,7 @@ import {
   type Ausencia,
 } from "@/lib/arco-rpc";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
+import { worksThroughLunch } from "@/lib/schedule";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
 
@@ -459,7 +460,7 @@ export default function AgendaProfissionais() {
 
   const handlePrint = (mode: AgendaPrintMode = "dia") => {
     setPrintMenuOpen(false);
-    const isPaulaProf = selectedProf?.name?.toLowerCase().includes("paula");
+    const isPaulaProf = worksThroughLunch(selectedProf?.name);
     let dates: string[] = [];
     let refDate = weekRef;
     if (mode === "dia") { dates = [today]; refDate = new Date(today + "T12:00:00"); }
@@ -1111,7 +1112,7 @@ export default function AgendaProfissionais() {
   // Usa a semana atualmente selecionada dentro do modal.
   const modalWeekDays = remanejFlow ? getWeekDays(remanejFlow.weekRef) : [];
   const modalWeekDates = modalWeekDays.map(d => format(d, "yyyy-MM-dd"));
-  const isPaula = selectedProf?.name?.toLowerCase().includes("paula");
+  const isPaula = worksThroughLunch(selectedProf?.name);
   const modalAvailableSlots = modalWeekDates.flatMap(date =>
     TIME_SLOTS.filter(t => (isPaula || t !== "12:10") && getApts(date, t).length === 0)
       .map(time => ({ date, time }))
@@ -1333,7 +1334,7 @@ export default function AgendaProfissionais() {
                   </thead>
                   <tbody>
                     {TIME_SLOTS.map(time => {
-                      const isPaulaProf = selectedProf?.name?.toLowerCase().includes("paula");
+                      const isPaulaProf = worksThroughLunch(selectedProf?.name);
                       const isLunch = time === "12:10" && !isPaulaProf;
                       return (
                         <tr key={time} className="border-b border-border/60 hover:bg-secondary/30 transition-colors">
