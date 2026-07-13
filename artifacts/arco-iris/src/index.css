@@ -246,6 +246,32 @@
   box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06) !important;
 }
 
+/* Textos de destaque "neon" (feitos p/ fundo escuro) somem no branco.
+   No modo claro trocamos as variantes 300/400 por tons 700 legíveis.
+   Os modais escuros usam cores inline + text-white, então não são afetados. */
+:root.light .text-cyan-400, :root.light .text-cyan-300 { color: #0e7490; }
+:root.light .text-sky-400, :root.light .text-sky-300 { color: #0369a1; }
+:root.light .text-blue-400, :root.light .text-blue-300 { color: #1d4ed8; }
+:root.light .text-teal-400, :root.light .text-teal-300 { color: #0f766e; }
+:root.light .text-emerald-400, :root.light .text-emerald-300 { color: #047857; }
+:root.light .text-green-400, :root.light .text-green-300 { color: #15803d; }
+:root.light .text-yellow-400, :root.light .text-yellow-300 { color: #a16207; }
+:root.light .text-amber-400, :root.light .text-amber-300 { color: #b45309; }
+:root.light .text-orange-400, :root.light .text-orange-300 { color: #c2410c; }
+:root.light .text-red-400, :root.light .text-red-300 { color: #b91c1c; }
+:root.light .text-rose-400, :root.light .text-rose-300 { color: #be123c; }
+:root.light .text-pink-400, :root.light .text-pink-300 { color: #be185d; }
+:root.light .text-fuchsia-400, :root.light .text-fuchsia-300 { color: #a21caf; }
+:root.light .text-purple-400, :root.light .text-purple-300 { color: #7e22ce; }
+:root.light .text-violet-400, :root.light .text-violet-300 { color: #6d28d9; }
+
+/* Textos muito apagados por opacidade (foreground/40, /50) ficam ilegíveis
+   no claro — elevamos o piso de opacidade sem mexer no escuro. */
+:root.light .text-foreground\/40 { color: hsl(var(--foreground) / 0.62); }
+:root.light .text-foreground\/50 { color: hsl(var(--foreground) / 0.68); }
+:root.light .text-foreground\/60 { color: hsl(var(--foreground) / 0.74); }
+:root.light .text-foreground\/70 { color: hsl(var(--foreground) / 0.82); }
+
 /* ═══════════════════════════════════════════
    NEON PRIORITY BADGES
    ═══════════════════════════════════════════ */

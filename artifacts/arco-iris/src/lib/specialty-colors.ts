@@ -21,6 +21,8 @@ export type SpecialtyTone = {
   key: string;
   /** Cor "core" neon para texto/borda em fundo escuro. */
   fg: string;
+  /** Cor "core" escura para texto legível em fundo claro (modo claro). */
+  fgLight: string;
   /** Cor "fill" suave (background do badge). */
   bg: string;
   /** Cor da borda do badge / barra lateral. */
@@ -32,6 +34,7 @@ export type SpecialtyTone = {
 const NEUTRAL: SpecialtyTone = {
   key: "default",
   fg: "#cbd5e1",
+  fgLight: "#475569",
   bg: "rgba(148,163,184,0.14)",
   border: "rgba(148,163,184,0.45)",
   glow: "rgba(148,163,184,0.25)",
@@ -42,6 +45,7 @@ const PALETTE: SpecialtyTone[] = [
   {
     key: "fono",
     fg: "#67e8f9",
+    fgLight: "#0e7490",
     bg: "rgba(34,211,238,0.14)",
     border: "rgba(34,211,238,0.55)",
     glow: "rgba(34,211,238,0.4)",
@@ -50,6 +54,7 @@ const PALETTE: SpecialtyTone[] = [
   {
     key: "to",
     fg: "#c4b5fd",
+    fgLight: "#6d28d9",
     bg: "rgba(168,85,247,0.16)",
     border: "rgba(168,85,247,0.55)",
     glow: "rgba(168,85,247,0.4)",
@@ -58,6 +63,7 @@ const PALETTE: SpecialtyTone[] = [
   {
     key: "psicologia",
     fg: "#f9a8d4",
+    fgLight: "#be185d",
     bg: "rgba(236,72,153,0.16)",
     border: "rgba(236,72,153,0.55)",
     glow: "rgba(236,72,153,0.4)",
@@ -66,6 +72,7 @@ const PALETTE: SpecialtyTone[] = [
   {
     key: "fisio",
     fg: "#fde68a",
+    fgLight: "#a16207",
     bg: "rgba(250,204,21,0.16)",
     border: "rgba(250,204,21,0.55)",
     glow: "rgba(250,204,21,0.4)",
@@ -74,6 +81,7 @@ const PALETTE: SpecialtyTone[] = [
   {
     key: "psicoped",
     fg: "#5eead4",
+    fgLight: "#0f766e",
     bg: "rgba(20,184,166,0.16)",
     border: "rgba(20,184,166,0.55)",
     glow: "rgba(20,184,166,0.4)",
@@ -82,6 +90,7 @@ const PALETTE: SpecialtyTone[] = [
   {
     key: "edfisica",
     fg: "#fdba74",
+    fgLight: "#c2410c",
     bg: "rgba(249,115,22,0.16)",
     border: "rgba(249,115,22,0.55)",
     glow: "rgba(249,115,22,0.4)",
@@ -90,6 +99,7 @@ const PALETTE: SpecialtyTone[] = [
   {
     key: "nutricao",
     fg: "#86efac",
+    fgLight: "#15803d",
     bg: "rgba(34,197,94,0.16)",
     border: "rgba(34,197,94,0.55)",
     glow: "rgba(34,197,94,0.4)",
@@ -98,6 +108,7 @@ const PALETTE: SpecialtyTone[] = [
   {
     key: "psicomotricidade",
     fg: "#fbbf24",
+    fgLight: "#b45309",
     bg: "rgba(251,191,36,0.16)",
     border: "rgba(251,191,36,0.55)",
     glow: "rgba(251,191,36,0.4)",
@@ -106,6 +117,7 @@ const PALETTE: SpecialtyTone[] = [
   {
     key: "parental",
     fg: "#f0abfc",
+    fgLight: "#a21caf",
     bg: "rgba(217,70,239,0.16)",
     border: "rgba(217,70,239,0.55)",
     glow: "rgba(217,70,239,0.4)",
@@ -168,9 +180,17 @@ export function specialtyKey(specialty: string | null | undefined): string {
   return "default";
 }
 
+function isLightTheme(): boolean {
+  return typeof document !== "undefined" && document.documentElement.classList.contains("light");
+}
+
 export function specialtyTone(specialty: string | null | undefined): SpecialtyTone {
   const k = specialtyKey(specialty);
-  return TONE_BY_KEY[k] ?? NEUTRAL;
+  const base = TONE_BY_KEY[k] ?? NEUTRAL;
+  // No modo claro o `fg` neon (feito p/ fundo escuro) some no branco;
+  // usa a variante escura pra manter os rótulos legíveis.
+  if (isLightTheme()) return { ...base, fg: base.fgLight };
+  return base;
 }
 
 export function specialtyShortLabel(specialty: string | null | undefined): string {
