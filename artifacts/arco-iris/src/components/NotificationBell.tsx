@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Bell, X, Check, MessageCircle } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from "react";
+import { Bell, X, Check, MessageCircle, CalendarPlus } from "lucide-react";
 import {
   listNotificacoes,
   markNotificacaoLido,
-  markAllNotificacoesLido,
   listProfessionals,
   type NotificacaoRecepcao,
   type Professional,
@@ -29,6 +28,7 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [tab, setTab] = useState<NotifTab>("agendamentos");
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   // Mapa nome→especialidade pra colorir cada notificação pela aura do
@@ -115,6 +115,12 @@ export default function NotificationBell() {
 
   const unreadCount = notifs.length;
 
+  // Separa "Novos Agendamentos" dos demais avisos pra a recepção acompanhar
+  // marcações novas sem se perder no meio de desmarcações/faltas/remanejos.
+  const agendamentos = useMemo(() => notifs.filter(isNovoAgendamento), [notifs]);
+  const outros = useMemo(() => notifs.filter((n) => !isNovoAgendamento(n)), [notifs]);
+  const visibleNotifs = tab === "agendamentos" ? agendamentos : outros;
+
   const handleCiente = async (n: NotificacaoRecepcao) => {
     // Otimista: tira da lista imediatamente. Se a RPC falhar, recoloca.
     setNotifs((prev) => prev.filter((x) => x.id !== n.id));
@@ -148,14 +154,18 @@ export default function NotificationBell() {
   };
 
   const handleMarkAllRead = async () => {
+    // Marca como ciente apenas os itens da aba aberta.
+    const target = visibleNotifs;
+    if (target.length === 0) return;
+    const ids = new Set(target.map((x) => x.id));
     const snapshot = notifs;
-    setNotifs([]);
+    setNotifs((prev) => prev.filter((x) => !ids.has(x.id)));
     try {
-      await markAllNotificacoesLido();
+      await Promise.all(target.map((x) => markNotificacaoLido(x.id)));
     } catch {
       setNotifs(snapshot);
       toast({
-        title: "Erro ao marcar todas",
+        title: "Erro ao marcar como ciente",
         description: "Tente novamente.",
         variant: "destructive",
       });
@@ -189,6 +199,20 @@ export default function NotificationBell() {
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
+        {/* Selo verde separado: novos agendamentos */}
+        {agendamentos.length > 0 && (
+          <span
+            className="absolute -bottom-1 -left-1 min-w-[16px] h-[16px] rounded-full flex items-center justify-center text-[9px] font-bold px-1"
+            style={{
+              background: "#16a34a",
+              color: "#fff",
+              boxShadow: "0 0 8px rgba(22,163,74,0.6)",
+            }}
+            title={`${agendamentos.length} novo(s) agendamento(s)`}
+          >
+            {agendamentos.length > 99 ? "99+" : agendamentos.length}
+          </span>
+        )}
       </button>
 
       {open && (
@@ -210,20 +234,15 @@ export default function NotificationBell() {
           >
             <div className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-orange-400" />
-              <span className="text-base font-bold text-white">Avisos dos Profissionais</span>
-              {unreadCount > 0 && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40">
-                  {unreadCount} nova{unreadCount > 1 ? "s" : ""}
-                </span>
-              )}
+              <span className="text-base font-bold text-white">Central de Avisos</span>
             </div>
             <div className="flex items-center gap-1">
-              {unreadCount > 0 && (
+              {visibleNotifs.length > 0 && (
                 <button
                   type="button"
                   onClick={handleMarkAllRead}
                   className="text-xs text-slate-300 hover:text-white px-2 py-1 rounded transition-colors"
-                  title="Marcar todas como lidas"
+                  title="Marcar como ciente os avisos desta aba"
                 >
                   Ciente todas
                 </button>
@@ -239,17 +258,39 @@ export default function NotificationBell() {
             </div>
           </div>
 
+          {/* Abas: Novos Agendamentos × Outros avisos */}
+          <div className="flex gap-1 px-3 pt-3 pb-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <TabButton
+              active={tab === "agendamentos"}
+              onClick={() => setTab("agendamentos")}
+              icon={<CalendarPlus className="w-4 h-4" />}
+              label="Novos Agendamentos"
+              count={agendamentos.length}
+              activeColor="#16a34a"
+            />
+            <TabButton
+              active={tab === "outros"}
+              onClick={() => setTab("outros")}
+              icon={<Bell className="w-4 h-4" />}
+              label="Outros avisos"
+              count={outros.length}
+              activeColor="#f97316"
+            />
+          </div>
+
           {/* List */}
           <div className="flex-1 overflow-y-auto">
             {loading && notifs.length === 0 ? (
               <div className="p-6 text-center text-sm text-slate-400">Carregando…</div>
-            ) : notifs.length === 0 ? (
+            ) : visibleNotifs.length === 0 ? (
               <div className="p-8 text-center text-sm text-slate-400">
-                Tudo em dia. Quando um profissional desmarcar, remanejar ou registrar atendimento, vai aparecer aqui.
+                {tab === "agendamentos"
+                  ? "Nenhum agendamento novo. Quando um paciente for marcado, aparece aqui."
+                  : "Nenhum outro aviso. Desmarcações, remanejamentos, faltas e atendimentos aparecem aqui."}
               </div>
             ) : (
               <ul className="divide-y divide-white/5">
-                {notifs.map((n) => (
+                {visibleNotifs.map((n) => (
                   <NotifItem
                     key={n.id}
                     n={n}
@@ -384,6 +425,56 @@ function NotifItem({
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+type NotifTab = "agendamentos" | "outros";
+
+/** Novo agendamento = ação contém "agend" (não pega remanejar/remarcar). */
+function isNovoAgendamento(n: NotificacaoRecepcao): boolean {
+  return (n.acao || "").toLowerCase().includes("agend");
+}
+
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+  count,
+  activeColor,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
+  count: number;
+  activeColor: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold px-2 py-2 rounded-lg transition-colors"
+      style={{
+        background: active ? `${activeColor}22` : "transparent",
+        color: active ? activeColor : "#94a3b8",
+        border: `1px solid ${active ? `${activeColor}88` : "rgba(148,163,184,0.20)"}`,
+      }}
+    >
+      {icon}
+      <span className="truncate">{label}</span>
+      {count > 0 && (
+        <span
+          className="min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold px-1"
+          style={{
+            background: activeColor,
+            color: "#fff",
+          }}
+        >
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </button>
+  );
+}
 
 type AcaoColor = {
   bg: string;
