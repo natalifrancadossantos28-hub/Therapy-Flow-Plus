@@ -1640,6 +1640,22 @@ export async function markAllNotificacoesLido(): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Marca como lidos os avisos pendentes (não-lidos) vinculados a um agendamento.
+ * Usado quando o agendamento é excluído/remanejado/desmarcado, para a Central
+ * de Avisos refletir só o estado atual. Best-effort — não lança.
+ */
+export async function markNotificacoesLidoByAppointment(appointmentId: number): Promise<void> {
+  if (!appointmentId || appointmentId <= 0) return;
+  try {
+    const all = await listNotificacoes();
+    const pendentes = all.filter((n) => !n.lido && n.appointmentId === appointmentId);
+    await Promise.all(pendentes.map((n) => markNotificacaoLido(n.id)));
+  } catch {
+    /* silencioso — limpeza não deve bloquear a ação principal */
+  }
+}
+
 // ── AI Brain API calls ─────────────────────────────────────────────────────
 
 export type AIAnalysis = {

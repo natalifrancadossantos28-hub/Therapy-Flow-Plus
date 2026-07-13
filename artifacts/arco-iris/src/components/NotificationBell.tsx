@@ -143,7 +143,11 @@ export default function NotificationBell() {
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
       : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    // Janela única: reaproveita sempre a mesma aba do WhatsApp (nome fixo do
+    // target) em vez de abrir uma nova a cada clique. Sem noopener para que o
+    // navegador reutilize a janela nomeada.
+    const waWindow = window.open(url, "whatsapp_nfs");
+    if (waWindow) waWindow.focus();
     if (!phone) {
       toast({
         title: "Sem telefone do responsável",

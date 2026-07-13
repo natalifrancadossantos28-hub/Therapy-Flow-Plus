@@ -24,6 +24,7 @@ import {
   deleteAppointmentAlta,
   deleteRecurrenceForward,
   createNotificacao,
+  markNotificacoesLidoByAppointment,
   createAppointments,
   listWaitingList,
   deleteWaitingListEntry,
@@ -698,6 +699,7 @@ export default function Agenda() {
     try {
       const data = await patchStatus(apt, "desmarcado");
       const realApt = { ...apt, id: data.id, status: "desmarcado" };
+      await markNotificacoesLidoByAppointment(realApt.id);
       await logNotificacao(realApt, "Desmarcado");
       setNotifyDone(false);
       setCancelDialog({ apt: realApt, profName, originalStatus });
@@ -881,6 +883,9 @@ export default function Agenda() {
       } else if (excluirConfirm.id > 0) {
         await deleteAppointmentAlta(excluirConfirm.id);
       }
+      // Limpa avisos pendentes desse agendamento na Central de Avisos (não deixa
+      // "Novo Agendamento" antigo pendurado depois de excluir).
+      await markNotificacoesLidoByAppointment(excluirConfirm.id);
       // Remove from local state: appointments in the same recurrence group from this date onward
       setAppointments(prev =>
         prev.filter(a => {
@@ -1289,8 +1294,9 @@ export default function Agenda() {
           }),
         });
       }
+      await markNotificacoesLidoByAppointment(realId);
       await logNotificacao(
-        { ...remanejFlow.apt, date: remanejFlow.newDate, time: remanejFlow.newTime },
+        { ...remanejFlow.apt, id: realId, date: remanejFlow.newDate, time: remanejFlow.newTime },
         acao
       );
       setRemanejDone(true);

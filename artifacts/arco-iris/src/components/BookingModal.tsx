@@ -318,7 +318,7 @@ export default function BookingModal({
         return;
       }
 
-      await createAppointments({
+      const created = await createAppointments({
         patientId: targetPatientId,
         professionalId,
         date,
@@ -327,10 +327,13 @@ export default function BookingModal({
         fromWaitingList: !isDirect,
       });
 
-      // Notificação para o sininho da Recepção: novo agendamento criado
+      // Notificação para o sininho da Recepção: novo agendamento criado.
+      // Vincula ao appointmentId pra a Central de Avisos poder limpar/atualizar
+      // esse aviso quando o agendamento for excluído/remanejado/desmarcado.
       try {
         const patientPhone = isDirect ? selectedDirect!.phone ?? null : null;
         await createNotificacao({
+          appointmentId: created?.id ?? null,
           patientName: targetPatientName,
           professionalName: professionalName,
           acao: "Novo Agendamento",
