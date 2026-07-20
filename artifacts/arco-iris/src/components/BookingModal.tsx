@@ -99,7 +99,9 @@ export default function BookingModal({
   const [frequency, setFrequency] = useState<"semanal" | "quinzenal" | "mensal">("semanal");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<"fila" | "direto">("fila");
+  const [mode, setMode] = useState<"fila" | "direto">(
+    () => ((professionalSpecialty || "").toLowerCase().includes("parental") ? "direto" : "fila")
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
   // Filtro de Disponibilidade: IDs de pacientes já agendados neste mesmo horário com QUALQUER profissional
@@ -113,6 +115,10 @@ export default function BookingModal({
   // é o mesmo da criança, liberamos o conflito de horário cross-especialidade só
   // para esta especialidade.
   const isParentalBooking = (professionalSpecialty || "").toLowerCase().includes("parental");
+
+  // Busca Direta liberada para o Admin e para a Psicologia Parental (atendimento
+  // da mãe/responsável, sem fila por prioridade). Nos demais casos, só via fila.
+  const allowDirect = adminMode || isParentalBooking;
 
   const loadData = useCallback(async () => {
     try {
@@ -130,7 +136,7 @@ export default function BookingModal({
       })));
     } catch (err) { console.error(err); }
 
-    if (adminMode) {
+    if (allowDirect) {
       listPatients().then(setPatients).catch(console.error);
     }
 
@@ -180,7 +186,7 @@ export default function BookingModal({
       }
       setBookedAtSlotIds(bookedIds);
     } catch (err) { console.error(err); }
-  }, [adminMode, professionalId, professionalSpecialty, date, time]);
+  }, [adminMode, allowDirect, professionalId, professionalSpecialty, date, time]);
 
   useEffect(() => { void loadData(); }, [loadData]);
 
@@ -232,7 +238,7 @@ export default function BookingModal({
   const queueBlockedCount = matchedBySpec.length - filteredList.length;
 
   const directMatches = useMemo(() => {
-    if (!adminMode || mode !== "direto") return [];
+    if (!allowDirect || mode !== "direto") return [];
     const term = searchTerm.trim().toLowerCase();
     const active = patients.filter(p => !["Alta", "Óbito", "Desistência"].includes(p.status ?? ""));
     if (!term) return active.slice(0, 30);
@@ -240,7 +246,7 @@ export default function BookingModal({
       (p.name ?? "").toLowerCase().includes(term) ||
       (p.prontuario ?? "").toLowerCase().includes(term)
     ).slice(0, 30);
-  }, [adminMode, mode, patients, searchTerm]);
+  }, [allowDirect, mode, patients, searchTerm]);
 
   const selectedDirectAlreadyScheduled =
     selectedPatientId != null && alreadyScheduledIds.has(selectedPatientId);
@@ -251,7 +257,7 @@ export default function BookingModal({
 
   const handleSave = async () => {
     setError("");
-    const isDirect = adminMode && mode === "direto";
+    const isDirect = allowDirect && mode === "direto";
     if (isDirect && !selectedDirect) { setError("Selecione um paciente."); return; }
     if (!isDirect && !nextPatient) return;
 
@@ -259,7 +265,7 @@ export default function BookingModal({
     const targetPatientName = isDirect ? selectedDirect!.name : nextPatient!.patientName;
     // Trava final: nao permite agendar paciente que ja tem horario ativo
     // com QUALQUER profissional. Admin pode forçar em Busca Direta.
-    if (alreadyScheduledIds.has(targetPatientId) && !(adminMode && isDirect)) {
+    if (alreadyScheduledIds.has(targetPatientId) && !isDirect) {
       setError(
         `${targetPatientName} já possui agendamento ativo nesta especialidade. ` +
         `Não é possível agendar novamente pela fila.`
@@ -285,7 +291,7 @@ export default function BookingModal({
           ? isSameSpecialty(professionalSpecialty, aptSpec)
           : a.professionalId === professionalId;
       });
-      if (hasActiveSameSpec && !(adminMode && isDirect)) {
+      if (hasActiveSameSpec && !isDirect) {
         setError(
           `${targetPatientName} já foi agendado por outro profissional desta especialidade. ` +
           `A lista será atualizada automaticamente.`
@@ -407,7 +413,7 @@ export default function BookingModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {adminMode && (
+          {allowDirect && (
             <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-secondary/40 border border-border text-xs font-semibold">
               <button
                 type="button"
@@ -427,12 +433,12 @@ export default function BookingModal({
                   mode === "direto" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <UserCog className="w-3.5 h-3.5" /> Admin — Busca Direta
+                <UserCog className="w-3.5 h-3.5" /> {adminMode ? "Admin — Busca Direta" : "Busca Direta"}
               </button>
             </div>
           )}
 
-          {(!adminMode || mode === "fila") && (
+          {(!allowDirect || mode === "fila") && (
             <div>
               <Label className="mb-2 block font-semibold">
                 Próximo da Fila de Espera
@@ -460,7 +466,7 @@ export default function BookingModal({
                         ? `${queueBlockedCount} paciente(s) oculto(s) pois já possuem agendamento ativo nesta especialidade.`
                         : "Pacientes de outras especialidades foram filtrados."}
                   </p>
-                  {adminMode && (
+                  {allowDirect && (
                     <p className="text-xs text-primary mt-1">Use a aba "Busca Direta" para agendar qualquer paciente.</p>
                   )}
                 </div>
@@ -518,7 +524,7 @@ export default function BookingModal({
             </div>
           )}
 
-          {adminMode && mode === "direto" && (
+          {allowDirect && mode === "direto" && (
             <div>
               <Label className="mb-2 block font-semibold">
                 Buscar paciente (nome ou prontuário)
@@ -585,7 +591,10 @@ export default function BookingModal({
               )}
               {selectedDirect && selectedDirectAlreadyScheduled && !selectedDirectBookedAtSlot && (
                 <p className="mt-2 text-xs font-semibold text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                  Atenção: {selectedDirect.name} já tem horário ativo com {professionalName}. Só o administrador pode adicionar um segundo horário.
+                  Atenção: {selectedDirect.name} já tem horário ativo com {professionalName}.{" "}
+                  {isParentalBooking
+                    ? "Na Psicologia Parental é permitido agendar mesmo assim."
+                    : "Só o administrador pode adicionar um segundo horário."}
                 </p>
               )}
             </div>
@@ -654,7 +663,7 @@ export default function BookingModal({
               (mode === "direto" && !selectedDirect)
             }
           >
-            {loading ? "Agendando…" : mode === "direto" ? "Agendar (Admin)" : "Confirmar"}
+            {loading ? "Agendando…" : mode === "direto" ? (adminMode ? "Agendar (Admin)" : "Agendar") : "Confirmar"}
           </Button>
         </div>
       </MotionCard>
