@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-custom";
-import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search } from "lucide-react";
+import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate } from "@/lib/utils";
-import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
+import { specialtyTone, specialtyShortLabel, SPECIALTIES } from "@/lib/specialty-colors";
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { supabase } from "@/lib/supabase";
 import {
@@ -14,6 +14,10 @@ import {
   addPatientToFila,
   listPatients,
   syncWaitingListWithAgenda,
+  upsertPatient,
+  getPatient,
+  listAppointments,
+  deleteAppointmentAlta,
   type WaitingListEntry,
   type Patient,
 } from "@/lib/arco-rpc";
@@ -50,8 +54,17 @@ export default function WaitingList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [formPatientId, setFormPatientId] = useState("");
+  // Inserção manual (admin): adiciona qualquer paciente sem exigir triagem.
+  const [manualMode, setManualMode] = useState(false);
+  const [manualSpecialty, setManualSpecialty] = useState("");
+  const [manualSearch, setManualSearch] = useState("");
   const [filterSpecialty, setFilterSpecialty] = useState<string>("__all__");
   const [searchQuery, setSearchQuery] = useState("");
+  // Saída do paciente (Alta / Desistência / Óbito) direto pela fila.
+  const [saidaTarget, setSaidaTarget] = useState<WaitingListEntry | null>(null);
+  const [saidaTipo, setSaidaTipo] = useState<"Alta" | "Desistência" | "Óbito">("Alta");
+  const [saidaMotivo, setSaidaMotivo] = useState("");
+  const [saidaLoading, setSaidaLoading] = useState(false);
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -123,7 +136,116 @@ export default function WaitingList() {
     return (score != null || isProntuarioAntigo) && !inactiveStatus && !isCenso;
   });
 
-  const resetForm = () => { setFormPatientId(""); };
+  const resetForm = () => {
+    setFormPatientId("");
+    setManualMode(false);
+    setManualSpecialty("");
+    setManualSearch("");
+  };
+
+  // Pacientes elegíveis para inserção manual (admin): qualquer paciente ativo,
+  // independente de triagem. Exclui status terminais e já em atendimento.
+  const manualEligible = patients
+    .filter(p => {
+      const inativo = ["Alta", "Óbito", "Desistência", "Atendimento"].includes(p.status ?? "");
+      return !inativo;
+    })
+    .filter(p => {
+      const q = manualSearch.trim().toLowerCase();
+      if (!q) return true;
+      return (p.name ?? "").toLowerCase().includes(q) || (p.prontuario ?? "").toLowerCase().includes(q);
+    })
+    .slice(0, 50);
+
+  const handleAddManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formPatientId) return;
+    setAdding(true);
+    try {
+      const result = await addPatientToFila(
+        parseInt(formPatientId),
+        manualSpecialty.trim() || null,
+        null,
+        true, // skipTriagemCheck — admin insere sem exigir triagem
+      );
+      await load();
+      toast({
+        title: "✅ Adicionado à fila!",
+        description: `${manualSpecialty || "Qualquer especialidade"} — Prioridade: ${PRIORITY_LABEL[result.priority] ?? result.priority}`,
+      });
+      setIsDialogOpen(false);
+      resetForm();
+    } catch (err: any) {
+      const already = err?.message?.toLowerCase().includes("fila");
+      toast({
+        title: already ? "Aviso" : "Erro",
+        description: already ? "Paciente já está na fila desta especialidade." : (err?.message || "Falha ao adicionar."),
+        variant: "destructive",
+      });
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const openSaida = (entry: WaitingListEntry, tipo: "Alta" | "Desistência" | "Óbito") => {
+    setSaidaTarget(entry);
+    setSaidaTipo(tipo);
+    setSaidaMotivo("");
+  };
+
+  const confirmSaida = async () => {
+    if (!saidaTarget) return;
+    // Motivo obrigatório para Alta e Desistência; Óbito é opcional.
+    if (saidaTipo !== "Óbito" && !saidaMotivo.trim()) return;
+    setSaidaLoading(true);
+    const label = saidaTipo;
+    const pid = saidaTarget.patientId;
+    try {
+      // 1) Grava status + motivo no prontuário do paciente.
+      try {
+        const existing = await getPatient(pid);
+        const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
+        const motivo = saidaMotivo.trim() || "—";
+        await upsertPatient(pid, {
+          status: label,
+          notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")} — Fila] Motivo: ${motivo}`,
+        });
+      } catch {
+        toast({ title: "Aviso", description: "Falha ao gravar no prontuário — a fila será atualizada mesmo assim.", variant: "destructive" });
+      }
+
+      // 2) Remove TODAS as entradas do paciente na fila.
+      try {
+        const filaAtual = await listWaitingList();
+        for (const e of filaAtual.filter(e => e.patientId === pid)) {
+          try { await deleteWaitingListEntry(e.id); } catch { /* best-effort */ }
+        }
+      } catch { /* silencioso */ }
+
+      // 3) Cascata: remove agendamentos futuros do paciente (evita fantasmas).
+      try {
+        const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+        const futuros = await listAppointments({ patientId: pid, dateFrom: todayStr });
+        const grupos = new Set<string>();
+        for (const a of futuros) {
+          if (a.id <= 0) continue;
+          const gid = a.recurrenceGroupId || `single:${a.id}`;
+          if (grupos.has(gid)) continue;
+          grupos.add(gid);
+          try { await deleteAppointmentAlta(a.id); } catch { /* best-effort */ }
+        }
+      } catch { /* best-effort */ }
+
+      await load();
+      toast({ title: `${label} registrada`, description: `${saidaTarget.patientName} saiu da fila.` });
+      setSaidaTarget(null);
+      setSaidaMotivo("");
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message || "Falha ao registrar saída.", variant: "destructive" });
+    } finally {
+      setSaidaLoading(false);
+    }
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,8 +393,8 @@ export default function WaitingList() {
               className="w-full sm:w-64 rounded-lg bg-secondary/40 border border-border pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors"
             />
           </div>
-          <Button onClick={() => setIsDialogOpen(true)} className="gap-2 whitespace-nowrap" disabled={eligiblePatients.length === 0}>
-            <ListPlus className="w-4 h-4" /> Adicionar Triado à Fila
+          <Button onClick={() => setIsDialogOpen(true)} className="gap-2 whitespace-nowrap">
+            <ListPlus className="w-4 h-4" /> Adicionar à Fila
           </Button>
         </div>
       </div>
@@ -445,7 +567,7 @@ export default function WaitingList() {
                       </td>
                       <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1 flex-wrap">
                           <Button
                             variant="outline"
                             title="Pausar atendimento (busca ativa) — tira da disputa por vaga sem remover"
@@ -455,8 +577,32 @@ export default function WaitingList() {
                             <Snowflake className="w-3.5 h-3.5" /> Pausar Atendimento
                           </Button>
                           <Button
+                            variant="outline"
+                            title="Dar Alta (encerra o atendimento — motivo obrigatório)"
+                            className="h-8 gap-1.5 text-xs border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                            onClick={() => openSaida(entry, "Alta")}
+                          >
+                            <LogOut className="w-3.5 h-3.5" /> Alta
+                          </Button>
+                          <Button
+                            variant="outline"
+                            title="Registrar Desistência (motivo obrigatório)"
+                            className="h-8 gap-1.5 text-xs border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                            onClick={() => openSaida(entry, "Desistência")}
+                          >
+                            Desistência
+                          </Button>
+                          <Button
+                            variant="outline"
+                            title="Registrar Óbito"
+                            className="h-8 gap-1.5 text-xs border-slate-500/40 text-slate-400 hover:bg-slate-500/10"
+                            onClick={() => openSaida(entry, "Óbito")}
+                          >
+                            Óbito
+                          </Button>
+                          <Button
                             variant="ghost"
-                            title="Remover da fila"
+                            title="Tirar da fila (sem alterar status do paciente)"
                             className="text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
                             onClick={() => handleRemove(entry.id)}
                           >
@@ -560,40 +706,144 @@ export default function WaitingList() {
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <MotionCard className="w-full max-w-md p-6 overflow-visible" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <h2 className="text-2xl font-bold font-display mb-1">Adicionar à Fila de Espera</h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              Apenas pacientes com triagem registrada aparecem aqui. A prioridade é calculada automaticamente.
-            </p>
-            <form onSubmit={handleAdd} className="space-y-4">
-              <div>
-                <Label>Paciente (com triagem realizada)</Label>
-                <Select required value={formPatientId} onChange={e => setFormPatientId(e.target.value)}>
-                  <option value="">Selecione um paciente triado...</option>
-                  {eligiblePatients.map(p => {
-                    const raw = p.triagemScore ?? 0;
-                    const scoreClinico = Math.round((raw * 100) / 360);
-                    return (
+
+            {/* Alternância: Triado (score automático) ou Manual (admin, sem triagem) */}
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-secondary/40 border border-border text-xs font-semibold mt-3 mb-4">
+              <button
+                type="button"
+                onClick={() => { setManualMode(false); setFormPatientId(""); }}
+                className={`py-2 rounded-lg transition-colors ${!manualMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Paciente triado
+              </button>
+              <button
+                type="button"
+                onClick={() => { setManualMode(true); setFormPatientId(""); }}
+                className={`py-2 rounded-lg transition-colors ${manualMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Manual (admin)
+              </button>
+            </div>
+
+            {!manualMode ? (
+              <form onSubmit={handleAdd} className="space-y-4">
+                <div>
+                  <Label>Paciente (com triagem realizada)</Label>
+                  <Select required value={formPatientId} onChange={e => setFormPatientId(e.target.value)}>
+                    <option value="">Selecione um paciente triado...</option>
+                    {eligiblePatients.map(p => {
+                      const raw = p.triagemScore ?? 0;
+                      const scoreClinico = Math.round((raw * 100) / 360);
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — Score clínico: {scoreClinico}/100
+                        </option>
+                      );
+                    })}
+                  </Select>
+                  {eligiblePatients.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1 font-semibold">
+                      Nenhum paciente com triagem disponível. Use a aba "Manual (admin)" para inserir qualquer paciente.
+                    </p>
+                  )}
+                </div>
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-semibold">
+                  ✅ As especialidades são detectadas automaticamente pelas áreas pontuadas na triagem do paciente. A prioridade (Elevado / Moderado / Leve / Baixo) é calculada com base no score clínico e critérios de vulnerabilidade.
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button type="button" variant="ghost" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>
+                  <Button type="submit" disabled={adding || !formPatientId}>
+                    {adding ? "Adicionando..." : "Confirmar e Adicionar"}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleAddManual} className="space-y-4">
+                <div>
+                  <Label>Buscar paciente (nome ou prontuário)</Label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={manualSearch}
+                      onChange={e => setManualSearch(e.target.value)}
+                      placeholder="Digite para filtrar..."
+                      className="w-full rounded-lg bg-secondary/40 border border-border pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Paciente</Label>
+                  <Select required value={formPatientId} onChange={e => setFormPatientId(e.target.value)}>
+                    <option value="">Selecione um paciente...</option>
+                    {manualEligible.map(p => (
                       <option key={p.id} value={p.id}>
-                        {p.name} — Score clínico: {scoreClinico}/100
+                        {p.name}{p.prontuario ? ` — ${p.prontuario}` : ""}
                       </option>
-                    );
-                  })}
-                </Select>
-                {eligiblePatients.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1 font-semibold">
-                    Nenhum paciente com triagem disponível. Realize a triagem no prontuário primeiro.
-                  </p>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label>Especialidade</Label>
+                  <Select value={manualSpecialty} onChange={e => setManualSpecialty(e.target.value)}>
+                    <option value="">Qualquer especialidade</option>
+                    {SPECIALTIES.map(sp => (
+                      <option key={sp} value={sp}>{sp}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-semibold">
+                  Inserção administrativa: adiciona o paciente à fila mesmo sem triagem registrada. A prioridade fica como "Baixo" até a triagem ser feita.
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button type="button" variant="ghost" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>
+                  <Button type="submit" disabled={adding || !formPatientId}>
+                    {adding ? "Adicionando..." : "Adicionar (Admin)"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </MotionCard>
+        </div>
+      )}
+
+      {saidaTarget && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <MotionCard className="w-full max-w-md p-6 overflow-visible" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <h2 className="text-2xl font-bold font-display mb-1">
+              {saidaTipo === "Alta" ? "Dar Alta" : saidaTipo === "Desistência" ? "Registrar Desistência" : "Registrar Óbito"}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Paciente: <strong className="text-foreground">{saidaTarget.patientName}</strong>. Isso remove o paciente da fila
+              e dos agendamentos futuros, e grava o status no prontuário.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <Label>
+                  Motivo {saidaTipo !== "Óbito" ? <span className="text-destructive">*</span> : <span className="text-muted-foreground">(opcional)</span>}
+                </Label>
+                <textarea
+                  value={saidaMotivo}
+                  onChange={e => setSaidaMotivo(e.target.value)}
+                  rows={3}
+                  placeholder={saidaTipo === "Óbito" ? "Observação (opcional)" : "Descreva o motivo..."}
+                  className="w-full rounded-lg bg-secondary/40 border border-border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors resize-none"
+                />
+                {saidaTipo !== "Óbito" && !saidaMotivo.trim() && (
+                  <p className="text-xs text-amber-600 mt-1 font-semibold">O motivo é obrigatório para {saidaTipo}.</p>
                 )}
               </div>
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-semibold">
-                ✅ As especialidades são detectadas automaticamente pelas áreas pontuadas na triagem do paciente. A prioridade (Elevado / Moderado / Leve / Baixo) é calculada com base no score clínico e critérios de vulnerabilidade.
-              </div>
               <div className="flex justify-end gap-3 mt-6">
-                <Button type="button" variant="ghost" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>
-                <Button type="submit" disabled={adding || !formPatientId}>
-                  {adding ? "Adicionando..." : "Confirmar e Adicionar"}
+                <Button type="button" variant="ghost" onClick={() => { setSaidaTarget(null); setSaidaMotivo(""); }}>Cancelar</Button>
+                <Button
+                  type="button"
+                  onClick={confirmSaida}
+                  disabled={saidaLoading || (saidaTipo !== "Óbito" && !saidaMotivo.trim())}
+                >
+                  {saidaLoading ? "Registrando..." : `Confirmar ${saidaTipo}`}
                 </Button>
               </div>
-            </form>
+            </div>
           </MotionCard>
         </div>
       )}
