@@ -225,6 +225,20 @@ export default function Dashboard() {
 
   const totalPatients = patients?.length || 0;
   const totalProfessionals = professionals?.length || 0;
+
+  // Pacientes ATIVOS em atendimento (naquele momento): distintos com agendamento
+  // ativo/futuro. Difere do total de CADASTROS (todos já cadastrados na base).
+  const activePatients = useMemo(() => {
+    const hojeStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    const ACTIVE = new Set(["agendado", "atendimento", "em_atendimento", "em atendimento", "presente", "remanejado", "remarcado"]);
+    const ids = new Set<number>();
+    for (const a of allAppointments) {
+      if ((a.date || "") < hojeStr) continue;
+      if (!ACTIVE.has((a.status || "").toLowerCase())) continue;
+      ids.add(a.patientId);
+    }
+    return ids.size;
+  }, [allAppointments]);
   const todayCount = (todayAppointments || []).filter(a => {
     const st = (a.status || "agendado").toLowerCase();
     return st !== "desmarcado" && st !== "cancelado";
@@ -506,9 +520,10 @@ export default function Dashboard() {
   const anos = [2023, 2024, 2025, 2026];
 
   const topCards = [
-    { title: "Pacientes Ativos", value: totalPatients, icon: Users, color: "text-[#00d4ff]", bg: "bg-[#00d4ff]/10" },
-    { title: "Fila de Espera", value: waitingCount, icon: ListTodo, color: "text-[#ff9f20]", bg: "bg-[#ff9f20]/10" },
-    { title: "Profissionais", value: totalProfessionals, icon: UserRound, color: "text-primary", bg: "bg-primary/10" },
+    { title: "Total de Cadastros", subtitle: "todos os pacientes na base", value: totalPatients, icon: Users, color: "text-[#a855f7]", bg: "bg-[#a855f7]/10" },
+    { title: "Em Atendimento", subtitle: "pacientes com agendamento ativo", value: activePatients, icon: HeartPulse, color: "text-[#00d4ff]", bg: "bg-[#00d4ff]/10" },
+    { title: "Fila de Espera", subtitle: "aguardando vaga", value: waitingCount, icon: ListTodo, color: "text-[#ff9f20]", bg: "bg-[#ff9f20]/10" },
+    { title: "Profissionais", subtitle: "equipe ativa", value: totalProfessionals, icon: UserRound, color: "text-primary", bg: "bg-primary/10" },
   ];
 
   const periodCards = [
@@ -546,13 +561,14 @@ export default function Dashboard() {
       />
 
       {/* Top Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {topCards.map((stat, i) => (
           <MotionCard key={i} className="p-6 relative overflow-hidden" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1">{stat.title}</p>
                 <p className="text-3xl font-bold font-display">{stat.value}</p>
+                {stat.subtitle && <p className="text-[11px] text-muted-foreground/70 mt-1">{stat.subtitle}</p>}
               </div>
               <div className={cn("p-4 rounded-2xl", stat.bg)}>
                 <stat.icon className={cn("w-6 h-6", stat.color)} />
