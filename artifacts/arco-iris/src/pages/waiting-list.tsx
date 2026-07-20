@@ -3,7 +3,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-custom";
 import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getPriorityColor, formatDate } from "@/lib/utils";
+import { getPriorityColor, formatDate, calcIdade } from "@/lib/utils";
 import { specialtyTone, specialtyShortLabel, SPECIALTIES } from "@/lib/specialty-colors";
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { supabase } from "@/lib/supabase";
@@ -22,6 +22,19 @@ import {
   type Patient,
 } from "@/lib/arco-rpc";
 
+
+// Regra de faixa etária: a fila de espera prioriza crianças. Pacientes acima
+// de 11 anos NÃO permanecem na fila (mas continuam cadastrados normalmente).
+const MAX_AGE_FILA = 11;
+
+// True se o paciente (pela data de nascimento) está acima da idade limite da
+// fila. Datas ausentes/inválidas (NaN) NÃO são consideradas acima do limite,
+// para não remover ninguém por falta de dado.
+function isOverAge(dob: string | null | undefined): boolean {
+  if (!dob) return false;
+  const idade = calcIdade(dob);
+  return !isNaN(idade) && idade > MAX_AGE_FILA;
+}
 
 const PRIORITY_LABEL: Record<string, string> = {
   maxima: "🔴 MÁXIMA – Prioridade Social/Idade",
@@ -74,7 +87,17 @@ export default function WaitingList() {
       try { await syncWaitingListWithAgenda(); } catch { /* silencioso */ }
 
       const [wl, ps] = await Promise.all([listWaitingList(), listPatients()]);
-      setWaitingList(wl);
+
+      // Regra de faixa etária: remove automaticamente da fila os pacientes acima
+      // de 11 anos (continuam cadastrados normalmente). Best-effort: se a exclusão
+      // no banco falhar, ainda ocultamos da lista exibida.
+      const dobById = new Map(ps.map(p => [p.id, p.dateOfBirth]));
+      const overAge = wl.filter(e => isOverAge(dobById.get(e.patientId)));
+      if (overAge.length > 0) {
+        await Promise.allSettled(overAge.map(e => deleteWaitingListEntry(e.id)));
+      }
+      const overAgeIds = new Set(overAge.map(e => e.id));
+      setWaitingList(wl.filter(e => !overAgeIds.has(e.id)));
       setPatients(ps);
     } catch (err: any) {
       toast({
@@ -133,6 +156,8 @@ export default function WaitingList() {
     const isProntuarioAntigo = !isNaN(prt) && prt < 500;
     const inactiveStatus = ["Alta", "Óbito", "Desistência", "Atendimento"].includes(p.status ?? "");
     const isCenso = p.tipoRegistro === "Registro Censo Municipal";
+    // Acima de 11 anos não entra na fila (prioridade para crianças).
+    if (isOverAge(p.dateOfBirth)) return false;
     return (score != null || isProntuarioAntigo) && !inactiveStatus && !isCenso;
   });
 
@@ -148,7 +173,8 @@ export default function WaitingList() {
   const manualEligible = patients
     .filter(p => {
       const inativo = ["Alta", "Óbito", "Desistência", "Atendimento"].includes(p.status ?? "");
-      return !inativo;
+      // Acima de 11 anos não entra na fila (prioridade para crianças).
+      return !inativo && !isOverAge(p.dateOfBirth);
     })
     .filter(p => {
       const q = manualSearch.trim().toLowerCase();
@@ -160,6 +186,11 @@ export default function WaitingList() {
   const handleAddManual = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formPatientId) return;
+    const sel = patients.find(p => String(p.id) === formPatientId);
+    if (isOverAge(sel?.dateOfBirth)) {
+      toast({ title: "Fora da faixa etária", description: `A fila é para pacientes com até ${MAX_AGE_FILA} anos. Acima disso, o atendimento é agendado direto.`, variant: "destructive" });
+      return;
+    }
     setAdding(true);
     try {
       const result = await addPatientToFila(
@@ -250,9 +281,14 @@ export default function WaitingList() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formPatientId) return;
-    setAdding(true);
 
     const selectedPatient = patients.find(p => String(p.id) === formPatientId);
+    if (isOverAge(selectedPatient?.dateOfBirth)) {
+      toast({ title: "Fora da faixa etária", description: `A fila é para pacientes com até ${MAX_AGE_FILA} anos. Acima disso, o atendimento é agendado direto.`, variant: "destructive" });
+      return;
+    }
+    setAdding(true);
+
     const scoredSpecialties = SCORE_SPECIALTY_MAP
       .filter(({ field }) => ((selectedPatient?.[field] as number | null) ?? 0) > 0)
       .map(({ specialty }) => specialty);
@@ -380,7 +416,7 @@ export default function WaitingList() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">Fila de Espera</h1>
-          <p className="text-muted-foreground mt-1">Organização por prioridade calculada na triagem.</p>
+          <p className="text-muted-foreground mt-1">Organização por prioridade calculada na triagem. A fila é para pacientes com até {MAX_AGE_FILA} anos.</p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-none">
