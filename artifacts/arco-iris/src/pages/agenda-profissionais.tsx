@@ -18,6 +18,7 @@ import {
   deleteAppointmentAlta,
   deleteRecurrenceForward,
   createNotificacao,
+  markNotificacoesLidoByAppointment,
   createAppointments,
   listWaitingList,
   deleteWaitingListEntry,
@@ -588,8 +589,9 @@ export default function AgendaProfissionais() {
           setAppointments(prev => prev.map(a => m.has(a.id) ? { ...a, date: m.get(a.id)!.date, time: m.get(a.id)!.time } : a));
         }
       }
+      await markNotificacoesLidoByAppointment(realId);
       await logNotificacao(
-        { ...remanejFlow.apt, date: newDate, time: newTime },
+        { ...remanejFlow.apt, id: realId, date: newDate, time: newTime },
         acao
       );
       setRemanejFlow({ ...remanejFlow, newDate, newTime, done: true });
@@ -832,8 +834,9 @@ export default function AgendaProfissionais() {
   const handleDesmarcado = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      await patchStatus(apt, "desmarcado");
-      await logNotificacao(apt, "Desmarcado");
+      const data = await patchStatus(apt, "desmarcado");
+      await markNotificacoesLidoByAppointment(data?.id ?? apt.id);
+      await logNotificacao({ ...apt, id: data?.id ?? apt.id }, "Desmarcado");
       toast({ title: "Desmarcado", description: `${apt.patientName} — agendamento desmarcado.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível desmarcar.", variant: "destructive" });
@@ -1056,6 +1059,7 @@ export default function AgendaProfissionais() {
       } else if (excluirConfirm.id > 0) {
         await deleteAppointmentAlta(excluirConfirm.id);
       }
+      await markNotificacoesLidoByAppointment(excluirConfirm.id);
       // Remove from local state: appointments in the same recurrence group from this date onward
       setAppointments(prev =>
         prev.filter(a => {

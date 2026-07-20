@@ -166,7 +166,8 @@ function FirstAppointmentMessageModal({
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
       : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    const waWindow = window.open(url, "whatsapp_nfs");
+    if (waWindow) waWindow.focus();
     onClose();
   };
 
@@ -262,7 +263,8 @@ function AbsenceBellModal({
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
       : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    const waWindow = window.open(url, "whatsapp_nfs");
+    if (waWindow) waWindow.focus();
     onClose();
   };
 
