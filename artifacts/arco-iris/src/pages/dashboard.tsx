@@ -17,13 +17,14 @@ import {
   type LongAttendancePatient,
   type PausedOverviewItem,
 } from "@/lib/arco-rpc";
-import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3, Snowflake, Clock, ChevronLeft, ChevronRight, HeartHandshake } from "lucide-react";
+import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3, Snowflake, Clock, ChevronLeft, ChevronRight, HeartHandshake, Printer } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor, calcIdade, formatDate } from "@/lib/utils";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 import { upcomingAwareness, dateLabel, CATEGORY_COLOR } from "@/lib/awareness-dates";
+import { printDashboardReport } from "@/lib/print-dashboard";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfWeek, addDays } from "date-fns";
@@ -537,11 +538,57 @@ export default function Dashboard() {
   const awarenessTodayISO = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   const awarenessUpcoming = upcomingAwareness(awarenessTodayISO, 3);
 
+  const handlePrintReport = () => {
+    printDashboardReport({
+      totalPatients,
+      activePatients,
+      waitingCount,
+      totalProfessionals,
+      today: {
+        total: todayCount,
+        realizado: heartbeat.realizado,
+        falta: heartbeat.falta,
+        pendente: heartbeat.pendente,
+        cancelado: heartbeat.cancelado,
+        taxaPresenca: heartbeat.taxaPresenca,
+      },
+      monthly: {
+        total: monthlyStats.total,
+        realizados: monthlyStats.realizados,
+        faltas: monthlyStats.faltas,
+        agendados: monthlyStats.agendados,
+        cancelados: monthlyStats.cancelados,
+      },
+      periodStats: {
+        semanal: aptStats?.semanal ?? 0,
+        mensal: aptStats?.mensal ?? 0,
+        trimestral: aptStats?.trimestral ?? 0,
+        semestral: aptStats?.semestral ?? 0,
+        anual: aptStats?.anual ?? 0,
+      },
+      ocupacao: ocupacao.map(o => ({
+        name: o.name,
+        specialty: o.specialty,
+        pacientesAtivos: o.pacientesAtivos,
+        capacidade: o.capacidade,
+        pct: o.pct,
+      })),
+      yearBySpecialty: Object.entries(atendimentosAno.porEspecialidade).sort((a, b) => b[1] - a[1]),
+      yearTotal: atendimentosAno.total,
+      filaBySpecialty: Object.entries(filaPorEspecialidade).sort((a, b) => b[1] - a[1]),
+    });
+  };
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-display font-bold text-foreground">Visão Geral</h1>
-        <p className="text-muted-foreground mt-1">Bem-vindo ao NFS – Gestão Terapêutica.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-display font-bold text-foreground">Visão Geral</h1>
+          <p className="text-muted-foreground mt-1">Bem-vindo ao NFS – Gestão Terapêutica.</p>
+        </div>
+        <Button onClick={handlePrintReport} className="gap-2 whitespace-nowrap self-start sm:self-auto">
+          <Printer className="w-4 h-4" /> Imprimir Relatório
+        </Button>
       </div>
 
       {/* Batimento Cardíaco da Clínica — resumo do dia em 5s de leitura. */}
