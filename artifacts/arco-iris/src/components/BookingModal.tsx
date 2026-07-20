@@ -5,7 +5,7 @@ import { X, Calendar, Clock, AlertCircle, Search, UserCog, ArrowRightLeft, Chevr
 import { MotionCard, Button, Label } from "@/components/ui-custom";
 import { listWaitingList, listPatients, createAppointments, listAppointments, deleteWaitingListEntry, listProfessionals, createNotificacao, type Patient } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
-import { cn } from "@/lib/utils";
+import { cn, todayBR, formatDate } from "@/lib/utils";
 import { specialtyKey } from "@/lib/specialty-colors";
 
 type WaitingEntry = {
@@ -249,8 +249,19 @@ export default function BookingModal({
 
   const selectedDirect = directMatches.find(p => p.id === selectedPatientId) ?? null;
 
+  // Trava de antecedência: só permite agendar a partir de amanhã.
+  // Bloqueia datas <= hoje (fuso de Brasília) em todos os módulos.
+  const isPastOrToday = date <= todayBR();
+
   const handleSave = async () => {
     setError("");
+    if (isPastOrToday) {
+      setError(
+        `Não é possível agendar para ${formatDate(date)} (hoje ou data passada). ` +
+        `Escolha uma data a partir de amanhã.`
+      );
+      return;
+    }
     const isDirect = adminMode && mode === "direto";
     if (isDirect && !selectedDirect) { setError("Selecione um paciente."); return; }
     if (!isDirect && !nextPatient) return;
@@ -407,6 +418,15 @@ export default function BookingModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {isPastOrToday && (
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-sm text-destructive flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>
+                Agendamentos só são permitidos a partir de amanhã. Esta data ({formatDate(date)})
+                é hoje ou já passou — escolha um dia futuro na agenda.
+              </span>
+            </div>
+          )}
           {adminMode && (
             <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-secondary/40 border border-border text-xs font-semibold">
               <button
@@ -650,11 +670,12 @@ export default function BookingModal({
             onClick={handleSave}
             disabled={
               loading ||
+              isPastOrToday ||
               (mode === "fila" && !nextPatient) ||
               (mode === "direto" && !selectedDirect)
             }
           >
-            {loading ? "Agendando…" : mode === "direto" ? "Agendar (Admin)" : "Confirmar"}
+            {loading ? "Agendando…" : isPastOrToday ? "Data indisponível" : mode === "direto" ? "Agendar (Admin)" : "Confirmar"}
           </Button>
         </div>
       </MotionCard>
