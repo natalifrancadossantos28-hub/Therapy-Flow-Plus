@@ -210,7 +210,7 @@ export default function SalasPage() {
             <DoorOpen className="w-7 h-7 text-primary" /> Gestão Inteligente de Salas
           </h1>
           <p className="text-muted-foreground mt-1">
-            Status em tempo real — 🟢 Livre · 🟡 Ociosa (paciente não chegou) · 🔴 Ocupada. Atualiza sozinho a cada 30s.
+            Status em tempo real — 🟢 Livre · 🟡 Ociosa (paciente não chegou) · 🔴 Ocupada. Atualiza sozinho a cada 30s. O card só mostra o profissional enquanto ele está na sala (dia e horário configurados).
           </p>
         </div>
         <Button variant="outline" onClick={fetchAll} disabled={refreshing} className="gap-2">
@@ -417,6 +417,9 @@ export default function SalasPage() {
                     : `Usa esta sala: ${s.dias.map((n) => WEEKDAYS.find((w) => w.n === n)?.label).join(", ")}${
                         s.inicio && s.fim ? ` · ${s.inicio}–${s.fim}` : ""
                       }`}
+                  {s.inicio && s.fim
+                    ? " — fora desse horário o profissional não aparece nesta sala."
+                    : " Dica: preencha o horário para o profissional sumir da sala fora do período de uso."}
                 </p>
               </div>
               );
