@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
-import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download, User } from "lucide-react";
+import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download, User, Printer, Stethoscope } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getStatusColor, cn, calcIdade } from "@/lib/utils";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -68,6 +68,7 @@ function IdadeBadge({ dateOfBirth }: { dateOfBirth?: string | null }) {
 export default function Patients() {
   useDocumentTitle("Pacientes");
   const [search, setSearch] = useState("");
+  const [cidFilter, setCidFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [redeFilter, setRedeFilter] = useState(false);
   const [idadeAlertaFilter, setIdadeAlertaFilter] = useState(false);
@@ -248,17 +249,81 @@ export default function Patients() {
     const matchName = p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.prontuario || "").toLowerCase().includes(search.toLowerCase());
     const matchStatus = !statusFilter || p.status === statusFilter;
+    const matchCid = !cidFilter || (p.diagnosis || "").toLowerCase().includes(cidFilter.toLowerCase());
     const matchRede = !redeFilter || p.escolaPublica === true;
     const matchIdade = !idadeAlertaFilter || (() => {
       const a = alertaIdade(p.dateOfBirth);
       return a && a.tipo !== "ok";
     })();
-    return matchName && matchStatus && matchRede && matchIdade;
+    return matchName && matchStatus && matchCid && matchRede && matchIdade;
   }).sort((a, b) => {
     const pa = parseInt(a.prontuario || "0", 10) || 0;
     const pb = parseInt(b.prontuario || "0", 10) || 0;
     return pa - pb;
   });
+
+  // Levantamento por CID/diagnóstico: agrupa os pacientes pelo código CID-10
+  // encontrado no texto do diagnóstico (ex.: "G80"); quando não há código,
+  // agrupa pelo próprio texto do diagnóstico. Abre uma folha imprimível.
+  const handlePrintCidReport = () => {
+    const cidRegex = /[A-TV-Z]\d{2}(?:\.\d{1,2})?/g;
+    type Grp = { label: string; names: string[] };
+    const groups = new Map<string, Grp>();
+    let semDiag = 0;
+
+    // Usa a lista já filtrada, pra o relatório respeitar os filtros da tela.
+    for (const p of filteredPatients) {
+      const diag = (p.diagnosis || "").trim();
+      const nome = `${p.prontuario ? `${p.prontuario} - ` : ""}${p.name}`;
+      if (!diag) { semDiag++; continue; }
+      const codes = Array.from(new Set((diag.toUpperCase().match(cidRegex) || [])));
+      if (codes.length > 0) {
+        for (const c of codes) {
+          const g = groups.get(c) ?? { label: c, names: [] };
+          g.names.push(nome);
+          groups.set(c, g);
+        }
+      } else {
+        const key = `TXT:${diag.toLowerCase()}`;
+        const g = groups.get(key) ?? { label: diag, names: [] };
+        g.names.push(nome);
+        groups.set(key, g);
+      }
+    }
+
+    const rows = Array.from(groups.values()).sort((a, b) => b.names.length - a.names.length);
+    const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] || c));
+    const todayStr = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+
+    const w = window.open("", "_blank");
+    if (!w) return;
+
+    const body = rows.map(g => `<tr>
+        <td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#059669;white-space:nowrap;">${esc(g.label)}</td>
+        <td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;">${g.names.length}</td>
+        <td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;color:#334155;">${g.names.map(esc).join("; ")}</td>
+      </tr>`).join("");
+
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pacientes por CID</title>
+    <style>body{font-family:Arial,sans-serif;padding:32px;color:#0f172a;}h1{font-size:20px;margin-bottom:4px;}
+    .sub{color:#64748b;font-size:13px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{text-align:left;padding:10px 12px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+    @media print{button{display:none}}</style></head><body>
+    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
+      <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
+      <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
+    </div>
+    <h1>Levantamento de Pacientes por CID / Diagnóstico</h1>
+    <p class="sub">${todayStr} · ${filteredPatients.length} paciente(s) considerado(s) · ${rows.length} diagnóstico(s) distinto(s)${semDiag ? ` · ${semDiag} sem diagnóstico informado` : ""}</p>
+    <table>
+      <thead><tr><th>CID / Diagnóstico</th><th style="text-align:center;">Qtd</th><th>Pacientes</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="3" style="padding:16px;color:#cbd5e1;font-style:italic;text-align:center;">Nenhum diagnóstico informado nos pacientes filtrados.</td></tr>`}</tbody>
+    </table>
+    <p style="margin-top:24px;font-size:11px;color:#94a3b8;">NFS – Gestão Terapêutica · Agrupado por código CID-10 quando presente no diagnóstico; senão pelo texto do diagnóstico.</p>
+    </body></html>`);
+    w.document.close();
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -307,6 +372,9 @@ export default function Patients() {
             <Button variant="outline" className="gap-2" onClick={handleExportCSV}>
               <Download className="w-4 h-4" /> Baixar Relatório
             </Button>
+            <Button variant="outline" className="gap-2" onClick={handlePrintCidReport}>
+              <Printer className="w-4 h-4" /> Relatório por CID
+            </Button>
           </div>
         </div>
 
@@ -314,6 +382,10 @@ export default function Patients() {
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input className="pl-9" placeholder="Buscar por nome ou prontuário..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <div className="relative flex-1 min-w-[200px]">
+            <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Filtrar por CID ou diagnóstico (ex.: G80, auditiva)..." value={cidFilter} onChange={e => setCidFilter(e.target.value)} />
           </div>
           <Select className="w-48" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="">Todos os Status</option>
@@ -567,7 +639,7 @@ export default function Patients() {
                 </div>
                 <div className="col-span-2">
                   <Label>Diagnóstico</Label>
-                  <Input value={formData.diagnosis} onChange={e => setFormData({ ...formData, diagnosis: e.target.value })} placeholder="Ex.: TEA, TDAH, sem diagnóstico" />
+                  <Input value={formData.diagnosis} onChange={e => setFormData({ ...formData, diagnosis: e.target.value })} placeholder="Ex.: Paralisia Cerebral (G80), TEA (F84), def. auditiva (H90)" />
                 </div>
 
                 <div className="col-span-2">
