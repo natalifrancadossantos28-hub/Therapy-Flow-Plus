@@ -244,6 +244,17 @@ export default function Dashboard() {
     const st = (a.status || "agendado").toLowerCase();
     return st !== "desmarcado" && st !== "cancelado";
   }).length;
+  // Pessoas físicas distintas com atendimento hoje (a mesma criança pode ter
+  // fono + psico + TO no mesmo dia). Útil para logística (lanches/lembranças).
+  const pessoasHoje = (() => {
+    const ids = new Set<number>();
+    for (const a of todayAppointments || []) {
+      const st = (a.status || "agendado").toLowerCase();
+      if (st === "desmarcado" || st === "cancelado") continue;
+      ids.add(a.patientId);
+    }
+    return ids.size;
+  })();
   const waitingCount = waitingList?.length || 0;
 
   // Agrupar alertas por paciente (pode ter múltiplos profissionais com >= 3 faltas)
@@ -594,6 +605,7 @@ export default function Dashboard() {
       {/* Batimento Cardíaco da Clínica — resumo do dia em 5s de leitura. */}
       <Heartbeat
         total={todayCount}
+        pessoasHoje={pessoasHoje}
         realizado={heartbeat.realizado}
         falta={heartbeat.falta}
         pendente={heartbeat.pendente}
@@ -1214,6 +1226,7 @@ function PausedOverviewWidget() {
 
 type HeartbeatProps = {
   total: number;
+  pessoasHoje: number;
   realizado: number;
   falta: number;
   pendente: number;
@@ -1229,6 +1242,7 @@ type HeartbeatProps = {
 
 function Heartbeat({
   total,
+  pessoasHoje,
   realizado,
   falta,
   pendente,
@@ -1264,7 +1278,12 @@ function Heartbeat({
           <span className="text-2xl font-display text-muted-foreground mb-1">/ {total}</span>
         </div>
         <p className="text-xs text-muted-foreground mt-1 font-medium">realizados de {total} agendados hoje</p>
-        <div className="grid grid-cols-3 gap-2 mt-5">
+        <div className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "rgba(0,240,255,0.08)", border: "1px solid rgba(0,240,255,0.25)" }}>
+          <Users className="w-4 h-4 text-[#00f0ff] shrink-0" />
+          <span className="text-lg font-bold font-display text-foreground leading-none">{pessoasHoje}</span>
+          <span className="text-[11px] text-muted-foreground leading-tight">pessoas hoje (crianças distintas — p/ lanches/lembranças)</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-4">
           <PulseStat label="Pendentes" value={pendente} fg="#fdba74" bg="rgba(251,146,60,0.12)" border="rgba(251,146,60,0.45)" />
           <PulseStat label="Faltas"    value={falta}    fg="#fca5a5" bg="rgba(248,113,113,0.12)" border="rgba(248,113,113,0.45)" />
           <PulseStat label="Cancel."   value={cancelado} fg="#cbd5e1" bg="rgba(148,163,184,0.12)" border="rgba(148,163,184,0.4)" />

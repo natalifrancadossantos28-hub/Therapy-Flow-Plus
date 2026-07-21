@@ -868,6 +868,63 @@ export default function Reception() {
     w.document.close();
   };
 
+  // Lista por paciente ÚNICO: cada criança aparece 1 vez (mesmo com fono+psico+TO),
+  // com uma coluna pra recepção ir riscando (baixa de lembrancinhas/lanches).
+  const handlePrintUnique = () => {
+    const todayStr = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+    const list = (appointments || []).filter(a => {
+      const st = (a.status || "").toLowerCase();
+      return st !== "cancelado" && st !== "desmarcado";
+    });
+
+    type Agg = { name: string; pront: string; horarios: string[]; profs: Set<string> };
+    const byPatient = new Map<number, Agg>();
+    for (const a of list) {
+      const pront = a.prontuario || prontuarioMap.get(a.patientId) || "";
+      const g = byPatient.get(a.patientId) ?? { name: a.patientName, pront, horarios: [], profs: new Set<string>() };
+      g.horarios.push(a.time);
+      if (a.professionalName) g.profs.add(a.professionalName);
+      byPatient.set(a.patientId, g);
+    }
+
+    const rows = [...byPatient.values()].sort((x, y) => x.name.localeCompare(y.name, "pt-BR"));
+
+    const w = window.open("", "_blank");
+    if (!w) return;
+
+    const rowHtml = rows.map((r, i) => {
+      const horarios = [...r.horarios].sort((a, b) => a.localeCompare(b)).join(", ");
+      const profs = [...r.profs].sort((a, b) => a.localeCompare(b, "pt-BR")).join(", ");
+      return `<tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:16px;">☐</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;text-align:center;">${i + 1}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:600;">${r.pront ? `${r.pront} - ` : ""}${r.name}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;">${profs}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;">${horarios}</td>
+      </tr>`;
+    }).join("");
+
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lista por Paciente</title>
+    <style>body{font-family:Arial,sans-serif;padding:32px;color:#0f172a;}h1{font-size:20px;margin-bottom:4px;}
+    .sub{color:#64748b;font-size:13px;margin-bottom:24px;text-transform:capitalize;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{text-align:left;padding:10px 12px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+    @media print{button{display:none}}</style></head><body>
+    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
+      <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
+      <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
+    </div>
+    <h1>Lista por Paciente (Único) – Hoje</h1>
+    <p class="sub">${todayStr} · ${rows.length} criança(s) — marque ☐ ao entregar lembrança/lanche</p>
+    <table>
+      <thead><tr><th style="text-align:center;">✓</th><th style="text-align:center;">#</th><th>Paciente</th><th>Profissional(is)</th><th>Horários</th></tr></thead>
+      <tbody>${rowHtml || `<tr><td colspan="5" style="padding:16px;color:#cbd5e1;font-style:italic;text-align:center;">Nenhum atendimento hoje.</td></tr>`}</tbody>
+    </table>
+    <p style="margin-top:24px;font-size:11px;color:#94a3b8;">NFS – Gestão Terapêutica</p>
+    </body></html>`);
+    w.document.close();
+  };
+
   const handleStatusChange = async (id: number, status: string): Promise<number> => {
     const apt = appointments?.find((a) => a.id === id);
     let newAbsenceCount = apt?.patientAbsenceCount ?? 0;
@@ -1221,6 +1278,9 @@ export default function Reception() {
             </Select>
             <Button variant="outline" className="gap-2" onClick={handlePrintPDF}>
               <Printer className="w-4 h-4" /> Imprimir PDF
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={handlePrintUnique}>
+              <Printer className="w-4 h-4" /> Lista por paciente (único)
             </Button>
           </div>
         </div>
