@@ -101,8 +101,11 @@ export default function PatientDetail() {
   const [editEntryDate, setEditEntryDate] = useState("");
   const [editDob, setEditDob] = useState("");
   const [editCpf, setEditCpf] = useState("");
+  const [editCns, setEditCns] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editMotherName, setEditMotherName] = useState("");
   const [editGuardianName, setEditGuardianName] = useState("");
   const [editGuardianPhone, setEditGuardianPhone] = useState("");
   const [editDiagnosis, setEditDiagnosis] = useState("");
@@ -176,8 +179,11 @@ export default function PatientDetail() {
     setEditEntryDate(patient.entryDate || "");
     setEditDob(patient.dateOfBirth || "");
     setEditCpf(patient.cpf || "");
+    setEditCns(patient.cns || "");
     setEditPhone(patient.phone || "");
     setEditEmail(patient.email || "");
+    setEditAddress(patient.address || "");
+    setEditMotherName(patient.motherName || "");
     setEditGuardianName(patient.guardianName || "");
     setEditGuardianPhone(patient.guardianPhone || "");
     setEditDiagnosis(patient.diagnosis || "");
@@ -196,8 +202,11 @@ export default function PatientDetail() {
         entryDate: editEntryDate || null,
         dateOfBirth: editDob || null,
         cpf: editCpf || null,
+        cns: editCns || null,
         phone: editPhone || null,
         email: editEmail || null,
+        address: editAddress || null,
+        motherName: editMotherName || null,
         guardianName: editGuardianName || null,
         guardianPhone: editGuardianPhone || null,
         diagnosis: editDiagnosis || null,
@@ -506,6 +515,10 @@ export default function PatientDetail() {
                 <p className="text-lg">{patient.cpf || "-"}</p>
               </div>
               <div>
+                <p className="text-sm font-semibold text-muted-foreground">CNS (Cartão SUS)</p>
+                <p className="text-lg">{patient.cns || "-"}</p>
+              </div>
+              <div>
                 <p className="text-sm font-semibold text-muted-foreground">Telefone</p>
                 <p className="text-lg">{patient.phone || "-"}</p>
               </div>
@@ -514,8 +527,16 @@ export default function PatientDetail() {
                 <p className="text-lg">{patient.email || "-"}</p>
               </div>
               <div className="md:col-span-2">
+                <p className="text-sm font-semibold text-muted-foreground">Nome da Mãe</p>
+                <p className="text-lg">{patient.motherName || "-"}</p>
+              </div>
+              <div className="md:col-span-2">
                 <p className="text-sm font-semibold text-muted-foreground">Responsável</p>
                 <p className="text-lg">{patient.guardianName || "-"} <span className="text-muted-foreground text-sm ml-2">{patient.guardianPhone}</span></p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm font-semibold text-muted-foreground">Endereço</p>
+                <p className="text-lg">{patient.address || "-"}</p>
               </div>
             </div>
 
@@ -882,6 +903,14 @@ export default function PatientDetail() {
                     <Input value={editCpf} onChange={e => setEditCpf(e.target.value)} placeholder="000.000.000-00" className="mt-1" />
                   </div>
                 </div>
+                <div>
+                  <Label className="text-sm font-semibold">CNS (Cartão SUS)</Label>
+                  <Input value={editCns} onChange={e => setEditCns(e.target.value)} placeholder="Nº do cartão SUS" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Nome da Mãe</Label>
+                  <Input value={editMotherName} onChange={e => setEditMotherName(e.target.value)} placeholder="Nome completo da mãe" className="mt-1" />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-semibold">Telefone</Label>
@@ -901,6 +930,10 @@ export default function PatientDetail() {
                     <Label className="text-sm font-semibold">Tel. Responsável</Label>
                     <Input value={editGuardianPhone} onChange={e => setEditGuardianPhone(e.target.value)} placeholder="(00) 0 0000-0000" className="mt-1" />
                   </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Endereço</Label>
+                  <Input value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="Rua, nº, bairro, cidade" className="mt-1" />
                 </div>
                 <div>
                   <Label className="text-sm font-semibold">Diagnóstico / Motivo</Label>

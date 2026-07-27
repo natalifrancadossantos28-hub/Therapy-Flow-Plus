@@ -90,6 +90,7 @@ export default function Patients() {
     motherName: "",
     guardianName: "",
     guardianPhone: "",
+    address: "",
     diagnosis: "",
     entryDate: today(),
     escolaPublica: false,
@@ -190,7 +191,7 @@ export default function Patients() {
     setProntuarioAlerta(null);
     setFormData({
       name: "", prontuario: next, cpf: "", cns: "", phone: "", dateOfBirth: "",
-      motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
+      motherName: "", guardianName: "", guardianPhone: "", address: "", diagnosis: "",
       entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
       tipoRegistro: "Paciente da Unidade", localAtendimento: "", photoUrl: null,
     });
@@ -202,7 +203,7 @@ export default function Patients() {
     setProntuarioAlerta(null);
     setFormData({
       name: "", prontuario: "", cpf: "", cns: "", phone: "", dateOfBirth: "",
-      motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
+      motherName: "", guardianName: "", guardianPhone: "", address: "", diagnosis: "",
       entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
       tipoRegistro: "Paciente da Unidade", localAtendimento: "", photoUrl: null,
     });
@@ -210,7 +211,7 @@ export default function Patients() {
 
   const handleExportCSV = () => {
     const BOM = "\uFEFF";
-    const header = ["Prontuário", "Nome", "Mãe", "Data Nascimento", "Idade", "CPF", "CNS", "Telefone", "Responsável", "Tel. Responsável", "Diagnóstico", "Status", "Data Entrada", "Tipo Registro", "Faltas", "Observações"];
+    const header = ["Prontuário", "Nome", "Mãe", "Data Nascimento", "Idade", "CPF", "CNS", "Telefone", "Responsável", "Tel. Responsável", "Endereço", "Diagnóstico", "Status", "Data Entrada", "Tipo Registro", "Faltas", "Observações"];
     const rows = patients.map(p => {
       const raw = p.dateOfBirth ? calcIdade(p.dateOfBirth) : NaN;
       const idade = isNaN(raw) ? "" : String(raw);
@@ -226,6 +227,7 @@ export default function Patients() {
         p.phone || "",
         p.guardianName || "",
         p.guardianPhone || "",
+        (p.address || "").replace(/"/g, '""'),
         p.diagnosis || "",
         p.status,
         p.entryDate || "",
@@ -628,6 +630,10 @@ export default function Patients() {
                 <div className="col-span-2">
                   <Label>Nome da Mãe</Label>
                   <Input value={formData.motherName} onChange={e => setFormData({ ...formData, motherName: e.target.value })} placeholder="Nome completo da mãe" />
+                </div>
+                <div className="col-span-2">
+                  <Label>Endereço</Label>
+                  <Input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder="Rua, nº, bairro, cidade" />
                 </div>
                 <div>
                   <Label>Responsável</Label>
