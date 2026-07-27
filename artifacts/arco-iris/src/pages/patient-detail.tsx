@@ -444,7 +444,12 @@ export default function PatientDetail() {
                 className="w-14 h-14 rounded-full object-cover border border-border shrink-0"
               />
             )}
-            <h1 className="text-3xl font-display font-bold text-foreground">{patient.name}</h1>
+            <h1 className="text-3xl font-display font-bold text-foreground">
+              {patient.prontuario && (
+                <span className="font-mono text-primary">{patient.prontuario} - </span>
+              )}
+              {patient.name}
+            </h1>
             <Badge className={getStatusColor(patient.status)}>{patient.status}</Badge>
             {isCensoMunicipal && (
               <Badge className="bg-violet-100 text-violet-800 border-violet-300">🏛️ Censo Municipal PCD</Badge>
