@@ -5,6 +5,13 @@ export type PatientDoc = { cpf: string | null; cns: string | null };
 
 const onlyDigits = (v: string) => v.replace(/\D/g, "");
 
+/** Cadastros antigos guardam lixo nesses campos (ex.: o nome do paciente no CPF). */
+function isPlausibleDoc(value: string | null | undefined): boolean {
+  if (!value || !value.trim()) return false;
+  const d = onlyDigits(value);
+  return d.length >= 8 && d.length <= 20;
+}
+
 export function formatCpf(value: string | null | undefined): string {
   if (!value) return "";
   const d = onlyDigits(value);
@@ -63,7 +70,7 @@ export function DocChip({
   value: string | null | undefined;
 }) {
   const { copied, run } = useCopied();
-  if (!value || !value.trim()) return null;
+  if (!isPlausibleDoc(value)) return null;
   const pretty = label === "CPF" ? formatCpf(value) : formatCns(value);
   return (
     <button
@@ -71,7 +78,7 @@ export function DocChip({
       title={`Copiar ${label}: ${pretty}`}
       onClick={(e) => {
         e.stopPropagation();
-        void run(value);
+        void run(value!);
       }}
       className="flex items-center gap-1 text-[9px] font-mono leading-tight text-muted-foreground hover:text-cyan-400 transition-colors max-w-full"
     >
@@ -95,13 +102,20 @@ export function DocCopyRow({
   value: string | null | undefined;
 }) {
   const { copied, run } = useCopied();
-  const has = !!value && !!value.trim();
-  const pretty = !has ? "não cadastrado" : label === "CPF" ? formatCpf(value) : formatCns(value);
+  const filled = !!value && !!value.trim();
+  const has = isPlausibleDoc(value);
+  const pretty = has
+    ? label === "CPF"
+      ? formatCpf(value)
+      : formatCns(value)
+    : filled
+      ? "⚠ valor inválido no cadastro"
+      : "não cadastrado";
   return (
     <button
       type="button"
       disabled={!has}
-      title={has ? `Copiar ${label}` : `${label} não cadastrado`}
+      title={has ? `Copiar ${label}` : filled ? `${label} com valor inválido: ${value}` : `${label} não cadastrado`}
       onClick={(e) => {
         e.stopPropagation();
         if (has) void run(value!);
@@ -123,7 +137,9 @@ export function DocCopyRow({
         className={
           has
             ? "text-[11px] font-mono text-white/90 truncate flex-1 text-left"
-            : "text-[10px] italic text-white/30 truncate flex-1 text-left"
+            : filled
+              ? "text-[10px] italic text-amber-400/80 truncate flex-1 text-left"
+              : "text-[10px] italic text-white/30 truncate flex-1 text-left"
         }
       >
         {pretty}
