@@ -21,6 +21,7 @@ import { hasAdminScope } from "@/lib/portal-session";
 const STATUS_OPTIONS = [
   { value: "Aguardando Triagem", label: "Aguardando Triagem" },
   { value: "Fila de Espera",     label: "Fila de Espera" },
+  { value: "Cadastro Geral",     label: "Cadastro Geral" },
   { value: "Atendimento",        label: "Atendimento" },
   { value: "Alta",               label: "Alta" },
   { value: "Óbito",              label: "Óbito" },
