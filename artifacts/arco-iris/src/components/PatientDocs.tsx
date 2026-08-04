@@ -80,14 +80,14 @@ export function DocChip({
         e.stopPropagation();
         void run(value!);
       }}
-      className="flex items-center gap-1 text-[9px] font-mono leading-tight text-muted-foreground hover:text-cyan-400 transition-colors max-w-full"
+      className="flex items-start gap-1 text-[13px] font-mono font-semibold leading-snug text-foreground/80 hover:text-cyan-400 transition-colors max-w-full text-left"
     >
-      <span className="font-sans font-bold text-[8px] uppercase tracking-wide opacity-70">{label}</span>
-      <span className="truncate">{pretty}</span>
+      <span className="font-sans font-bold text-[11px] uppercase tracking-wide opacity-70 shrink-0">{label}</span>
+      <span className="break-all">{pretty}</span>
       {copied ? (
-        <Check className="w-2.5 h-2.5 shrink-0 text-green-400" />
+        <Check className="w-3.5 h-3.5 shrink-0 mt-0.5 text-green-400" />
       ) : (
-        <Copy className="w-2.5 h-2.5 shrink-0 opacity-60" />
+        <Copy className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-60" />
       )}
     </button>
   );
@@ -125,30 +125,30 @@ export function DocCopyRow({
         alignItems: "center",
         gap: "6px",
         width: "100%",
-        padding: "4px 6px",
+        padding: "6px 8px",
         borderRadius: "8px",
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.07)",
         cursor: has ? "pointer" : "default",
       }}
     >
-      <span className="text-[9px] font-bold uppercase text-white/40 w-7 shrink-0 text-left">{label}</span>
+      <span className="text-[11px] font-bold uppercase text-white/40 w-8 shrink-0 text-left">{label}</span>
       <span
         className={
           has
-            ? "text-[11px] font-mono text-white/90 truncate flex-1 text-left"
+            ? "text-[14px] font-mono font-semibold text-white truncate flex-1 text-left"
             : filled
-              ? "text-[10px] italic text-amber-400/80 truncate flex-1 text-left"
-              : "text-[10px] italic text-white/30 truncate flex-1 text-left"
+              ? "text-[12px] italic text-amber-400/80 truncate flex-1 text-left"
+              : "text-[12px] italic text-white/30 truncate flex-1 text-left"
         }
       >
         {pretty}
       </span>
       {has &&
         (copied ? (
-          <Check className="w-3 h-3 shrink-0 text-green-400" />
+          <Check className="w-4 h-4 shrink-0 text-green-400" />
         ) : (
-          <Copy className="w-3 h-3 shrink-0 text-white/40" />
+          <Copy className="w-4 h-4 shrink-0 text-white/40" />
         ))}
     </button>
   );
