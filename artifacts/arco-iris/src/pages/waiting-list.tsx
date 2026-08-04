@@ -445,6 +445,11 @@ export default function WaitingList() {
           <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-bold border border-sky-200">AZUL – Leve</span>
           <span className="text-muted-foreground">→</span>
           <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">VERDE – Baixo</span>
+          <span className="w-full text-[11px] leading-snug mt-1">
+            Idade na prioridade: <strong>Fono e Fisio</strong> desde o nascimento ·{" "}
+            <strong>Psicologia, Psicomotricidade e T.O.</strong> só a partir de 3 anos ·{" "}
+            <strong>Nutrição e Psic. Parental</strong> por ordem de chegada.
+          </span>
         </div>
         {specialtyOptions.length > 0 && (
           <div className="relative">
@@ -551,6 +556,14 @@ export default function WaitingList() {
                         <Badge className={getPriorityColor(entry.priority)}>
                           {PRIORITY_LABEL[entry.priority] ?? entry.priority}
                         </Badge>
+                        {entry.ordenacao === "chegada" && (
+                          <div
+                            title="Nesta especialidade a fila segue a ordem de chegada — a idade não altera a posição."
+                            className="text-[10px] font-bold uppercase tracking-wide mt-1 text-muted-foreground"
+                          >
+                            ⏱ ordem de chegada
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         {entry.scoreEspecialidade != null ? (
