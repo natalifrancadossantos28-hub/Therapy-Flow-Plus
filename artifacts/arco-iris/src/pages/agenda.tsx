@@ -36,12 +36,15 @@ import {
   materializeVirtualAppointment,
   remanejarRecurrenceForward,
   undoMultiAppointment,
+  createMultiAppointment,
+  listMultiPartnerAppointments,
   listFeriados,
   listAusencias,
   type Professional as ArcoProfessional,
   type Feriado,
   type Ausencia,
 } from "@/lib/arco-rpc";
+import { buildMultiGuestAppointments } from "@/lib/multi-agenda";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { worksThroughLunch } from "@/lib/schedule";
 
@@ -229,6 +232,9 @@ type Appointment = {
   pausedAt?: string | null;
   pausedReason?: string | null;
   pausedReturnDate?: string | null;
+  /** Card do Atendimento Multi projetado a partir da linha do outro profissional. */
+  multiGuest?: boolean;
+  multiHostName?: string | null;
 };
 
 type AbsenceAlert = {
@@ -444,6 +450,7 @@ export default function Agenda() {
     setWeekRef(d);
   };
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [multiPartnerRows, setMultiPartnerRows] = useState<Appointment[]>([]);
   const [feriados, setFeriados] = useState<Feriado[]>([]);
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
@@ -512,6 +519,19 @@ export default function Agenda() {
 
   const loadedRangeRef = useRef<{ from: string; to: string } | null>(null);
 
+  // Atendimento Multi: linhas de OUTROS profissionais que têm este profissional
+  // como parceiro. Sem isso o horário aparece livre na grade de quem foi
+  // convidado sempre que a linha própria dele não existe (ou a série divergiu).
+  const fetchMultiPartners = (dateFrom: string, dateTo: string) => {
+    const profName = professionals.find(p => String(p.id) === selectedProfId)?.name;
+    if (!profName) { setMultiPartnerRows([]); return; }
+    listMultiPartnerAppointments({ professionalName: profName, dateFrom, dateTo })
+      .then(list => setMultiPartnerRows(
+        list.filter(a => !TERMINAL_STATUSES.includes((a.patientStatus ?? "").toLowerCase())) as Appointment[]
+      ))
+      .catch(err => console.error("fetchMultiPartners error:", err));
+  };
+
   const fetchAppointments = (refDate?: Date) => {
     if (!selectedProfId) return;
     const ref = refDate ?? weekRef;
@@ -520,6 +540,7 @@ export default function Agenda() {
     const dateFrom = format(rangeStart, "yyyy-MM-dd");
     const dateTo = format(rangeEnd, "yyyy-MM-dd");
     loadedRangeRef.current = { from: dateFrom, to: dateTo };
+    fetchMultiPartners(dateFrom, dateTo);
     listAppointments({
       professionalId: parseInt(selectedProfId),
       dateFrom,
@@ -541,6 +562,14 @@ export default function Agenda() {
   useEffect(() => {
     if (canView && selectedProfId) fetchAppointments();
   }, [selectedProfId, canView]);
+
+  // A lista de profissionais chega depois do primeiro fetch: sem o nome não dá
+  // para buscar os Multi em que este profissional é o convidado.
+  useEffect(() => {
+    const range = loadedRangeRef.current;
+    if (!canView || !selectedProfId || !professionals.length || !range) return;
+    fetchMultiPartners(range.from, range.to);
+  }, [professionals, selectedProfId, canView]);
 
   // Re-fetch when navigating outside the loaded date window
   useEffect(() => {
@@ -1148,16 +1177,18 @@ export default function Agenda() {
         realId = mat.id;
       }
 
-      await createAppointments({
+      // Grava os dois lados: a série do convidado espelha a recorrência do
+      // profissional atual e as duas linhas ficam etiquetadas uma com a outra.
+      await createMultiAppointment({
+        hostAppointmentId: realId,
         patientId: multiApt.patientId,
-        professionalId: secondProf.id,
         date: multiApt.date,
         time: multiApt.time,
-        notes: `Atendimento Multi com ${currentProf.name} (${currentProf.specialty || "—"})`,
+        host: currentProf,
+        guest: secondProf,
         frequency: (multiApt.frequency as "semanal" | "quinzenal" | "mensal") ?? "semanal",
+        recurring: !!multiApt.recurrenceGroupId,
       });
-      // Marca o appointment original como Multi (propaga para toda a recorrência via DB)
-      await updateAppointment(realId, { notes: `Atendimento Multi com ${secondProf.name} (${secondProf.specialty || "—"})` });
       await logNotificacao(multiApt, `Atendimento Multi — ${secondProf.name} (${secondProf.specialty || "—"}) adicionado ao horário de ${currentProf.name}`);
       setMultiApt(null);
       toast({ title: "Atendimento Multi criado", description: `${secondProf.name} adicionado ao horário de ${multiApt.patientName} às ${multiApt.time}.` });
@@ -1185,6 +1216,7 @@ export default function Agenda() {
         date: undoMultiApt.date,
         time: undoMultiApt.time,
         keepProfessionalId: undoMultiApt.professionalId,
+        keepProfessionalName: selectedProf?.name ?? null,
       });
       const nomes = res.removedNames.join(", ");
       await logNotificacao(undoMultiApt, `Multi desfeito — ${nomes || "profissional convidado"} removido (${selectedProf?.name || ""} mantido)`);
@@ -1358,16 +1390,31 @@ export default function Agenda() {
     }
   };
 
+  const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
+
   // Expande recorrência: projeta agendamentos recorrentes em semanas sem linha real no banco.
-  // Depois filtra: se frequência é quinzenal/mensal, esconde "agendado" nas semanas erradas.
+  const ownExpanded = expandRecurrence(appointments, weekDates);
+
+  // Atendimento Multi: horários em que este profissional participa como convidado
+  // e não tem linha própria (série do parceiro criada sem recorrência, renovada
+  // depois, etc.). Sem isso o horário aparecia livre nesta grade.
+  const multiGuestApts = selectedProf
+    ? (buildMultiGuestAppointments(
+        expandRecurrence(multiPartnerRows, weekDates),
+        ownExpanded,
+        selectedProf,
+        professionals,
+      ) as Appointment[])
+    : [];
+
+  // Filtra: se frequência é quinzenal/mensal, esconde "agendado" nas semanas erradas.
   // Por fim, oculta feriados e ausências do profissional (férias/folga/falta).
-  const expanded = applyFrequencyFilter(expandRecurrence(appointments, weekDates), weekDates)
+  const expanded = applyFrequencyFilter([...ownExpanded, ...multiGuestApts], weekDates)
     .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias));
 
   // Fase 5A: slots em grupo — um mesmo (date,time,profissional) pode ter varios pacientes.
   const getApts = (date: string, time: string) =>
     expanded.filter(a => a.date === date && a.time === time);
-  const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
   const selectedProfIdNum = selectedProfId ? parseInt(selectedProfId) : 0;
   const dayBlock = (date: string): string | null => {
     const h = holidayOn(date, feriados);
@@ -1379,7 +1426,11 @@ export default function Agenda() {
   const isPaula = worksThroughLunch(selectedProf?.name);
 
   const buildPrintApts = (dates: string[]): PrintAppointment[] => {
-    const exp = applyFrequencyFilter(expandRecurrence(appointments, dates), dates);
+    const own = expandRecurrence(appointments, dates);
+    const guests = selectedProf
+      ? (buildMultiGuestAppointments(expandRecurrence(multiPartnerRows, dates), own, selectedProf, professionals) as Appointment[])
+      : [];
+    const exp = applyFrequencyFilter([...own, ...guests], dates);
     return exp
       .filter(a => dates.includes(a.date) && !INACTIVE_STATUSES.includes((a.status || "").toLowerCase()))
       .map(a => ({
@@ -1617,16 +1668,29 @@ export default function Agenda() {
                                     const isMulti = !!(apt.notes && apt.notes.startsWith("Atendimento Multi com "));
                                     const multiPartner = isMulti ? apt.notes!.replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "") : null;
                                     const multiPartnerSpec = isMulti ? (apt.notes!.match(/\(([^)]+)\)\s*$/) || [])[1] || null : null;
-                                    const isMenuOpen = actionMenuId === apt.id;
+                                    const isMultiGuest = !!apt.multiGuest;
+                                    const isMenuOpen = actionMenuId === apt.id && !isMultiGuest;
                                     const isPastDate = date < today;
                                     const isGhost = !apt.patientName || apt.patientName.trim() === "";
                                     return (
                                 <div key={apt.id} className="relative" ref={isMenuOpen ? menuRef : null}>
                                   {/* Appointment block */}
                                   <div
-                                    onClick={() => setActionMenuId(isMenuOpen ? null : apt.id)}
+                                    onClick={() => {
+                                      // Card projetado do Multi: a linha real é do outro
+                                      // profissional, então as ações ficam na agenda dele.
+                                      if (isMultiGuest) {
+                                        toast({
+                                          title: "Atendimento Multi",
+                                          description: `Este horário é um Multi com ${apt.multiHostName || "outro profissional"}. Gerencie o agendamento pela agenda de ${apt.multiHostName || "quem criou o Multi"}.`,
+                                        });
+                                        return;
+                                      }
+                                      setActionMenuId(isMenuOpen ? null : apt.id);
+                                    }}
                                     className={cn(
                                       "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
+                                      isMultiGuest && "border-dashed",
                                       isGhost && "bg-amber-950/20 border-amber-500/60 animate-pulse",
                                       !isGhost && isDesmarcado && "bg-red-950/10 border-red-500/40",
                                       !isGhost && isFaltaNaoJustificada && "bg-red-950/10 border-red-500/40",
@@ -1684,6 +1748,7 @@ export default function Agenda() {
                                     {isMulti && multiPartner && (
                                       <span className="text-[9px] text-violet-400 font-semibold flex items-center gap-0.5 flex-wrap">
                                         <Users className="w-2.5 h-2.5 shrink-0" /> Multi: {multiPartner}
+                                        {isMultiGuest && <span className="text-violet-300/70">(convidado)</span>}
                                       </span>
                                     )}
                                     {(apt.recurrenceGroupId || isMulti) && !isDesmarcado && !isRescheduled && (
