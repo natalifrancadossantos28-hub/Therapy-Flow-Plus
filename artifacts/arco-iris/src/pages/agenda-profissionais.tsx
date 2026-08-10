@@ -8,7 +8,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
-import { DocChip, DocCopyRow } from "@/components/PatientDocs";
+import { DocCopyRow } from "@/components/PatientDocs";
 import { supabase } from "@/lib/supabase";
 import {
   listProfessionals,
@@ -1472,12 +1472,6 @@ export default function AgendaProfissionais() {
                                             <span className="text-[9px] text-muted-foreground/50">
                                               {apt.frequency === "quinzenal" ? "↺ quinzenal" : apt.frequency === "mensal" ? "↺ mensal" : "↺ semanal"}
                                             </span>
-                                          )}
-                                          {!isGhost && (docsById.get(apt.patientId)?.cpf || docsById.get(apt.patientId)?.cns) && (
-                                            <div className="flex flex-col gap-0.5 min-w-0">
-                                              <DocChip label="CPF" value={docsById.get(apt.patientId)?.cpf} />
-                                              <DocChip label="CNS" value={docsById.get(apt.patientId)?.cns} />
-                                            </div>
                                           )}
                                           {/* Psicologia Parental: show guardian/mother name */}
                                           {apt.guardianName && selectedProf?.specialty?.toLowerCase().includes("parental") && (
