@@ -168,20 +168,25 @@ export default function WaitingList() {
     setManualSearch("");
   };
 
-  // Pacientes elegíveis para inserção manual (admin): qualquer paciente ativo,
-  // independente de triagem. Exclui status terminais e já em atendimento.
-  const manualEligible = patients
-    .filter(p => {
-      const inativo = ["Alta", "Óbito", "Desistência", "Atendimento"].includes(p.status ?? "");
-      // Acima de 11 anos não entra na fila (prioridade para crianças).
-      return !inativo && !isOverAge(p.dateOfBirth);
-    })
-    .filter(p => {
-      const q = manualSearch.trim().toLowerCase();
-      if (!q) return true;
-      return (p.name ?? "").toLowerCase().includes(q) || (p.prontuario ?? "").toLowerCase().includes(q);
-    })
-    .slice(0, 50);
+  // Pacientes elegíveis para inserção manual (admin): autonomia total — qualquer
+  // paciente cadastrado, independente de triagem, de status (inclusive quem já
+  // está em atendimento em outra especialidade) ou de alta/desistência.
+  // Restrições que permanecem porque são regra do banco/da clínica:
+  //   • Censo Municipal não entra na fila;
+  //   • acima de 11 anos não permanece na fila.
+  const manualCandidates = patients.filter(p => {
+    if (p.tipoRegistro === "Registro Censo Municipal") return false;
+    return !isOverAge(p.dateOfBirth);
+  });
+
+  const manualMatches = manualCandidates.filter(p => {
+    const q = manualSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (p.name ?? "").toLowerCase().includes(q) || (p.prontuario ?? "").toLowerCase().includes(q);
+  });
+
+  const MANUAL_LIST_LIMIT = 100;
+  const manualEligible = manualMatches.slice(0, MANUAL_LIST_LIMIT);
 
   const handleAddManual = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,6 +205,14 @@ export default function WaitingList() {
         true, // skipTriagemCheck — admin insere sem exigir triagem
       );
       await load();
+      if (result?.id == null) {
+        toast({
+          title: "Não foi possível adicionar",
+          description: "O banco recusou a inserção deste paciente na fila. Confira a data de nascimento e o tipo de cadastro.",
+          variant: "destructive",
+        });
+        return;
+      }
       toast({
         title: "✅ Adicionado à fila!",
         description: `${manualSpecialty || "Qualquer especialidade"} — Prioridade: ${PRIORITY_LABEL[result.priority] ?? result.priority}`,
@@ -814,10 +827,20 @@ export default function WaitingList() {
                     <option value="">Selecione um paciente...</option>
                     {manualEligible.map(p => (
                       <option key={p.id} value={p.id}>
-                        {p.name}{p.prontuario ? ` — ${p.prontuario}` : ""}
+                        {p.name}{p.prontuario ? ` — ${p.prontuario}` : ""}{p.status ? ` (${p.status})` : ""}
                       </option>
                     ))}
                   </Select>
+                  {manualMatches.length > MANUAL_LIST_LIMIT && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Mostrando {MANUAL_LIST_LIMIT} de {manualMatches.length} pacientes — refine a busca acima.
+                    </p>
+                  )}
+                  {manualMatches.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1 font-semibold">
+                      Nenhum paciente encontrado. Pacientes acima de {MAX_AGE_FILA} anos e do Censo Municipal não entram na fila.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label>Especialidade</Label>
@@ -829,7 +852,7 @@ export default function WaitingList() {
                   </Select>
                 </div>
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-semibold">
-                  Inserção administrativa: adiciona o paciente à fila mesmo sem triagem registrada. A prioridade fica como "Baixo" até a triagem ser feita.
+                  Inserção administrativa: adiciona qualquer paciente à fila, mesmo sem triagem e mesmo que ele já esteja em atendimento em outra especialidade. A entrada é protegida da limpeza automática da fila e a prioridade fica como "Baixo" até a triagem ser feita.
                 </div>
                 <div className="flex justify-end gap-3 mt-6">
                   <Button type="button" variant="ghost" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>
