@@ -15,6 +15,7 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
+import { DocCopyRow } from "@/components/PatientDocs";
 import {
   listProfessionals,
   verifyProfessionalPin,
@@ -466,6 +467,7 @@ export default function Agenda() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
+  const [docsById, setDocsById] = useState<Map<number, { cpf: string | null; cns: string | null }>>(new Map());
   const { toast } = useToast();
 
   // Atendimento Multi
@@ -491,8 +493,13 @@ export default function Agenda() {
     listProfessionals().then(setProfessionals).catch(console.error);
     listPatients().then((ps) => {
       const m = new Map<number, string | null>();
-      for (const p of ps) if (p.photoUrl) m.set(p.id, p.photoUrl);
+      const d = new Map<number, { cpf: string | null; cns: string | null }>();
+      for (const p of ps) {
+        if (p.photoUrl) m.set(p.id, p.photoUrl);
+        if (p.cpf || p.cns) d.set(p.id, { cpf: p.cpf, cns: p.cns });
+      }
       setPhotoById(m);
+      setDocsById(d);
     }).catch(console.error);
     listFeriados().then(setFeriados).catch(console.error);
     listAusencias().then(setAusencias).catch(console.error);
@@ -1695,7 +1702,7 @@ export default function Agenda() {
                                   {/* Action menu */}
                                   {isMenuOpen && (
                                     <div
-                                      className="absolute z-50 top-full mt-1 left-0 w-52 rounded-2xl overflow-hidden shadow-2xl"
+                                      className="absolute z-50 top-full mt-1 left-0 w-60 rounded-2xl overflow-hidden shadow-2xl"
                                       style={{
                                         background: "rgba(2,4,8,0.97)",
                                         border: "1px solid rgba(255,255,255,0.08)",
@@ -1707,6 +1714,13 @@ export default function Agenda() {
                                       }}
                                     >
                                       <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName || `Agendamento #${apt.id}`}</p>
+                                      {!isGhost && (
+                                        <div className="flex flex-col gap-1 mb-1">
+                                          <DocCopyRow label="CPF" value={docsById.get(apt.patientId)?.cpf} />
+                                          <DocCopyRow label="CNS" value={docsById.get(apt.patientId)?.cns} />
+                                          <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                        </div>
+                                      )}
                                       {isGhost && (
                                         <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⚠ Paciente sem dados — clique em Excluir para limpar</p>
                                       )}

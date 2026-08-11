@@ -817,8 +817,8 @@ export type WaitingListEntry = {
   scoreEspecialidadeTotal?: number | null;
   /** Bônus de idade: <4 anos = +50, 4-6 anos = +20, >6 = 0. */
   ageBonus?: number | null;
-  /** Critério da fila na especialidade: "chegada" (FIFO) ou "prioridade". */
-  ordenacao?: "chegada" | "prioridade" | null;
+  /** 'prioridade' (Fono/Fisio) | 'chegada' (FIFO nas demais especialidades). */
+  ordenacao?: string | null;
   /** Data de nascimento do paciente (ISO). */
   dateOfBirth?: string | null;
   /** Busca ativa: paciente congelado, fora da disputa por vaga prioritária. */

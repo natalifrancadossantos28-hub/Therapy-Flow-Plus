@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
+import { DocCopyRow } from "@/components/PatientDocs";
 import { supabase } from "@/lib/supabase";
 import {
   listProfessionals,
@@ -230,6 +231,7 @@ export default function AgendaProfissionais() {
       : "";
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
+  const [docsById, setDocsById] = useState<Map<number, { cpf: string | null; cns: string | null }>>(new Map());
   const [selectedProfId, setSelectedProfId] = useState(
     isProfessionalSession
       ? String(portalProf!.professionalId)
@@ -326,8 +328,13 @@ export default function AgendaProfissionais() {
       .catch(console.error);
     listPatients().then((ps) => {
       const m = new Map<number, string | null>();
-      for (const p of ps) if (p.photoUrl) m.set(p.id, p.photoUrl);
+      const d = new Map<number, { cpf: string | null; cns: string | null }>();
+      for (const p of ps) {
+        if (p.photoUrl) m.set(p.id, p.photoUrl);
+        if (p.cpf || p.cns) d.set(p.id, { cpf: p.cpf, cns: p.cns });
+      }
       setPhotoById(m);
+      setDocsById(d);
     }).catch(console.error);
     listFeriados().then(setFeriados).catch(console.error);
     listAusencias().then(setAusencias).catch(console.error);
@@ -1482,10 +1489,17 @@ export default function AgendaProfissionais() {
 
                                         {isMenuOpen && (
                                           <div
-                                            className="absolute z-50 top-full left-0 mt-1 w-56 rounded-2xl shadow-2xl"
+                                            className="absolute z-50 top-full left-0 mt-1 w-60 rounded-2xl shadow-2xl"
                                             style={{ background: "rgba(2,4,8,0.97)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)", padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}
                                           >
                                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName || `Agendamento #${apt.id}`}</p>
+                                            {!isGhost && (
+                                              <div className="flex flex-col gap-1 mb-1">
+                                                <DocCopyRow label="CPF" value={docsById.get(apt.patientId)?.cpf} />
+                                                <DocCopyRow label="CNS" value={docsById.get(apt.patientId)?.cns} />
+                                                <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                              </div>
+                                            )}
                                             {isGhost && (
                                               <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⚠ Paciente sem dados — solicite exclusão ao admin</p>
                                             )}
