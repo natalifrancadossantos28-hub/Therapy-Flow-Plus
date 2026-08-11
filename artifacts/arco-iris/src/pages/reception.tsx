@@ -820,8 +820,8 @@ export default function Reception() {
   const handlePrintPDF = () => {
     const todayStr = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
     const list = [...(appointments || [])].sort((a, b) => a.time.localeCompare(b.time));
-    const morningSlots = ["07:10","08:00","08:50","09:40","10:30","11:20"];
-    const afternoonSlots = ["13:10","14:00","14:50","15:40","16:30"];
+    const baseMorning = ["07:10","08:00","08:50","09:40","10:30","11:20"];
+    const baseAfternoon = ["13:10","14:00","14:50","15:40","16:30"];
 
     const aptMap: Record<string, typeof list[0][]> = {};
     for (const a of list) {
@@ -829,12 +829,20 @@ export default function Reception() {
       aptMap[a.time].push(a);
     }
 
+    // Horários fora da grade padrão (encaixes) entram na folha, senão esses
+    // pacientes não saem na impressão.
+    const known = new Set([...baseMorning, ...baseAfternoon, "12:10"]);
+    const extras = Object.keys(aptMap).filter(t => !known.has(t));
+    const sortT = (a: string, b: string) => a.localeCompare(b);
+    const morningSlots = [...baseMorning, ...extras.filter(t => t < "12:10")].sort(sortT);
+    const afternoonSlots = [...baseAfternoon, ...extras.filter(t => t > "12:10")].sort(sortT);
+
     const w = window.open("", "_blank");
     if (!w) return;
 
     const rowHtml = (time: string, isLunch = false) => {
-      if (isLunch) return `<tr><td colspan="4" style="background:#f8fafc;color:#94a3b8;font-style:italic;padding:8px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;">🍽 12:10 — Intervalo de Almoço</td></tr>`;
       const apts = aptMap[time] || [];
+      if (isLunch && apts.length === 0) return `<tr><td colspan="4" style="background:#f8fafc;color:#94a3b8;font-style:italic;padding:8px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;">🍽 12:10 — Intervalo de Almoço</td></tr>`;
       if (apts.length === 0)
         return `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td colspan="3" style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#cbd5e1;font-style:italic;">Livre</td></tr>`;
       return apts.map(a => { const pront = a.prontuario || prontuarioMap.get(a.patientId) || ""; return `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;font-weight:600;">${pront ? `${pront} - ` : ""}${a.patientName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.professionalName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.status}</td></tr>`; }).join("");
@@ -846,13 +854,13 @@ export default function Reception() {
     table{width:100%;border-collapse:collapse;font-size:13px;}
     th{text-align:left;padding:10px 14px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
     .section{background:#fefce8;color:#92400e;font-size:11px;font-weight:700;padding:8px 14px;border-bottom:1px solid #e2e8f0;text-transform:uppercase;letter-spacing:.05em;}
-    @media print{button{display:none}}</style></head><body>
+    @media print{button{display:none}html,body{height:auto!important;overflow:visible!important;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
     <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
       <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
       <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
     </div>
     <h1>Atendimentos Terapêuticos – Hoje</h1>
-    <p class="sub">${todayStr}</p>
+    <p class="sub">${todayStr} · ${list.length} atendimento(s)</p>
     <table>
       <thead><tr><th>Horário</th><th>Paciente</th><th>Profissional</th><th>Status</th></tr></thead>
       <tbody>
@@ -909,7 +917,7 @@ export default function Reception() {
     .sub{color:#64748b;font-size:13px;margin-bottom:24px;text-transform:capitalize;}
     table{width:100%;border-collapse:collapse;font-size:13px;}
     th{text-align:left;padding:10px 12px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
-    @media print{button{display:none}}</style></head><body>
+    @media print{button{display:none}html,body{height:auto!important;overflow:visible!important;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
     <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
       <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
       <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
