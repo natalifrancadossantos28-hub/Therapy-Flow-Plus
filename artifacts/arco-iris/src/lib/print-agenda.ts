@@ -56,12 +56,40 @@ function statusLabel(status: string): string {
   return map[s] ?? (status ? cap(status) : "");
 }
 
-function patientCell(apt: PrintAppointment | undefined): string {
-  if (!apt) return '<span style="color:#9ca3af;font-style:italic">Livre</span>';
+function patientLine(apt: PrintAppointment): string {
   const pront = apt.prontuario
     ? `<strong style="color:#0891b2">[${esc(apt.prontuario)}]</strong> `
     : "";
   return `${pront}${esc(apt.patientName || `Paciente #${apt.patientId}`)}`;
+}
+
+/** Um mesmo horário pode ter vários pacientes (grupo, Multi, Parental). */
+function patientCell(apts: PrintAppointment[], emptyLabel = ""): string {
+  if (apts.length === 0) {
+    return emptyLabel ? `<span style="color:#9ca3af;font-style:italic">${esc(emptyLabel)}</span>` : "";
+  }
+  return apts.map((a) => `<div class="pat">${patientLine(a)}</div>`).join("");
+}
+
+function statusCell(apts: PrintAppointment[]): string {
+  return apts.map((a) => `<div class="pat">${esc(statusLabel(a.status))}</div>`).join("");
+}
+
+const aptsAt = (list: PrintAppointment[], date: string, time: string): PrintAppointment[] =>
+  list.filter((a) => a.date === date && a.time === time);
+
+/**
+ * Linhas da grade impressa: os horários fixos mais qualquer horário que tenha
+ * atendimento fora da grade (senão esses pacientes não saem no papel).
+ */
+function printableSlots(o: AgendaPrintOptions, dates: string[]): string[] {
+  const lunch = o.lunchSlot ?? "12:10";
+  const includeLunch = o.includeLunch ?? true;
+  const base = o.timeSlots.filter((t) => includeLunch || t !== lunch);
+  const extras = o.appointments
+    .filter((a) => dates.includes(a.date) && !base.includes(a.time))
+    .map((a) => a.time);
+  return Array.from(new Set([...base, ...extras])).sort((a, b) => a.localeCompare(b));
 }
 
 // -----------------------------------------------------------------------------
@@ -71,17 +99,17 @@ function buildDia(o: AgendaPrintOptions, dateStr: string): string {
   const lunch = o.lunchSlot ?? "12:10";
   const includeLunch = o.includeLunch ?? true;
   const dayApts = o.appointments.filter((a) => a.date === dateStr);
-  const slots = o.timeSlots.filter((t) => includeLunch || t !== lunch);
+  const slots = printableSlots(o, [dateStr]);
 
   const rowFor = (time: string): string => {
-    if (time === lunch && includeLunch) {
+    const apts = dayApts.filter((a) => a.time === time);
+    if (time === lunch && includeLunch && apts.length === 0) {
       return `<tr class="lunch-row"><td colspan="3">🍽 ${esc(time)} — Intervalo de Almoço</td></tr>`;
     }
-    const apt = dayApts.find((a) => a.time === time);
     return `<tr>
       <td class="time">${esc(time)}</td>
-      <td>${patientCell(apt)}</td>
-      <td>${apt ? esc(statusLabel(apt.status)) : ""}</td>
+      <td>${patientCell(apts, "Livre")}</td>
+      <td>${statusCell(apts)}</td>
     </tr>`;
   };
 
@@ -95,7 +123,9 @@ function buildDia(o: AgendaPrintOptions, dateStr: string): string {
 function buildSemanaTable(o: AgendaPrintOptions, weekDates: string[], blank: boolean): string {
   const lunch = o.lunchSlot ?? "12:10";
   const includeLunch = o.includeLunch ?? true;
-  const slots = o.timeSlots.filter((t) => includeLunch || t !== lunch);
+  const slots = blank
+    ? o.timeSlots.filter((t) => includeLunch || t !== lunch)
+    : printableSlots(o, weekDates);
 
   const head = `<tr><th style="width:70px">Horário</th>${weekDates
     .map((d) => {
@@ -106,14 +136,14 @@ function buildSemanaTable(o: AgendaPrintOptions, weekDates: string[], blank: boo
 
   const body = slots
     .map((time) => {
-      if (time === lunch && includeLunch) {
+      const naLinha = blank ? [] : weekDates.flatMap((d) => aptsAt(o.appointments, d, time));
+      if (time === lunch && includeLunch && naLinha.length === 0) {
         return `<tr class="lunch-row"><td class="time">${esc(time)}</td><td colspan="${weekDates.length}">🍽 Intervalo de Almoço</td></tr>`;
       }
       const cells = weekDates
         .map((date) => {
           if (blank) return `<td class="blank-cell"></td>`;
-          const apt = o.appointments.find((a) => a.date === date && a.time === time);
-          return `<td>${apt ? patientCell(apt) : ""}</td>`;
+          return `<td>${patientCell(aptsAt(o.appointments, date, time))}</td>`;
         })
         .join("");
       return `<tr><td class="time">${esc(time)}</td>${cells}</tr>`;
@@ -145,7 +175,7 @@ function buildMes(o: AgendaPrintOptions): string {
       const rows = dayApts
         .map(
           (apt) =>
-            `<div class="mes-row"><span class="mes-time">${esc(apt.time)}</span><span class="mes-pat">${patientCell(apt)}</span><span class="mes-status">${esc(statusLabel(apt.status))}</span></div>`,
+            `<div class="mes-row"><span class="mes-time">${esc(apt.time)}</span><span class="mes-pat">${patientLine(apt)}</span><span class="mes-status">${esc(statusLabel(apt.status))}</span></div>`,
         )
         .join("");
       return `<div class="mes-day">${header}${rows}</div>`;
@@ -213,7 +243,16 @@ export function openAgendaPrint(o: AgendaPrintOptions): void {
   .mes-status{color:#6b7280;width:130px;flex:0 0 130px;text-align:right;}
   .mes-empty{padding:5px 10px;color:#9ca3af;font-style:italic;font-size:12px;}
   .footer{margin-top:22px;font-size:11px;color:#94a3b8;}
-  @media print{.no-print{display:none!important;} body{padding:0;}}
+  .pat + .pat{margin-top:3px;padding-top:3px;border-top:1px dotted #cbd5e1;}
+  @media print{
+    .no-print{display:none!important;}
+    body{padding:0;}
+    /* Nada de altura fixa/rolagem: a folha tem que sair com a lista inteira. */
+    html,body{height:auto!important;overflow:visible!important;}
+    thead{display:table-header-group;}
+    tr,.mes-day,.mes-row{break-inside:avoid;page-break-inside:avoid;}
+    table{break-inside:auto;}
+  }
 </style></head><body>
   <div class="no-print" style="display:flex;gap:10px;margin-bottom:18px;align-items:center;">
     <button onclick="window.close()" style="padding:8px 18px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar</button>

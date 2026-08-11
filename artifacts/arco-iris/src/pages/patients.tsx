@@ -311,7 +311,7 @@ export default function Patients() {
     .sub{color:#64748b;font-size:13px;margin-bottom:20px;}
     table{width:100%;border-collapse:collapse;font-size:13px;}
     th{text-align:left;padding:10px 12px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
-    @media print{button{display:none}}</style></head><body>
+    @media print{button{display:none}html,body{height:auto!important;overflow:visible!important;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
     <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
       <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
       <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>

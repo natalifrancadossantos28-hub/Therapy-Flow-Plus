@@ -97,14 +97,18 @@ export default function RelatorioRepasse() {
         @media print {
           body * { visibility: hidden !important; }
           #relatorio-print, #relatorio-print * { visibility: visible !important; }
+          /* position:fixed imprime só a primeira página — o resto da lista some. */
+          html, body { height: auto !important; overflow: visible !important; }
           #relatorio-print {
-            position: fixed !important;
-            top: 0 !important; left: 0 !important;
-            width: 100vw !important;
-            padding: 32px !important;
+            position: static !important;
+            width: 100% !important;
+            padding: 0 !important;
             background: #fff !important;
             color: #111 !important;
           }
+          thead { display: table-header-group; }
+          tr { break-inside: avoid; page-break-inside: avoid; }
+          table { break-inside: auto; }
           .no-print { display: none !important; }
           .print-page-break { page-break-after: always; }
           .print-border { border: 1px solid #e5e7eb !important; }
