@@ -20,31 +20,148 @@ export const CLINIC_CONFIG = {
 
 type Pergunta = { area: string; pergunta: string; explicacao: string };
 
+// Questionário Multidisciplinar de Triagem (versão 2): 9 áreas x 10 perguntas.
+// A ordem das áreas define a ordem das respostas salvas — o banco
+// (_autolink_triagem_internal) faz o mesmo fatiamento por posição.
 const AREAS = [
+  "Fisioterapia", "Terapia Ocupacional", "Psicomotricidade", "Educação Física",
+  "Nutrição", "Fonoaudiologia", "Psicologia", "Psicologia Parental", "Psicopedagogia",
+];
+
+// Áreas do questionário antigo (104 perguntas), usadas só para abrir triagens
+// salvas antes da troca do questionário.
+const AREAS_LEGADO = [
   "Psicológico", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
   "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
 ];
 
 const AREA_ICONS: Record<string, string> = {
-  "Psicológico": "🧠", "Psicomotricidade": "🏃", "Fisioterapia": "💪",
+  "Psicologia": "🧠", "Psicológico": "🧠", "Psicologia Parental": "👨‍👩‍👧",
+  "Psicomotricidade": "🏃", "Fisioterapia": "💪",
   "Terapia Ocupacional": "🤲", "Fonoaudiologia": "💬",
   "Nutrição": "🥗", "Psicopedagogia": "📚", "Educação Física": "⚽",
 };
 
 const AREA_COLORS: Record<string, string> = {
-  "Psicológico": "#a855f7", "Psicomotricidade": "#6366f1", "Fisioterapia": "#f97316",
+  "Psicologia": "#a855f7", "Psicológico": "#a855f7", "Psicologia Parental": "#8b5cf6",
+  "Psicomotricidade": "#6366f1", "Fisioterapia": "#f97316",
   "Terapia Ocupacional": "#14b8a6", "Fonoaudiologia": "#3b82f6",
   "Nutrição": "#22c55e", "Psicopedagogia": "#eab308", "Educação Física": "#f43f5e",
 };
 
 const SHORT_NAMES: Record<string, string> = {
-  "Psicológico": "Psicol.", "Psicomotricidade": "Psicomotr.",
+  "Psicologia": "Psicol.", "Psicológico": "Psicol.", "Psicologia Parental": "Psic. Parental",
+  "Psicomotricidade": "Psicomotr.",
   "Fisioterapia": "Fisio.", "Terapia Ocupacional": "T. Ocup.",
   "Fonoaudiologia": "Fono.", "Nutrição": "Nutrição",
   "Psicopedagogia": "Psicoped.", "Educação Física": "Ed. Física",
 };
 
 const PERGUNTAS: Pergunta[] = [
+  // ── FISIOTERAPIA (10) — desenvolvimento motor global, marcha, postura
+  { area: "Fisioterapia", pergunta: "Apresentou atraso para sentar sem apoio (após 8 meses) ou para andar sozinho (após 18 meses)?", explicacao: "Demorou mais que o esperado pra sentar sozinho ou pra começar a andar?" },
+  { area: "Fisioterapia", pergunta: "Utiliza órtese, andador, muletas ou algum outro dispositivo para auxiliar a locomoção?", explicacao: "Usa aparelho, andador, muleta ou cadeira pra se locomover?" },
+  { area: "Fisioterapia", pergunta: "Anda na ponta dos pés ou apresenta os pés muito planos (\"pé chato\")?", explicacao: "Anda na pontinha do pé ou o pé é bem chato/caído por dentro?" },
+  { area: "Fisioterapia", pergunta: "Cai ou tropeça com frequência?", explicacao: "Cai bastante em situações simples do dia a dia?" },
+  { area: "Fisioterapia", pergunta: "Reclama de dores nas pernas, pés, costas ou outras partes do corpo?", explicacao: "Costuma reclamar de dor no corpo?" },
+  { area: "Fisioterapia", pergunta: "As articulações parecem muito soltas ou ele parece muito \"molinho\" nas atividades do dia a dia?", explicacao: "O corpo dele parece frouxo/molinho demais?" },
+  { area: "Fisioterapia", pergunta: "Apresenta dificuldade para subir escadas, andar de bicicleta, pular ou ficar apoiado em um pé só?", explicacao: "Tem dificuldade nessas atividades comparado a outras crianças da idade?" },
+  { area: "Fisioterapia", pergunta: "Apresenta movimentos involuntários ou movimentos repetitivos do corpo?", explicacao: "Faz movimentos que ele não controla ou repete o mesmo movimento?" },
+  { area: "Fisioterapia", pergunta: "Costuma sentar em posição de \"W\" (joelhos dobrados para frente e pés para trás)?", explicacao: "Senta no chão com as perninhas abertas pra trás, formando um W?" },
+  { area: "Fisioterapia", pergunta: "Apresenta escapes de urina ou fezes após a idade esperada para o controle do banheiro?", explicacao: "Faz xixi ou cocô na roupa depois da idade em que já deveria controlar?" },
+  // ── TERAPIA OCUPACIONAL (10) — AVDs, motora fina, processamento sensorial
+  { area: "Terapia Ocupacional", pergunta: "Apresenta dificuldade para se alimentar ou se vestir sozinho, de acordo com a idade?", explicacao: "Precisa de ajuda pra comer ou se vestir mais do que o esperado pra idade?" },
+  { area: "Terapia Ocupacional", pergunta: "Apresenta dificuldade para brincar de forma adequada com os brinquedos?", explicacao: "Dá a função certa ao brinquedo ou só empilha, gira e enfileira?" },
+  { area: "Terapia Ocupacional", pergunta: "Apresenta medo excessivo de locais altos, escadas, balanços ou de tirar os pés do chão?", explicacao: "Fica muito inseguro quando os pés saem do chão?" },
+  { area: "Terapia Ocupacional", pergunta: "Procura movimento o tempo todo (corre, pula, gira, sobe em móveis, não fica parado)?", explicacao: "Parece não conseguir ficar parado, buscando movimento o tempo todo?" },
+  { area: "Terapia Ocupacional", pergunta: "Costuma passar mal em carros, balanços, brinquedos giratórios ou em situações de movimento?", explicacao: "Enjoa ou passa mal com movimento (carro, balanço, roda-gigante)?" },
+  { area: "Terapia Ocupacional", pergunta: "Apresenta dificuldade durante o banho, ao lavar a cabeça, cortar as unhas ou escovar os dentes?", explicacao: "Esses momentos de higiene viram briga ou choro?" },
+  { area: "Terapia Ocupacional", pergunta: "Evita tocar ou brincar com texturas como areia, grama, tinta, massinha ou slime?", explicacao: "Recusa sujar a mão ou tocar em texturas diferentes?" },
+  { area: "Terapia Ocupacional", pergunta: "Se incomoda excessivamente com sons, luzes, cheiros ou determinados tipos de roupa?", explicacao: "Tapa os ouvidos, reclama de etiqueta na roupa, de cheiro ou de luz forte?" },
+  { area: "Terapia Ocupacional", pergunta: "Utiliza fraldas além do esperado para a idade?", explicacao: "Ainda usa fralda mesmo já tendo idade pra largar?" },
+  { area: "Terapia Ocupacional", pergunta: "Apresenta dificuldade para usar lápis, tesoura, encaixes ou manipular objetos pequenos?", explicacao: "Tem dificuldade com atividades de mão (recortar, escrever, encaixar)?" },
+  // ── PSICOMOTRICIDADE (10) — esquema corporal, imitação, brincar relacional
+  { area: "Psicomotricidade", pergunta: "Apresenta dificuldade para imitar gestos, movimentos ou posições demonstradas por outra pessoa?", explicacao: "Ex.: bater palmas, levantar os braços, copiar uma brincadeira ou uma dança." },
+  { area: "Psicomotricidade", pergunta: "Apresenta dificuldade para realizar pequenas sequências de movimentos quando solicitado?", explicacao: "Ex.: pular, bater palmas e sentar; pegar um objeto e colocá-lo em outro lugar." },
+  { area: "Psicomotricidade", pergunta: "Apresenta dificuldade para identificar ou apontar partes do próprio corpo quando solicitado?", explicacao: "Ex.: nariz, boca, mãos, pés, joelhos." },
+  { area: "Psicomotricidade", pergunta: "Apresenta dificuldade para brincar com outras crianças?", explicacao: "Consegue entrar na brincadeira das outras crianças?" },
+  { area: "Psicomotricidade", pergunta: "Apresenta dificuldade para participar de brincadeiras em grupo?", explicacao: "Em grupo ele se afasta, se desorganiza ou não participa?" },
+  { area: "Psicomotricidade", pergunta: "Apresenta dificuldade para esperar sua vez durante brincadeiras ou jogos?", explicacao: "Consegue esperar a vez sem se irritar?" },
+  { area: "Psicomotricidade", pergunta: "Apresenta dificuldade para seguir regras simples durante brincadeiras?", explicacao: "Entende e respeita as regrinhas do jogo?" },
+  { area: "Psicomotricidade", pergunta: "Demonstra pouco interesse em explorar brinquedos, espaços ou novas atividades?", explicacao: "Fica sempre na mesma brincadeira e evita novidade?" },
+  { area: "Psicomotricidade", pergunta: "Apresenta dificuldade para utilizar a imaginação em brincadeiras de faz de conta?", explicacao: "Ex.: casinha, escolinha, super-herói, médico ou criar histórias brincando." },
+  { area: "Psicomotricidade", pergunta: "Apresenta dificuldade para expressar emoções ou sentimentos durante as brincadeiras?", explicacao: "Demonstra alegria, raiva ou frustração brincando?" },
+  // ── EDUCAÇÃO FÍSICA (10) — prática corporal, condicionamento, sedentarismo
+  { area: "Educação Física", pergunta: "Evita participar de atividades físicas que exigem correr, saltar ou realizar esforços físicos?", explicacao: "Foge de brincadeira que dá canseira?" },
+  { area: "Educação Física", pergunta: "Cansa mais rápido que outras crianças da mesma idade durante brincadeiras ou atividades físicas?", explicacao: "Cansa antes dos coleguinhas?" },
+  { area: "Educação Física", pergunta: "Passa a maior parte do tempo livre em atividades sedentárias?", explicacao: "Ex.: celular, tablet, televisão ou videogame." },
+  { area: "Educação Física", pergunta: "Fica sem praticar atividade física ou esporte regularmente fora da escola?", explicacao: "Fora da escola, ele pratica algum esporte ou atividade física na rotina?" },
+  { area: "Educação Física", pergunta: "Apresenta dificuldade para acompanhar as atividades físicas propostas na escola?", explicacao: "Na Educação Física da escola ele consegue acompanhar a turma?" },
+  { area: "Educação Física", pergunta: "Evita participar de jogos ou esportes por insegurança ou medo de não acompanhar os colegas?", explicacao: "Deixa de jogar com medo de errar ou de ser o pior?" },
+  { area: "Educação Física", pergunta: "Demonstra pouca resistência física para brincar ou se manter ativo por períodos compatíveis com a idade?", explicacao: "Aguenta pouco tempo de brincadeira ativa?" },
+  { area: "Educação Física", pergunta: "Apresenta dificuldade para participar de atividades físicas em grupo por limitações físicas ou baixo condicionamento?", explicacao: "O corpo dele limita a participação nas atividades em grupo?" },
+  { area: "Educação Física", pergunta: "Apresenta excesso de peso que dificulta a participação em brincadeiras ou atividades físicas?", explicacao: "O peso atrapalha ele de brincar e se movimentar?" },
+  { area: "Educação Física", pergunta: "A família gostaria de apoio para aumentar a prática de atividade física e reduzir o sedentarismo?", explicacao: "Vocês querem ajuda pra ele se mexer mais e ficar menos na tela?" },
+  // ── NUTRIÇÃO (10) — alimentação, estado nutricional, repercussões gastro
+  { area: "Nutrição", pergunta: "Aceita apenas uma quantidade limitada de alimentos?", explicacao: "Ex.: come sempre os mesmos alimentos e recusa experimentar novos." },
+  { area: "Nutrição", pergunta: "Recusa alimentos por causa da textura, cor, cheiro, temperatura ou aparência?", explicacao: "Recusa a comida pelo jeito dela, e não pela fome?" },
+  { area: "Nutrição", pergunta: "Apresenta ou apresentou dificuldades na amamentação, introdução alimentar ou aceitação dos alimentos?", explicacao: "Ex.: dificuldade de pega, sucção, baixa ingestão de leite, recusa alimentar." },
+  { area: "Nutrição", pergunta: "Apresenta alteração de peso (baixo peso, perda de peso, sobrepeso ou ganho excessivo)?", explicacao: "O médico já falou que o peso está fora do esperado?" },
+  { area: "Nutrição", pergunta: "Apresenta prisão de ventre (intestino preso) com frequência?", explicacao: "Fica muitos dias sem evacuar ou sofre pra fazer cocô?" },
+  { area: "Nutrição", pergunta: "Apresenta diarreia, dores abdominais, gases excessivos ou outros desconfortos gastrointestinais com frequência?", explicacao: "Vive com dor de barriga, gases ou intestino solto?" },
+  { area: "Nutrição", pergunta: "Possui alergia alimentar ou restrições alimentares orientadas por profissional de saúde?", explicacao: "Tem alguma comida proibida por orientação médica?" },
+  { area: "Nutrição", pergunta: "Já apresentou alterações em exames relacionadas à alimentação ou nutrição?", explicacao: "Ex.: anemia, falta de ferro, vitamina D ou B12." },
+  { area: "Nutrição", pergunta: "Apresenta dificuldade para mastigar ou engolir os alimentos?", explicacao: "Engasga, guarda comida na boca ou evita mastigar?" },
+  { area: "Nutrição", pergunta: "As dificuldades alimentares interferem na rotina da família ou da escola?", explicacao: "Ex.: precisa preparar refeição separada ou é difícil comer fora de casa." },
+  // ── FONOAUDIOLOGIA (10) — comunicação, linguagem, deglutição/disfagia
+  { area: "Fonoaudiologia", pergunta: "Apresenta dificuldade para mastigar os alimentos?", explicacao: "Evita comida dura ou mastiga com muita dificuldade?" },
+  { area: "Fonoaudiologia", pergunta: "Engasga, tosse ou parece \"afogar\" durante a alimentação ou ao beber líquidos?", explicacao: "Engasga com comida ou com água?" },
+  { area: "Fonoaudiologia", pergunta: "Já apresentou pneumonia de repetição, infecções respiratórias frequentes ou suspeita de broncoaspiração?", explicacao: "Já teve pneumonia mais de uma vez ou vive com infecção no pulmão?" },
+  { area: "Fonoaudiologia", pergunta: "Apresenta dificuldade para engolir alimentos, líquidos ou medicamentos?", explicacao: "Tem dificuldade pra engolir mesmo comida mole ou remédio?" },
+  { area: "Fonoaudiologia", pergunta: "Não fala ou utiliza poucas palavras, quando comparado a crianças da mesma idade?", explicacao: "Fala bem menos que outras crianças da mesma idade?" },
+  { area: "Fonoaudiologia", pergunta: "Apresenta dificuldade para expressar necessidades, desejos ou sentimentos pela fala ou outra forma de comunicação?", explicacao: "Consegue pedir o que quer ou só chora e aponta?" },
+  { area: "Fonoaudiologia", pergunta: "Apresenta dificuldade para formar frases adequadas para a idade?", explicacao: "Monta frases completas ou fala por palavras soltas?" },
+  { area: "Fonoaudiologia", pergunta: "A fala é difícil de ser compreendida por pessoas que não convivem com ele?", explicacao: "Estranhos entendem o que ele fala?" },
+  { area: "Fonoaudiologia", pergunta: "Troca sons ou pronuncia palavras de forma diferente do esperado para a idade?", explicacao: "Ex.: troca letras, omite sons ou fala a palavra pela metade." },
+  { area: "Fonoaudiologia", pergunta: "Necessita de gestos, figuras, pranchas, aplicativos ou outros recursos para ser compreendido?", explicacao: "Ex.: aponta figuras, usa PECS, prancha de comunicação, tablet ou aplicativo." },
+  // ── PSICOLOGIA (10) — regulação emocional, comportamento, impacto funcional
+  { area: "Psicologia", pergunta: "Apresenta crises de choro, irritação ou nervosismo que dificultam as atividades do dia a dia?", explicacao: "As crises atrapalham a rotina da casa?" },
+  { area: "Psicologia", pergunta: "Fica muito incomodado quando há mudanças na rotina ou quando algo acontece diferente do esperado?", explicacao: "Mudou o plano do dia e ele desmonta?" },
+  { area: "Psicologia", pergunta: "Apresenta comportamentos agressivos, como bater, morder, chutar, empurrar ou quebrar objetos?", explicacao: "Machuca outras pessoas ou quebra coisas quando se irrita?" },
+  { area: "Psicologia", pergunta: "Tem dificuldade para ouvir \"não\", esperar sua vez ou lidar com frustrações?", explicacao: "Quando contrariam, faz birra grande?" },
+  { area: "Psicologia", pergunta: "Apresenta comportamentos repetitivos ou dificuldade para interromper uma atividade quando solicitado?", explicacao: "Custa a parar uma atividade quando você pede?" },
+  { area: "Psicologia", pergunta: "Costuma agir sem pensar nas consequências ou se colocar em situações de risco com frequência?", explicacao: "Ex.: correr para a rua, subir em lugar perigoso, mexer no que pode machucar." },
+  { area: "Psicologia", pergunta: "Apresenta medos, preocupações ou inseguranças que atrapalham sua rotina?", explicacao: "Ex.: medo excessivo de pessoas, lugares, situações ou de se separar dos pais." },
+  { area: "Psicologia", pergunta: "Tem dificuldade para demonstrar ou falar sobre o que está sentindo?", explicacao: "Ex.: tristeza, raiva, medo ou felicidade." },
+  { area: "Psicologia", pergunta: "Os comportamentos atrapalham a participação na escola, nas terapias ou em outras atividades do dia a dia?", explicacao: "A escola ou a terapia já reclamaram do comportamento?" },
+  { area: "Psicologia", pergunta: "Os comportamentos causam dificuldades importantes na convivência com a família ou outras pessoas?", explicacao: "O comportamento dele desgasta a convivência em casa?" },
+  // ── PSICOLOGIA PARENTAL (10) — manejo familiar, orientação e adesão
+  { area: "Psicologia Parental", pergunta: "A família apresenta dificuldade para lidar com as crises emocionais ou comportamentais da criança?", explicacao: "Na hora da crise, vocês sabem o que fazer?" },
+  { area: "Psicologia Parental", pergunta: "A família apresenta dificuldade para estabelecer limites e combinados com a criança?", explicacao: "É difícil colocar limite e manter o combinado?" },
+  { area: "Psicologia Parental", pergunta: "A família apresenta dificuldade para organizar uma rotina previsível para a criança?", explicacao: "A rotina da casa é organizada (hora de comer, dormir, brincar)?" },
+  { area: "Psicologia Parental", pergunta: "A família apresenta dificuldade para manter as orientações dadas pelos profissionais de saúde ou educação?", explicacao: "Consegue seguir em casa o que os terapeutas orientam?" },
+  { area: "Psicologia Parental", pergunta: "A família sente necessidade de orientação para estimular o desenvolvimento da criança em casa?", explicacao: "Vocês gostariam de aprender a estimular ele em casa?" },
+  { area: "Psicologia Parental", pergunta: "Os comportamentos da criança geram desgaste importante para os cuidadores?", explicacao: "Quem cuida está esgotado, com estresse ou adoecendo?" },
+  { area: "Psicologia Parental", pergunta: "A família apresenta dificuldade para compreender as necessidades da criança e como ajudá-la?", explicacao: "Vocês entendem o que ele precisa na maior parte do tempo?" },
+  { area: "Psicologia Parental", pergunta: "A família apresenta dificuldade para lidar com comportamentos agressivos, desafiadores ou de oposição?", explicacao: "É difícil manejar a agressividade ou a desobediência?" },
+  { area: "Psicologia Parental", pergunta: "A família necessita de apoio para favorecer a participação da criança na escola, em casa ou na comunidade?", explicacao: "Precisam de ajuda pra incluir ele nesses espaços?" },
+  { area: "Psicologia Parental", pergunta: "A família necessita de acompanhamento psicológico ou orientação para lidar com as demandas do desenvolvimento da criança?", explicacao: "Os cuidadores precisam de apoio psicológico?" },
+  // ── PSICOPEDAGOGIA (10) — aprendizagem escolar e articulação com o AEE
+  { area: "Psicopedagogia", pergunta: "É aluno da rede municipal, está matriculado entre o 1º e o 5º ano e possui acompanhamento pelo AEE?", explicacao: "Critério de elegibilidade da Psicopedagogia — marque 3 se atende a todos os itens." },
+  { area: "Psicopedagogia", pergunta: "Apresenta dificuldade para aprender a ler?", explicacao: "Está lendo do jeito esperado pra série dele?" },
+  { area: "Psicopedagogia", pergunta: "Apresenta dificuldade para compreender o que lê?", explicacao: "Lê mas não entende o que leu?" },
+  { area: "Psicopedagogia", pergunta: "Apresenta dificuldade para escrever palavras, frases ou textos adequados para sua escolaridade?", explicacao: "A escrita está atrasada em relação à série?" },
+  { area: "Psicopedagogia", pergunta: "Apresenta dificuldade para reconhecer letras, números ou símbolos adequados para sua escolaridade?", explicacao: "Reconhece as letras e os números da série dele?" },
+  { area: "Psicopedagogia", pergunta: "Apresenta dificuldade para realizar atividades matemáticas adequadas para sua escolaridade?", explicacao: "As continhas da série dele são um problema?" },
+  { area: "Psicopedagogia", pergunta: "Necessita de ajuda constante para realizar tarefas escolares em casa ou na escola?", explicacao: "Só consegue fazer a lição com alguém do lado?" },
+  { area: "Psicopedagogia", pergunta: "Apresenta dificuldade para acompanhar os conteúdos trabalhados na escola?", explicacao: "Fica pra trás em relação à turma?" },
+  { area: "Psicopedagogia", pergunta: "Evita ou demonstra resistência para realizar atividades de leitura, escrita ou matemática?", explicacao: "Foge de atividade de leitura, escrita ou conta?" },
+  { area: "Psicopedagogia", pergunta: "A escola ou o AEE relatam dificuldades importantes no processo de aprendizagem?", explicacao: "A escola já sinalizou dificuldade de aprendizagem?" },
+];
+
+// Questionário antigo (104 perguntas). Mantido só para abrir/editar triagens
+// salvas antes da troca — novas triagens usam sempre PERGUNTAS.
+const PERGUNTAS_LEGADO: Pergunta[] = [
   // ── PSICOLÓGICO (15) — foco emocional e comportamental
   { area: "Psicológico", pergunta: "Apresenta dificuldade em manter a atenção", explicacao: "Ele se distrai com qualquer barulhinho e não termina o que começa?" },
   { area: "Psicológico", pergunta: "Demonstra sinais de ansiedade", explicacao: "Vive nervoso, agitado, roendo unha ou puxando cabelo sem motivo?" },
@@ -160,10 +277,10 @@ const PERGUNTAS: Pergunta[] = [
 ];
 
 const ESCALA = [
-  { valor: 0, label: "0 – Nunca" },
-  { valor: 1, label: "1 – Às vezes" },
-  { valor: 2, label: "2 – Quase sempre" },
-  { valor: 3, label: "3 – Sempre" },
+  { valor: 0, label: "0 – Não acontece" },
+  { valor: 1, label: "1 – Raramente acontece" },
+  { valor: 2, label: "2 – Acontece com alguma frequência" },
+  { valor: 3, label: "3 – Acontece quase sempre" },
 ];
 
 const ESCOLARIDADE_OPTIONS = [
@@ -173,6 +290,8 @@ const ESCOLARIDADE_OPTIONS = [
 ];
 
 const CORES_AREA: Record<string, string> = {
+  "Psicologia": "bg-purple-950/60 text-purple-300 border-purple-700/50",
+  "Psicologia Parental": "bg-violet-950/60 text-violet-300 border-violet-700/50",
   "Psicológico": "bg-purple-950/60 text-purple-300 border-purple-700/50",
   "Psicomotricidade": "bg-indigo-950/60 text-indigo-300 border-indigo-700/50",
   "Fisioterapia": "bg-orange-950/60 text-orange-300 border-orange-700/50",
@@ -189,6 +308,37 @@ function classificar(pontos: number, max: number) {
   if (pct <= 50) return { label: "Indício leve",     cor: "text-blue-400",    bg: "bg-blue-950/50 border-blue-700/50",       hex: "#3b82f6" };
   if (pct <= 75) return { label: "Indício moderado", cor: "text-amber-400",   bg: "bg-amber-950/50 border-amber-700/50",     hex: "#f59e0b" };
   return               { label: "Indício elevado",   cor: "text-rose-400",    bg: "bg-rose-950/50 border-rose-700/50",       hex: "#f43f5e" };
+}
+
+// Faixas do questionário novo, por área (10 itens, 0 a 30 pontos):
+//   0 a 8   → baixa sinalização funcional (fluxo regular)
+//   9 a 17  → sinalização funcional moderada (atenção ampliada)
+//   18 a 30 → alta sinalização funcional (priorização na avaliação)
+function classificarV2(pontos: number) {
+  if (pontos <= 8)  return { label: "Baixa sinalização",     cor: "text-emerald-400", bg: "bg-emerald-950/50 border-emerald-700/50", hex: "#10b981" };
+  if (pontos <= 17) return { label: "Sinalização moderada",  cor: "text-amber-400",   bg: "bg-amber-950/50 border-amber-700/50",     hex: "#f59e0b" };
+  return              { label: "Alta sinalização",           cor: "text-rose-400",    bg: "bg-rose-950/50 border-rose-700/50",       hex: "#f43f5e" };
+}
+
+type QuestionarioConfig = {
+  perguntas: Pergunta[];
+  areas: string[];
+  escalaMax: number;
+  classificar: (pontos: number, max: number) => ReturnType<typeof classificar>;
+};
+
+const QUESTIONARIO_V2: QuestionarioConfig = {
+  perguntas: PERGUNTAS, areas: AREAS, escalaMax: 30,
+  classificar: (pontos) => classificarV2(pontos),
+};
+
+const QUESTIONARIO_LEGADO: QuestionarioConfig = {
+  perguntas: PERGUNTAS_LEGADO, areas: AREAS_LEGADO, escalaMax: 45, classificar,
+};
+
+/** Triagens salvas antes da troca têm 104 respostas e usam o questionário antigo. */
+function questionarioDe(totalRespostas: number): QuestionarioConfig {
+  return totalRespostas === PERGUNTAS_LEGADO.length ? QUESTIONARIO_LEGADO : QUESTIONARIO_V2;
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -246,7 +396,10 @@ function triSalvaToFormData(t: TriagemSalva): FormData {
     try {
       const parsed = JSON.parse(t.respostas);
       if (Array.isArray(parsed)) {
-        for (let i = 0; i < Math.min(parsed.length, PERGUNTAS.length); i++)
+        // Preserva o tamanho salvo: 104 respostas = questionário antigo.
+        const total = questionarioDe(parsed.length).perguntas.length;
+        respostas = Array(total).fill(0);
+        for (let i = 0; i < Math.min(parsed.length, total); i++)
           respostas[i] = Number(parsed[i]) || 0;
       }
     } catch { /* ignore */ }
@@ -292,6 +445,14 @@ function parsePontosTotal(resultado: string | null): number {
   }, 0);
 }
 
+/** Máximo do texto de resultado: 9 áreas x 30 (novo) ou 8 áreas x 45 (legado). */
+function parsePontosMax(resultado: string | null): number {
+  const areas = (resultado ?? "").split(" | ").filter(Boolean).length;
+  return areas === QUESTIONARIO_LEGADO.areas.length
+    ? QUESTIONARIO_LEGADO.areas.length * QUESTIONARIO_LEGADO.escalaMax
+    : QUESTIONARIO_V2.areas.length * QUESTIONARIO_V2.escalaMax;
+}
+
 // Social: +1 Escola Municipal/Estadual, +1 Trabalho Informal/Roça/Desempregado.
 // Serve apenas como desempate; nao sobrepoe a gravidade clinica e nao muda a
 // cor da classificacao.
@@ -305,11 +466,12 @@ function calcVulnScore(t: {
   return score;
 }
 
-// Total raw clinico maximo = 360 (8 areas x 15 perguntas x 3 pts).
-// Escala para 0..100 pra compor com social (usado internamente).
-const CLINICAL_MAX_RAW = 8 * 15 * 3;
-function toScoreClinico100(clinicalPts: number): number {
-  return Math.round((clinicalPts * 100) / CLINICAL_MAX_RAW);
+// Escala o total clinico (na base do proprio questionario) para 0..100, pra
+// compor com o social (usado internamente).
+const CLINICAL_MAX_RAW = QUESTIONARIO_V2.areas.length * QUESTIONARIO_V2.escalaMax;
+function toScoreClinico100(clinicalPts: number, maxRaw: number = CLINICAL_MAX_RAW): number {
+  if (maxRaw <= 0) return 0;
+  return Math.round((clinicalPts * 100) / maxRaw);
 }
 
 // Score exibido ao usuário em escala padronizada /150 (espelha a Gestão).
@@ -324,8 +486,8 @@ function toScoreDisplay(raw: number, rawMax: number): number {
 // Cor da prioridade vem do score TOTAL (clinico /100 + vulnerabilidade).
 // Mesma regra do banco (_calc_priority) e do Perfil Multidisciplinar.
 // Sem upgrade automatico de nivel — vulnerabilidade soma pontos.
-function getPrioridadeBadge(vulnScore: number, clinicalPts: number) {
-  const total = toScoreClinico100(clinicalPts) + vulnScore;
+function getPrioridadeBadge(vulnScore: number, clinicalPts: number, maxRaw?: number) {
+  const total = toScoreClinico100(clinicalPts, maxRaw) + vulnScore;
   if (total >= 75) return { label: "Prioridade Máxima", cls: "bg-red-100 text-red-800 border-red-300", icon: "🔴" };
   if (total >= 50) return { label: "Alta Prioridade",    cls: "bg-orange-100 text-orange-800 border-orange-300", icon: "🟠" };
   if (total >= 25) return { label: "Média Prioridade",   cls: "bg-amber-100 text-amber-800 border-amber-300",    icon: "🟡" };
@@ -460,10 +622,11 @@ function Formulario({ onSubmit, initialData, noHeader }: { onSubmit: (f: FormDat
   const [localAtendimento, setLocalAtendimento] = useState(b?.localAtendimento ?? "");
   const [tipoRegistro, setTipoRegistro] = useState(b?.tipoRegistro ?? "Paciente da Unidade");
   const [profissional, setProfissional] = useState(b?.profissional ?? "");
-  const [areaAtiva, setAreaAtiva] = useState(AREAS[0]);
+  const questionario = questionarioDe(respostas.length);
+  const [areaAtiva, setAreaAtiva] = useState(questionario.areas[0]);
 
-  const perguntasDaArea = PERGUNTAS.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === areaAtiva);
-  const areaIdx = AREAS.indexOf(areaAtiva);
+  const perguntasDaArea = questionario.perguntas.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === areaAtiva);
+  const areaIdx = questionario.areas.indexOf(areaAtiva);
   const fc = "w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-secondary text-foreground placeholder:text-muted-foreground transition-colors";
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -745,8 +908,8 @@ function Formulario({ onSubmit, initialData, noHeader }: { onSubmit: (f: FormDat
         {tipoRegistro !== "Registro Censo Municipal" && (<>
           {/* Navegação áreas */}
           <div className="flex flex-wrap gap-2">
-            {AREAS.map((area) => {
-              const pergs = PERGUNTAS.map((p, idx) => ({ ...p, idx })).filter((p) => p.area === area);
+            {questionario.areas.map((area) => {
+              const pergs = questionario.perguntas.map((p, idx) => ({ ...p, idx })).filter((p) => p.area === area);
               const temResposta = pergs.some((p) => respostas[p.idx] > 0);
               return (
                 <button key={area} type="button" onClick={() => setAreaAtiva(area)}
@@ -766,7 +929,7 @@ function Formulario({ onSubmit, initialData, noHeader }: { onSubmit: (f: FormDat
           <div className="bg-card rounded-2xl border border-border/60 glow-card overflow-hidden">
             <div className={`px-6 py-4 border-b border-border ${CORES_AREA[areaAtiva] ?? "bg-secondary"}`}>
               <h2 className="font-bold text-lg">{areaAtiva}</h2>
-              <p className="text-sm opacity-80">Área {areaIdx + 1} de {AREAS.length} — {perguntasDaArea.length} perguntas</p>
+              <p className="text-sm opacity-80">Área {areaIdx + 1} de {questionario.areas.length} — {perguntasDaArea.length} perguntas</p>
             </div>
             <div className="divide-y divide-border">
               {perguntasDaArea.map(({ pergunta, explicacao, idx }) => (
@@ -796,14 +959,14 @@ function Formulario({ onSubmit, initialData, noHeader }: { onSubmit: (f: FormDat
               ))}
             </div>
             <div className="px-6 py-4 bg-muted/30 flex justify-between items-center border-t border-border">
-              <button type="button" onClick={() => setAreaAtiva(AREAS[Math.max(0, areaIdx - 1)])}
+              <button type="button" onClick={() => setAreaAtiva(questionario.areas[Math.max(0, areaIdx - 1)])}
                 disabled={areaIdx === 0}
                 className="px-4 py-2 rounded-lg border border-border text-sm font-semibold disabled:opacity-40 hover:bg-secondary">
                 ← Anterior
               </button>
-              <span className="text-sm text-muted-foreground">{areaIdx + 1} / {AREAS.length}</span>
-              {areaIdx < AREAS.length - 1 ? (
-                <button type="button" onClick={() => setAreaAtiva(AREAS[areaIdx + 1])}
+              <span className="text-sm text-muted-foreground">{areaIdx + 1} / {questionario.areas.length}</span>
+              {areaIdx < questionario.areas.length - 1 ? (
+                <button type="button" onClick={() => setAreaAtiva(questionario.areas[areaIdx + 1])}
                   className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90">
                   Próxima →
                 </button>
@@ -829,6 +992,13 @@ function Formulario({ onSubmit, initialData, noHeader }: { onSubmit: (f: FormDat
                 </span>
               ))}
             </div>
+            {questionario === QUESTIONARIO_V2 && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Cada área tem 10 itens (0 a 30 pontos): <strong>0 a 8</strong> baixa sinalização ·{" "}
+                <strong>9 a 17</strong> sinalização moderada ·{" "}
+                <strong>18 a 30</strong> alta sinalização (priorização na avaliação).
+              </p>
+            )}
           </div>
         </>)}
       </form>
@@ -868,6 +1038,8 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
   // Se "Cognitivo Não Preservado" marcado, Psicopedagogia recebe redutor (0.5x)
   // e terapias de base (Fono, TO, Fisio) ganham bonus (1.15x).
   const pesoArea: Record<string, number> = {
+    "Psicologia": 1.0,
+    "Psicologia Parental": 1.0,
     "Psicológico": 1.0,
     "Psicomotricidade": 0.85,
     "Fisioterapia": 1.3,
@@ -878,12 +1050,12 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
     "Educação Física": 0.9,
   };
 
-  // Todas as areas sao normalizadas para a mesma base (45 pontos), mantendo a
-  // porcentagem real. Assim o "Resultado Detalhado por Area" mostra X/45 em
-  // todas, independente do numero de perguntas de cada area.
-  const ESCALA_MAX = 45;
-  const porArea = AREAS.map((area) => {
-    const pergs = PERGUNTAS.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === area);
+  // Todas as areas sao normalizadas para a mesma base (30 pontos no
+  // questionario novo; 45 no legado), mantendo a porcentagem real.
+  const questionario = questionarioDe(respostas.length);
+  const ESCALA_MAX = questionario.escalaMax;
+  const porArea = questionario.areas.map((area) => {
+    const pergs = questionario.perguntas.map((p, i) => ({ ...p, idx: i })).filter((p) => p.area === area);
     const pontosRaw = pergs.reduce((a, p) => a + respostas[p.idx], 0);
     const peso = pesoArea[area] ?? 1.0;
     const pontosReal = Math.round(pontosRaw * peso);
@@ -891,13 +1063,13 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
     const pct = maxReal > 0 ? Math.round((pontosReal / maxReal) * 100) : 0;
     const pontos = maxReal > 0 ? Math.round((pontosReal / maxReal) * ESCALA_MAX) : 0;
     const max = ESCALA_MAX;
-    return { area, pontos, max, pct, nivel: classificar(pontosReal, maxReal) };
+    return { area, pontos, max, pct, nivel: questionario.classificar(pontos, ESCALA_MAX) };
   });
 
   const ranking = [...porArea].sort((a, b) => b.pontos - a.pontos);
   const top3 = ranking.slice(0, 3).filter((a) => a.pontos > 0);
   const totalPontos = respostas.reduce((a, b) => a + b, 0);
-  const totalMax = PERGUNTAS.length * 3;
+  const totalMax = questionario.perguntas.length * 3;
   const pctTotal = Math.round((totalPontos / totalMax) * 100);
   // Bonus de vulnerabilidade somado direto ao score exibido (espelha a Gestao):
   //   +1 Escola Publica (Municipal/Estadual), +1 Trabalho Informal/Roca/Desempregado.
@@ -1441,8 +1613,8 @@ function ListaPacientes() {
     )
     .sort((a, b) => {
       // ORDER BY (score_clinico_100 + score_social) DESC.
-      const scoreA = toScoreClinico100(parsePontosTotal(a.resultado)) + calcVulnScore(a);
-      const scoreB = toScoreClinico100(parsePontosTotal(b.resultado)) + calcVulnScore(b);
+      const scoreA = toScoreClinico100(parsePontosTotal(a.resultado), parsePontosMax(a.resultado)) + calcVulnScore(a);
+      const scoreB = toScoreClinico100(parsePontosTotal(b.resultado), parsePontosMax(b.resultado)) + calcVulnScore(b);
       return scoreB - scoreA;
     });
 
@@ -1483,7 +1655,7 @@ function ListaPacientes() {
               const top3 = areas.slice(0, 3);
               const vulnScore = calcVulnScore(t);
               const clinicalPts = parsePontosTotal(t.resultado);
-              const prioridade = getPrioridadeBadge(vulnScore, clinicalPts);
+              const prioridade = getPrioridadeBadge(vulnScore, clinicalPts, parsePontosMax(t.resultado));
               return (
                 <div key={t.id} className={`bg-card rounded-2xl border p-5 glow-card hover:border-primary/40 transition-all ${prioridade?.label === "Prioridade Máxima" ? "border-red-800/70 border-l-4 border-l-red-500" : prioridade?.label === "Alta Prioridade" ? "border-orange-800/70 border-l-4 border-l-orange-400" : "border-border/60"}`}>
                   <div className="flex items-start justify-between gap-4">
@@ -1537,8 +1709,8 @@ function ListaPacientes() {
                     <div className="mt-3 pt-3 border-t border-border">
                       <div className="flex flex-wrap gap-2">
                         {top3.map(({ area, pontos, nivel }) => {
-                          const cor = nivel === "Indício elevado" ? "bg-rose-100 text-rose-800 border-rose-200"
-                            : nivel === "Indício moderado" ? "bg-amber-100 text-amber-800 border-amber-200"
+                          const cor = nivel === "Indício elevado" || nivel === "Alta sinalização" ? "bg-rose-100 text-rose-800 border-rose-200"
+                            : nivel === "Indício moderado" || nivel === "Sinalização moderada" ? "bg-amber-100 text-amber-800 border-amber-200"
                             : nivel === "Indício leve" ? "bg-blue-100 text-blue-800 border-blue-200"
                             : "bg-emerald-100 text-emerald-800 border-emerald-200";
                           return (
@@ -1605,7 +1777,7 @@ function Dashboard() {
     semOutroAtend: triagens.filter(t => t.outroAtendimento === false).length,
     prioridadeMaxima: triagens.filter(t => {
       const v = calcVulnScore(t); const c = parsePontosTotal(t.resultado);
-      return getPrioridadeBadge(v, c)?.label === "Prioridade Máxima";
+      return getPrioridadeBadge(v, c, parsePontosMax(t.resultado))?.label === "Prioridade Máxima";
     }).length,
   };
 
