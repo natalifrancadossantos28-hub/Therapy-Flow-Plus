@@ -7,6 +7,7 @@ import { getPriorityColor, formatDate, calcIdade } from "@/lib/utils";
 import { specialtyTone, specialtyShortLabel, SPECIALTIES } from "@/lib/specialty-colors";
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { supabase } from "@/lib/supabase";
+import { AREA_MAX_UI, areaToUi } from "@/lib/score-scale";
 import {
   listWaitingList,
   deleteWaitingListEntry,
@@ -581,8 +582,8 @@ export default function WaitingList() {
                         {entry.scoreEspecialidade != null ? (
                           <div className="flex flex-col gap-0.5">
                             <div className="flex items-baseline gap-1 font-mono">
-                              <span className="font-bold text-foreground">{entry.scoreEspecialidade}</span>
-                              <span className="text-xs text-muted-foreground">/45</span>
+                              <span className="font-bold text-foreground">{areaToUi(entry.scoreEspecialidade)}</span>
+                              <span className="text-xs text-muted-foreground">/{AREA_MAX_UI}</span>
                               {!!entry.scoreSocialDesempate && entry.scoreSocialDesempate > 0 && (
                                 <span
                                   title="Pontos de vulnerabilidade somados como desempate (+1 Escola Publica / +1 Trabalho na Roca)"
