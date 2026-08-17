@@ -463,6 +463,10 @@ export default function WaitingList() {
             Vale só para <strong>Fonoaudiologia</strong> e <strong>Fisioterapia</strong>. Nas demais especialidades a fila segue a
             <strong> ordem de chegada</strong> (do mais antigo para o mais novo pela data de entrada).
           </span>
+          <span className="w-full text-[11px] text-muted-foreground">
+            Quem <strong>já faz atendimento terapêutico em outro lugar</strong> e tem <strong>pai e mãe registrados</strong> vai para o
+            <strong> fim da fila</strong> — os demais pacientes passam na frente.
+          </span>
         </div>
         {specialtyOptions.length > 0 && (
           <div className="relative">
@@ -569,6 +573,14 @@ export default function WaitingList() {
                         <Badge className={getPriorityColor(entry.priority)}>
                           {PRIORITY_LABEL[entry.priority] ?? entry.priority}
                         </Badge>
+                        {entry.despriorizado && (
+                          <div
+                            title={`Já faz atendimento fora da unidade${entry.localAtendimento ? ` (${entry.localAtendimento})` : ""} e tem pai e mãe registrados: os demais pacientes passam na frente.`}
+                            className="mt-1 text-[11px] font-bold text-amber-500"
+                          >
+                            ↓ atende fora · pai e mãe registrados
+                          </div>
+                        )}
                         {entry.ordenacao === "chegada" && (
                           <div
                             title="Nesta especialidade a fila segue a ordem de chegada: do mais antigo para o mais novo pela data de entrada. A cor indica só a gravidade clínica."

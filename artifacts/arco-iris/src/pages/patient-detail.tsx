@@ -107,6 +107,7 @@ export default function PatientDetail() {
   const [editEmail, setEditEmail] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editMotherName, setEditMotherName] = useState("");
+  const [editFatherName, setEditFatherName] = useState("");
   const [editGuardianName, setEditGuardianName] = useState("");
   const [editGuardianPhone, setEditGuardianPhone] = useState("");
   const [editDiagnosis, setEditDiagnosis] = useState("");
@@ -185,6 +186,7 @@ export default function PatientDetail() {
     setEditEmail(patient.email || "");
     setEditAddress(patient.address || "");
     setEditMotherName(patient.motherName || "");
+    setEditFatherName(patient.fatherName || "");
     setEditGuardianName(patient.guardianName || "");
     setEditGuardianPhone(patient.guardianPhone || "");
     setEditDiagnosis(patient.diagnosis || "");
@@ -208,6 +210,7 @@ export default function PatientDetail() {
         email: editEmail || null,
         address: editAddress || null,
         motherName: editMotherName || null,
+        fatherName: editFatherName || null,
         guardianName: editGuardianName || null,
         guardianPhone: editGuardianPhone || null,
         diagnosis: editDiagnosis || null,
@@ -530,9 +533,13 @@ export default function PatientDetail() {
                 <p className="text-sm font-semibold text-muted-foreground">Email</p>
                 <p className="text-lg">{patient.email || "-"}</p>
               </div>
-              <div className="md:col-span-2">
+              <div>
                 <p className="text-sm font-semibold text-muted-foreground">Nome da Mãe</p>
                 <p className="text-lg">{patient.motherName || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Nome do Pai</p>
+                <p className="text-lg">{patient.fatherName || "-"}</p>
               </div>
               <div className="md:col-span-2">
                 <p className="text-sm font-semibold text-muted-foreground">Responsável</p>
@@ -914,6 +921,10 @@ export default function PatientDetail() {
                 <div>
                   <Label className="text-sm font-semibold">Nome da Mãe</Label>
                   <Input value={editMotherName} onChange={e => setEditMotherName(e.target.value)} placeholder="Nome completo da mãe" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Nome do Pai</Label>
+                  <Input value={editFatherName} onChange={e => setEditFatherName(e.target.value)} placeholder="Nome completo do pai" className="mt-1" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>

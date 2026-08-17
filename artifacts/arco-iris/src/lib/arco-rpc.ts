@@ -449,6 +449,7 @@ export type Patient = {
   guardianName: string | null;
   guardianPhone: string | null;
   motherName: string | null;
+  fatherName: string | null;
   diagnosis: string | null;
   notes: string | null;
   professionalId: number | null;
@@ -470,6 +471,8 @@ export type Patient = {
   abrigoCasaCrianca: boolean | null;
   tipoRegistro: string | null;
   localAtendimento: string | null;
+  /** Já faz atendimento terapêutico em outro local (fora da unidade). */
+  outroAtendimento: boolean | null;
   photoUrl: string | null;
   createdAt: string;
   updatedAt: string;
@@ -489,6 +492,7 @@ type PatientRow = {
   guardian_name: string | null;
   guardian_phone: string | null;
   mother_name: string | null;
+  father_name: string | null;
   diagnosis: string | null;
   notes: string | null;
   professional_id: number | string | null;
@@ -510,6 +514,7 @@ type PatientRow = {
   abrigo_casa_crianca: boolean | null;
   tipo_registro: string | null;
   local_atendimento: string | null;
+  outro_atendimento: boolean | null;
   photo_url: string | null;
   created_at: string;
   updated_at: string;
@@ -536,6 +541,7 @@ function mapPatient(r: PatientRow): Patient {
     guardianName: r.guardian_name,
     guardianPhone: r.guardian_phone,
     motherName: r.mother_name,
+    fatherName: r.father_name,
     diagnosis: r.diagnosis,
     notes: r.notes,
     professionalId: num(r.professional_id),
@@ -557,6 +563,7 @@ function mapPatient(r: PatientRow): Patient {
     abrigoCasaCrianca: r.abrigo_casa_crianca,
     tipoRegistro: r.tipo_registro,
     localAtendimento: r.local_atendimento,
+    outroAtendimento: r.outro_atendimento,
     photoUrl: r.photo_url,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -817,8 +824,16 @@ export type WaitingListEntry = {
   scoreEspecialidadeTotal?: number | null;
   /** Bônus de idade: <4 anos = +50, 4-6 anos = +20, >6 = 0. */
   ageBonus?: number | null;
-  /** 'prioridade' (Fono/Fisio) | 'chegada' (FIFO nas demais especialidades). */
+  /** 'prioridade' (Fono/Fisio) | 'chegada' (FIFO) | 'fim_da_fila' (atende fora com pai e mãe registrados). */
   ordenacao?: string | null;
+  /** Já faz atendimento terapêutico fora da unidade. */
+  atendeFora?: boolean | null;
+  /** Pai e mãe preenchidos no cadastro. */
+  paisRegistrados?: boolean | null;
+  /** Onde faz o atendimento fora da unidade. */
+  localAtendimento?: string | null;
+  /** Atende fora + pai e mãe registrados: os demais pacientes passam na frente. */
+  despriorizado?: boolean | null;
   /** Data de nascimento do paciente (ISO). */
   dateOfBirth?: string | null;
   /** Busca ativa: paciente congelado, fora da disputa por vaga prioritária. */
