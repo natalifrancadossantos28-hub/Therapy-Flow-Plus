@@ -37,6 +37,7 @@ import {
 } from "@/lib/arco-rpc";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { worksThroughLunch } from "@/lib/schedule";
+import { buildSlotOptions, callOrder } from "@/lib/agenda-slots";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
 
@@ -147,7 +148,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     existing.add(key);
     const hasAtendimento = (scheduleRefApts.length > 0 ? scheduleRefApts : activeApts).some(a => ["atendimento", "em_atendimento", "em atendimento", "remanejado"].includes(a.status.toLowerCase()));
     const virtualStatus = hasAtendimento ? "atendimento" : "agendado";
-    virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!) } as T);
+    virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!), sourceId: (refApt as { id?: number }).id } as T);
   }
   return [...allApts, ...virtual];
 }
@@ -184,7 +185,7 @@ function applyFrequencyFilter<T extends { date: string; recurrenceGroupId?: stri
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
-type Appointment = { id: number; patientId: number; patientName?: string; patientStatus?: string | null; guardianName?: string | null; professionalName?: string | null; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; paused?: boolean; pausedAt?: string | null; pausedReason?: string | null; pausedReturnDate?: string | null; };
+type Appointment = { id: number; sourceId?: number | null; patientId: number; patientName?: string; patientStatus?: string | null; guardianName?: string | null; professionalName?: string | null; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; paused?: boolean; pausedAt?: string | null; pausedReason?: string | null; pausedReturnDate?: string | null; };
 
 type AbsenceAlert = { patientName: string; professionalName: string; professionalSpecialty: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
@@ -1117,17 +1118,25 @@ export default function AgendaProfissionais() {
 
   // Fase 5A: slots em grupo — o mesmo horario pode ter varios pacientes.
   const getApts = (date: string, time: string) =>
-    expanded.filter(a => a.date === date && a.time === time);
+    expanded
+      .filter(a => a.date === date && a.time === time)
+      .sort((a, b) => callOrder(a) - callOrder(b));
 
   // Slots vazios para o seletor do modal (remanejar/remarcar).
   // Usa a semana atualmente selecionada dentro do modal.
   const modalWeekDays = remanejFlow ? getWeekDays(remanejFlow.weekRef) : [];
   const modalWeekDates = modalWeekDays.map(d => format(d, "yyyy-MM-dd"));
   const isPaula = worksThroughLunch(selectedProf?.name);
-  const modalAvailableSlots = modalWeekDates.flatMap(date =>
-    TIME_SLOTS.filter(t => (isPaula || t !== "12:10") && getApts(date, t).length === 0)
-      .map(time => ({ date, time }))
-  );
+  // Inclui os slots ocupados: o paciente pode ser transferido direto para um grupo.
+  const modalAvailableSlots = remanejFlow
+    ? buildSlotOptions({
+        dates: modalWeekDates,
+        times: TIME_SLOTS.filter(t => isPaula || t !== "12:10"),
+        aptsAt: getApts,
+        patientId: remanejFlow.apt.patientId,
+        origin: { date: remanejFlow.apt.date, time: remanejFlow.apt.time },
+      })
+    : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
@@ -1377,7 +1386,7 @@ export default function AgendaProfissionais() {
                                           · grupo ({apts.length})
                                         </span>
                                       )}
-                                      {apts.map(apt => (() => {
+                                      {apts.map((apt, ordem) => (() => {
                                     const isMenuOpen = actionMenuId === apt.id;
                                     const s = apt.status?.toLowerCase() ?? "";
                                     const isDesmarcado    = s === "desmarcado";
@@ -1435,6 +1444,7 @@ export default function AgendaProfissionais() {
                                             <span className="flex items-center gap-1.5 min-w-0 font-bold text-foreground text-xs leading-tight" title={apt.patientName || undefined}>
                                               <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={40} />
                                               <span className="truncate">
+                                                {isGroup && <span className="text-cyan-300 font-extrabold mr-1">{ordem + 1}º</span>}
                                                 {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
                                                 {isGhost ? (
                                                   <span className="text-amber-400">⚠ Sem dados</span>
@@ -2143,8 +2153,8 @@ export default function AgendaProfissionais() {
                   )}
                   <p className="text-sm text-white/60 mb-4">
                     {remanejFlow.kind === "remarcar"
-                      ? "Navegue entre as semanas e escolha um horário livre:"
-                      : "Escolha um novo horário livre nesta semana:"}
+                      ? "Navegue entre as semanas e escolha um horário livre ou um grupo:"
+                      : "Escolha um novo horário — livre ou um grupo já existente:"}
                   </p>
                   {modalAvailableSlots.length === 0 ? (
                     <p className="text-center text-white/40 py-8">Nenhum horário disponível nesta semana.</p>
@@ -2164,10 +2174,14 @@ export default function AgendaProfissionais() {
                                 key={slot.time}
                                 onClick={() => confirmRemanejar(slot.date, slot.time)}
                                 disabled={remanejSending}
-                                style={{ ...NEON.blue, opacity: remanejSending ? 0.5 : 1 }}
+                                style={{ ...(slot.group.length > 0 ? NEON.cyan : NEON.blue), opacity: remanejSending ? 0.5 : 1 }}
                                 className="mb-1"
+                                title={slot.group.length > 0 ? `Entrar no grupo: ${slot.group.join(", ")}` : "Horário livre"}
                               >
                                 {slot.time}
+                                {slot.group.length > 0 && (
+                                  <span className="text-[9px] font-bold uppercase"> · grupo ({slot.group.length})</span>
+                                )}
                               </button>
                             ))}
                           </div>
