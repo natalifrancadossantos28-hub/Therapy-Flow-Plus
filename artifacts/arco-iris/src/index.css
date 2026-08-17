@@ -369,3 +369,27 @@
   box-shadow: 0 0 12px rgba(0, 240, 255, 0.2), inset 0 0 12px rgba(0, 240, 255, 0.05);
   border: 1px solid rgba(0, 240, 255, 0.25);
 }
+
+/* ═══════════════════════════════════════════
+   IMPRESSÃO — a casca do app usa h-screen + overflow, o que faz o navegador
+   imprimir só o que cabe na tela. Na impressão tudo vira fluxo normal para a
+   lista inteira sair no papel.
+   ═══════════════════════════════════════════ */
+@media print {
+  html, body, #root {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  #root .h-screen,
+  #root .overflow-hidden,
+  #root .overflow-y-auto,
+  #root .overflow-auto,
+  #main-content {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+}

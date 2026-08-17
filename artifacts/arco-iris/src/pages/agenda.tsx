@@ -15,7 +15,7 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
-import { DocChip, DocCopyRow } from "@/components/PatientDocs";
+import { DocCopyRow } from "@/components/PatientDocs";
 import {
   listProfessionals,
   verifyProfessionalPin,
@@ -47,6 +47,7 @@ import {
 import { buildMultiGuestAppointments } from "@/lib/multi-agenda";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { worksThroughLunch } from "@/lib/schedule";
+import { buildSlotOptions, callOrder } from "@/lib/agenda-slots";
 
 const TIME_SLOTS = [
   "07:10", "08:00", "08:50", "09:40", "10:30", "11:20",
@@ -149,7 +150,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     existing.add(key);
     const hasAtendimento = (scheduleRefApts.length > 0 ? scheduleRefApts : activeApts).some(a => ["atendimento", "em_atendimento", "em atendimento", "remanejado"].includes(a.status.toLowerCase()));
     const virtualStatus = hasAtendimento ? "atendimento" : "agendado";
-    virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!) } as T);
+    virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!), sourceId: (refApt as { id?: number }).id } as T);
   }
   return [...allApts, ...virtual];
 }
@@ -210,6 +211,8 @@ function withCiclo<T extends { frequency?: string | null; date: string }>(
 
 type Appointment = {
   id: number;
+  /** Id da linha real que originou uma ocorrência virtual (mantém a ordem de chamada). */
+  sourceId?: number | null;
   patientId: number;
   patientName?: string | null;
   patientStatus?: string | null;
@@ -1414,7 +1417,9 @@ export default function Agenda() {
 
   // Fase 5A: slots em grupo — um mesmo (date,time,profissional) pode ter varios pacientes.
   const getApts = (date: string, time: string) =>
-    expanded.filter(a => a.date === date && a.time === time);
+    expanded
+      .filter(a => a.date === date && a.time === time)
+      .sort((a, b) => callOrder(a) - callOrder(b));
   const selectedProfIdNum = selectedProfId ? parseInt(selectedProfId) : 0;
   const dayBlock = (date: string): string | null => {
     const h = holidayOn(date, feriados);
@@ -1468,11 +1473,17 @@ export default function Agenda() {
     });
   };
 
-  // Slots disponiveis para remanejar = sem qualquer paciente (vazio de verdade).
-  const availableSlots = weekDates.flatMap(date =>
-    TIME_SLOTS.filter(t => (isPaula || t !== "12:10") && getApts(date, t).length === 0)
-              .map(time => ({ date, time }))
-  );
+  // Slots para remanejar: horários livres E grupos já existentes (transferência direta).
+  const slotTimes = TIME_SLOTS.filter(t => isPaula || t !== "12:10");
+  const availableSlots = remanejFlow
+    ? buildSlotOptions({
+        dates: weekDates,
+        times: slotTimes,
+        aptsAt: getApts,
+        patientId: remanejFlow.apt.patientId,
+        origin: { date: remanejFlow.apt.date, time: remanejFlow.apt.time },
+      })
+    : [];
 
   // ── Modal week for Remarcar (navigable) ──
   const modalWeekStart = remanejFlow?.kind === "remarcar" && remanejFlow.weekRef
@@ -1481,10 +1492,13 @@ export default function Agenda() {
   const modalWeekDays = Array.from({ length: 5 }, (_, i) => addDays(modalWeekStart, i));
   const modalWeekDates = modalWeekDays.map(d => format(d, "yyyy-MM-dd"));
   const modalAvailableSlots = remanejFlow?.kind === "remarcar"
-    ? modalWeekDates.flatMap(date =>
-        TIME_SLOTS.filter(t => (isPaula || t !== "12:10") && getApts(date, t).length === 0)
-                  .map(time => ({ date, time }))
-      )
+    ? buildSlotOptions({
+        dates: modalWeekDates,
+        times: slotTimes,
+        aptsAt: getApts,
+        patientId: remanejFlow.apt.patientId,
+        origin: { date: remanejFlow.apt.date, time: remanejFlow.apt.time },
+      })
     : availableSlots;
 
   return (
@@ -1657,7 +1671,7 @@ export default function Agenda() {
                                       · grupo ({apts.length})
                                     </span>
                                   )}
-                                  {apts.map(apt => {
+                                  {apts.map((apt, ordem) => {
                                     const isDesmarcado = apt.status?.toLowerCase() === "desmarcado";
                                     const isAtendimento = apt.status?.toLowerCase() === "atendimento" || apt.status?.toLowerCase() === "presente";
                                     const isRemarcado = apt.status?.toLowerCase() === "remarcado";
@@ -1720,6 +1734,7 @@ export default function Agenda() {
                                     <div className="flex items-center gap-1.5 min-w-0">
                                       <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={40} />
                                       <span className="font-bold text-foreground truncate text-xs leading-tight" title={apt.patientName || undefined}>
+                                        {isGroup && <span className="text-cyan-300 font-extrabold mr-1">{ordem + 1}º</span>}
                                         {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
                                         {isGhost ? (
                                           <span className="text-amber-400">⚠ Sem dados</span>
@@ -1755,12 +1770,6 @@ export default function Agenda() {
                                       <span className="text-[9px] text-muted-foreground/50">
                                         {apt.frequency === "quinzenal" ? "↺ quinzenal" : apt.frequency === "mensal" ? "↺ mensal" : "↺ semanal"}
                                       </span>
-                                    )}
-                                    {!isGhost && (docsById.get(apt.patientId)?.cpf || docsById.get(apt.patientId)?.cns) && (
-                                      <div className="flex flex-col gap-0.5 min-w-0">
-                                        <DocChip label="CPF" value={docsById.get(apt.patientId)?.cpf} />
-                                        <DocChip label="CNS" value={docsById.get(apt.patientId)?.cns} />
-                                      </div>
                                     )}
                                     {/* Psicologia Parental: show guardian/mother name */}
                                     {apt.guardianName && selectedProf?.specialty?.toLowerCase().includes("parental") && (
@@ -2511,8 +2520,8 @@ export default function Agenda() {
 
               <p className="text-sm text-white/60 mb-4">
                 {remanejFlow.kind === "remarcar"
-                  ? "Navegue entre as semanas e escolha um horário livre:"
-                  : "Escolha um novo horário disponível nesta semana:"}
+                  ? "Navegue entre as semanas e escolha um horário livre ou um grupo:"
+                  : "Escolha um novo horário — livre ou um grupo já existente:"}
               </p>
 
               {modalAvailableSlots.length === 0 ? (
@@ -2532,10 +2541,14 @@ export default function Agenda() {
                           <button
                             key={slot.time}
                             onClick={() => handlePickRemanejSlot(slot.date, slot.time)}
-                            style={NEON.blue}
+                            style={slot.group.length > 0 ? NEON.cyan : NEON.blue}
                             className="mb-1"
+                            title={slot.group.length > 0 ? `Entrar no grupo: ${slot.group.join(", ")}` : "Horário livre"}
                           >
                             {slot.time}
+                            {slot.group.length > 0 && (
+                              <span className="text-[9px] font-bold uppercase"> · grupo ({slot.group.length})</span>
+                            )}
                           </button>
                         ))}
                       </div>

@@ -19,6 +19,7 @@ import {
   type PatientPdfData,
   type PatientAbsencesInfo,
 } from "@/lib/arco-rpc";
+import { AREA_MAX_UI, areaToDb, areaToUi } from "@/lib/score-scale";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
@@ -297,18 +298,20 @@ export default function PatientDetail() {
   };
 
   const p = patient;
+  // Soma no domínio do banco (0-360), a partir das notas digitadas em 0-30.
   const totalScore = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri]
-    .reduce((acc, v) => acc + (parseInt(v) || 0), 0);
+    .reduce((acc, v) => acc + areaToDb(parseInt(v) || 0), 0);
 
   const openTriagemEdit = () => {
-    setSPsicologia(p?.scorePsicologia != null ? String(p.scorePsicologia) : "");
-    setSPsicomotricidade(p?.scorePsicomotricidade != null ? String(p.scorePsicomotricidade) : "");
-    setSFisioterapia(p?.scoreFisioterapia != null ? String(p.scoreFisioterapia) : "");
-    setSPsicopedagogia(p?.scorePsicopedagogia != null ? String(p.scorePsicopedagogia) : "");
-    setSEdFisica(p?.scoreEdFisica != null ? String(p.scoreEdFisica) : "");
-    setSFono(p?.scoreFonoaudiologia != null ? String(p.scoreFonoaudiologia) : "");
-    setSTO(p?.scoreTO != null ? String(p.scoreTO) : "");
-    setSNutri(p?.scoreNutricionista != null ? String(p.scoreNutricionista) : "");
+    const ui = (v: number | null | undefined) => (v != null ? String(areaToUi(v)) : "");
+    setSPsicologia(ui(p?.scorePsicologia));
+    setSPsicomotricidade(ui(p?.scorePsicomotricidade));
+    setSFisioterapia(ui(p?.scoreFisioterapia));
+    setSPsicopedagogia(ui(p?.scorePsicopedagogia));
+    setSEdFisica(ui(p?.scoreEdFisica));
+    setSFono(ui(p?.scoreFonoaudiologia));
+    setSTO(ui(p?.scoreTO));
+    setSNutri(ui(p?.scoreNutricionista));
     setEscolaPublica(p?.escolaPublica ?? null);
     setTrabalhoNaRoca(p?.trabalhoNaRoca ?? null);
     setTriagemEdit(true);
@@ -345,11 +348,12 @@ export default function PatientDetail() {
   };
 
   const saveTriagem = async () => {
-    const scores = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri].map(v => parseInt(v) || 0);
-    if (scores.some(s => s < 0 || s > 45)) {
-      toast({ title: "Score inválido", description: "Cada área deve ter um valor entre 0 e 45.", variant: "destructive" });
+    const digitados = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri].map(v => parseInt(v) || 0);
+    if (digitados.some(s => s < 0 || s > AREA_MAX_UI)) {
+      toast({ title: "Score inválido", description: `Cada área deve ter um valor entre 0 e ${AREA_MAX_UI}.`, variant: "destructive" });
       return;
     }
+    const scores = digitados.map(areaToDb);
     const total = scores.reduce((a, b) => a + b, 0);
     if (!patient) return;
     setSavingTriagem(true);
@@ -631,7 +635,7 @@ export default function PatientDetail() {
                   ].map(area => (
                     <div key={area.label} className="p-2 bg-secondary/30 rounded-xl text-center">
                       <p className="text-muted-foreground font-semibold text-xs mb-1">{area.label}</p>
-                      <p className="text-lg font-bold text-foreground">{area.val ?? "—"}<span className="text-xs text-muted-foreground">/45</span></p>
+                      <p className="text-lg font-bold text-foreground">{area.val != null ? areaToUi(area.val) : "—"}<span className="text-xs text-muted-foreground">/{AREA_MAX_UI}</span></p>
                     </div>
                   ))}
                 </div>
@@ -661,7 +665,7 @@ export default function PatientDetail() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground italic">
-                Registre a triagem com as notas por área (0–45 cada) para liberar o botão <strong>"Adicionar à Fila"</strong>.
+                Registre a triagem com as notas por área (0–30 cada) para liberar o botão <strong>"Adicionar à Fila"</strong>.
               </p>
             )}
           </Card>
@@ -705,7 +709,7 @@ export default function PatientDetail() {
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <MotionCard className="w-full max-w-lg p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <h2 className="text-2xl font-bold font-display mb-1">{triagemFeita ? "Editar Triagem" : "Registrar Triagem"}</h2>
-            <p className="text-sm text-muted-foreground mb-5">Preencha a nota de cada área (0–45). O score total é exibido em escala padronizada (máx. {SCORE_MAX_DISPLAY}).</p>
+            <p className="text-sm text-muted-foreground mb-5">Preencha a nota de cada área (0–{AREA_MAX_UI}, mesma escala da Triagem). O score total é exibido em escala padronizada (máx. {SCORE_MAX_DISPLAY}).</p>
             <div className="space-y-5">
               <div>
                 <Label className="text-base font-bold mb-3 block">Perfil Multidisciplinar</Label>
@@ -721,9 +725,9 @@ export default function PatientDetail() {
                     { label: "Nutricionista", val: sNutri, set: setSNutri },
                   ] as const).map(area => (
                     <div key={area.label} className="space-y-1">
-                      <Label className="text-sm">{area.label} <span className="text-muted-foreground font-normal">(0–45)</span></Label>
+                      <Label className="text-sm">{area.label} <span className="text-muted-foreground font-normal">(0–{AREA_MAX_UI})</span></Label>
                       <Input
-                        type="number" min={0} max={45}
+                        type="number" min={0} max={AREA_MAX_UI}
                         value={area.val}
                         onChange={e => area.set(e.target.value)}
                         placeholder="0"
