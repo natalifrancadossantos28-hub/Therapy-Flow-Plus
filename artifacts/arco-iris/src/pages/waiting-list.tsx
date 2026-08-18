@@ -464,8 +464,8 @@ export default function WaitingList() {
             <strong> ordem de chegada</strong> (do mais antigo para o mais novo pela data de entrada).
           </span>
           <span className="w-full text-[11px] text-muted-foreground">
-            Quem <strong>já faz atendimento terapêutico em outro lugar</strong> e tem <strong>pai e mãe registrados</strong> vai para o
-            <strong> fim da fila</strong> — os demais pacientes passam na frente.
+            Quem <strong>já faz atendimento terapêutico em outro lugar</strong> não recebe prioridade (sem Prioridade Máxima e sem bônus de idade).
+            Quem tem <strong>pai e mãe registrados</strong> perde pontos no score, mas continua na disputa.
           </span>
         </div>
         {specialtyOptions.length > 0 && (
@@ -573,12 +573,12 @@ export default function WaitingList() {
                         <Badge className={getPriorityColor(entry.priority)}>
                           {PRIORITY_LABEL[entry.priority] ?? entry.priority}
                         </Badge>
-                        {entry.despriorizado && (
+                        {entry.atendeFora && (
                           <div
-                            title={`Já faz atendimento fora da unidade${entry.localAtendimento ? ` (${entry.localAtendimento})` : ""} e tem pai e mãe registrados: os demais pacientes passam na frente.`}
+                            title={`Já faz atendimento terapêutico fora da unidade${entry.localAtendimento ? ` (${entry.localAtendimento})` : ""}: não recebe Prioridade Máxima nem bônus de idade.`}
                             className="mt-1 text-[11px] font-bold text-amber-500"
                           >
-                            ↓ atende fora · pai e mãe registrados
+                            ⚠ atende fora · sem prioridade
                           </div>
                         )}
                         {entry.ordenacao === "chegada" && (
@@ -596,6 +596,14 @@ export default function WaitingList() {
                             <div className="flex items-baseline gap-1 font-mono">
                               <span className="font-bold text-foreground">{areaToUi(entry.scoreEspecialidade)}</span>
                               <span className="text-xs text-muted-foreground">/{AREA_MAX_UI}</span>
+                              {!!entry.penalidadePais && entry.penalidadePais > 0 && (
+                                <span
+                                  title="Pai e mãe registrados no cadastro: penalidade no score de ordenação (não vai para o fim da fila)"
+                                  className="ml-2 text-xs font-semibold text-rose-400"
+                                >
+                                  −{entry.penalidadePais} pai e mãe
+                                </span>
+                              )}
                               {!!entry.scoreSocialDesempate && entry.scoreSocialDesempate > 0 && (
                                 <span
                                   title="Pontos de vulnerabilidade somados como desempate (+1 Escola Publica / +1 Trabalho na Roca)"
