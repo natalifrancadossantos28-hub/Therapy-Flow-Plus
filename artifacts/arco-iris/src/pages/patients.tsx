@@ -635,6 +635,11 @@ export default function Patients() {
                 <div className="col-span-2">
                   <Label>Nome do Pai</Label>
                   <Input value={formData.fatherName} onChange={e => setFormData({ ...formData, fatherName: e.target.value })} placeholder="Nome completo do pai" />
+                  {formData.motherName.trim() !== "" && formData.fatherName.trim() !== "" && (
+                    <p className="text-xs text-amber-600 mt-1 font-semibold">
+                      Pai e mãe registrados: a fila de espera aplica uma penalidade no score (o paciente continua na disputa).
+                    </p>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <Label>Endereço</Label>
@@ -686,10 +691,9 @@ export default function Patients() {
                     <option value="">Selecione...</option>
                     {["CAPS", "Reabilitação", "Particular", "Sem Atendimento"].map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
-                  {formData.localAtendimento !== "" && formData.localAtendimento !== "Sem Atendimento"
-                    && formData.motherName.trim() !== "" && formData.fatherName.trim() !== "" && (
+                  {formData.localAtendimento !== "" && formData.localAtendimento !== "Sem Atendimento" && (
                     <p className="text-xs text-amber-600 mt-1 font-semibold">
-                      Já atende fora e tem pai e mãe registrados: na fila de espera os demais pacientes passam na frente.
+                      Já atende em outro lugar: na fila de espera não recebe prioridade (sem Prioridade Máxima e sem bônus de idade).
                     </p>
                   )}
                 </div>

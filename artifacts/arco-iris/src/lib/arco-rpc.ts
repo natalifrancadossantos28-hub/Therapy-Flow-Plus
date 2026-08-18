@@ -824,16 +824,16 @@ export type WaitingListEntry = {
   scoreEspecialidadeTotal?: number | null;
   /** Bônus de idade: <4 anos = +50, 4-6 anos = +20, >6 = 0. */
   ageBonus?: number | null;
-  /** 'prioridade' (Fono/Fisio) | 'chegada' (FIFO) | 'fim_da_fila' (atende fora com pai e mãe registrados). */
+  /** 'prioridade' (Fono/Fisio) | 'chegada' (FIFO nas demais especialidades). */
   ordenacao?: string | null;
-  /** Já faz atendimento terapêutico fora da unidade. */
+  /** Já faz atendimento terapêutico fora da unidade: sem Prioridade Máxima e sem bônus de idade. */
   atendeFora?: boolean | null;
-  /** Pai e mãe preenchidos no cadastro. */
+  /** Pai e mãe preenchidos no cadastro: penalidade no score. */
   paisRegistrados?: boolean | null;
+  /** Pontos descontados do score por pai e mãe registrados. */
+  penalidadePais?: number | null;
   /** Onde faz o atendimento fora da unidade. */
   localAtendimento?: string | null;
-  /** Atende fora + pai e mãe registrados: os demais pacientes passam na frente. */
-  despriorizado?: boolean | null;
   /** Data de nascimento do paciente (ISO). */
   dateOfBirth?: string | null;
   /** Busca ativa: paciente congelado, fora da disputa por vaga prioritária. */
