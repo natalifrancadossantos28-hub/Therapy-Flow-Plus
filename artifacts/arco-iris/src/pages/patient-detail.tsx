@@ -688,6 +688,9 @@ export default function PatientDetail() {
                 <h3 className={cn("font-bold font-display text-lg", hasWarning && "text-rose-900 dark:text-rose-400")}>Faltas</h3>
                 <p className={cn("text-sm", hasWarning ? "text-rose-700 font-semibold" : "text-muted-foreground")}>
                   {patient.absenceCount} registradas
+                  {typeof absenceInfo?.justificadas === "number" && absenceInfo.justificadas > 0 && (
+                    <span className="text-muted-foreground font-normal"> · {absenceInfo.justificadas} justificada(s)</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -696,12 +699,39 @@ export default function PatientDetail() {
                 ⚠️ Alerta: Limite de faltas excedido. Considere repassar as regras da clínica.
               </div>
             )}
+            {!!absenceInfo?.porEspecialidade?.length && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {absenceInfo.porEspecialidade.map(g => (
+                  <span
+                    key={g.specialty}
+                    title={g.professionals?.length ? `Profissional(is): ${g.professionals.join(", ")}` : undefined}
+                    className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary border border-border"
+                  >
+                    {g.total} {g.total === 1 ? "falta" : "faltas"} em {g.specialty}
+                    {g.justificadas > 0 && (
+                      <span className="font-normal text-muted-foreground"> ({g.justificadas} just.)</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="space-y-3">
               {absenceInfo?.absences?.length ? (
-                absenceInfo.absences.map((abs: any, i: number) => (
-                  <div key={i} className="flex justify-between text-sm p-2 border-b border-border/50 last:border-0">
-                    <span className="font-medium text-foreground">{formatDate(abs.date)}</span>
-                    <span className="text-muted-foreground">{abs.time}</span>
+                absenceInfo.absences.map(abs => (
+                  <div key={abs.id} className="text-sm p-2 border-b border-border/50 last:border-0">
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="font-medium text-foreground">{formatDate(abs.date)}</span>
+                      <span className="text-muted-foreground">{abs.time}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2 mt-0.5">
+                      <span className="text-xs font-semibold text-foreground">{abs.specialty}</span>
+                      <span className="text-xs text-muted-foreground truncate">{abs.professionalName}</span>
+                    </div>
+                    {abs.justificada && (
+                      <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-500">
+                        falta justificada
+                      </span>
+                    )}
                   </div>
                 ))
               ) : (
