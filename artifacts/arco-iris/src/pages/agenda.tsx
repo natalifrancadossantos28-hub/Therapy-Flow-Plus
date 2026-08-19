@@ -59,6 +59,10 @@ function getWeekDays(ref: Date): Date[] {
 }
 
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
+// Status do PACIENTE que escondem o agendamento da grade. "Alta" ficou de fora:
+// ela vale por especialidade, então quem teve alta numa área continua com
+// horário válido nas outras.
+const PATIENT_HIDDEN_STATUSES = ["desistência", "desistencia", "óbito", "obito"];
 const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
 
 /** Abbreviate long names keeping first + second name: "Isis Godinho Lima" → "Isis Godinho L." */
@@ -533,7 +537,7 @@ export default function Agenda() {
         withCiclo(
           // Oculta pacientes com status terminal (Alta/Óbito/Desistência):
           // mesmo com agendamento, não devem aparecer na agenda (evita "fantasmas").
-          list.filter(a => !TERMINAL_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))
+          list.filter(a => !PATIENT_HIDDEN_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))
         ) as Appointment[]
       ))
       .catch((err) => {

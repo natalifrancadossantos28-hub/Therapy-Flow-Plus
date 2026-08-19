@@ -669,8 +669,9 @@ export default function Reception() {
     const opts = profIdFilter ? { professionalId: parseInt(profIdFilter) } : undefined;
     return listAppointmentsToday(opts)
       .then((data) => {
-        // Oculta pacientes com status terminal (Alta/Óbito/Desistência) da recepção.
-        const TERMINAL = ["alta", "óbito", "obito", "desistência", "desistencia"];
+        // Oculta pacientes encerrados por completo. "Alta" vale por especialidade,
+        // então quem tem horário hoje em outra área continua aparecendo.
+        const TERMINAL = ["óbito", "obito", "desistência", "desistencia"];
         // Oculta atendimentos em feriado ou quando o profissional está ausente (férias/folga/falta).
         setAppointments(data.filter(a =>
           !TERMINAL.includes((a.patientStatus ?? "").toLowerCase()) &&
