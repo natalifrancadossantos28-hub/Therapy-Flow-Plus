@@ -240,7 +240,9 @@ export default function BookingModal({
   const directMatches = useMemo(() => {
     if (!allowDirect || mode !== "direto") return [];
     const term = searchTerm.trim().toLowerCase();
-    const active = patients.filter(p => !["Alta", "Óbito", "Desistência"].includes(p.status ?? ""));
+    // "Alta" é por especialidade: quem teve alta em uma área continua liberado
+    // para as outras. Só Óbito/Desistência encerram o paciente inteiro.
+    const active = patients.filter(p => !["Óbito", "Desistência"].includes(p.status ?? ""));
     if (!term) return active.slice(0, 30);
     return active.filter(p =>
       (p.name ?? "").toLowerCase().includes(term) ||

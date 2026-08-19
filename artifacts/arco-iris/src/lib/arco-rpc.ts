@@ -1462,6 +1462,68 @@ export async function deleteAppointmentAlta(
   return data as { ok: true; deletedCount: number };
 }
 
+// ── Alta por especialidade ───────────────────────────────────────────────────
+
+export type SpecialtyDischargeResult = {
+  ok: true;
+  patientId: number;
+  specialty: string | null;
+  tipo: string;
+  /** Status global do paciente depois da saída. */
+  statusGlobal: string;
+  /** true quando a alta encerrou o paciente inteiro (nenhuma área ativa). */
+  altaGlobalAplicada: boolean;
+  especialidadesAtivas: string[];
+};
+
+export type PatientDischarge = {
+  id: number;
+  specialty: string;
+  professionalId: number | null;
+  professionalName: string | null;
+  tipo: string;
+  reason: string | null;
+  dischargedAt: string;
+};
+
+/**
+ * Registra a saída (Alta/Óbito/Desistência) em UMA especialidade.
+ * O status global só vira "Alta" quando não sobra nenhuma área ativa.
+ */
+export async function dischargePatientSpecialty(payload: {
+  patientId: number;
+  specialty: string | null;
+  professionalId?: number | null;
+  tipo?: string;
+  reason?: string | null;
+}): Promise<SpecialtyDischargeResult> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("discharge_patient_specialty", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: payload.patientId,
+    p_specialty: payload.specialty,
+    p_professional_id: payload.professionalId ?? null,
+    p_tipo: payload.tipo ?? "Alta",
+    p_reason: payload.reason ?? null,
+  });
+  if (error) throw error;
+  return data as SpecialtyDischargeResult;
+}
+
+export async function listPatientDischarges(id: number): Promise<PatientDischarge[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_patient_discharges", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+  return (data ?? []) as PatientDischarge[];
+}
+
 export async function deleteAppointment(id: number): Promise<void> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();

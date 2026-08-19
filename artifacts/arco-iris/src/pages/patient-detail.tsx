@@ -15,9 +15,11 @@ import {
   addPatientToFila,
   listAppointments,
   updateAppointment,
+  listPatientDischarges,
   type Patient,
   type PatientPdfData,
   type PatientAbsencesInfo,
+  type PatientDischarge,
 } from "@/lib/arco-rpc";
 import { AREA_MAX_UI, areaToDb, areaToUi } from "@/lib/score-scale";
 
@@ -78,6 +80,7 @@ export default function PatientDetail() {
   // Equipe de Atendimento
   type TeamMember = { professionalId: number; professionalName: string; specialty: string; status: "Ativo" | "Alta" };
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [discharges, setDischarges] = useState<PatientDischarge[]>([]);
 
   const [triagemEdit, setTriagemEdit] = useState(false);
   const [sPsicologia, setSPsicologia] = useState("");
@@ -231,15 +234,17 @@ export default function PatientDetail() {
     setIsLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const [p, pdf, abs, allApts] = await Promise.all([
+      const [p, pdf, abs, allApts, alts] = await Promise.all([
         getPatient(patientId),
         getPatientPdf(patientId).catch(() => null),
         getPatientAbsences(patientId).catch(() => null),
         listAppointments({ patientId }).catch(() => [] as any[]),
+        listPatientDischarges(patientId).catch(() => [] as PatientDischarge[]),
       ]);
       setPatient(p);
       setPdfData(pdf);
       setAbsenceInfo(abs);
+      setDischarges(alts);
       // Derive team from appointments
       const profMap = new Map<number, { name: string; hasActive: boolean }>();
       for (const apt of allApts) {
@@ -283,7 +288,7 @@ export default function PatientDetail() {
   };
 
   const handleDischarge = async () => {
-    if (!confirm("Tem certeza que deseja dar alta para este paciente? O status mudará e a vaga será liberada.")) return;
+    if (!confirm("Encerrar o atendimento deste paciente em TODAS as especialidades? Para dar alta de apenas uma área, use \"Dar Alta\" no card do agendamento na agenda daquele profissional.")) return;
     setDeleting(true);
     try {
       await deletePatient(patientId);
@@ -378,9 +383,9 @@ export default function PatientDetail() {
       setPatient(updated);
       setTriagemEdit(false);
       const scoreMsg = `Score total: ${toScoreDisplay(total, escolaPublica, trabalhoNaRoca)}/${SCORE_MAX_DISPLAY} (bônus vuln.: +${vulnBonus(escolaPublica, trabalhoNaRoca)}).`;
+      // Alta é por especialidade: não impede entrar na fila de outra área.
       const podeEntrarNaFila = updated.status !== "Fila de Espera"
         && updated.status !== "Atendimento"
-        && updated.status !== "Alta"
         && updated.tipoRegistro !== "Registro Censo Municipal";
       if (podeEntrarNaFila) {
         const { added, skipped } = await enqueueScoredSpecialties(updated, false);
@@ -442,7 +447,10 @@ export default function PatientDetail() {
   // Prontuário antigo (< 500) pode ser adicionado à fila mesmo sem triagem
   const prtNum = parseInt(patient.prontuario ?? "", 10);
   const isProntuarioAntigo = !isNaN(prtNum) && prtNum < 500;
-  const podeAdicionarFila = (triagemFeita || isProntuarioAntigo) && !naFila && !emAtendimento && patient.status !== "Alta" && !isCensoMunicipal;
+  // Alta é por especialidade — quem teve alta em uma área continua podendo
+  // entrar na fila de outra. Óbito/Desistência encerram o paciente inteiro.
+  const encerrado = patient.status === "Óbito" || patient.status === "Desistência";
+  const podeAdicionarFila = (triagemFeita || isProntuarioAntigo) && !naFila && !emAtendimento && !encerrado && !isCensoMunicipal;
 
   return (
     <div className="space-y-8">
@@ -500,7 +508,7 @@ export default function PatientDetail() {
             </Button>
           )}
           <Button variant="destructive" onClick={handleDischarge} disabled={deleting || patient.status === "Alta"} className="gap-2">
-            <UserMinus className="w-4 h-4" /> Dar Alta
+            <UserMinus className="w-4 h-4" /> Alta Geral (todas as áreas)
           </Button>
         </div>
       </div>
@@ -569,11 +577,30 @@ export default function PatientDetail() {
             )}
 
             {/* Equipe de Atendimento */}
-            {team.length > 0 && (
+            {(team.length > 0 || discharges.length > 0) && (
               <div className="mt-10">
                 <h2 className="text-xl font-bold font-display mb-6 border-b border-border pb-4 flex items-center gap-2">
                   <Users className="w-5 h-5 text-primary" /> Equipe de Atendimento
                 </h2>
+                {discharges.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                      Altas por especialidade — o paciente segue liberado nas demais áreas
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {discharges.map(d => (
+                        <span
+                          key={d.id}
+                          title={[d.professionalName, d.reason].filter(Boolean).join(" · ") || undefined}
+                          className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary border border-border"
+                        >
+                          {d.tipo} em {d.specialty}
+                          <span className="font-normal text-muted-foreground"> · {formatDate(d.dischargedAt.slice(0, 10))}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   {team.map(m => (
                     <div key={m.professionalId} className={cn("flex items-center justify-between p-3 rounded-xl border transition-colors", m.status === "Ativo" ? "border-emerald-400/40 bg-emerald-50/5" : "border-border/50 bg-secondary/20 opacity-70")}>
