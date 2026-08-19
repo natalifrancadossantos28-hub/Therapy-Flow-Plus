@@ -62,7 +62,9 @@ type Ocupacao = {
 };
 
 const POLL_MS = 30_000; // 30 s
-const TERMINAL_PT_STATUSES = new Set(["alta", "obito", "óbito", "desistencia", "desistência"]);
+// Alta é por especialidade: o paciente continua contando enquanto tiver
+// atendimento ativo em outra área.
+const ENCERRADO_PT_STATUSES = new Set(["obito", "óbito", "desistencia", "desistência"]);
 
 export default function Dashboard() {
   useDocumentTitle("Dashboard");
@@ -314,7 +316,7 @@ export default function Dashboard() {
   const weeklyReport = useMemo(() => {
     const byProf = new Map<number, { name: string; total: number; multi: number }>();
     for (const a of weekAppointments) {
-      if (TERMINAL_PT_STATUSES.has((a.patientStatus || "").toLowerCase())) continue;
+      if (ENCERRADO_PT_STATUSES.has((a.patientStatus || "").toLowerCase())) continue;
       const entry = byProf.get(a.professionalId) || { name: a.professionalName, total: 0, multi: 0 };
       entry.total++;
       const notes = (a.notes || "").toLowerCase();

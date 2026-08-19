@@ -54,6 +54,10 @@ function getWeekDays(ref: Date): Date[] {
 }
 
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
+// Status do PACIENTE que escondem o agendamento da grade. "Alta" ficou de fora:
+// ela vale por especialidade, então quem teve alta numa área continua com
+// horário válido nas outras.
+const PATIENT_HIDDEN_STATUSES = ["desistência", "desistencia", "óbito", "obito"];
 const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
 
 /** Abbreviate long names keeping first + second name: "Isis Godinho Lima" → "Isis Godinho L." */
@@ -354,7 +358,7 @@ export default function AgendaProfissionais() {
     loadedRangeRef.current = { from: dateFrom, to: dateTo };
     listAppointments({ professionalId: parseInt(selectedProfId), dateFrom, dateTo })
       // Oculta pacientes com status terminal (Alta/Óbito/Desistência) da agenda.
-      .then((list) => setAppointments(list.filter(a => !TERMINAL_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))))
+      .then((list) => setAppointments(list.filter(a => !PATIENT_HIDDEN_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))))
       .catch((err) => {
         console.error("fetchAppointments error:", err);
         toast({ title: "Erro ao carregar agenda", description: err?.message || String(err), variant: "destructive" });
