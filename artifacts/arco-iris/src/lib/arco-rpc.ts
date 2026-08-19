@@ -725,12 +725,37 @@ export async function addPatientToFila(
   return data as AddToFilaResult;
 }
 
+export type PatientAbsence = {
+  id: number;
+  date: string;
+  time: string;
+  status: string;
+  justificada: boolean;
+  specialty: string;
+  professionalId: number | null;
+  professionalName: string;
+};
+
+export type PatientAbsenceBySpecialty = {
+  specialty: string;
+  total: number;
+  naoJustificadas: number;
+  justificadas: number;
+  professionals: string[] | null;
+};
+
 export type PatientAbsencesInfo = {
   patientId: number;
   patientName: string;
   absenceCount: number;
   hasWarning: boolean;
-  absences: unknown[];
+  /** Total de registros de falta (justificadas + não justificadas). */
+  totalRegistros?: number;
+  naoJustificadas?: number;
+  justificadas?: number;
+  /** Resumo por especialidade: onde as faltas estão acontecendo. */
+  porEspecialidade?: PatientAbsenceBySpecialty[];
+  absences: PatientAbsence[];
 };
 
 export async function getPatientAbsences(id: number): Promise<PatientAbsencesInfo> {
