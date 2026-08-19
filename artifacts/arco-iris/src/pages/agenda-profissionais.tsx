@@ -17,6 +17,7 @@ import {
   listAppointments,
   updateAppointment,
   deleteAppointmentAlta,
+  dischargePatientSpecialty,
   deleteRecurrenceForward,
   createNotificacao,
   markNotificacoesLidoByAppointment,
@@ -655,44 +656,33 @@ export default function AgendaProfissionais() {
       const todayStr = todayBR();
       const profSpecialty = selectedProf?.specialty ?? null;
 
-      // Check if patient still has active appointments with OTHER professionals
+      // A saída é registrada por especialidade: o status global só vira "Alta"
+      // quando o paciente não tem mais nenhuma outra área ativa.
       let hasOtherActive = false;
       try {
-        const allFuture = await listAppointments({ patientId: altaConfirm.patientId, dateFrom: todayStr });
-        hasOtherActive = allFuture.some(a =>
-          a.professionalId !== altaConfirm.professionalId &&
-          (a.status === "agendado" || a.status === "atendimento" || a.status === "em_atendimento")
-        );
-      } catch { hasOtherActive = true; }
+        const res = await dischargePatientSpecialty({
+          patientId: altaConfirm.patientId,
+          specialty: profSpecialty,
+          professionalId: altaConfirm.professionalId,
+          tipo: label,
+          reason: altaMotivo.trim(),
+        });
+        hasOtherActive = !res.altaGlobalAplicada;
+      } catch {
+        toast({ title: "Aviso", description: "Não foi possível registrar a alta desta especialidade no prontuário.", variant: "destructive" });
+        hasOtherActive = true;
+      }
 
-      // Persistência: salva motivo; só altera status global se não houver outros atendimentos
+      // Histórico no prontuário (o status é responsabilidade da RPC acima).
       try {
         const existing = await getPatient(altaConfirm.patientId);
         const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
-        const updatePayload: Record<string, unknown> = {
+        await upsertPatient(altaConfirm.patientId, {
           notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")} — ${profSpecialty ?? "Geral"}] Motivo: ${altaMotivo.trim()}`,
-        };
-        if (!hasOtherActive) {
-          updatePayload.status = label;
-        }
-        await upsertPatient(altaConfirm.patientId, updatePayload);
+        });
       } catch {
         toast({ title: "Aviso", description: "Motivo registrado na notificação, mas houve falha ao gravar no prontuário.", variant: "destructive" });
       }
-
-      // Remover apenas da fila da especialidade deste profissional (não de todas).
-      // Comparação case-insensitive/trim para não deixar a entrada presa por diferença de formatação.
-      try {
-        const specNorm = (profSpecialty || "").trim().toLowerCase();
-        const filaAtual = await listWaitingList();
-        const entradas = filaAtual.filter(e =>
-          e.patientId === altaConfirm.patientId &&
-          (!specNorm || !(e.specialty || "").trim() || (e.specialty || "").trim().toLowerCase() === specNorm)
-        );
-        for (const entry of entradas) {
-          await deleteWaitingListEntry(entry.id);
-        }
-      } catch { /* silencioso — fila pode estar vazia */ }
 
       // Cascata: remove TODOS os agendamentos futuros do paciente com este profissional
       // (não só o grupo de recorrência clicado) — evita "fantasmas" na agenda após a alta.
