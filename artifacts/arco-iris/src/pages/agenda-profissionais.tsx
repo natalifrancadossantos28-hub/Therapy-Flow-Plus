@@ -1325,7 +1325,9 @@ export default function AgendaProfissionais() {
             {/* Weekly grid */}
             <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+                {/* min-w: no celular as 5 colunas ficariam com ~55px e os cards
+                    se sobrepunham; abaixo disso a grade rola na horizontal. */}
+                <table className="w-full min-w-[820px] text-sm" style={{ tableLayout: "fixed" }}>
                   <thead className="bg-muted/60 border-b border-border">
                     <tr>
                       <th className="px-2 py-2 sticky left-0 bg-muted/80 backdrop-blur z-10 border-r border-border text-left text-sm text-primary uppercase font-bold" style={{ width: "60px" }}>Horário</th>
@@ -1452,7 +1454,7 @@ export default function AgendaProfissionais() {
                                               <Lock className="w-3 h-3 shrink-0" style={{ color: "#22d3ee", filter: "drop-shadow(0 0 4px rgba(6,182,212,0.7))" }} />
                                             )}
                                           </div>
-                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
+                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
                                           {(apt.paused || (apt.status || "").toLowerCase() === "pausado") && (
                                             <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
                                               <Snowflake className="w-2.5 h-2.5" /> Pausado

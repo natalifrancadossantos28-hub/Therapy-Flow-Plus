@@ -1573,7 +1573,9 @@ export default function Agenda() {
             </div>
           )}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left" style={{ tableLayout: "fixed" }}>
+            {/* min-w: no celular as 5 colunas ficariam com ~55px e os cards se
+                sobrepunham; abaixo desta largura a grade rola na horizontal. */}
+            <table className="w-full min-w-[820px] text-sm text-left" style={{ tableLayout: "fixed" }}>
               <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
                 <tr>
                   <th className="px-2 py-2 sticky left-0 bg-secondary/90 backdrop-blur z-10 border-r border-border" style={{ width: "60px" }}>Horário</th>
@@ -1673,7 +1675,7 @@ export default function Agenda() {
                                         )}
                                       </span>
                                     </div>
-                                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>
+                                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apt.status))}>
                                       {getStatusLabel(apt.status)}
                                     </span>
                                     {apt.paused && (
