@@ -1154,17 +1154,30 @@ export async function listAppointments(opts?: {
 }): Promise<AppointmentListItem[]> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
-  const { data, error } = await supabase.rpc("list_appointments", {
-    p_slug: slug,
-    p_password: password,
-    p_date: opts?.date ?? null,
-    p_date_from: opts?.dateFrom ?? null,
-    p_date_to: opts?.dateTo ?? null,
-    p_professional_id: opts?.professionalId ?? null,
-    p_patient_id: opts?.patientId ?? null,
-  });
-  if (error) throw error;
-  const rows = (data ?? []) as AppointmentListRow[];
+  // O PostgREST devolve no máximo 1000 linhas por requisição: períodos longos
+  // (Visão Mensal, Dashboard) vinham cortados no meio do mês. A RPC ordena por
+  // date/time/id, então dá para paginar com range até esvaziar.
+  const PAGE = 1000;
+  const MAX_PAGES = 60;
+  const rows: AppointmentListRow[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * PAGE;
+    const { data, error } = await supabase
+      .rpc("list_appointments", {
+        p_slug: slug,
+        p_password: password,
+        p_date: opts?.date ?? null,
+        p_date_from: opts?.dateFrom ?? null,
+        p_date_to: opts?.dateTo ?? null,
+        p_professional_id: opts?.professionalId ?? null,
+        p_patient_id: opts?.patientId ?? null,
+      })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const chunk = (data ?? []) as AppointmentListRow[];
+    rows.push(...chunk);
+    if (chunk.length < PAGE) break;
+  }
   return rows.map(mapAppointmentListItem);
 }
 
