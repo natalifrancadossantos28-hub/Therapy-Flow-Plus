@@ -22,6 +22,7 @@ import {
   type PatientDischarge,
 } from "@/lib/arco-rpc";
 import { AREA_MAX_UI, areaToDb, areaToUi } from "@/lib/score-scale";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
@@ -259,12 +260,15 @@ export default function PatientDetail() {
       const { listProfessionals } = await import("@/lib/arco-rpc");
       const profs = await listProfessionals().catch(() => []);
       const profSpecMap = new Map(profs.map((pr: any) => [pr.id, pr.specialty || "—"]));
-      const teamArr: TeamMember[] = Array.from(profMap.entries()).map(([id, info]) => ({
-        professionalId: id,
-        professionalName: info.name,
-        specialty: (profSpecMap.get(id) as string) || "—",
-        status: info.hasActive ? "Ativo" : "Alta",
-      }));
+      // Motorista não faz parte da equipe clínica — o transporte é apoio administrativo.
+      const teamArr: TeamMember[] = Array.from(profMap.entries())
+        .filter(([id]) => !isTransportSpecialty(profSpecMap.get(id) as string | null))
+        .map(([id, info]) => ({
+          professionalId: id,
+          professionalName: info.name,
+          specialty: (profSpecMap.get(id) as string) || "—",
+          status: info.hasActive ? "Ativo" : "Alta",
+        }));
       teamArr.sort((a, b) => (a.status === "Ativo" ? 0 : 1) - (b.status === "Ativo" ? 0 : 1) || a.specialty.localeCompare(b.specialty));
       setTeam(teamArr);
     } catch (err: any) {

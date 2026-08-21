@@ -24,13 +24,14 @@ import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
   UserPlus, PhoneOff, FileCheck, Bell, MessageSquare, Copy,
-  BellRing, Undo2,
+  BellRing, Undo2, Bus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import NotificationBell from "@/components/NotificationBell";
 import { PatientAvatar } from "@/components/PatientAvatar";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 type Appointment = {
   id: number;
@@ -402,10 +403,11 @@ function AbsenceBellModal({
 }
 
 function AppointmentRow({
-  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, photoUrl,
+  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, photoUrl, drivers,
 }: {
   apt: Appointment;
   photoUrl?: string | null;
+  drivers: string[];
   index: number;
   atestado: Atestado | null;
   onStatusChange: (id: number, status: string) => Promise<number>;
@@ -467,6 +469,11 @@ function AppointmentRow({
             <p className="text-sm text-muted-foreground">
               {apt.professionalName} • {apt.professionalSpecialty}
             </p>
+            {drivers.length > 0 && (
+              <p className="text-xs font-bold mt-0.5 flex items-center gap-1 text-blue-400">
+                <Bus className="w-3.5 h-3.5" /> Transporte: {drivers.join(", ")}
+              </p>
+            )}
             {(() => {
               const s = apt.status?.toLowerCase() ?? "";
               if (s !== "desmarcado" && s !== "remanejado" && s !== "remarcado") return null;
@@ -639,6 +646,7 @@ export default function Reception() {
   useDocumentTitle("Recepção");
   const [profIdFilter, setProfIdFilter] = useState<string>("");
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
+  const [transportByPatient, setTransportByPatient] = useState<Map<number, string[]>>(new Map());
   const [appointments, setAppointments] = useState<AppointmentToday[]>([]);
   const [prontuarioMap, setProntuarioMap] = useState<Map<number, string>>(new Map());
   const [photoMap, setPhotoMap] = useState<Map<number, string | null>>(new Map());
@@ -666,16 +674,33 @@ export default function Reception() {
   }, []);
 
   const reloadAppointments = useCallback(() => {
-    const opts = profIdFilter ? { professionalId: parseInt(profIdFilter) } : undefined;
-    return listAppointmentsToday(opts)
+    // Busca o dia inteiro e filtra aqui: o aviso de transporte precisa dos
+    // motoristas mesmo quando a tela está filtrada por um profissional.
+    const filterId = profIdFilter ? parseInt(profIdFilter) : null;
+    return listAppointmentsToday()
       .then((data) => {
         // Oculta pacientes encerrados por completo. "Alta" vale por especialidade,
         // então quem tem horário hoje em outra área continua aparecendo.
         const TERMINAL = ["óbito", "obito", "desistência", "desistencia"];
         // Oculta atendimentos em feriado ou quando o profissional está ausente (férias/folga/falta).
-        setAppointments(data.filter(a =>
+        const visible = data.filter(a =>
           !TERMINAL.includes((a.patientStatus ?? "").toLowerCase()) &&
           !isBlocked(a.date, a.professionalId, feriadosRef.current, ausenciasRef.current)
+        );
+        // Transporte não é atendimento: sai da lista e vira aviso no card do paciente.
+        const transport = new Map<number, string[]>();
+        for (const a of visible) {
+          if (!isTransportSpecialty(a.professionalSpecialty)) continue;
+          const st = (a.status ?? "").toLowerCase();
+          if (st === "desmarcado" || st === "cancelado") continue;
+          const names = transport.get(a.patientId) ?? [];
+          if (!names.includes(a.professionalName)) names.push(a.professionalName);
+          transport.set(a.patientId, names);
+        }
+        setTransportByPatient(transport);
+        setAppointments(visible.filter(a =>
+          !isTransportSpecialty(a.professionalSpecialty) &&
+          (filterId === null || a.professionalId === filterId)
         ));
         setIsLoading(false);
         reloadAbsences();
@@ -1281,7 +1306,7 @@ export default function Reception() {
             <span className="text-sm font-semibold text-muted-foreground">Filtrar:</span>
             <Select className="w-48" value={profIdFilter} onChange={(e) => setProfIdFilter(e.target.value)}>
               <option value="">Todos os Profissionais</option>
-              {professionals?.map((p) => (
+              {professionals?.filter((p) => !isTransportSpecialty(p.specialty)).map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </Select>
@@ -1322,6 +1347,7 @@ export default function Reception() {
                 specialtyAbsences={specialtyAbsences}
                 onFirstApptMsg={setFirstApptMsgApt}
                 onAbsenceBell={(a, count) => setAbsenceBellData({ apt: a, absenceCount: count })}
+                drivers={transportByPatient.get(apt.patientId) ?? []}
               />
             );})
           )}

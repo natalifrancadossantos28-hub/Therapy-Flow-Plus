@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/lib/print-agenda";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play, Bus } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,7 @@ import {
   type Feriado,
   type Ausencia,
 } from "@/lib/arco-rpc";
+import { fetchTransportMap, transportDrivers, type TransportMap } from "@/lib/transporte";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { worksThroughLunch } from "@/lib/schedule";
 import { buildSlotOptions, callOrder } from "@/lib/agenda-slots";
@@ -217,7 +218,7 @@ const NEON: Record<string, React.CSSProperties> = {
 
 const SPECIALTIES = [
   "Psicologia", "Psicologia Parental", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
-  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
+  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física", "Motorista",
 ];
 
 export default function AgendaProfissionais() {
@@ -366,6 +367,17 @@ export default function AgendaProfissionais() {
   };
 
   useEffect(() => { if (pinVerified) fetchAppointments(); }, [selectedProfId, pinVerified]);
+
+  // Transporte: motorista que busca a criança aparece no card (só leitura).
+  const [transportMap, setTransportMap] = useState<TransportMap>(new Map());
+  useEffect(() => {
+    const from = weekDates[0];
+    const to = weekDates[weekDates.length - 1];
+    if (!pinVerified || !from || !to) return;
+    fetchTransportMap(professionals, from, to)
+      .then(setTransportMap)
+      .catch(() => setTransportMap(new Map()));
+  }, [professionals, pinVerified, weekDates[0]]);
 
   // Re-fetch when navigating outside the loaded date window
   useEffect(() => {
@@ -1465,6 +1477,11 @@ export default function AgendaProfissionais() {
                                               <Users className="w-2.5 h-2.5 shrink-0" /> Multi: {selectedProf?.name} {selectedProf?.specialty ? `(${selectedProf.specialty})` : ""} & {multiPartner} {multiPartnerSpec ? `(${multiPartnerSpec})` : ""}
                                             </span>
                                           )}
+                                          {transportDrivers(transportMap, apt.patientId, apt.date).map(driver => (
+                                            <span key={driver} className="text-[9px] text-blue-300 font-semibold flex items-center gap-0.5 flex-wrap">
+                                              <Bus className="w-2.5 h-2.5 shrink-0" /> Transporte: {driver}
+                                            </span>
+                                          ))}
                                           {isDesmarcado && (
                                             <span className="text-[9px] text-orange-400 font-semibold">⚠ só esta data</span>
                                           )}

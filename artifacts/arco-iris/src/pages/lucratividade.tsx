@@ -4,6 +4,7 @@ import {
   listAppointments,
   type Professional as ArcoProfessional,
 } from "@/lib/arco-rpc";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
 import { TrendingUp, DollarSign, Users, AlertTriangle, ChevronDown, Sparkles, Target, BarChart3, LayoutList, Search } from "lucide-react";
 import { Card, Button } from "@/components/ui-custom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,7 +50,10 @@ export default function Lucratividade() {
   const { dateFrom, dateTo, label: mesLabel } = getCurrentMonthRange();
 
   useEffect(() => {
-    listProfessionals().then(setProfessionals).catch(console.error);
+    // Motorista não entra no cálculo de lucratividade clínica.
+    listProfessionals()
+      .then((list) => setProfessionals(list.filter((p) => !isTransportSpecialty(p.specialty))))
+      .catch(console.error);
   }, []);
 
   useEffect(() => {

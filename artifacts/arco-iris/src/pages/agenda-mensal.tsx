@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, Button } from "@/components/ui-custom";
 import { cn } from "@/lib/utils";
 import { specialtyTone, specialtyShortLabel, specialtyKey } from "@/lib/specialty-colors";
+import { listDrivers } from "@/lib/transporte";
 
 // Visão mensal do Admin: mostra todos os atendimentos de todos os profissionais
 // num grid de mês inteiro. Reflete em tempo real qualquer mudança feita no
@@ -49,9 +50,21 @@ export default function AgendaMensal() {
   const [monthRef, setMonthRef] = useState<Date>(() => new Date());
   const [profFilter, setProfFilter] = useState<string>(""); // "" = todos
   const [professionals, setProfessionals] = useState<Professional[]>([]);
-  const [appointments, setAppointments] = useState<AppointmentListItem[]>([]);
+  const [appointmentsRaw, setAppointments] = useState<AppointmentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  // Transporte só aparece (e só conta) quando o mês está filtrado pelo próprio
+  // motorista — é a agenda administrativa dele, não atendimento clínico.
+  const driverIds = useMemo(
+    () => new Set(listDrivers(professionals).map((p) => p.id)),
+    [professionals],
+  );
+  const viewingDriver = profFilter !== "" && driverIds.has(parseInt(profFilter));
+  const appointments = useMemo(
+    () => (viewingDriver ? appointmentsRaw : appointmentsRaw.filter((a) => !driverIds.has(a.professionalId))),
+    [appointmentsRaw, driverIds, viewingDriver],
+  );
 
   // Grid: do início da semana do dia 1 até o fim da semana do último dia.
   const monthStart = startOfMonth(monthRef);
