@@ -15,11 +15,14 @@ import {
   addPatientToFila,
   listAppointments,
   updateAppointment,
+  listPatientDischarges,
   type Patient,
   type PatientPdfData,
   type PatientAbsencesInfo,
+  type PatientDischarge,
 } from "@/lib/arco-rpc";
 import { AREA_MAX_UI, areaToDb, areaToUi } from "@/lib/score-scale";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
@@ -78,6 +81,7 @@ export default function PatientDetail() {
   // Equipe de Atendimento
   type TeamMember = { professionalId: number; professionalName: string; specialty: string; status: "Ativo" | "Alta" };
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [discharges, setDischarges] = useState<PatientDischarge[]>([]);
 
   const [triagemEdit, setTriagemEdit] = useState(false);
   const [sPsicologia, setSPsicologia] = useState("");
@@ -107,6 +111,7 @@ export default function PatientDetail() {
   const [editEmail, setEditEmail] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editMotherName, setEditMotherName] = useState("");
+  const [editFatherName, setEditFatherName] = useState("");
   const [editGuardianName, setEditGuardianName] = useState("");
   const [editGuardianPhone, setEditGuardianPhone] = useState("");
   const [editDiagnosis, setEditDiagnosis] = useState("");
@@ -185,6 +190,7 @@ export default function PatientDetail() {
     setEditEmail(patient.email || "");
     setEditAddress(patient.address || "");
     setEditMotherName(patient.motherName || "");
+    setEditFatherName(patient.fatherName || "");
     setEditGuardianName(patient.guardianName || "");
     setEditGuardianPhone(patient.guardianPhone || "");
     setEditDiagnosis(patient.diagnosis || "");
@@ -208,6 +214,7 @@ export default function PatientDetail() {
         email: editEmail || null,
         address: editAddress || null,
         motherName: editMotherName || null,
+        fatherName: editFatherName || null,
         guardianName: editGuardianName || null,
         guardianPhone: editGuardianPhone || null,
         diagnosis: editDiagnosis || null,
@@ -228,15 +235,17 @@ export default function PatientDetail() {
     setIsLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const [p, pdf, abs, allApts] = await Promise.all([
+      const [p, pdf, abs, allApts, alts] = await Promise.all([
         getPatient(patientId),
         getPatientPdf(patientId).catch(() => null),
         getPatientAbsences(patientId).catch(() => null),
         listAppointments({ patientId }).catch(() => [] as any[]),
+        listPatientDischarges(patientId).catch(() => [] as PatientDischarge[]),
       ]);
       setPatient(p);
       setPdfData(pdf);
       setAbsenceInfo(abs);
+      setDischarges(alts);
       // Derive team from appointments
       const profMap = new Map<number, { name: string; hasActive: boolean }>();
       for (const apt of allApts) {
@@ -251,12 +260,15 @@ export default function PatientDetail() {
       const { listProfessionals } = await import("@/lib/arco-rpc");
       const profs = await listProfessionals().catch(() => []);
       const profSpecMap = new Map(profs.map((pr: any) => [pr.id, pr.specialty || "—"]));
-      const teamArr: TeamMember[] = Array.from(profMap.entries()).map(([id, info]) => ({
-        professionalId: id,
-        professionalName: info.name,
-        specialty: (profSpecMap.get(id) as string) || "—",
-        status: info.hasActive ? "Ativo" : "Alta",
-      }));
+      // Motorista não faz parte da equipe clínica — o transporte é apoio administrativo.
+      const teamArr: TeamMember[] = Array.from(profMap.entries())
+        .filter(([id]) => !isTransportSpecialty(profSpecMap.get(id) as string | null))
+        .map(([id, info]) => ({
+          professionalId: id,
+          professionalName: info.name,
+          specialty: (profSpecMap.get(id) as string) || "—",
+          status: info.hasActive ? "Ativo" : "Alta",
+        }));
       teamArr.sort((a, b) => (a.status === "Ativo" ? 0 : 1) - (b.status === "Ativo" ? 0 : 1) || a.specialty.localeCompare(b.specialty));
       setTeam(teamArr);
     } catch (err: any) {
@@ -280,7 +292,7 @@ export default function PatientDetail() {
   };
 
   const handleDischarge = async () => {
-    if (!confirm("Tem certeza que deseja dar alta para este paciente? O status mudará e a vaga será liberada.")) return;
+    if (!confirm("Encerrar o atendimento deste paciente em TODAS as especialidades? Para dar alta de apenas uma área, use \"Dar Alta\" no card do agendamento na agenda daquele profissional.")) return;
     setDeleting(true);
     try {
       await deletePatient(patientId);
@@ -375,9 +387,9 @@ export default function PatientDetail() {
       setPatient(updated);
       setTriagemEdit(false);
       const scoreMsg = `Score total: ${toScoreDisplay(total, escolaPublica, trabalhoNaRoca)}/${SCORE_MAX_DISPLAY} (bônus vuln.: +${vulnBonus(escolaPublica, trabalhoNaRoca)}).`;
+      // Alta é por especialidade: não impede entrar na fila de outra área.
       const podeEntrarNaFila = updated.status !== "Fila de Espera"
         && updated.status !== "Atendimento"
-        && updated.status !== "Alta"
         && updated.tipoRegistro !== "Registro Censo Municipal";
       if (podeEntrarNaFila) {
         const { added, skipped } = await enqueueScoredSpecialties(updated, false);
@@ -439,7 +451,10 @@ export default function PatientDetail() {
   // Prontuário antigo (< 500) pode ser adicionado à fila mesmo sem triagem
   const prtNum = parseInt(patient.prontuario ?? "", 10);
   const isProntuarioAntigo = !isNaN(prtNum) && prtNum < 500;
-  const podeAdicionarFila = (triagemFeita || isProntuarioAntigo) && !naFila && !emAtendimento && patient.status !== "Alta" && !isCensoMunicipal;
+  // Alta é por especialidade — quem teve alta em uma área continua podendo
+  // entrar na fila de outra. Óbito/Desistência encerram o paciente inteiro.
+  const encerrado = patient.status === "Óbito" || patient.status === "Desistência";
+  const podeAdicionarFila = (triagemFeita || isProntuarioAntigo) && !naFila && !emAtendimento && !encerrado && !isCensoMunicipal;
 
   return (
     <div className="space-y-8">
@@ -497,7 +512,7 @@ export default function PatientDetail() {
             </Button>
           )}
           <Button variant="destructive" onClick={handleDischarge} disabled={deleting || patient.status === "Alta"} className="gap-2">
-            <UserMinus className="w-4 h-4" /> Dar Alta
+            <UserMinus className="w-4 h-4" /> Alta Geral (todas as áreas)
           </Button>
         </div>
       </div>
@@ -530,9 +545,13 @@ export default function PatientDetail() {
                 <p className="text-sm font-semibold text-muted-foreground">Email</p>
                 <p className="text-lg">{patient.email || "-"}</p>
               </div>
-              <div className="md:col-span-2">
+              <div>
                 <p className="text-sm font-semibold text-muted-foreground">Nome da Mãe</p>
                 <p className="text-lg">{patient.motherName || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Nome do Pai</p>
+                <p className="text-lg">{patient.fatherName || "-"}</p>
               </div>
               <div className="md:col-span-2">
                 <p className="text-sm font-semibold text-muted-foreground">Responsável</p>
@@ -562,11 +581,30 @@ export default function PatientDetail() {
             )}
 
             {/* Equipe de Atendimento */}
-            {team.length > 0 && (
+            {(team.length > 0 || discharges.length > 0) && (
               <div className="mt-10">
                 <h2 className="text-xl font-bold font-display mb-6 border-b border-border pb-4 flex items-center gap-2">
                   <Users className="w-5 h-5 text-primary" /> Equipe de Atendimento
                 </h2>
+                {discharges.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                      Altas por especialidade — o paciente segue liberado nas demais áreas
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {discharges.map(d => (
+                        <span
+                          key={d.id}
+                          title={[d.professionalName, d.reason].filter(Boolean).join(" · ") || undefined}
+                          className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary border border-border"
+                        >
+                          {d.tipo} em {d.specialty}
+                          <span className="font-normal text-muted-foreground"> · {formatDate(d.dischargedAt.slice(0, 10))}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   {team.map(m => (
                     <div key={m.professionalId} className={cn("flex items-center justify-between p-3 rounded-xl border transition-colors", m.status === "Ativo" ? "border-emerald-400/40 bg-emerald-50/5" : "border-border/50 bg-secondary/20 opacity-70")}>
@@ -681,6 +719,9 @@ export default function PatientDetail() {
                 <h3 className={cn("font-bold font-display text-lg", hasWarning && "text-rose-900 dark:text-rose-400")}>Faltas</h3>
                 <p className={cn("text-sm", hasWarning ? "text-rose-700 font-semibold" : "text-muted-foreground")}>
                   {patient.absenceCount} registradas
+                  {typeof absenceInfo?.justificadas === "number" && absenceInfo.justificadas > 0 && (
+                    <span className="text-muted-foreground font-normal"> · {absenceInfo.justificadas} justificada(s)</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -689,12 +730,39 @@ export default function PatientDetail() {
                 ⚠️ Alerta: Limite de faltas excedido. Considere repassar as regras da clínica.
               </div>
             )}
+            {!!absenceInfo?.porEspecialidade?.length && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {absenceInfo.porEspecialidade.map(g => (
+                  <span
+                    key={g.specialty}
+                    title={g.professionals?.length ? `Profissional(is): ${g.professionals.join(", ")}` : undefined}
+                    className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary border border-border"
+                  >
+                    {g.total} {g.total === 1 ? "falta" : "faltas"} em {g.specialty}
+                    {g.justificadas > 0 && (
+                      <span className="font-normal text-muted-foreground"> ({g.justificadas} just.)</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="space-y-3">
               {absenceInfo?.absences?.length ? (
-                absenceInfo.absences.map((abs: any, i: number) => (
-                  <div key={i} className="flex justify-between text-sm p-2 border-b border-border/50 last:border-0">
-                    <span className="font-medium text-foreground">{formatDate(abs.date)}</span>
-                    <span className="text-muted-foreground">{abs.time}</span>
+                absenceInfo.absences.map(abs => (
+                  <div key={abs.id} className="text-sm p-2 border-b border-border/50 last:border-0">
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="font-medium text-foreground">{formatDate(abs.date)}</span>
+                      <span className="text-muted-foreground">{abs.time}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2 mt-0.5">
+                      <span className="text-xs font-semibold text-foreground">{abs.specialty}</span>
+                      <span className="text-xs text-muted-foreground truncate">{abs.professionalName}</span>
+                    </div>
+                    {abs.justificada && (
+                      <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-500">
+                        falta justificada
+                      </span>
+                    )}
                   </div>
                 ))
               ) : (
@@ -914,6 +982,10 @@ export default function PatientDetail() {
                 <div>
                   <Label className="text-sm font-semibold">Nome da Mãe</Label>
                   <Input value={editMotherName} onChange={e => setEditMotherName(e.target.value)} placeholder="Nome completo da mãe" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Nome do Pai</Label>
+                  <Input value={editFatherName} onChange={e => setEditFatherName(e.target.value)} placeholder="Nome completo do pai" className="mt-1" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>

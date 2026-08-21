@@ -122,6 +122,15 @@ const PALETTE: SpecialtyTone[] = [
     border: "rgba(217,70,239,0.55)",
     glow: "rgba(217,70,239,0.4)",
   },
+  // Motorista (transporte, apoio administrativo) → azul aço
+  {
+    key: "motorista",
+    fg: "#93c5fd",
+    fgLight: "#1d4ed8",
+    bg: "rgba(59,130,246,0.16)",
+    border: "rgba(59,130,246,0.55)",
+    glow: "rgba(59,130,246,0.4)",
+  },
 ];
 
 const TONE_BY_KEY: Record<string, SpecialtyTone> = Object.fromEntries(
@@ -150,6 +159,16 @@ export const SPECIALTIES = [
 
 export type SpecialtyOfficial = typeof SPECIALTIES[number];
 
+/**
+ * Funções de apoio (não clínicas). Entram no cadastro de profissionais e na
+ * agenda, mas ficam fora da fila, da triagem e de qualquer contagem de
+ * produtividade/atendimento.
+ */
+export const SUPPORT_SPECIALTIES = ["Motorista"] as const;
+
+/** Opções do dropdown de especialidade no cadastro de profissionais. */
+export const PROFESSIONAL_SPECIALTIES = [...SPECIALTIES, ...SUPPORT_SPECIALTIES];
+
 function normalize(raw: string | null | undefined): string {
   return (raw ?? "")
     .toString()
@@ -177,7 +196,16 @@ export function specialtyKey(specialty: string | null | undefined): string {
   if (s.includes("fisio")) return "fisio";
   if (s.includes("ed fisica") || s.includes("educacao fisica") || /(^|\s)ef(\s|$)/.test(s)) return "edfisica";
   if (s.includes("nutri")) return "nutricao";
+  if (s.includes("motorista") || s.includes("transporte")) return "motorista";
   return "default";
+}
+
+/**
+ * Transporte (motorista) é registro administrativo: aparece na agenda e no card
+ * do paciente, mas nunca conta como atendimento clínico.
+ */
+export function isTransportSpecialty(specialty: string | null | undefined): boolean {
+  return specialtyKey(specialty) === "motorista";
 }
 
 function isLightTheme(): boolean {
@@ -205,6 +233,7 @@ export function specialtyShortLabel(specialty: string | null | undefined): strin
     case "psicomotricidade":   return "Psicomotr.";
     case "edfisica":           return "Ed. Física";
     case "nutricao":           return "Nutrição";
+    case "motorista":          return "Motorista";
     default:                   return (specialty ?? "—").trim() || "—";
   }
 }

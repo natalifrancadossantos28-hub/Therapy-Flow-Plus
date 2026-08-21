@@ -88,6 +88,7 @@ export default function Patients() {
     phone: "",
     dateOfBirth: "",
     motherName: "",
+    fatherName: "",
     guardianName: "",
     guardianPhone: "",
     address: "",
@@ -191,7 +192,7 @@ export default function Patients() {
     setProntuarioAlerta(null);
     setFormData({
       name: "", prontuario: next, cpf: "", cns: "", phone: "", dateOfBirth: "",
-      motherName: "", guardianName: "", guardianPhone: "", address: "", diagnosis: "",
+      motherName: "", fatherName: "", guardianName: "", guardianPhone: "", address: "", diagnosis: "",
       entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
       tipoRegistro: "Paciente da Unidade", localAtendimento: "", photoUrl: null,
     });
@@ -203,7 +204,7 @@ export default function Patients() {
     setProntuarioAlerta(null);
     setFormData({
       name: "", prontuario: "", cpf: "", cns: "", phone: "", dateOfBirth: "",
-      motherName: "", guardianName: "", guardianPhone: "", address: "", diagnosis: "",
+      motherName: "", fatherName: "", guardianName: "", guardianPhone: "", address: "", diagnosis: "",
       entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
       tipoRegistro: "Paciente da Unidade", localAtendimento: "", photoUrl: null,
     });
@@ -632,6 +633,15 @@ export default function Patients() {
                   <Input value={formData.motherName} onChange={e => setFormData({ ...formData, motherName: e.target.value })} placeholder="Nome completo da mãe" />
                 </div>
                 <div className="col-span-2">
+                  <Label>Nome do Pai</Label>
+                  <Input value={formData.fatherName} onChange={e => setFormData({ ...formData, fatherName: e.target.value })} placeholder="Nome completo do pai" />
+                  {formData.motherName.trim() !== "" && formData.fatherName.trim() !== "" && (
+                    <p className="text-xs text-amber-600 mt-1 font-semibold">
+                      Pai e mãe registrados: a fila de espera aplica uma penalidade no score (o paciente continua na disputa).
+                    </p>
+                  )}
+                </div>
+                <div className="col-span-2">
                   <Label>Endereço</Label>
                   <Input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder="Rua, nº, bairro, cidade" />
                 </div>
@@ -681,6 +691,11 @@ export default function Patients() {
                     <option value="">Selecione...</option>
                     {["CAPS", "Reabilitação", "Particular", "Sem Atendimento"].map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
+                  {formData.localAtendimento !== "" && formData.localAtendimento !== "Sem Atendimento" && (
+                    <p className="text-xs text-amber-600 mt-1 font-semibold">
+                      Já atende em outro lugar: na fila de espera não recebe prioridade (sem Prioridade Máxima e sem bônus de idade).
+                    </p>
+                  )}
                 </div>
 
                 <div className="col-span-2">

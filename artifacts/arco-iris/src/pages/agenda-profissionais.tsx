@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/lib/print-agenda";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play, Bus } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ import {
   listAppointments,
   updateAppointment,
   deleteAppointmentAlta,
+  dischargePatientSpecialty,
   deleteRecurrenceForward,
   createNotificacao,
   markNotificacoesLidoByAppointment,
@@ -38,6 +39,7 @@ import {
   type Ausencia,
 } from "@/lib/arco-rpc";
 import { buildMultiGuestAppointments } from "@/lib/multi-agenda";
+import { fetchTransportMap, transportDrivers, type TransportMap } from "@/lib/transporte";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { worksThroughLunch } from "@/lib/schedule";
 import { buildSlotOptions, callOrder } from "@/lib/agenda-slots";
@@ -56,6 +58,10 @@ function getWeekDays(ref: Date): Date[] {
 }
 
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
+// Status do PACIENTE que escondem o agendamento da grade. "Alta" ficou de fora:
+// ela vale por especialidade, então quem teve alta numa área continua com
+// horário válido nas outras.
+const PATIENT_HIDDEN_STATUSES = ["desistência", "desistencia", "óbito", "obito"];
 const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
 
 /** Abbreviate long names keeping first + second name: "Isis Godinho Lima" → "Isis Godinho L." */
@@ -215,7 +221,7 @@ const NEON: Record<string, React.CSSProperties> = {
 
 const SPECIALTIES = [
   "Psicologia", "Psicologia Parental", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
-  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
+  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física", "Motorista",
 ];
 
 export default function AgendaProfissionais() {
@@ -370,7 +376,7 @@ export default function AgendaProfissionais() {
     fetchMultiPartners(dateFrom, dateTo);
     listAppointments({ professionalId: parseInt(selectedProfId), dateFrom, dateTo })
       // Oculta pacientes com status terminal (Alta/Óbito/Desistência) da agenda.
-      .then((list) => setAppointments(list.filter(a => !TERMINAL_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))))
+      .then((list) => setAppointments(list.filter(a => !PATIENT_HIDDEN_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))))
       .catch((err) => {
         console.error("fetchAppointments error:", err);
         toast({ title: "Erro ao carregar agenda", description: err?.message || String(err), variant: "destructive" });
@@ -386,6 +392,17 @@ export default function AgendaProfissionais() {
     if (!pinVerified || !selectedProfId || !professionals.length || !range) return;
     fetchMultiPartners(range.from, range.to);
   }, [professionals, selectedProfId, pinVerified]);
+
+  // Transporte: motorista que busca a criança aparece no card (só leitura).
+  const [transportMap, setTransportMap] = useState<TransportMap>(new Map());
+  useEffect(() => {
+    const from = weekDates[0];
+    const to = weekDates[weekDates.length - 1];
+    if (!pinVerified || !from || !to) return;
+    fetchTransportMap(professionals, from, to)
+      .then(setTransportMap)
+      .catch(() => setTransportMap(new Map()));
+  }, [professionals, pinVerified, weekDates[0]]);
 
   // Re-fetch when navigating outside the loaded date window
   useEffect(() => {
@@ -684,44 +701,33 @@ export default function AgendaProfissionais() {
       const todayStr = todayBR();
       const profSpecialty = selectedProf?.specialty ?? null;
 
-      // Check if patient still has active appointments with OTHER professionals
+      // A saída é registrada por especialidade: o status global só vira "Alta"
+      // quando o paciente não tem mais nenhuma outra área ativa.
       let hasOtherActive = false;
       try {
-        const allFuture = await listAppointments({ patientId: altaConfirm.patientId, dateFrom: todayStr });
-        hasOtherActive = allFuture.some(a =>
-          a.professionalId !== altaConfirm.professionalId &&
-          (a.status === "agendado" || a.status === "atendimento" || a.status === "em_atendimento")
-        );
-      } catch { hasOtherActive = true; }
+        const res = await dischargePatientSpecialty({
+          patientId: altaConfirm.patientId,
+          specialty: profSpecialty,
+          professionalId: altaConfirm.professionalId,
+          tipo: label,
+          reason: altaMotivo.trim(),
+        });
+        hasOtherActive = !res.altaGlobalAplicada;
+      } catch {
+        toast({ title: "Aviso", description: "Não foi possível registrar a alta desta especialidade no prontuário.", variant: "destructive" });
+        hasOtherActive = true;
+      }
 
-      // Persistência: salva motivo; só altera status global se não houver outros atendimentos
+      // Histórico no prontuário (o status é responsabilidade da RPC acima).
       try {
         const existing = await getPatient(altaConfirm.patientId);
         const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
-        const updatePayload: Record<string, unknown> = {
+        await upsertPatient(altaConfirm.patientId, {
           notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")} — ${profSpecialty ?? "Geral"}] Motivo: ${altaMotivo.trim()}`,
-        };
-        if (!hasOtherActive) {
-          updatePayload.status = label;
-        }
-        await upsertPatient(altaConfirm.patientId, updatePayload);
+        });
       } catch {
         toast({ title: "Aviso", description: "Motivo registrado na notificação, mas houve falha ao gravar no prontuário.", variant: "destructive" });
       }
-
-      // Remover apenas da fila da especialidade deste profissional (não de todas).
-      // Comparação case-insensitive/trim para não deixar a entrada presa por diferença de formatação.
-      try {
-        const specNorm = (profSpecialty || "").trim().toLowerCase();
-        const filaAtual = await listWaitingList();
-        const entradas = filaAtual.filter(e =>
-          e.patientId === altaConfirm.patientId &&
-          (!specNorm || !(e.specialty || "").trim() || (e.specialty || "").trim().toLowerCase() === specNorm)
-        );
-        for (const entry of entradas) {
-          await deleteWaitingListEntry(entry.id);
-        }
-      } catch { /* silencioso — fila pode estar vazia */ }
 
       // Cascata: remove TODOS os agendamentos futuros do paciente com este profissional
       // (não só o grupo de recorrência clicado) — evita "fantasmas" na agenda após a alta.
@@ -1392,7 +1398,9 @@ export default function AgendaProfissionais() {
             {/* Weekly grid */}
             <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+                {/* min-w: no celular as 5 colunas ficariam com ~55px e os cards
+                    se sobrepunham; abaixo disso a grade rola na horizontal. */}
+                <table className="w-full min-w-[820px] text-sm" style={{ tableLayout: "fixed" }}>
                   <thead className="bg-muted/60 border-b border-border">
                     <tr>
                       <th className="px-2 py-2 sticky left-0 bg-muted/80 backdrop-blur z-10 border-r border-border text-left text-sm text-primary uppercase font-bold" style={{ width: "60px" }}>Horário</th>
@@ -1530,7 +1538,7 @@ export default function AgendaProfissionais() {
                                               <Lock className="w-3 h-3 shrink-0" style={{ color: "#22d3ee", filter: "drop-shadow(0 0 4px rgba(6,182,212,0.7))" }} />
                                             )}
                                           </div>
-                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
+                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
                                           {(apt.paused || (apt.status || "").toLowerCase() === "pausado") && (
                                             <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
                                               <Snowflake className="w-2.5 h-2.5" /> Pausado
@@ -1542,6 +1550,11 @@ export default function AgendaProfissionais() {
                                               {isMultiGuest && <span className="text-violet-300/70">(convidado)</span>}
                                             </span>
                                           )}
+                                          {transportDrivers(transportMap, apt.patientId, apt.date).map(driver => (
+                                            <span key={driver} className="text-[9px] text-blue-300 font-semibold flex items-center gap-0.5 flex-wrap">
+                                              <Bus className="w-2.5 h-2.5 shrink-0" /> Transporte: {driver}
+                                            </span>
+                                          ))}
                                           {isDesmarcado && (
                                             <span className="text-[9px] text-orange-400 font-semibold">⚠ só esta data</span>
                                           )}
