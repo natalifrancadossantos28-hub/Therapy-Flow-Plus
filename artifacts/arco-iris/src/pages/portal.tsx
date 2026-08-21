@@ -12,6 +12,7 @@ import {
   restoreCompanyFromDevice,
 } from "@/lib/portal-session";
 import { listProfessionalsPublic, verifyProfessionalPinWithSlug } from "@/lib/arco-rpc";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 type CardKey = "reception" | "professional" | "admin";
 
@@ -66,7 +67,8 @@ export default function Portal() {
   useEffect(() => {
     if (active === "professional") {
       listProfessionalsPublic(DEFAULT_SLUG)
-        .then((list) => setProfessionals(list))
+        // Motorista é função administrativa: a agenda dele vive só na Administração.
+        .then((list) => setProfessionals(list.filter((p) => !isTransportSpecialty(p.specialty))))
         .catch((err) => {
           console.error(err);
           setError(err?.message || "Nao foi possivel carregar a lista.");

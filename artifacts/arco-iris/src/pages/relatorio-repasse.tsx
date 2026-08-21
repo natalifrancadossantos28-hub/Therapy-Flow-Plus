@@ -4,6 +4,7 @@ import {
   listAppointments,
   type Professional as ArcoProfessional,
 } from "@/lib/arco-rpc";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
 import { FileText, Printer, ChevronLeft, ChevronRight, TrendingUp, Users, DollarSign, CheckCircle2, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -52,7 +53,10 @@ export default function RelatorioRepasse() {
   const range = useMemo(() => getMonthRange(monthOffset), [monthOffset]);
 
   useEffect(() => {
-    listProfessionals().then(setProfessionals).catch(console.error);
+    // Motorista não entra em repasse: transporte não é sessão clínica.
+    listProfessionals()
+      .then((list) => setProfessionals(list.filter((p) => !isTransportSpecialty(p.specialty))))
+      .catch(console.error);
   }, []);
 
   useEffect(() => {

@@ -22,7 +22,8 @@ import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor, calcIdade, formatDate } from "@/lib/utils";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
-import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
+import { specialtyTone, specialtyShortLabel, isTransportSpecialty } from "@/lib/specialty-colors";
+import { listDrivers } from "@/lib/transporte";
 import { upcomingAwareness, dateLabel, CATEGORY_COLOR } from "@/lib/awareness-dates";
 import { printDashboardReport } from "@/lib/print-dashboard";
 import { AREA_MAX_DB, AREA_MAX_UI, areaToUi } from "@/lib/score-scale";
@@ -71,7 +72,7 @@ export default function Dashboard() {
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
-  const [todayAppointments, setTodayAppointments] = useState<AppointmentToday[]>([]);
+  const [todayAppointmentsRaw, setTodayAppointments] = useState<AppointmentToday[]>([]);
   const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
   const [aptStats, setAptStats] = useState<Stats | null>(null);
   const [ocupacao, setOcupacao] = useState<Ocupacao[]>([]);
@@ -81,18 +82,35 @@ export default function Dashboard() {
   const [dashMonth, setDashMonth] = useState<Date>(new Date());
   // Semana selecionada no card "Atendimentos da Semana" (segunda-feira)
   const [multiWeek, setMultiWeek] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const [weekAppointments, setWeekAppointments] = useState<AppointmentListItem[]>([]);
+  const [weekAppointmentsRaw, setWeekAppointments] = useState<AppointmentListItem[]>([]);
   // Atendimentos do ano corrente (01/01 → hoje) — card "por especialidade no ano".
-  const [yearAppointments, setYearAppointments] = useState<AppointmentListItem[]>([]);
-  const [monthAppointments, setMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
+  const [yearAppointmentsRaw, setYearAppointments] = useState<AppointmentListItem[]>([]);
+  const [monthAppointmentsRaw, setMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
   // Mês corrente (fixo em "hoje"), independente do navegador da Visão Mensal —
   // usado na Performance dos Profissionais (aba "Mês Atual").
-  const [currentMonthAppointments, setCurrentMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
+  const [currentMonthAppointmentsRaw, setCurrentMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
 
   // Leitura completa de agendamentos (carregada uma vez) — usada para o perfil
   // de faixa etária por profissional, que deve refletir a MESMA base da ocupação
   // (pacientes com agendamento ativo/futuro), não a atribuição bruta do cadastro.
-  const [allAppointments, setAllAppointments] = useState<AppointmentListItem[]>([]);
+  const [allAppointmentsRaw, setAllAppointments] = useState<AppointmentListItem[]>([]);
+
+  // Motorista é apoio administrativo: o transporte fica fora de toda estatística
+  // clínica (atendimentos, faltas, presença, produtividade, ocupação).
+  const driverIds = useMemo(
+    () => new Set(listDrivers(professionals ?? []).map((p) => p.id)),
+    [professionals],
+  );
+  const semMotorista = useCallback(
+    <T extends { professionalId: number }>(rows: T[]): T[] => rows.filter((a) => !driverIds.has(a.professionalId)),
+    [driverIds],
+  );
+  const todayAppointments = useMemo(() => semMotorista(todayAppointmentsRaw), [todayAppointmentsRaw, semMotorista]);
+  const weekAppointments = useMemo(() => semMotorista(weekAppointmentsRaw), [weekAppointmentsRaw, semMotorista]);
+  const yearAppointments = useMemo(() => semMotorista(yearAppointmentsRaw), [yearAppointmentsRaw, semMotorista]);
+  const monthAppointments = useMemo(() => semMotorista(monthAppointmentsRaw), [monthAppointmentsRaw, semMotorista]);
+  const currentMonthAppointments = useMemo(() => semMotorista(currentMonthAppointmentsRaw), [currentMonthAppointmentsRaw, semMotorista]);
+  const allAppointments = useMemo(() => semMotorista(allAppointmentsRaw), [allAppointmentsRaw, semMotorista]);
 
   // Faltas por profissional (não geral)
   type AbsenceByProf = { patientId: number; patientName: string; professionalName: string; specialty: string; count: number };
@@ -137,10 +155,12 @@ export default function Dashboard() {
       // Faltas POR PROFISSIONAL — só alerta quando >= 3 com o MESMO profissional
       const ABSENCE = ["ausente", "falta_nao_justificada"];
       const specMap = new Map(profs.map(p => [p.name, p.specialty || "—"]));
+      const driverSet = new Set(listDrivers(profs).map(p => p.id));
       const map = new Map<string, { patientId: number; patientName: string; professionalName: string; count: number }>();
       for (const a of pastApts) {
         const st = (a.status || "").toLowerCase();
         if (!ABSENCE.includes(st)) continue;
+        if (driverSet.has(a.professionalId)) continue;
         const k = `${a.patientId}|${a.professionalId}`;
         const entry = map.get(k) || { patientId: a.patientId, patientName: a.patientName, professionalName: a.professionalName, count: 0 };
         entry.count++;
@@ -199,7 +219,7 @@ export default function Dashboard() {
   const fetchOcupacao = useCallback(() => {
     listProfessionalsCapacity()
       .then((rows) => {
-        const mapped: Ocupacao[] = rows.map((r) => {
+        const mapped: Ocupacao[] = rows.filter((r) => !isTransportSpecialty(r.specialty)).map((r) => {
           const max = r.maxPatients || (r.cargaHoraria.startsWith("20") ? 25 : 35);
           const cur = r.currentPatients;
           const pct = max > 0 ? Math.round((cur / max) * 100) : 0;
@@ -228,7 +248,7 @@ export default function Dashboard() {
   useVisibleInterval(fetchOcupacao, POLL_MS);
 
   const totalPatients = patients?.length || 0;
-  const totalProfessionals = professionals?.length || 0;
+  const totalProfessionals = (professionals || []).filter(p => !isTransportSpecialty(p.specialty)).length;
 
   // Pacientes ATIVOS em atendimento (naquele momento): distintos com agendamento
   // ativo/futuro. Difere do total de CADASTROS (todos já cadastrados na base).
