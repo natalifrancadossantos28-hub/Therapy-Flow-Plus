@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/lib/print-agenda";
@@ -33,10 +33,20 @@ import {
   undoMultiAppointment,
   listFeriados,
   listAusencias,
+  type AppointmentListItem,
   type Feriado,
   type Ausencia,
 } from "@/lib/arco-rpc";
-import { fetchTransportMap, transportDrivers, type TransportMap } from "@/lib/transporte";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
+import {
+  activeCareDays,
+  fetchClinicalAppointments,
+  fetchTransportMap,
+  listDrivers,
+  transportDrivers,
+  transportKey,
+  type TransportMap,
+} from "@/lib/transporte";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { worksThroughLunch } from "@/lib/schedule";
 import { buildSlotOptions, callOrder } from "@/lib/agenda-slots";
@@ -378,6 +388,27 @@ export default function AgendaProfissionais() {
       .then(setTransportMap)
       .catch(() => setTransportMap(new Map()));
   }, [professionals, pinVerified, weekDates[0]]);
+
+  const driverIds = useMemo(
+    () => new Set(listDrivers(professionals).map(p => p.id)),
+    [professionals],
+  );
+  const viewingDriver = isTransportSpecialty(selectedProf?.specialty);
+
+  // Agenda do motorista: carrega os atendimentos clínicos do período para saber
+  // em quais dias o paciente ainda tem alguma sessão de pé.
+  const [clinicalApts, setClinicalApts] = useState<AppointmentListItem[]>([]);
+  useEffect(() => {
+    const to = weekDates[weekDates.length - 1];
+    if (!pinVerified || !viewingDriver || !to) {
+      setClinicalApts([]);
+      return;
+    }
+    const from = format(addDays(startOfWeek(weekRef, { weekStartsOn: 1 }), -56), "yyyy-MM-dd");
+    fetchClinicalAppointments(from, to, driverIds)
+      .then(setClinicalApts)
+      .catch(() => setClinicalApts([]));
+  }, [pinVerified, viewingDriver, weekDates[0], driverIds]);
 
   // Re-fetch when navigating outside the loaded date window
   useEffect(() => {
@@ -1110,8 +1141,21 @@ export default function AgendaProfissionais() {
   // Expande recorrência: projeta agendamentos recorrentes em semanas sem linha real no banco.
   // Depois filtra: se frequência é quinzenal/mensal, esconde "agendado" nas semanas erradas.
   // Por fim, oculta feriados e ausências do profissional (férias/folga/falta).
+  const careDays = useMemo(
+    () =>
+      activeCareDays(
+        applyFrequencyFilter(expandRecurrence(clinicalApts, weekDates), weekDates),
+        feriados,
+        ausencias,
+        driverIds,
+      ),
+    [clinicalApts, weekDates[0], feriados, ausencias, driverIds],
+  );
+
   const expanded = applyFrequencyFilter(expandRecurrence(appointments, weekDates), weekDates)
-    .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias));
+    .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias))
+    // Motorista não busca quem ficou sem nenhum atendimento no dia (férias/ausência/feriado).
+    .filter(a => !viewingDriver || careDays.has(transportKey(a.patientId, a.date)));
 
   const selectedProfIdNum = selectedProfId ? parseInt(selectedProfId) : 0;
   const dayBlock = (date: string): string | null => {
