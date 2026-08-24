@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Card, Select, Button, Label } from "@/components/ui-custom";
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
@@ -42,12 +42,21 @@ import {
   listFeriados,
   listAusencias,
   type Professional as ArcoProfessional,
+  type AppointmentListItem,
   type Feriado,
   type Ausencia,
 } from "@/lib/arco-rpc";
 import { buildMultiGuestAppointments } from "@/lib/multi-agenda";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
-import { fetchTransportMap, listDrivers, transportDrivers, type TransportMap } from "@/lib/transporte";
+import {
+  activeCareDays,
+  fetchClinicalAppointments,
+  fetchTransportMap,
+  listDrivers,
+  transportDrivers,
+  transportKey,
+  type TransportMap,
+} from "@/lib/transporte";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { worksThroughLunch } from "@/lib/schedule";
 import { buildSlotOptions, callOrder } from "@/lib/agenda-slots";
@@ -492,6 +501,7 @@ export default function Agenda() {
   const [transporteProfId, setTransporteProfId] = useState<string>("");
   const [transporteSending, setTransporteSending] = useState(false);
   const [transportMap, setTransportMap] = useState<TransportMap>(new Map());
+  const [clinicalApts, setClinicalApts] = useState<AppointmentListItem[]>([]);
 
   // Atendimento Multi
   const [multiApt, setMultiApt] = useState<Appointment | null>(null);
@@ -602,6 +612,11 @@ export default function Agenda() {
     }
   }, [weekRef, canView, selectedProfId]);
 
+  const driverIds = useMemo(
+    () => new Set(listDrivers(professionals).map(p => p.id)),
+    [professionals],
+  );
+
   // Transporte: quem vem de van aparece no card do paciente (só leitura).
   const reloadTransporte = () => {
     if (!canView) return;
@@ -616,6 +631,24 @@ export default function Agenda() {
   useEffect(() => {
     reloadTransporte();
   }, [professionals, canView, weekDates[0]]);
+
+  // Agenda do motorista: precisa saber quais pacientes ainda têm atendimento de
+  // pé no dia. Se todos os profissionais do paciente estiverem de férias/ausentes
+  // (ou for feriado), o motorista não precisa buscá-lo naquele dia.
+  useEffect(() => {
+    const prof = professionals.find(p => String(p.id) === selectedProfId);
+    if (!canView || !prof || !isTransportSpecialty(prof.specialty)) {
+      setClinicalApts([]);
+      return;
+    }
+    const to = weekDates[weekDates.length - 1];
+    if (!to) return;
+    // Janela para trás para que recorrências antigas se projetem na semana atual.
+    const from = format(addDays(startOfWeek(weekRef, { weekStartsOn: 1 }), -56), "yyyy-MM-dd");
+    fetchClinicalAppointments(from, to, driverIds)
+      .then(setClinicalApts)
+      .catch(() => setClinicalApts([]));
+  }, [professionals, selectedProfId, canView, weekDates[0], driverIds]);
 
   // Realtime: recarrega a agenda quando qualquer appointment desse profissional muda
   // (agendamento, remanejamento pelo profissional, mudança de status, etc.).
@@ -1465,8 +1498,25 @@ export default function Agenda() {
 
   // Filtra: se frequência é quinzenal/mensal, esconde "agendado" nas semanas erradas.
   // Por fim, oculta feriados e ausências do profissional (férias/folga/falta).
+  const viewingDriver = isTransportSpecialty(selectedProf?.specialty);
+
+  // Dias em que o paciente ainda tem atendimento de pé (profissional presente,
+  // sem feriado). Só usado na agenda do motorista.
+  const careDays = useMemo(
+    () =>
+      activeCareDays(
+        applyFrequencyFilter(expandRecurrence(clinicalApts, weekDates), weekDates),
+        feriados,
+        ausencias,
+        driverIds,
+      ),
+    [clinicalApts, weekDates[0], feriados, ausencias, driverIds],
+  );
+
   const expanded = applyFrequencyFilter([...ownExpanded, ...multiGuestApts], weekDates)
-    .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias));
+    .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias))
+    // Motorista não busca quem ficou sem nenhum atendimento no dia (férias/ausência/feriado).
+    .filter(a => !viewingDriver || careDays.has(transportKey(a.patientId, a.date)));
 
   // Fase 5A: slots em grupo — um mesmo (date,time,profissional) pode ter varios pacientes.
   const getApts = (date: string, time: string) =>
