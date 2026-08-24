@@ -1,4 +1,10 @@
-import { listAppointments } from "@/lib/arco-rpc";
+import {
+  listAppointments,
+  type AppointmentListItem,
+  type Ausencia,
+  type Feriado,
+} from "@/lib/arco-rpc";
+import { isBlocked } from "@/lib/blocked-dates";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 /** Forma mínima compartilhada pelas telas de agenda (algumas usam um tipo local). */
@@ -19,6 +25,48 @@ export function transportDrivers(map: TransportMap, patientId: number, date: str
 
 export function listDrivers<T extends DriverLike>(professionals: T[]): T[] {
   return professionals.filter((p) => isTransportSpecialty(p.specialty));
+}
+
+/** Agendamento clínico, na forma mínima usada para decidir se o transporte é necessário. */
+export type ClinicalLike = {
+  patientId: number;
+  professionalId: number;
+  date: string;
+  status: string;
+};
+
+/**
+ * Dias (`pacienteId|data`) em que o paciente ainda tem pelo menos um atendimento
+ * de pé: profissional presente, sem feriado e com status ativo. Nos dias fora
+ * deste conjunto o motorista não precisa buscar a criança.
+ *
+ * Deve receber os atendimentos já expandidos (recorrências projetadas), senão
+ * uma semana sem linha real no banco pareceria um dia sem atendimento.
+ */
+export function activeCareDays(
+  clinical: ClinicalLike[],
+  feriados: Feriado[],
+  ausencias: Ausencia[],
+  driverIds: Set<number>,
+): Set<string> {
+  const days = new Set<string>();
+  for (const a of clinical) {
+    if (driverIds.has(a.professionalId)) continue;
+    if (IGNORED_STATUSES.includes((a.status || "").toLowerCase())) continue;
+    if (isBlocked(a.date, a.professionalId, feriados, ausencias)) continue;
+    days.add(transportKey(a.patientId, a.date));
+  }
+  return days;
+}
+
+/** Busca os atendimentos clínicos (sem transporte) do período, de todos os profissionais. */
+export async function fetchClinicalAppointments(
+  dateFrom: string,
+  dateTo: string,
+  driverIds: Set<number>,
+): Promise<AppointmentListItem[]> {
+  const rows = await listAppointments({ dateFrom, dateTo }).catch(() => []);
+  return rows.filter((r) => !driverIds.has(r.professionalId));
 }
 
 /**
