@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
 import {
@@ -642,9 +642,18 @@ function AppointmentRow({
   );
 }
 
+/** Atendimento ainda não marcado pela recepção (segue na lista de pendentes). */
+function isPendente(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "" || s === "agendado" || s === "pausado";
+}
+
+type SituacaoFilter = "pendentes" | "concluidos" | "todos";
+
 export default function Reception() {
   useDocumentTitle("Recepção");
   const [profIdFilter, setProfIdFilter] = useState<string>("");
+  const [situacao, setSituacao] = useState<SituacaoFilter>("pendentes");
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [transportByPatient, setTransportByPatient] = useState<Map<number, string[]>>(new Map());
   const [appointments, setAppointments] = useState<AppointmentToday[]>([]);
@@ -1074,6 +1083,19 @@ export default function Reception() {
   const [dismissedMissed, setDismissedMissed] = useState<Set<number>>(new Set());
   const visibleMissed = missedAppointments.filter((a) => !dismissedMissed.has(a.id));
 
+  const pendentesCount = appointments.filter(isPendente).length;
+  const concluidosCount = appointments.length - pendentesCount;
+
+  // Marcado (presente/ausente/em atendimento) sai da lista de pendentes; em
+  // "Todos" ele desce para o fim, para a recepção não perder o próximo paciente.
+  const visibleAppointments = useMemo(() => {
+    if (situacao === "pendentes") return appointments.filter(isPendente);
+    if (situacao === "concluidos") return appointments.filter(a => !isPendente(a));
+    return [...appointments].sort(
+      (a, b) => Number(isPendente(b)) - Number(isPendente(a)),
+    );
+  }, [appointments, situacao]);
+
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
@@ -1303,6 +1325,26 @@ export default function Reception() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">
           <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
           <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center rounded-lg border border-border overflow-hidden">
+              {([
+                ["pendentes", `Pendentes (${pendentesCount})`],
+                ["concluidos", `Concluídos (${concluidosCount})`],
+                ["todos", `Todos (${appointments.length})`],
+              ] as [SituacaoFilter, string][]).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => setSituacao(value)}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-bold transition-colors",
+                    situacao === value
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-secondary",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <span className="text-sm font-semibold text-muted-foreground">Filtrar:</span>
             <Select className="w-48" value={profIdFilter} onChange={(e) => setProfIdFilter(e.target.value)}>
               <option value="">Todos os Profissionais</option>
@@ -1322,16 +1364,24 @@ export default function Reception() {
         <div className="space-y-4">
           {isLoading ? (
             <div className="text-center py-12 animate-pulse text-muted-foreground">Carregando agenda do dia...</div>
-          ) : appointments?.length === 0 ? (
+          ) : visibleAppointments.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4">
-                <CalendarClock className="w-8 h-8 text-muted-foreground" />
+                {situacao === "pendentes" && appointments.length > 0
+                  ? <CheckCircle className="w-8 h-8 text-emerald-500" />
+                  : <CalendarClock className="w-8 h-8 text-muted-foreground" />}
               </div>
-              <p className="text-lg font-bold text-foreground">Agenda Vazia</p>
-              <p className="text-muted-foreground">Nenhuma consulta encontrada para os filtros selecionados.</p>
+              <p className="text-lg font-bold text-foreground">
+                {situacao === "pendentes" && appointments.length > 0 ? "Tudo marcado!" : "Agenda Vazia"}
+              </p>
+              <p className="text-muted-foreground">
+                {situacao === "pendentes" && appointments.length > 0
+                  ? "Nenhum atendimento pendente. Veja os concluídos para revisar."
+                  : "Nenhuma consulta encontrada para os filtros selecionados."}
+              </p>
             </div>
           ) : (
-            appointments?.map((apt, i) => {
+            visibleAppointments.map((apt, i) => {
               const enriched = { ...apt, prontuario: apt.prontuario || prontuarioMap.get(apt.patientId) || null } as Appointment;
               return (
               <AppointmentRow
