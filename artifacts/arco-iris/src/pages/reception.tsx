@@ -648,7 +648,23 @@ function isPendente(apt: { status?: string | null }): boolean {
   return s === "" || s === "agendado" || s === "pausado";
 }
 
-type SituacaoFilter = "pendentes" | "concluidos" | "todos";
+/** Presente ou já em atendimento. */
+function isPresente(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "presente" || s === "atendimento";
+}
+
+function isFaltaJustificada(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "falta_justificada" || s === "justificado" || s === "abonado";
+}
+
+function isFaltaSemJustificativa(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "ausente" || s === "falta_nao_justificada";
+}
+
+type SituacaoFilter = "pendentes" | "presente" | "justificada" | "falta" | "todos";
 
 export default function Reception() {
   useDocumentTitle("Recepção");
@@ -1083,14 +1099,21 @@ export default function Reception() {
   const [dismissedMissed, setDismissedMissed] = useState<Set<number>>(new Set());
   const visibleMissed = missedAppointments.filter((a) => !dismissedMissed.has(a.id));
 
-  const pendentesCount = appointments.filter(isPendente).length;
-  const concluidosCount = appointments.length - pendentesCount;
+  const situacaoTabs: [SituacaoFilter, string, number][] = [
+    ["pendentes", "Pendentes", appointments.filter(isPendente).length],
+    ["presente", "Presente", appointments.filter(isPresente).length],
+    ["justificada", "Falta Justificada", appointments.filter(isFaltaJustificada).length],
+    ["falta", "Falta sem Justificativa", appointments.filter(isFaltaSemJustificativa).length],
+    ["todos", "Todos", appointments.length],
+  ];
 
   // Marcado (presente/ausente/em atendimento) sai da lista de pendentes; em
   // "Todos" ele desce para o fim, para a recepção não perder o próximo paciente.
   const visibleAppointments = useMemo(() => {
     if (situacao === "pendentes") return appointments.filter(isPendente);
-    if (situacao === "concluidos") return appointments.filter(a => !isPendente(a));
+    if (situacao === "presente") return appointments.filter(isPresente);
+    if (situacao === "justificada") return appointments.filter(isFaltaJustificada);
+    if (situacao === "falta") return appointments.filter(isFaltaSemJustificativa);
     return [...appointments].sort(
       (a, b) => Number(isPendente(b)) - Number(isPendente(a)),
     );
@@ -1326,11 +1349,7 @@ export default function Reception() {
           <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center rounded-lg border border-border overflow-hidden">
-              {([
-                ["pendentes", `Pendentes (${pendentesCount})`],
-                ["concluidos", `Concluídos (${concluidosCount})`],
-                ["todos", `Todos (${appointments.length})`],
-              ] as [SituacaoFilter, string][]).map(([value, label]) => (
+              {situacaoTabs.map(([value, label, count]) => (
                 <button
                   key={value}
                   onClick={() => setSituacao(value)}
@@ -1341,7 +1360,7 @@ export default function Reception() {
                       : "text-muted-foreground hover:bg-secondary",
                   )}
                 >
-                  {label}
+                  {label} ({count})
                 </button>
               ))}
             </div>
@@ -1376,7 +1395,7 @@ export default function Reception() {
               </p>
               <p className="text-muted-foreground">
                 {situacao === "pendentes" && appointments.length > 0
-                  ? "Nenhum atendimento pendente. Veja os concluídos para revisar."
+                  ? "Nenhum atendimento pendente. Use os outros filtros para revisar."
                   : "Nenhuma consulta encontrada para os filtros selecionados."}
               </p>
             </div>
