@@ -432,7 +432,8 @@ function AppointmentRow({
   const statusLower = apt.status?.toLowerCase() ?? "";
   const isFalta = statusLower === "ausente" || statusLower === "falta_nao_justificada";
   const isJustificado = statusLower === "falta_justificada" || statusLower === "justificado" || statusLower === "abonado";
-  const isPresente = statusLower === "presente" || statusLower === "atendimento";
+  const isPresente = statusLower === "presente";
+  const recepcaoStatus = statusLower === "atendimento" || statusLower === "em_atendimento" ? "agendado" : (apt.status ?? "");
 
   return (
     <MotionCard
@@ -511,7 +512,7 @@ function AppointmentRow({
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <Badge className={getStatusColor(apt.status)}>{getStatusLabel(apt.status)}</Badge>
+          <Badge className={getStatusColor(recepcaoStatus)}>{getStatusLabel(recepcaoStatus)}</Badge>
 
           <div className="flex gap-2 ml-4 pl-4 border-l border-border">
             {/* ✓ Presente */}
@@ -642,16 +643,18 @@ function AppointmentRow({
   );
 }
 
-/** Atendimento ainda não marcado pela recepção (segue na lista de pendentes). */
+/**
+ * Atendimento ainda não marcado pela recepção (segue na lista de pendentes).
+ * "atendimento" é herdado da recorrência pelo banco, então não indica presença.
+ */
 function isPendente(apt: { status?: string | null }): boolean {
   const s = (apt.status ?? "").toLowerCase();
-  return s === "" || s === "agendado" || s === "pausado";
+  return s === "" || s === "agendado" || s === "pausado" || s === "atendimento" || s === "em_atendimento";
 }
 
-/** Presente ou já em atendimento. */
+/** Presença confirmada no balcão (check-in manual da recepção). */
 function isPresente(apt: { status?: string | null }): boolean {
-  const s = (apt.status ?? "").toLowerCase();
-  return s === "presente" || s === "atendimento";
+  return (apt.status ?? "").toLowerCase() === "presente";
 }
 
 function isFaltaJustificada(apt: { status?: string | null }): boolean {
@@ -669,7 +672,7 @@ type SituacaoFilter = "pendentes" | "presente" | "justificada" | "falta" | "todo
 export default function Reception() {
   useDocumentTitle("Recepção");
   const [profIdFilter, setProfIdFilter] = useState<string>("");
-  const [situacao, setSituacao] = useState<SituacaoFilter>("pendentes");
+  const [situacao, setSituacao] = useState<SituacaoFilter>("todos");
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [transportByPatient, setTransportByPatient] = useState<Map<number, string[]>>(new Map());
   const [appointments, setAppointments] = useState<AppointmentToday[]>([]);
@@ -1001,12 +1004,12 @@ export default function Reception() {
       }
 
       const label = getStatusLabel(status);
-      const toastTitle = status === "presente" || status === "atendimento"
+      const toastTitle = status === "presente"
         ? "✅ Presente"
         : status === "falta_justificada"
         ? "📄 Falta Justificada"
         : "🔴 Ausente";
-      const aba = status === "presente" || status === "atendimento"
+      const aba = status === "presente"
         ? "Presente"
         : status === "falta_justificada"
         ? "Falta Justificada"
@@ -1357,8 +1360,8 @@ export default function Reception() {
           <div>
             <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              <strong>Presente</strong> = check-in da recepção hoje · <strong>Em Sessão</strong> = terapeuta já iniciou ·
-              {" "}<strong>Em Atendimento</strong> (cadastro) = paciente com vínculo ativo, sem indicar presença.
+              <strong>Presente</strong> só com o check-in da recepção (botão ✓). <strong>Em Atendimento</strong> (cadastro) = paciente
+              com vínculo ativo na unidade, sem indicar presença hoje.
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">

@@ -554,15 +554,6 @@ export default function AgendaProfissionais() {
     const data = await updateAppointment(realId, { status });
     setAppointments(prev => prev.map(a => {
       if (a.id === apt.id || a.id === realId) return { ...a, id: realId, status };
-      if (
-        status === "atendimento"
-        && apt.recurrenceGroupId
-        && a.recurrenceGroupId === apt.recurrenceGroupId
-        && a.date > apt.date
-        && (a.status?.toLowerCase() ?? "agendado") === "agendado"
-      ) {
-        return { ...a, status: "atendimento" };
-      }
       return a;
     }));
     return data;
