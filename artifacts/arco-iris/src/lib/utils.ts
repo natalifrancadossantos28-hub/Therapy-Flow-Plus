@@ -47,7 +47,9 @@ export const getStatusColor = (status: string) => {
 
 export const getStatusLabel = (status: string): string => {
   const s = status.toLowerCase();
-  if (s === "atendimento") return "Em Atendimento";
+  // "atendimento" é a sessão em curso; "Em Atendimento" ficou reservado para o
+  // status cadastral do paciente (vínculo ativo na unidade).
+  if (s === "atendimento") return "Em Sessão";
   if (s === "presente") return "Presente";
   if (s === "ausente" || s === "falta_nao_justificada") return "Ausente";
   if (s === "falta_justificada" || s === "justificado" || s === "abonado") return "Justificado";

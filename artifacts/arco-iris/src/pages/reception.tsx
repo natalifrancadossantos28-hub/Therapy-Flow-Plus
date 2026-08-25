@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
 import {
@@ -24,13 +24,14 @@ import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
   UserPlus, PhoneOff, FileCheck, Bell, MessageSquare, Copy,
-  BellRing, Undo2,
+  BellRing, Undo2, Bus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import NotificationBell from "@/components/NotificationBell";
 import { PatientAvatar } from "@/components/PatientAvatar";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 type Appointment = {
   id: number;
@@ -402,10 +403,11 @@ function AbsenceBellModal({
 }
 
 function AppointmentRow({
-  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, photoUrl,
+  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, photoUrl, drivers,
 }: {
   apt: Appointment;
   photoUrl?: string | null;
+  drivers: string[];
   index: number;
   atestado: Atestado | null;
   onStatusChange: (id: number, status: string) => Promise<number>;
@@ -467,6 +469,11 @@ function AppointmentRow({
             <p className="text-sm text-muted-foreground">
               {apt.professionalName} • {apt.professionalSpecialty}
             </p>
+            {drivers.length > 0 && (
+              <p className="text-xs font-bold mt-0.5 flex items-center gap-1 text-blue-400">
+                <Bus className="w-3.5 h-3.5" /> Transporte: {drivers.join(", ")}
+              </p>
+            )}
             {(() => {
               const s = apt.status?.toLowerCase() ?? "";
               if (s !== "desmarcado" && s !== "remanejado" && s !== "remarcado") return null;
@@ -635,10 +642,36 @@ function AppointmentRow({
   );
 }
 
+/** Atendimento ainda não marcado pela recepção (segue na lista de pendentes). */
+function isPendente(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "" || s === "agendado" || s === "pausado";
+}
+
+/** Presente ou já em atendimento. */
+function isPresente(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "presente" || s === "atendimento";
+}
+
+function isFaltaJustificada(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "falta_justificada" || s === "justificado" || s === "abonado";
+}
+
+function isFaltaSemJustificativa(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "ausente" || s === "falta_nao_justificada";
+}
+
+type SituacaoFilter = "pendentes" | "presente" | "justificada" | "falta" | "todos";
+
 export default function Reception() {
   useDocumentTitle("Recepção");
   const [profIdFilter, setProfIdFilter] = useState<string>("");
+  const [situacao, setSituacao] = useState<SituacaoFilter>("pendentes");
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
+  const [transportByPatient, setTransportByPatient] = useState<Map<number, string[]>>(new Map());
   const [appointments, setAppointments] = useState<AppointmentToday[]>([]);
   const [prontuarioMap, setProntuarioMap] = useState<Map<number, string>>(new Map());
   const [photoMap, setPhotoMap] = useState<Map<number, string | null>>(new Map());
@@ -666,15 +699,33 @@ export default function Reception() {
   }, []);
 
   const reloadAppointments = useCallback(() => {
-    const opts = profIdFilter ? { professionalId: parseInt(profIdFilter) } : undefined;
-    return listAppointmentsToday(opts)
+    // Busca o dia inteiro e filtra aqui: o aviso de transporte precisa dos
+    // motoristas mesmo quando a tela está filtrada por um profissional.
+    const filterId = profIdFilter ? parseInt(profIdFilter) : null;
+    return listAppointmentsToday()
       .then((data) => {
-        // Oculta pacientes com status terminal (Alta/Óbito/Desistência) da recepção.
-        const TERMINAL = ["alta", "óbito", "obito", "desistência", "desistencia"];
+        // Oculta pacientes encerrados por completo. "Alta" vale por especialidade,
+        // então quem tem horário hoje em outra área continua aparecendo.
+        const TERMINAL = ["óbito", "obito", "desistência", "desistencia"];
         // Oculta atendimentos em feriado ou quando o profissional está ausente (férias/folga/falta).
-        setAppointments(data.filter(a =>
+        const visible = data.filter(a =>
           !TERMINAL.includes((a.patientStatus ?? "").toLowerCase()) &&
           !isBlocked(a.date, a.professionalId, feriadosRef.current, ausenciasRef.current)
+        );
+        // Transporte não é atendimento: sai da lista e vira aviso no card do paciente.
+        const transport = new Map<number, string[]>();
+        for (const a of visible) {
+          if (!isTransportSpecialty(a.professionalSpecialty)) continue;
+          const st = (a.status ?? "").toLowerCase();
+          if (st === "desmarcado" || st === "cancelado") continue;
+          const names = transport.get(a.patientId) ?? [];
+          if (!names.includes(a.professionalName)) names.push(a.professionalName);
+          transport.set(a.patientId, names);
+        }
+        setTransportByPatient(transport);
+        setAppointments(visible.filter(a =>
+          !isTransportSpecialty(a.professionalSpecialty) &&
+          (filterId === null || a.professionalId === filterId)
         ));
         setIsLoading(false);
         reloadAbsences();
@@ -820,8 +871,8 @@ export default function Reception() {
   const handlePrintPDF = () => {
     const todayStr = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
     const list = [...(appointments || [])].sort((a, b) => a.time.localeCompare(b.time));
-    const morningSlots = ["07:10","08:00","08:50","09:40","10:30","11:20"];
-    const afternoonSlots = ["13:10","14:00","14:50","15:40","16:30"];
+    const baseMorning = ["07:10","08:00","08:50","09:40","10:30","11:20"];
+    const baseAfternoon = ["13:10","14:00","14:50","15:40","16:30"];
 
     const aptMap: Record<string, typeof list[0][]> = {};
     for (const a of list) {
@@ -829,12 +880,20 @@ export default function Reception() {
       aptMap[a.time].push(a);
     }
 
+    // Horários fora da grade padrão (encaixes) entram na folha, senão esses
+    // pacientes não saem na impressão.
+    const known = new Set([...baseMorning, ...baseAfternoon, "12:10"]);
+    const extras = Object.keys(aptMap).filter(t => !known.has(t));
+    const sortT = (a: string, b: string) => a.localeCompare(b);
+    const morningSlots = [...baseMorning, ...extras.filter(t => t < "12:10")].sort(sortT);
+    const afternoonSlots = [...baseAfternoon, ...extras.filter(t => t > "12:10")].sort(sortT);
+
     const w = window.open("", "_blank");
     if (!w) return;
 
     const rowHtml = (time: string, isLunch = false) => {
-      if (isLunch) return `<tr><td colspan="4" style="background:#f8fafc;color:#94a3b8;font-style:italic;padding:8px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;">🍽 12:10 — Intervalo de Almoço</td></tr>`;
       const apts = aptMap[time] || [];
+      if (isLunch && apts.length === 0) return `<tr><td colspan="4" style="background:#f8fafc;color:#94a3b8;font-style:italic;padding:8px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;">🍽 12:10 — Intervalo de Almoço</td></tr>`;
       if (apts.length === 0)
         return `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td colspan="3" style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#cbd5e1;font-style:italic;">Livre</td></tr>`;
       return apts.map(a => { const pront = a.prontuario || prontuarioMap.get(a.patientId) || ""; return `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;font-weight:600;">${pront ? `${pront} - ` : ""}${a.patientName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.professionalName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.status}</td></tr>`; }).join("");
@@ -846,13 +905,13 @@ export default function Reception() {
     table{width:100%;border-collapse:collapse;font-size:13px;}
     th{text-align:left;padding:10px 14px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
     .section{background:#fefce8;color:#92400e;font-size:11px;font-weight:700;padding:8px 14px;border-bottom:1px solid #e2e8f0;text-transform:uppercase;letter-spacing:.05em;}
-    @media print{button{display:none}}</style></head><body>
+    @media print{button{display:none}html,body{height:auto!important;overflow:visible!important;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
     <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
       <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
       <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
     </div>
     <h1>Atendimentos Terapêuticos – Hoje</h1>
-    <p class="sub">${todayStr}</p>
+    <p class="sub">${todayStr} · ${list.length} atendimento(s)</p>
     <table>
       <thead><tr><th>Horário</th><th>Paciente</th><th>Profissional</th><th>Status</th></tr></thead>
       <tbody>
@@ -909,7 +968,7 @@ export default function Reception() {
     .sub{color:#64748b;font-size:13px;margin-bottom:24px;text-transform:capitalize;}
     table{width:100%;border-collapse:collapse;font-size:13px;}
     th{text-align:left;padding:10px 12px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
-    @media print{button{display:none}}</style></head><body>
+    @media print{button{display:none}html,body{height:auto!important;overflow:visible!important;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
     <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
       <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
       <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
@@ -1039,6 +1098,26 @@ export default function Reception() {
 
   const [dismissedMissed, setDismissedMissed] = useState<Set<number>>(new Set());
   const visibleMissed = missedAppointments.filter((a) => !dismissedMissed.has(a.id));
+
+  const situacaoTabs: [SituacaoFilter, string, number][] = [
+    ["pendentes", "Pendentes", appointments.filter(isPendente).length],
+    ["presente", "Presente", appointments.filter(isPresente).length],
+    ["justificada", "Falta Justificada", appointments.filter(isFaltaJustificada).length],
+    ["falta", "Falta sem Justificativa", appointments.filter(isFaltaSemJustificativa).length],
+    ["todos", "Todos", appointments.length],
+  ];
+
+  // Marcado (presente/ausente/em atendimento) sai da lista de pendentes; em
+  // "Todos" ele desce para o fim, para a recepção não perder o próximo paciente.
+  const visibleAppointments = useMemo(() => {
+    if (situacao === "pendentes") return appointments.filter(isPendente);
+    if (situacao === "presente") return appointments.filter(isPresente);
+    if (situacao === "justificada") return appointments.filter(isFaltaJustificada);
+    if (situacao === "falta") return appointments.filter(isFaltaSemJustificativa);
+    return [...appointments].sort(
+      (a, b) => Number(isPendente(b)) - Number(isPendente(a)),
+    );
+  }, [appointments, situacao]);
 
   return (
     <div className="space-y-8">
@@ -1267,12 +1346,34 @@ export default function Reception() {
 
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">
-          <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
+          <div>
+            <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              <strong>Presente</strong> = check-in da recepção hoje · <strong>Em Sessão</strong> = terapeuta já iniciou ·
+              {" "}<strong>Em Atendimento</strong> (cadastro) = paciente com vínculo ativo, sem indicar presença.
+            </p>
+          </div>
           <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center rounded-lg border border-border overflow-hidden">
+              {situacaoTabs.map(([value, label, count]) => (
+                <button
+                  key={value}
+                  onClick={() => setSituacao(value)}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-bold transition-colors",
+                    situacao === value
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-secondary",
+                  )}
+                >
+                  {label} ({count})
+                </button>
+              ))}
+            </div>
             <span className="text-sm font-semibold text-muted-foreground">Filtrar:</span>
             <Select className="w-48" value={profIdFilter} onChange={(e) => setProfIdFilter(e.target.value)}>
               <option value="">Todos os Profissionais</option>
-              {professionals?.map((p) => (
+              {professionals?.filter((p) => !isTransportSpecialty(p.specialty)).map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </Select>
@@ -1288,16 +1389,24 @@ export default function Reception() {
         <div className="space-y-4">
           {isLoading ? (
             <div className="text-center py-12 animate-pulse text-muted-foreground">Carregando agenda do dia...</div>
-          ) : appointments?.length === 0 ? (
+          ) : visibleAppointments.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4">
-                <CalendarClock className="w-8 h-8 text-muted-foreground" />
+                {situacao === "pendentes" && appointments.length > 0
+                  ? <CheckCircle className="w-8 h-8 text-emerald-500" />
+                  : <CalendarClock className="w-8 h-8 text-muted-foreground" />}
               </div>
-              <p className="text-lg font-bold text-foreground">Agenda Vazia</p>
-              <p className="text-muted-foreground">Nenhuma consulta encontrada para os filtros selecionados.</p>
+              <p className="text-lg font-bold text-foreground">
+                {situacao === "pendentes" && appointments.length > 0 ? "Tudo marcado!" : "Agenda Vazia"}
+              </p>
+              <p className="text-muted-foreground">
+                {situacao === "pendentes" && appointments.length > 0
+                  ? "Nenhum atendimento pendente. Use os outros filtros para revisar."
+                  : "Nenhuma consulta encontrada para os filtros selecionados."}
+              </p>
             </div>
           ) : (
-            appointments?.map((apt, i) => {
+            visibleAppointments.map((apt, i) => {
               const enriched = { ...apt, prontuario: apt.prontuario || prontuarioMap.get(apt.patientId) || null } as Appointment;
               return (
               <AppointmentRow
@@ -1313,6 +1422,7 @@ export default function Reception() {
                 specialtyAbsences={specialtyAbsences}
                 onFirstApptMsg={setFirstApptMsgApt}
                 onAbsenceBell={(a, count) => setAbsenceBellData({ apt: a, absenceCount: count })}
+                drivers={transportByPatient.get(apt.patientId) ?? []}
               />
             );})
           )}

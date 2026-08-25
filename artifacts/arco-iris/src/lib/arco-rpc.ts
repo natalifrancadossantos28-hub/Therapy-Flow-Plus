@@ -449,6 +449,7 @@ export type Patient = {
   guardianName: string | null;
   guardianPhone: string | null;
   motherName: string | null;
+  fatherName: string | null;
   diagnosis: string | null;
   notes: string | null;
   professionalId: number | null;
@@ -470,6 +471,8 @@ export type Patient = {
   abrigoCasaCrianca: boolean | null;
   tipoRegistro: string | null;
   localAtendimento: string | null;
+  /** Já faz atendimento terapêutico em outro local (fora da unidade). */
+  outroAtendimento: boolean | null;
   photoUrl: string | null;
   createdAt: string;
   updatedAt: string;
@@ -489,6 +492,7 @@ type PatientRow = {
   guardian_name: string | null;
   guardian_phone: string | null;
   mother_name: string | null;
+  father_name: string | null;
   diagnosis: string | null;
   notes: string | null;
   professional_id: number | string | null;
@@ -510,6 +514,7 @@ type PatientRow = {
   abrigo_casa_crianca: boolean | null;
   tipo_registro: string | null;
   local_atendimento: string | null;
+  outro_atendimento: boolean | null;
   photo_url: string | null;
   created_at: string;
   updated_at: string;
@@ -536,6 +541,7 @@ function mapPatient(r: PatientRow): Patient {
     guardianName: r.guardian_name,
     guardianPhone: r.guardian_phone,
     motherName: r.mother_name,
+    fatherName: r.father_name,
     diagnosis: r.diagnosis,
     notes: r.notes,
     professionalId: num(r.professional_id),
@@ -557,6 +563,7 @@ function mapPatient(r: PatientRow): Patient {
     abrigoCasaCrianca: r.abrigo_casa_crianca,
     tipoRegistro: r.tipo_registro,
     localAtendimento: r.local_atendimento,
+    outroAtendimento: r.outro_atendimento,
     photoUrl: r.photo_url,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -718,12 +725,37 @@ export async function addPatientToFila(
   return data as AddToFilaResult;
 }
 
+export type PatientAbsence = {
+  id: number;
+  date: string;
+  time: string;
+  status: string;
+  justificada: boolean;
+  specialty: string;
+  professionalId: number | null;
+  professionalName: string;
+};
+
+export type PatientAbsenceBySpecialty = {
+  specialty: string;
+  total: number;
+  naoJustificadas: number;
+  justificadas: number;
+  professionals: string[] | null;
+};
+
 export type PatientAbsencesInfo = {
   patientId: number;
   patientName: string;
   absenceCount: number;
   hasWarning: boolean;
-  absences: unknown[];
+  /** Total de registros de falta (justificadas + não justificadas). */
+  totalRegistros?: number;
+  naoJustificadas?: number;
+  justificadas?: number;
+  /** Resumo por especialidade: onde as faltas estão acontecendo. */
+  porEspecialidade?: PatientAbsenceBySpecialty[];
+  absences: PatientAbsence[];
 };
 
 export async function getPatientAbsences(id: number): Promise<PatientAbsencesInfo> {
@@ -817,6 +849,16 @@ export type WaitingListEntry = {
   scoreEspecialidadeTotal?: number | null;
   /** Bônus de idade: <4 anos = +50, 4-6 anos = +20, >6 = 0. */
   ageBonus?: number | null;
+  /** 'prioridade' (Fono/Fisio) | 'chegada' (FIFO nas demais especialidades). */
+  ordenacao?: string | null;
+  /** Já faz atendimento terapêutico fora da unidade: sem Prioridade Máxima e sem bônus de idade. */
+  atendeFora?: boolean | null;
+  /** Pai e mãe preenchidos no cadastro: penalidade no score. */
+  paisRegistrados?: boolean | null;
+  /** Pontos descontados do score por pai e mãe registrados. */
+  penalidadePais?: number | null;
+  /** Onde faz o atendimento fora da unidade. */
+  localAtendimento?: string | null;
   /** Data de nascimento do paciente (ISO). */
   dateOfBirth?: string | null;
   /** Busca ativa: paciente congelado, fora da disputa por vaga prioritária. */
@@ -1112,17 +1154,30 @@ export async function listAppointments(opts?: {
 }): Promise<AppointmentListItem[]> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
-  const { data, error } = await supabase.rpc("list_appointments", {
-    p_slug: slug,
-    p_password: password,
-    p_date: opts?.date ?? null,
-    p_date_from: opts?.dateFrom ?? null,
-    p_date_to: opts?.dateTo ?? null,
-    p_professional_id: opts?.professionalId ?? null,
-    p_patient_id: opts?.patientId ?? null,
-  });
-  if (error) throw error;
-  const rows = (data ?? []) as AppointmentListRow[];
+  // O PostgREST devolve no máximo 1000 linhas por requisição: períodos longos
+  // (Visão Mensal, Dashboard) vinham cortados no meio do mês. A RPC ordena por
+  // date/time/id, então dá para paginar com range até esvaziar.
+  const PAGE = 1000;
+  const MAX_PAGES = 60;
+  const rows: AppointmentListRow[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * PAGE;
+    const { data, error } = await supabase
+      .rpc("list_appointments", {
+        p_slug: slug,
+        p_password: password,
+        p_date: opts?.date ?? null,
+        p_date_from: opts?.dateFrom ?? null,
+        p_date_to: opts?.dateTo ?? null,
+        p_professional_id: opts?.professionalId ?? null,
+        p_patient_id: opts?.patientId ?? null,
+      })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const chunk = (data ?? []) as AppointmentListRow[];
+    rows.push(...chunk);
+    if (chunk.length < PAGE) break;
+  }
   return rows.map(mapAppointmentListItem);
 }
 
@@ -1418,6 +1473,68 @@ export async function deleteAppointmentAlta(
   });
   if (error) throw error;
   return data as { ok: true; deletedCount: number };
+}
+
+// ── Alta por especialidade ───────────────────────────────────────────────────
+
+export type SpecialtyDischargeResult = {
+  ok: true;
+  patientId: number;
+  specialty: string | null;
+  tipo: string;
+  /** Status global do paciente depois da saída. */
+  statusGlobal: string;
+  /** true quando a alta encerrou o paciente inteiro (nenhuma área ativa). */
+  altaGlobalAplicada: boolean;
+  especialidadesAtivas: string[];
+};
+
+export type PatientDischarge = {
+  id: number;
+  specialty: string;
+  professionalId: number | null;
+  professionalName: string | null;
+  tipo: string;
+  reason: string | null;
+  dischargedAt: string;
+};
+
+/**
+ * Registra a saída (Alta/Óbito/Desistência) em UMA especialidade.
+ * O status global só vira "Alta" quando não sobra nenhuma área ativa.
+ */
+export async function dischargePatientSpecialty(payload: {
+  patientId: number;
+  specialty: string | null;
+  professionalId?: number | null;
+  tipo?: string;
+  reason?: string | null;
+}): Promise<SpecialtyDischargeResult> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("discharge_patient_specialty", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: payload.patientId,
+    p_specialty: payload.specialty,
+    p_professional_id: payload.professionalId ?? null,
+    p_tipo: payload.tipo ?? "Alta",
+    p_reason: payload.reason ?? null,
+  });
+  if (error) throw error;
+  return data as SpecialtyDischargeResult;
+}
+
+export async function listPatientDischarges(id: number): Promise<PatientDischarge[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_patient_discharges", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+  return (data ?? []) as PatientDischarge[];
 }
 
 export async function deleteAppointment(id: number): Promise<void> {

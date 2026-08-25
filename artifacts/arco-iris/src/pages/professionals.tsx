@@ -25,7 +25,7 @@ import {
   transferAppointments,
   type Professional,
 } from "@/lib/arco-rpc";
-import { SPECIALTIES, specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
+import { PROFESSIONAL_SPECIALTIES, specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
 
 function PinManager({
   prof,
@@ -453,12 +453,14 @@ export default function Professionals() {
                   onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
                 >
                   <option value="" disabled>Selecione…</option>
-                  {SPECIALTIES.map((s) => (
+                  {PROFESSIONAL_SPECIALTIES.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   Lista oficial — define a cor neon na agenda e nos avisos.
+                  <br />
+                  <strong>Motorista</strong> é função de apoio: agenda o transporte do paciente, mas não conta como atendimento clínico.
                 </p>
               </div>
               <div>

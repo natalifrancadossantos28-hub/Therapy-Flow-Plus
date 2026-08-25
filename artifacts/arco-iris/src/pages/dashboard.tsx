@@ -22,9 +22,11 @@ import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
 import { cn, getStatusColor, calcIdade, formatDate } from "@/lib/utils";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
-import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
+import { specialtyTone, specialtyShortLabel, isTransportSpecialty } from "@/lib/specialty-colors";
+import { listDrivers } from "@/lib/transporte";
 import { upcomingAwareness, dateLabel, CATEGORY_COLOR } from "@/lib/awareness-dates";
 import { printDashboardReport } from "@/lib/print-dashboard";
+import { AREA_MAX_DB, AREA_MAX_UI, areaToUi } from "@/lib/score-scale";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfWeek, addDays } from "date-fns";
@@ -61,14 +63,16 @@ type Ocupacao = {
 };
 
 const POLL_MS = 30_000; // 30 s
-const TERMINAL_PT_STATUSES = new Set(["alta", "obito", "óbito", "desistencia", "desistência"]);
+// Alta é por especialidade: o paciente continua contando enquanto tiver
+// atendimento ativo em outra área.
+const ENCERRADO_PT_STATUSES = new Set(["obito", "óbito", "desistencia", "desistência"]);
 
 export default function Dashboard() {
   useDocumentTitle("Dashboard");
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
-  const [todayAppointments, setTodayAppointments] = useState<AppointmentToday[]>([]);
+  const [todayAppointmentsRaw, setTodayAppointments] = useState<AppointmentToday[]>([]);
   const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
   const [aptStats, setAptStats] = useState<Stats | null>(null);
   const [ocupacao, setOcupacao] = useState<Ocupacao[]>([]);
@@ -78,18 +82,35 @@ export default function Dashboard() {
   const [dashMonth, setDashMonth] = useState<Date>(new Date());
   // Semana selecionada no card "Atendimentos da Semana" (segunda-feira)
   const [multiWeek, setMultiWeek] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const [weekAppointments, setWeekAppointments] = useState<AppointmentListItem[]>([]);
+  const [weekAppointmentsRaw, setWeekAppointments] = useState<AppointmentListItem[]>([]);
   // Atendimentos do ano corrente (01/01 → hoje) — card "por especialidade no ano".
-  const [yearAppointments, setYearAppointments] = useState<AppointmentListItem[]>([]);
-  const [monthAppointments, setMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
+  const [yearAppointmentsRaw, setYearAppointments] = useState<AppointmentListItem[]>([]);
+  const [monthAppointmentsRaw, setMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
   // Mês corrente (fixo em "hoje"), independente do navegador da Visão Mensal —
   // usado na Performance dos Profissionais (aba "Mês Atual").
-  const [currentMonthAppointments, setCurrentMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
+  const [currentMonthAppointmentsRaw, setCurrentMonthAppointments] = useState<Array<{ patientId: number; patientName: string; professionalId: number; professionalName: string; date: string; time: string; status: string; notes?: string | null }>>([]);
 
   // Leitura completa de agendamentos (carregada uma vez) — usada para o perfil
   // de faixa etária por profissional, que deve refletir a MESMA base da ocupação
   // (pacientes com agendamento ativo/futuro), não a atribuição bruta do cadastro.
-  const [allAppointments, setAllAppointments] = useState<AppointmentListItem[]>([]);
+  const [allAppointmentsRaw, setAllAppointments] = useState<AppointmentListItem[]>([]);
+
+  // Motorista é apoio administrativo: o transporte fica fora de toda estatística
+  // clínica (atendimentos, faltas, presença, produtividade, ocupação).
+  const driverIds = useMemo(
+    () => new Set(listDrivers(professionals ?? []).map((p) => p.id)),
+    [professionals],
+  );
+  const semMotorista = useCallback(
+    <T extends { professionalId: number }>(rows: T[]): T[] => rows.filter((a) => !driverIds.has(a.professionalId)),
+    [driverIds],
+  );
+  const todayAppointments = useMemo(() => semMotorista(todayAppointmentsRaw), [todayAppointmentsRaw, semMotorista]);
+  const weekAppointments = useMemo(() => semMotorista(weekAppointmentsRaw), [weekAppointmentsRaw, semMotorista]);
+  const yearAppointments = useMemo(() => semMotorista(yearAppointmentsRaw), [yearAppointmentsRaw, semMotorista]);
+  const monthAppointments = useMemo(() => semMotorista(monthAppointmentsRaw), [monthAppointmentsRaw, semMotorista]);
+  const currentMonthAppointments = useMemo(() => semMotorista(currentMonthAppointmentsRaw), [currentMonthAppointmentsRaw, semMotorista]);
+  const allAppointments = useMemo(() => semMotorista(allAppointmentsRaw), [allAppointmentsRaw, semMotorista]);
 
   // Faltas por profissional (não geral)
   type AbsenceByProf = { patientId: number; patientName: string; professionalName: string; specialty: string; count: number };
@@ -134,10 +155,12 @@ export default function Dashboard() {
       // Faltas POR PROFISSIONAL — só alerta quando >= 3 com o MESMO profissional
       const ABSENCE = ["ausente", "falta_nao_justificada"];
       const specMap = new Map(profs.map(p => [p.name, p.specialty || "—"]));
+      const driverSet = new Set(listDrivers(profs).map(p => p.id));
       const map = new Map<string, { patientId: number; patientName: string; professionalName: string; count: number }>();
       for (const a of pastApts) {
         const st = (a.status || "").toLowerCase();
         if (!ABSENCE.includes(st)) continue;
+        if (driverSet.has(a.professionalId)) continue;
         const k = `${a.patientId}|${a.professionalId}`;
         const entry = map.get(k) || { patientId: a.patientId, patientName: a.patientName, professionalName: a.professionalName, count: 0 };
         entry.count++;
@@ -196,7 +219,7 @@ export default function Dashboard() {
   const fetchOcupacao = useCallback(() => {
     listProfessionalsCapacity()
       .then((rows) => {
-        const mapped: Ocupacao[] = rows.map((r) => {
+        const mapped: Ocupacao[] = rows.filter((r) => !isTransportSpecialty(r.specialty)).map((r) => {
           const max = r.maxPatients || (r.cargaHoraria.startsWith("20") ? 25 : 35);
           const cur = r.currentPatients;
           const pct = max > 0 ? Math.round((cur / max) * 100) : 0;
@@ -225,7 +248,7 @@ export default function Dashboard() {
   useVisibleInterval(fetchOcupacao, POLL_MS);
 
   const totalPatients = patients?.length || 0;
-  const totalProfessionals = professionals?.length || 0;
+  const totalProfessionals = (professionals || []).filter(p => !isTransportSpecialty(p.specialty)).length;
 
   // Pacientes ATIVOS em atendimento (naquele momento): distintos com agendamento
   // ativo/futuro. Difere do total de CADASTROS (todos já cadastrados na base).
@@ -313,7 +336,7 @@ export default function Dashboard() {
   const weeklyReport = useMemo(() => {
     const byProf = new Map<number, { name: string; total: number; multi: number }>();
     for (const a of weekAppointments) {
-      if (TERMINAL_PT_STATUSES.has((a.patientStatus || "").toLowerCase())) continue;
+      if (ENCERRADO_PT_STATUSES.has((a.patientStatus || "").toLowerCase())) continue;
       const entry = byProf.get(a.professionalId) || { name: a.professionalName, total: 0, multi: 0 };
       entry.total++;
       const notes = (a.notes || "").toLowerCase();
@@ -520,7 +543,7 @@ export default function Dashboard() {
     { area: "Fonoaud.", score: avg("scoreFonoaudiologia") },
     { area: "T.O.", score: avg("scoreTO") },
     { area: "Nutrição", score: avg("scoreNutricionista") },
-  ].map(d => ({ ...d, pct: Math.round((d.score / 45) * 100) }));
+  ].map(d => ({ ...d, pct: Math.round((d.score / AREA_MAX_DB) * 100), scoreUi: areaToUi(d.score) }));
 
   // Historical count by year — prefer entryDate, fallback to createdAt
   const byYear: Record<number, number> = {};
@@ -533,7 +556,7 @@ export default function Dashboard() {
 
   const topCards = [
     { title: "Total de Cadastros", subtitle: "todos os pacientes na base", value: totalPatients, icon: Users, color: "text-[#a855f7]", bg: "bg-[#a855f7]/10" },
-    { title: "Em Atendimento", subtitle: "pacientes com agendamento ativo", value: activePatients, icon: HeartPulse, color: "text-[#00d4ff]", bg: "bg-[#00d4ff]/10" },
+    { title: "Em Atendimento", subtitle: "vínculo ativo na unidade (não é presença de hoje)", value: activePatients, icon: HeartPulse, color: "text-[#00d4ff]", bg: "bg-[#00d4ff]/10" },
     { title: "Fila de Espera", subtitle: "aguardando vaga", value: waitingCount, icon: ListTodo, color: "text-[#ff9f20]", bg: "bg-[#ff9f20]/10" },
     { title: "Profissionais", subtitle: "equipe ativa", value: totalProfessionals, icon: UserRound, color: "text-primary", bg: "bg-primary/10" },
   ];
@@ -805,7 +828,7 @@ export default function Dashboard() {
           <h2 className="text-xl font-bold font-display">Perfil Multidisciplinar</h2>
           <span className="ml-auto text-xs text-muted-foreground font-semibold">Média dos {triadPatients.length} pacientes triados</span>
         </div>
-        <p className="text-sm text-muted-foreground mb-4">Média do score por área terapêutica (% do máximo 45 pts por área)</p>
+        <p className="text-sm text-muted-foreground mb-4">Média do score por área terapêutica (% do máximo {AREA_MAX_UI} pts por área)</p>
         {triadPatients.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-center">
             <Activity className="w-10 h-10 text-muted-foreground/40 mb-2" />
@@ -832,7 +855,7 @@ export default function Dashboard() {
                   <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: `${d.pct}%`, background: "linear-gradient(90deg, #00b4d8, #00f0ff)", boxShadow: "0 0 8px rgba(0,240,255,0.5)" }} />
                   </div>
-                  <span className="w-12 text-right text-xs font-bold text-foreground">{d.score}/45</span>
+                  <span className="w-12 text-right text-xs font-bold text-foreground">{d.scoreUi}/{AREA_MAX_UI}</span>
                   <span className="w-10 text-right text-xs text-muted-foreground">{d.pct}%</span>
                 </div>
               ))}

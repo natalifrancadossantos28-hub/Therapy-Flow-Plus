@@ -22,7 +22,7 @@ const STATUS_OPTIONS = [
   { value: "Aguardando Triagem", label: "Aguardando Triagem" },
   { value: "Fila de Espera",     label: "Fila de Espera" },
   { value: "Cadastro Geral",     label: "Cadastro Geral" },
-  { value: "Atendimento",        label: "Atendimento" },
+  { value: "Atendimento",        label: "Em Atendimento (vínculo ativo)" },
   { value: "Alta",               label: "Alta" },
   { value: "Óbito",              label: "Óbito" },
   { value: "Desistência",        label: "Desistência" },
@@ -89,8 +89,10 @@ export default function Patients() {
     phone: "",
     dateOfBirth: "",
     motherName: "",
+    fatherName: "",
     guardianName: "",
     guardianPhone: "",
+    address: "",
     diagnosis: "",
     entryDate: today(),
     escolaPublica: false,
@@ -191,7 +193,7 @@ export default function Patients() {
     setProntuarioAlerta(null);
     setFormData({
       name: "", prontuario: next, cpf: "", cns: "", phone: "", dateOfBirth: "",
-      motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
+      motherName: "", fatherName: "", guardianName: "", guardianPhone: "", address: "", diagnosis: "",
       entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
       tipoRegistro: "Paciente da Unidade", localAtendimento: "", photoUrl: null,
     });
@@ -203,7 +205,7 @@ export default function Patients() {
     setProntuarioAlerta(null);
     setFormData({
       name: "", prontuario: "", cpf: "", cns: "", phone: "", dateOfBirth: "",
-      motherName: "", guardianName: "", guardianPhone: "", diagnosis: "",
+      motherName: "", fatherName: "", guardianName: "", guardianPhone: "", address: "", diagnosis: "",
       entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
       tipoRegistro: "Paciente da Unidade", localAtendimento: "", photoUrl: null,
     });
@@ -211,7 +213,7 @@ export default function Patients() {
 
   const handleExportCSV = () => {
     const BOM = "\uFEFF";
-    const header = ["Prontuário", "Nome", "Mãe", "Data Nascimento", "Idade", "CPF", "CNS", "Telefone", "Responsável", "Tel. Responsável", "Diagnóstico", "Status", "Data Entrada", "Tipo Registro", "Faltas", "Observações"];
+    const header = ["Prontuário", "Nome", "Mãe", "Data Nascimento", "Idade", "CPF", "CNS", "Telefone", "Responsável", "Tel. Responsável", "Endereço", "Diagnóstico", "Status", "Data Entrada", "Tipo Registro", "Faltas", "Observações"];
     const rows = patients.map(p => {
       const raw = p.dateOfBirth ? calcIdade(p.dateOfBirth) : NaN;
       const idade = isNaN(raw) ? "" : String(raw);
@@ -227,6 +229,7 @@ export default function Patients() {
         p.phone || "",
         p.guardianName || "",
         p.guardianPhone || "",
+        (p.address || "").replace(/"/g, '""'),
         p.diagnosis || "",
         p.status,
         p.entryDate || "",
@@ -310,7 +313,7 @@ export default function Patients() {
     .sub{color:#64748b;font-size:13px;margin-bottom:20px;}
     table{width:100%;border-collapse:collapse;font-size:13px;}
     th{text-align:left;padding:10px 12px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
-    @media print{button{display:none}}</style></head><body>
+    @media print{button{display:none}html,body{height:auto!important;overflow:visible!important;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
     <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
       <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
       <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
@@ -630,6 +633,19 @@ export default function Patients() {
                   <Label>Nome da Mãe</Label>
                   <Input value={formData.motherName} onChange={e => setFormData({ ...formData, motherName: e.target.value })} placeholder="Nome completo da mãe" />
                 </div>
+                <div className="col-span-2">
+                  <Label>Nome do Pai</Label>
+                  <Input value={formData.fatherName} onChange={e => setFormData({ ...formData, fatherName: e.target.value })} placeholder="Nome completo do pai" />
+                  {formData.motherName.trim() !== "" && formData.fatherName.trim() !== "" && (
+                    <p className="text-xs text-amber-600 mt-1 font-semibold">
+                      Pai e mãe registrados: a fila de espera aplica uma penalidade no score (o paciente continua na disputa).
+                    </p>
+                  )}
+                </div>
+                <div className="col-span-2">
+                  <Label>Endereço</Label>
+                  <Input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder="Rua, nº, bairro, cidade" />
+                </div>
                 <div>
                   <Label>Responsável</Label>
                   <Input value={formData.guardianName} onChange={e => setFormData({ ...formData, guardianName: e.target.value })} placeholder="Nome do responsável" />
@@ -676,6 +692,11 @@ export default function Patients() {
                     <option value="">Selecione...</option>
                     {["CAPS", "Reabilitação", "Particular", "Sem Atendimento"].map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
+                  {formData.localAtendimento !== "" && formData.localAtendimento !== "Sem Atendimento" && (
+                    <p className="text-xs text-amber-600 mt-1 font-semibold">
+                      Já atende em outro lugar: na fila de espera não recebe prioridade (sem Prioridade Máxima e sem bônus de idade).
+                    </p>
+                  )}
                 </div>
 
                 <div className="col-span-2">

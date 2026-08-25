@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/lib/print-agenda";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play, Bus } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
+import { DocCopyRow } from "@/components/PatientDocs";
 import { supabase } from "@/lib/supabase";
 import {
   listProfessionals,
@@ -16,6 +17,7 @@ import {
   listAppointments,
   updateAppointment,
   deleteAppointmentAlta,
+  dischargePatientSpecialty,
   deleteRecurrenceForward,
   createNotificacao,
   markNotificacoesLidoByAppointment,
@@ -31,11 +33,23 @@ import {
   undoMultiAppointment,
   listFeriados,
   listAusencias,
+  type AppointmentListItem,
   type Feriado,
   type Ausencia,
 } from "@/lib/arco-rpc";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
+import {
+  activeCareDays,
+  fetchClinicalAppointments,
+  fetchTransportMap,
+  listDrivers,
+  transportDrivers,
+  transportKey,
+  type TransportMap,
+} from "@/lib/transporte";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { worksThroughLunch } from "@/lib/schedule";
+import { buildSlotOptions, callOrder } from "@/lib/agenda-slots";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
 
@@ -51,6 +65,10 @@ function getWeekDays(ref: Date): Date[] {
 }
 
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
+// Status do PACIENTE que escondem o agendamento da grade. "Alta" ficou de fora:
+// ela vale por especialidade, então quem teve alta numa área continua com
+// horário válido nas outras.
+const PATIENT_HIDDEN_STATUSES = ["desistência", "desistencia", "óbito", "obito"];
 const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
 
 /** Abbreviate long names keeping first + second name: "Isis Godinho Lima" → "Isis Godinho L." */
@@ -146,7 +164,7 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     existing.add(key);
     const hasAtendimento = (scheduleRefApts.length > 0 ? scheduleRefApts : activeApts).some(a => ["atendimento", "em_atendimento", "em atendimento", "remanejado"].includes(a.status.toLowerCase()));
     const virtualStatus = hasAtendimento ? "atendimento" : "agendado";
-    virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!) } as T);
+    virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!), sourceId: (refApt as { id?: number }).id } as T);
   }
   return [...allApts, ...virtual];
 }
@@ -183,7 +201,7 @@ function applyFrequencyFilter<T extends { date: string; recurrenceGroupId?: stri
 }
 
 type Professional = { id: number; name: string; specialty: string; pin?: string };
-type Appointment = { id: number; patientId: number; patientName?: string; patientStatus?: string | null; guardianName?: string | null; professionalName?: string | null; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; paused?: boolean; pausedAt?: string | null; pausedReason?: string | null; pausedReturnDate?: string | null; };
+type Appointment = { id: number; sourceId?: number | null; patientId: number; patientName?: string; patientStatus?: string | null; guardianName?: string | null; professionalName?: string | null; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; paused?: boolean; pausedAt?: string | null; pausedReason?: string | null; pausedReturnDate?: string | null; };
 
 type AbsenceAlert = { patientName: string; professionalName: string; professionalSpecialty: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
 
@@ -210,7 +228,7 @@ const NEON: Record<string, React.CSSProperties> = {
 
 const SPECIALTIES = [
   "Psicologia", "Psicologia Parental", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
-  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
+  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física", "Motorista",
 ];
 
 export default function AgendaProfissionais() {
@@ -230,6 +248,7 @@ export default function AgendaProfissionais() {
       : "";
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
+  const [docsById, setDocsById] = useState<Map<number, { cpf: string | null; cns: string | null }>>(new Map());
   const [selectedProfId, setSelectedProfId] = useState(
     isProfessionalSession
       ? String(portalProf!.professionalId)
@@ -326,8 +345,13 @@ export default function AgendaProfissionais() {
       .catch(console.error);
     listPatients().then((ps) => {
       const m = new Map<number, string | null>();
-      for (const p of ps) if (p.photoUrl) m.set(p.id, p.photoUrl);
+      const d = new Map<number, { cpf: string | null; cns: string | null }>();
+      for (const p of ps) {
+        if (p.photoUrl) m.set(p.id, p.photoUrl);
+        if (p.cpf || p.cns) d.set(p.id, { cpf: p.cpf, cns: p.cns });
+      }
       setPhotoById(m);
+      setDocsById(d);
     }).catch(console.error);
     listFeriados().then(setFeriados).catch(console.error);
     listAusencias().then(setAusencias).catch(console.error);
@@ -345,7 +369,7 @@ export default function AgendaProfissionais() {
     loadedRangeRef.current = { from: dateFrom, to: dateTo };
     listAppointments({ professionalId: parseInt(selectedProfId), dateFrom, dateTo })
       // Oculta pacientes com status terminal (Alta/Óbito/Desistência) da agenda.
-      .then((list) => setAppointments(list.filter(a => !TERMINAL_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))))
+      .then((list) => setAppointments(list.filter(a => !PATIENT_HIDDEN_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))))
       .catch((err) => {
         console.error("fetchAppointments error:", err);
         toast({ title: "Erro ao carregar agenda", description: err?.message || String(err), variant: "destructive" });
@@ -353,6 +377,38 @@ export default function AgendaProfissionais() {
   };
 
   useEffect(() => { if (pinVerified) fetchAppointments(); }, [selectedProfId, pinVerified]);
+
+  // Transporte: motorista que busca a criança aparece no card (só leitura).
+  const [transportMap, setTransportMap] = useState<TransportMap>(new Map());
+  useEffect(() => {
+    const from = weekDates[0];
+    const to = weekDates[weekDates.length - 1];
+    if (!pinVerified || !from || !to) return;
+    fetchTransportMap(professionals, from, to)
+      .then(setTransportMap)
+      .catch(() => setTransportMap(new Map()));
+  }, [professionals, pinVerified, weekDates[0]]);
+
+  const driverIds = useMemo(
+    () => new Set(listDrivers(professionals).map(p => p.id)),
+    [professionals],
+  );
+  const viewingDriver = isTransportSpecialty(selectedProf?.specialty);
+
+  // Agenda do motorista: carrega os atendimentos clínicos do período para saber
+  // em quais dias o paciente ainda tem alguma sessão de pé.
+  const [clinicalApts, setClinicalApts] = useState<AppointmentListItem[]>([]);
+  useEffect(() => {
+    const to = weekDates[weekDates.length - 1];
+    if (!pinVerified || !viewingDriver || !to) {
+      setClinicalApts([]);
+      return;
+    }
+    const from = format(addDays(startOfWeek(weekRef, { weekStartsOn: 1 }), -56), "yyyy-MM-dd");
+    fetchClinicalAppointments(from, to, driverIds)
+      .then(setClinicalApts)
+      .catch(() => setClinicalApts([]));
+  }, [pinVerified, viewingDriver, weekDates[0], driverIds]);
 
   // Re-fetch when navigating outside the loaded date window
   useEffect(() => {
@@ -616,10 +672,10 @@ export default function AgendaProfissionais() {
     setActionMenuId(null);
     try {
       await patchStatus(apt, "atendimento");
-      await logNotificacao(apt, "Em Atendimento");
-      toast({ title: "✅ Em Atendimento", description: `${apt.patientName} marcado como em atendimento.` });
+      await logNotificacao(apt, "Em Sessão");
+      toast({ title: "✅ Em Sessão", description: `${apt.patientName} está em sessão agora.` });
     } catch (err: any) {
-      toast({ title: "Erro ao iniciar atendimento", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
+      toast({ title: "Erro ao iniciar a sessão", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }
   };
 
@@ -647,44 +703,33 @@ export default function AgendaProfissionais() {
       const todayStr = todayBR();
       const profSpecialty = selectedProf?.specialty ?? null;
 
-      // Check if patient still has active appointments with OTHER professionals
+      // A saída é registrada por especialidade: o status global só vira "Alta"
+      // quando o paciente não tem mais nenhuma outra área ativa.
       let hasOtherActive = false;
       try {
-        const allFuture = await listAppointments({ patientId: altaConfirm.patientId, dateFrom: todayStr });
-        hasOtherActive = allFuture.some(a =>
-          a.professionalId !== altaConfirm.professionalId &&
-          (a.status === "agendado" || a.status === "atendimento" || a.status === "em_atendimento")
-        );
-      } catch { hasOtherActive = true; }
+        const res = await dischargePatientSpecialty({
+          patientId: altaConfirm.patientId,
+          specialty: profSpecialty,
+          professionalId: altaConfirm.professionalId,
+          tipo: label,
+          reason: altaMotivo.trim(),
+        });
+        hasOtherActive = !res.altaGlobalAplicada;
+      } catch {
+        toast({ title: "Aviso", description: "Não foi possível registrar a alta desta especialidade no prontuário.", variant: "destructive" });
+        hasOtherActive = true;
+      }
 
-      // Persistência: salva motivo; só altera status global se não houver outros atendimentos
+      // Histórico no prontuário (o status é responsabilidade da RPC acima).
       try {
         const existing = await getPatient(altaConfirm.patientId);
         const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
-        const updatePayload: Record<string, unknown> = {
+        await upsertPatient(altaConfirm.patientId, {
           notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")} — ${profSpecialty ?? "Geral"}] Motivo: ${altaMotivo.trim()}`,
-        };
-        if (!hasOtherActive) {
-          updatePayload.status = label;
-        }
-        await upsertPatient(altaConfirm.patientId, updatePayload);
+        });
       } catch {
         toast({ title: "Aviso", description: "Motivo registrado na notificação, mas houve falha ao gravar no prontuário.", variant: "destructive" });
       }
-
-      // Remover apenas da fila da especialidade deste profissional (não de todas).
-      // Comparação case-insensitive/trim para não deixar a entrada presa por diferença de formatação.
-      try {
-        const specNorm = (profSpecialty || "").trim().toLowerCase();
-        const filaAtual = await listWaitingList();
-        const entradas = filaAtual.filter(e =>
-          e.patientId === altaConfirm.patientId &&
-          (!specNorm || !(e.specialty || "").trim() || (e.specialty || "").trim().toLowerCase() === specNorm)
-        );
-        for (const entry of entradas) {
-          await deleteWaitingListEntry(entry.id);
-        }
-      } catch { /* silencioso — fila pode estar vazia */ }
 
       // Cascata: remove TODOS os agendamentos futuros do paciente com este profissional
       // (não só o grupo de recorrência clicado) — evita "fantasmas" na agenda após a alta.
@@ -1096,8 +1141,21 @@ export default function AgendaProfissionais() {
   // Expande recorrência: projeta agendamentos recorrentes em semanas sem linha real no banco.
   // Depois filtra: se frequência é quinzenal/mensal, esconde "agendado" nas semanas erradas.
   // Por fim, oculta feriados e ausências do profissional (férias/folga/falta).
+  const careDays = useMemo(
+    () =>
+      activeCareDays(
+        applyFrequencyFilter(expandRecurrence(clinicalApts, weekDates), weekDates),
+        feriados,
+        ausencias,
+        driverIds,
+      ),
+    [clinicalApts, weekDates[0], feriados, ausencias, driverIds],
+  );
+
   const expanded = applyFrequencyFilter(expandRecurrence(appointments, weekDates), weekDates)
-    .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias));
+    .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias))
+    // Motorista não busca quem ficou sem nenhum atendimento no dia (férias/ausência/feriado).
+    .filter(a => !viewingDriver || careDays.has(transportKey(a.patientId, a.date)));
 
   const selectedProfIdNum = selectedProfId ? parseInt(selectedProfId) : 0;
   const dayBlock = (date: string): string | null => {
@@ -1110,17 +1168,25 @@ export default function AgendaProfissionais() {
 
   // Fase 5A: slots em grupo — o mesmo horario pode ter varios pacientes.
   const getApts = (date: string, time: string) =>
-    expanded.filter(a => a.date === date && a.time === time);
+    expanded
+      .filter(a => a.date === date && a.time === time)
+      .sort((a, b) => callOrder(a) - callOrder(b));
 
   // Slots vazios para o seletor do modal (remanejar/remarcar).
   // Usa a semana atualmente selecionada dentro do modal.
   const modalWeekDays = remanejFlow ? getWeekDays(remanejFlow.weekRef) : [];
   const modalWeekDates = modalWeekDays.map(d => format(d, "yyyy-MM-dd"));
   const isPaula = worksThroughLunch(selectedProf?.name);
-  const modalAvailableSlots = modalWeekDates.flatMap(date =>
-    TIME_SLOTS.filter(t => (isPaula || t !== "12:10") && getApts(date, t).length === 0)
-      .map(time => ({ date, time }))
-  );
+  // Inclui os slots ocupados: o paciente pode ser transferido direto para um grupo.
+  const modalAvailableSlots = remanejFlow
+    ? buildSlotOptions({
+        dates: modalWeekDates,
+        times: TIME_SLOTS.filter(t => isPaula || t !== "12:10"),
+        aptsAt: getApts,
+        patientId: remanejFlow.apt.patientId,
+        origin: { date: remanejFlow.apt.date, time: remanejFlow.apt.time },
+      })
+    : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
@@ -1315,7 +1381,9 @@ export default function AgendaProfissionais() {
             {/* Weekly grid */}
             <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+                {/* min-w: no celular as 5 colunas ficariam com ~55px e os cards
+                    se sobrepunham; abaixo disso a grade rola na horizontal. */}
+                <table className="w-full min-w-[820px] text-sm" style={{ tableLayout: "fixed" }}>
                   <thead className="bg-muted/60 border-b border-border">
                     <tr>
                       <th className="px-2 py-2 sticky left-0 bg-muted/80 backdrop-blur z-10 border-r border-border text-left text-sm text-primary uppercase font-bold" style={{ width: "60px" }}>Horário</th>
@@ -1370,7 +1438,7 @@ export default function AgendaProfissionais() {
                                           · grupo ({apts.length})
                                         </span>
                                       )}
-                                      {apts.map(apt => (() => {
+                                      {apts.map((apt, ordem) => (() => {
                                     const isMenuOpen = actionMenuId === apt.id;
                                     const s = apt.status?.toLowerCase() ?? "";
                                     const isDesmarcado    = s === "desmarcado";
@@ -1428,6 +1496,7 @@ export default function AgendaProfissionais() {
                                             <span className="flex items-center gap-1.5 min-w-0 font-bold text-foreground text-xs leading-tight" title={apt.patientName || undefined}>
                                               <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={40} />
                                               <span className="truncate">
+                                                {isGroup && <span className="text-cyan-300 font-extrabold mr-1">{ordem + 1}º</span>}
                                                 {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
                                                 {isGhost ? (
                                                   <span className="text-amber-400">⚠ Sem dados</span>
@@ -1441,7 +1510,7 @@ export default function AgendaProfissionais() {
                                               <Lock className="w-3 h-3 shrink-0" style={{ color: "#22d3ee", filter: "drop-shadow(0 0 4px rgba(6,182,212,0.7))" }} />
                                             )}
                                           </div>
-                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
+                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
                                           {(apt.paused || (apt.status || "").toLowerCase() === "pausado") && (
                                             <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
                                               <Snowflake className="w-2.5 h-2.5" /> Pausado
@@ -1452,6 +1521,11 @@ export default function AgendaProfissionais() {
                                               <Users className="w-2.5 h-2.5 shrink-0" /> Multi: {selectedProf?.name} {selectedProf?.specialty ? `(${selectedProf.specialty})` : ""} & {multiPartner} {multiPartnerSpec ? `(${multiPartnerSpec})` : ""}
                                             </span>
                                           )}
+                                          {transportDrivers(transportMap, apt.patientId, apt.date).map(driver => (
+                                            <span key={driver} className="text-[9px] text-blue-300 font-semibold flex items-center gap-0.5 flex-wrap">
+                                              <Bus className="w-2.5 h-2.5 shrink-0" /> Transporte: {driver}
+                                            </span>
+                                          ))}
                                           {isDesmarcado && (
                                             <span className="text-[9px] text-orange-400 font-semibold">⚠ só esta data</span>
                                           )}
@@ -1482,10 +1556,17 @@ export default function AgendaProfissionais() {
 
                                         {isMenuOpen && (
                                           <div
-                                            className="absolute z-50 top-full left-0 mt-1 w-56 rounded-2xl shadow-2xl"
+                                            className="absolute z-50 top-full left-0 mt-1 w-60 rounded-2xl shadow-2xl"
                                             style={{ background: "rgba(2,4,8,0.97)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)", padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}
                                           >
                                             <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Ações — {apt.patientName || `Agendamento #${apt.id}`}</p>
+                                            {!isGhost && (
+                                              <div className="flex flex-col gap-1 mb-1">
+                                                <DocCopyRow label="CPF" value={docsById.get(apt.patientId)?.cpf} />
+                                                <DocCopyRow label="CNS" value={docsById.get(apt.patientId)?.cns} />
+                                                <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                              </div>
+                                            )}
                                             {isGhost && (
                                               <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⚠ Paciente sem dados — solicite exclusão ao admin</p>
                                             )}
@@ -1494,7 +1575,7 @@ export default function AgendaProfissionais() {
                                             ) : (
                                               <>
                                                 <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                                  <Activity className="w-3.5 h-3.5" /> Em Atendimento
+                                                  <Activity className="w-3.5 h-3.5" /> Em Sessão
                                                 </button>
                                                 <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
                                                   <CheckCircle className="w-3.5 h-3.5" /> Falta Justificada
@@ -2129,8 +2210,8 @@ export default function AgendaProfissionais() {
                   )}
                   <p className="text-sm text-white/60 mb-4">
                     {remanejFlow.kind === "remarcar"
-                      ? "Navegue entre as semanas e escolha um horário livre:"
-                      : "Escolha um novo horário livre nesta semana:"}
+                      ? "Navegue entre as semanas e escolha um horário livre ou um grupo:"
+                      : "Escolha um novo horário — livre ou um grupo já existente:"}
                   </p>
                   {modalAvailableSlots.length === 0 ? (
                     <p className="text-center text-white/40 py-8">Nenhum horário disponível nesta semana.</p>
@@ -2150,10 +2231,14 @@ export default function AgendaProfissionais() {
                                 key={slot.time}
                                 onClick={() => confirmRemanejar(slot.date, slot.time)}
                                 disabled={remanejSending}
-                                style={{ ...NEON.blue, opacity: remanejSending ? 0.5 : 1 }}
+                                style={{ ...(slot.group.length > 0 ? NEON.cyan : NEON.blue), opacity: remanejSending ? 0.5 : 1 }}
                                 className="mb-1"
+                                title={slot.group.length > 0 ? `Entrar no grupo: ${slot.group.join(", ")}` : "Horário livre"}
                               >
                                 {slot.time}
+                                {slot.group.length > 0 && (
+                                  <span className="text-[9px] font-bold uppercase"> · grupo ({slot.group.length})</span>
+                                )}
                               </button>
                             ))}
                           </div>

@@ -12,6 +12,7 @@ import {
   restoreCompanyFromDevice,
 } from "@/lib/portal-session";
 import { listProfessionalsPublic, verifyProfessionalPinWithSlug } from "@/lib/arco-rpc";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 type CardKey = "reception" | "professional" | "admin";
 
@@ -21,10 +22,14 @@ type ProfOption = { id: number; name: string; specialty: string | null };
 // Quando houver multi-tenant, expor um campo dedicado no card.
 const DEFAULT_SLUG = (import.meta.env.VITE_DEFAULT_COMPANY_SLUG as string | undefined) || "clinica-nfs";
 
-// Senha compartilhada para Recepcao e Administracao. O profissional continua
-// usando PIN. Pode ser sobrescrita por env (VITE_PORTAL_PASSWORD) por empresa.
+// Senha da Recepcao. O profissional continua usando PIN.
+// Pode ser sobrescrita por env (VITE_PORTAL_PASSWORD) por empresa.
 const PORTAL_PASSWORD =
   (import.meta.env.VITE_PORTAL_PASSWORD as string | undefined) || "arcoiris2026";
+
+// A Administracao tem senha propria (nao e a mesma da Recepcao/Triagem).
+const ADMIN_PASSWORD =
+  (import.meta.env.VITE_ADMIN_PASSWORD as string | undefined) || "NTL28";
 
 // Compara ignorando case, espacos e zero-width chars que o auto-complete
 // do celular costuma colar (ex.: "Clinica123 ", "clinica 123").
@@ -62,7 +67,8 @@ export default function Portal() {
   useEffect(() => {
     if (active === "professional") {
       listProfessionalsPublic(DEFAULT_SLUG)
-        .then((list) => setProfessionals(list))
+        // Motorista é função administrativa: a agenda dele vive só na Administração.
+        .then((list) => setProfessionals(list.filter((p) => !isTransportSpecialty(p.specialty))))
         .catch((err) => {
           console.error(err);
           setError(err?.message || "Nao foi possivel carregar a lista.");
@@ -84,7 +90,8 @@ export default function Portal() {
     setLoading(true);
     setError("");
     try {
-      if (normalizePassword(passwordInput) !== normalizePassword(PORTAL_PASSWORD)) {
+      const expected = scope === "admin" ? ADMIN_PASSWORD : PORTAL_PASSWORD;
+      if (normalizePassword(passwordInput) !== normalizePassword(expected)) {
         setError("Senha incorreta.");
         return;
       }

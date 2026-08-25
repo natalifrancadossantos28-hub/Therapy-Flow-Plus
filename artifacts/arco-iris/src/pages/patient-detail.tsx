@@ -15,10 +15,14 @@ import {
   addPatientToFila,
   listAppointments,
   updateAppointment,
+  listPatientDischarges,
   type Patient,
   type PatientPdfData,
   type PatientAbsencesInfo,
+  type PatientDischarge,
 } from "@/lib/arco-rpc";
+import { AREA_MAX_UI, areaToDb, areaToUi } from "@/lib/score-scale";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
@@ -77,6 +81,7 @@ export default function PatientDetail() {
   // Equipe de Atendimento
   type TeamMember = { professionalId: number; professionalName: string; specialty: string; status: "Ativo" | "Alta" };
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [discharges, setDischarges] = useState<PatientDischarge[]>([]);
 
   const [triagemEdit, setTriagemEdit] = useState(false);
   const [sPsicologia, setSPsicologia] = useState("");
@@ -101,8 +106,12 @@ export default function PatientDetail() {
   const [editEntryDate, setEditEntryDate] = useState("");
   const [editDob, setEditDob] = useState("");
   const [editCpf, setEditCpf] = useState("");
+  const [editCns, setEditCns] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editMotherName, setEditMotherName] = useState("");
+  const [editFatherName, setEditFatherName] = useState("");
   const [editGuardianName, setEditGuardianName] = useState("");
   const [editGuardianPhone, setEditGuardianPhone] = useState("");
   const [editDiagnosis, setEditDiagnosis] = useState("");
@@ -176,8 +185,12 @@ export default function PatientDetail() {
     setEditEntryDate(patient.entryDate || "");
     setEditDob(patient.dateOfBirth || "");
     setEditCpf(patient.cpf || "");
+    setEditCns(patient.cns || "");
     setEditPhone(patient.phone || "");
     setEditEmail(patient.email || "");
+    setEditAddress(patient.address || "");
+    setEditMotherName(patient.motherName || "");
+    setEditFatherName(patient.fatherName || "");
     setEditGuardianName(patient.guardianName || "");
     setEditGuardianPhone(patient.guardianPhone || "");
     setEditDiagnosis(patient.diagnosis || "");
@@ -196,8 +209,12 @@ export default function PatientDetail() {
         entryDate: editEntryDate || null,
         dateOfBirth: editDob || null,
         cpf: editCpf || null,
+        cns: editCns || null,
         phone: editPhone || null,
         email: editEmail || null,
+        address: editAddress || null,
+        motherName: editMotherName || null,
+        fatherName: editFatherName || null,
         guardianName: editGuardianName || null,
         guardianPhone: editGuardianPhone || null,
         diagnosis: editDiagnosis || null,
@@ -218,15 +235,17 @@ export default function PatientDetail() {
     setIsLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const [p, pdf, abs, allApts] = await Promise.all([
+      const [p, pdf, abs, allApts, alts] = await Promise.all([
         getPatient(patientId),
         getPatientPdf(patientId).catch(() => null),
         getPatientAbsences(patientId).catch(() => null),
         listAppointments({ patientId }).catch(() => [] as any[]),
+        listPatientDischarges(patientId).catch(() => [] as PatientDischarge[]),
       ]);
       setPatient(p);
       setPdfData(pdf);
       setAbsenceInfo(abs);
+      setDischarges(alts);
       // Derive team from appointments
       const profMap = new Map<number, { name: string; hasActive: boolean }>();
       for (const apt of allApts) {
@@ -241,12 +260,15 @@ export default function PatientDetail() {
       const { listProfessionals } = await import("@/lib/arco-rpc");
       const profs = await listProfessionals().catch(() => []);
       const profSpecMap = new Map(profs.map((pr: any) => [pr.id, pr.specialty || "—"]));
-      const teamArr: TeamMember[] = Array.from(profMap.entries()).map(([id, info]) => ({
-        professionalId: id,
-        professionalName: info.name,
-        specialty: (profSpecMap.get(id) as string) || "—",
-        status: info.hasActive ? "Ativo" : "Alta",
-      }));
+      // Motorista não faz parte da equipe clínica — o transporte é apoio administrativo.
+      const teamArr: TeamMember[] = Array.from(profMap.entries())
+        .filter(([id]) => !isTransportSpecialty(profSpecMap.get(id) as string | null))
+        .map(([id, info]) => ({
+          professionalId: id,
+          professionalName: info.name,
+          specialty: (profSpecMap.get(id) as string) || "—",
+          status: info.hasActive ? "Ativo" : "Alta",
+        }));
       teamArr.sort((a, b) => (a.status === "Ativo" ? 0 : 1) - (b.status === "Ativo" ? 0 : 1) || a.specialty.localeCompare(b.specialty));
       setTeam(teamArr);
     } catch (err: any) {
@@ -270,7 +292,7 @@ export default function PatientDetail() {
   };
 
   const handleDischarge = async () => {
-    if (!confirm("Tem certeza que deseja dar alta para este paciente? O status mudará e a vaga será liberada.")) return;
+    if (!confirm("Encerrar o atendimento deste paciente em TODAS as especialidades? Para dar alta de apenas uma área, use \"Dar Alta\" no card do agendamento na agenda daquele profissional.")) return;
     setDeleting(true);
     try {
       await deletePatient(patientId);
@@ -288,18 +310,20 @@ export default function PatientDetail() {
   };
 
   const p = patient;
+  // Soma no domínio do banco (0-360), a partir das notas digitadas em 0-30.
   const totalScore = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri]
-    .reduce((acc, v) => acc + (parseInt(v) || 0), 0);
+    .reduce((acc, v) => acc + areaToDb(parseInt(v) || 0), 0);
 
   const openTriagemEdit = () => {
-    setSPsicologia(p?.scorePsicologia != null ? String(p.scorePsicologia) : "");
-    setSPsicomotricidade(p?.scorePsicomotricidade != null ? String(p.scorePsicomotricidade) : "");
-    setSFisioterapia(p?.scoreFisioterapia != null ? String(p.scoreFisioterapia) : "");
-    setSPsicopedagogia(p?.scorePsicopedagogia != null ? String(p.scorePsicopedagogia) : "");
-    setSEdFisica(p?.scoreEdFisica != null ? String(p.scoreEdFisica) : "");
-    setSFono(p?.scoreFonoaudiologia != null ? String(p.scoreFonoaudiologia) : "");
-    setSTO(p?.scoreTO != null ? String(p.scoreTO) : "");
-    setSNutri(p?.scoreNutricionista != null ? String(p.scoreNutricionista) : "");
+    const ui = (v: number | null | undefined) => (v != null ? String(areaToUi(v)) : "");
+    setSPsicologia(ui(p?.scorePsicologia));
+    setSPsicomotricidade(ui(p?.scorePsicomotricidade));
+    setSFisioterapia(ui(p?.scoreFisioterapia));
+    setSPsicopedagogia(ui(p?.scorePsicopedagogia));
+    setSEdFisica(ui(p?.scoreEdFisica));
+    setSFono(ui(p?.scoreFonoaudiologia));
+    setSTO(ui(p?.scoreTO));
+    setSNutri(ui(p?.scoreNutricionista));
     setEscolaPublica(p?.escolaPublica ?? null);
     setTrabalhoNaRoca(p?.trabalhoNaRoca ?? null);
     setTriagemEdit(true);
@@ -336,11 +360,12 @@ export default function PatientDetail() {
   };
 
   const saveTriagem = async () => {
-    const scores = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri].map(v => parseInt(v) || 0);
-    if (scores.some(s => s < 0 || s > 45)) {
-      toast({ title: "Score inválido", description: "Cada área deve ter um valor entre 0 e 45.", variant: "destructive" });
+    const digitados = [sPsicologia, sPsicomotricidade, sFisioterapia, sPsicopedagogia, sEdFisica, sFono, sTO, sNutri].map(v => parseInt(v) || 0);
+    if (digitados.some(s => s < 0 || s > AREA_MAX_UI)) {
+      toast({ title: "Score inválido", description: `Cada área deve ter um valor entre 0 e ${AREA_MAX_UI}.`, variant: "destructive" });
       return;
     }
+    const scores = digitados.map(areaToDb);
     const total = scores.reduce((a, b) => a + b, 0);
     if (!patient) return;
     setSavingTriagem(true);
@@ -362,9 +387,9 @@ export default function PatientDetail() {
       setPatient(updated);
       setTriagemEdit(false);
       const scoreMsg = `Score total: ${toScoreDisplay(total, escolaPublica, trabalhoNaRoca)}/${SCORE_MAX_DISPLAY} (bônus vuln.: +${vulnBonus(escolaPublica, trabalhoNaRoca)}).`;
+      // Alta é por especialidade: não impede entrar na fila de outra área.
       const podeEntrarNaFila = updated.status !== "Fila de Espera"
         && updated.status !== "Atendimento"
-        && updated.status !== "Alta"
         && updated.tipoRegistro !== "Registro Censo Municipal";
       if (podeEntrarNaFila) {
         const { added, skipped } = await enqueueScoredSpecialties(updated, false);
@@ -426,7 +451,10 @@ export default function PatientDetail() {
   // Prontuário antigo (< 500) pode ser adicionado à fila mesmo sem triagem
   const prtNum = parseInt(patient.prontuario ?? "", 10);
   const isProntuarioAntigo = !isNaN(prtNum) && prtNum < 500;
-  const podeAdicionarFila = (triagemFeita || isProntuarioAntigo) && !naFila && !emAtendimento && patient.status !== "Alta" && !isCensoMunicipal;
+  // Alta é por especialidade — quem teve alta em uma área continua podendo
+  // entrar na fila de outra. Óbito/Desistência encerram o paciente inteiro.
+  const encerrado = patient.status === "Óbito" || patient.status === "Desistência";
+  const podeAdicionarFila = (triagemFeita || isProntuarioAntigo) && !naFila && !emAtendimento && !encerrado && !isCensoMunicipal;
 
   return (
     <div className="space-y-8">
@@ -444,7 +472,12 @@ export default function PatientDetail() {
                 className="w-14 h-14 rounded-full object-cover border border-border shrink-0"
               />
             )}
-            <h1 className="text-3xl font-display font-bold text-foreground">{patient.name}</h1>
+            <h1 className="text-3xl font-display font-bold text-foreground">
+              {patient.prontuario && (
+                <span className="font-mono text-primary">{patient.prontuario} - </span>
+              )}
+              {patient.name}
+            </h1>
             <Badge className={getStatusColor(patient.status)}>{patient.status}</Badge>
             {isCensoMunicipal && (
               <Badge className="bg-violet-100 text-violet-800 border-violet-300">🏛️ Censo Municipal PCD</Badge>
@@ -479,7 +512,7 @@ export default function PatientDetail() {
             </Button>
           )}
           <Button variant="destructive" onClick={handleDischarge} disabled={deleting || patient.status === "Alta"} className="gap-2">
-            <UserMinus className="w-4 h-4" /> Dar Alta
+            <UserMinus className="w-4 h-4" /> Alta Geral (todas as áreas)
           </Button>
         </div>
       </div>
@@ -501,6 +534,10 @@ export default function PatientDetail() {
                 <p className="text-lg">{patient.cpf || "-"}</p>
               </div>
               <div>
+                <p className="text-sm font-semibold text-muted-foreground">CNS (Cartão SUS)</p>
+                <p className="text-lg">{patient.cns || "-"}</p>
+              </div>
+              <div>
                 <p className="text-sm font-semibold text-muted-foreground">Telefone</p>
                 <p className="text-lg">{patient.phone || "-"}</p>
               </div>
@@ -508,9 +545,21 @@ export default function PatientDetail() {
                 <p className="text-sm font-semibold text-muted-foreground">Email</p>
                 <p className="text-lg">{patient.email || "-"}</p>
               </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Nome da Mãe</p>
+                <p className="text-lg">{patient.motherName || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Nome do Pai</p>
+                <p className="text-lg">{patient.fatherName || "-"}</p>
+              </div>
               <div className="md:col-span-2">
                 <p className="text-sm font-semibold text-muted-foreground">Responsável</p>
                 <p className="text-lg">{patient.guardianName || "-"} <span className="text-muted-foreground text-sm ml-2">{patient.guardianPhone}</span></p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm font-semibold text-muted-foreground">Endereço</p>
+                <p className="text-lg">{patient.address || "-"}</p>
               </div>
             </div>
 
@@ -532,11 +581,30 @@ export default function PatientDetail() {
             )}
 
             {/* Equipe de Atendimento */}
-            {team.length > 0 && (
+            {(team.length > 0 || discharges.length > 0) && (
               <div className="mt-10">
                 <h2 className="text-xl font-bold font-display mb-6 border-b border-border pb-4 flex items-center gap-2">
                   <Users className="w-5 h-5 text-primary" /> Equipe de Atendimento
                 </h2>
+                {discharges.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                      Altas por especialidade — o paciente segue liberado nas demais áreas
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {discharges.map(d => (
+                        <span
+                          key={d.id}
+                          title={[d.professionalName, d.reason].filter(Boolean).join(" · ") || undefined}
+                          className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary border border-border"
+                        >
+                          {d.tipo} em {d.specialty}
+                          <span className="font-normal text-muted-foreground"> · {formatDate(d.dischargedAt.slice(0, 10))}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   {team.map(m => (
                     <div key={m.professionalId} className={cn("flex items-center justify-between p-3 rounded-xl border transition-colors", m.status === "Ativo" ? "border-emerald-400/40 bg-emerald-50/5" : "border-border/50 bg-secondary/20 opacity-70")}>
@@ -605,7 +673,7 @@ export default function PatientDetail() {
                   ].map(area => (
                     <div key={area.label} className="p-2 bg-secondary/30 rounded-xl text-center">
                       <p className="text-muted-foreground font-semibold text-xs mb-1">{area.label}</p>
-                      <p className="text-lg font-bold text-foreground">{area.val ?? "—"}<span className="text-xs text-muted-foreground">/45</span></p>
+                      <p className="text-lg font-bold text-foreground">{area.val != null ? areaToUi(area.val) : "—"}<span className="text-xs text-muted-foreground">/{AREA_MAX_UI}</span></p>
                     </div>
                   ))}
                 </div>
@@ -635,7 +703,7 @@ export default function PatientDetail() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground italic">
-                Registre a triagem com as notas por área (0–45 cada) para liberar o botão <strong>"Adicionar à Fila"</strong>.
+                Registre a triagem com as notas por área (0–30 cada) para liberar o botão <strong>"Adicionar à Fila"</strong>.
               </p>
             )}
           </Card>
@@ -651,6 +719,9 @@ export default function PatientDetail() {
                 <h3 className={cn("font-bold font-display text-lg", hasWarning && "text-rose-900 dark:text-rose-400")}>Faltas</h3>
                 <p className={cn("text-sm", hasWarning ? "text-rose-700 font-semibold" : "text-muted-foreground")}>
                   {patient.absenceCount} registradas
+                  {typeof absenceInfo?.justificadas === "number" && absenceInfo.justificadas > 0 && (
+                    <span className="text-muted-foreground font-normal"> · {absenceInfo.justificadas} justificada(s)</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -659,12 +730,39 @@ export default function PatientDetail() {
                 ⚠️ Alerta: Limite de faltas excedido. Considere repassar as regras da clínica.
               </div>
             )}
+            {!!absenceInfo?.porEspecialidade?.length && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {absenceInfo.porEspecialidade.map(g => (
+                  <span
+                    key={g.specialty}
+                    title={g.professionals?.length ? `Profissional(is): ${g.professionals.join(", ")}` : undefined}
+                    className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary border border-border"
+                  >
+                    {g.total} {g.total === 1 ? "falta" : "faltas"} em {g.specialty}
+                    {g.justificadas > 0 && (
+                      <span className="font-normal text-muted-foreground"> ({g.justificadas} just.)</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="space-y-3">
               {absenceInfo?.absences?.length ? (
-                absenceInfo.absences.map((abs: any, i: number) => (
-                  <div key={i} className="flex justify-between text-sm p-2 border-b border-border/50 last:border-0">
-                    <span className="font-medium text-foreground">{formatDate(abs.date)}</span>
-                    <span className="text-muted-foreground">{abs.time}</span>
+                absenceInfo.absences.map(abs => (
+                  <div key={abs.id} className="text-sm p-2 border-b border-border/50 last:border-0">
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="font-medium text-foreground">{formatDate(abs.date)}</span>
+                      <span className="text-muted-foreground">{abs.time}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2 mt-0.5">
+                      <span className="text-xs font-semibold text-foreground">{abs.specialty}</span>
+                      <span className="text-xs text-muted-foreground truncate">{abs.professionalName}</span>
+                    </div>
+                    {abs.justificada && (
+                      <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-500">
+                        falta justificada
+                      </span>
+                    )}
                   </div>
                 ))
               ) : (
@@ -679,7 +777,7 @@ export default function PatientDetail() {
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <MotionCard className="w-full max-w-lg p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <h2 className="text-2xl font-bold font-display mb-1">{triagemFeita ? "Editar Triagem" : "Registrar Triagem"}</h2>
-            <p className="text-sm text-muted-foreground mb-5">Preencha a nota de cada área (0–45). O score total é exibido em escala padronizada (máx. {SCORE_MAX_DISPLAY}).</p>
+            <p className="text-sm text-muted-foreground mb-5">Preencha a nota de cada área (0–{AREA_MAX_UI}, mesma escala da Triagem). O score total é exibido em escala padronizada (máx. {SCORE_MAX_DISPLAY}).</p>
             <div className="space-y-5">
               <div>
                 <Label className="text-base font-bold mb-3 block">Perfil Multidisciplinar</Label>
@@ -695,9 +793,9 @@ export default function PatientDetail() {
                     { label: "Nutricionista", val: sNutri, set: setSNutri },
                   ] as const).map(area => (
                     <div key={area.label} className="space-y-1">
-                      <Label className="text-sm">{area.label} <span className="text-muted-foreground font-normal">(0–45)</span></Label>
+                      <Label className="text-sm">{area.label} <span className="text-muted-foreground font-normal">(0–{AREA_MAX_UI})</span></Label>
                       <Input
-                        type="number" min={0} max={45}
+                        type="number" min={0} max={AREA_MAX_UI}
                         value={area.val}
                         onChange={e => area.set(e.target.value)}
                         placeholder="0"
@@ -877,6 +975,18 @@ export default function PatientDetail() {
                     <Input value={editCpf} onChange={e => setEditCpf(e.target.value)} placeholder="000.000.000-00" className="mt-1" />
                   </div>
                 </div>
+                <div>
+                  <Label className="text-sm font-semibold">CNS (Cartão SUS)</Label>
+                  <Input value={editCns} onChange={e => setEditCns(e.target.value)} placeholder="Nº do cartão SUS" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Nome da Mãe</Label>
+                  <Input value={editMotherName} onChange={e => setEditMotherName(e.target.value)} placeholder="Nome completo da mãe" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Nome do Pai</Label>
+                  <Input value={editFatherName} onChange={e => setEditFatherName(e.target.value)} placeholder="Nome completo do pai" className="mt-1" />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-semibold">Telefone</Label>
@@ -896,6 +1006,10 @@ export default function PatientDetail() {
                     <Label className="text-sm font-semibold">Tel. Responsável</Label>
                     <Input value={editGuardianPhone} onChange={e => setEditGuardianPhone(e.target.value)} placeholder="(00) 0 0000-0000" className="mt-1" />
                   </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Endereço</Label>
+                  <Input value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="Rua, nº, bairro, cidade" className="mt-1" />
                 </div>
                 <div>
                   <Label className="text-sm font-semibold">Diagnóstico / Motivo</Label>
