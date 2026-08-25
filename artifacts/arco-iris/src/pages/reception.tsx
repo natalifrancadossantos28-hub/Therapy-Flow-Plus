@@ -1006,7 +1006,15 @@ export default function Reception() {
         : status === "falta_justificada"
         ? "📄 Falta Justificada"
         : "🔴 Ausente";
-      toast({ title: toastTitle, description: `${apt?.patientName} — ${label}.` });
+      const aba = status === "presente" || status === "atendimento"
+        ? "Presente"
+        : status === "falta_justificada"
+        ? "Falta Justificada"
+        : "Falta sem Justificativa";
+      toast({
+        title: toastTitle,
+        description: `${apt?.patientName} — ${label}. Saiu dos Pendentes; para rever, use o filtro "${aba}".`,
+      });
     } catch {
       toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
     } finally {
@@ -1345,7 +1353,7 @@ export default function Reception() {
       )}
 
       <Card className="p-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">
+        <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 bg-card/95 backdrop-blur flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">
           <div>
             <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
             <p className="text-xs text-muted-foreground mt-1">
@@ -1408,9 +1416,20 @@ export default function Reception() {
           ) : (
             visibleAppointments.map((apt, i) => {
               const enriched = { ...apt, prontuario: apt.prontuario || prontuarioMap.get(apt.patientId) || null } as Appointment;
+              const abreMarcados =
+                situacao === "todos" && !isPendente(apt) &&
+                (i === 0 || isPendente(visibleAppointments[i - 1]));
               return (
+              <div key={apt.id} className={cn(situacao === "todos" && !isPendente(apt) && "opacity-70")}>
+              {abreMarcados && (
+                <div className="flex items-center gap-3 pt-4 pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Já marcados ({visibleAppointments.filter((a) => !isPendente(a)).length})
+                  </span>
+                  <span className="flex-1 h-px bg-border" />
+                </div>
+              )}
               <AppointmentRow
-                key={apt.id}
                 apt={enriched}
                 photoUrl={photoMap.get(apt.patientId) ?? null}
                 index={i}
@@ -1424,6 +1443,7 @@ export default function Reception() {
                 onAbsenceBell={(a, count) => setAbsenceBellData({ apt: a, absenceCount: count })}
                 drivers={transportByPatient.get(apt.patientId) ?? []}
               />
+              </div>
             );})
           )}
         </div>
