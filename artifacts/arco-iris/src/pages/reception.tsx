@@ -1346,7 +1346,13 @@ export default function Reception() {
 
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">
-          <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
+          <div>
+            <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              <strong>Presente</strong> = check-in da recepção hoje · <strong>Em Sessão</strong> = terapeuta já iniciou ·
+              {" "}<strong>Em Atendimento</strong> (cadastro) = paciente com vínculo ativo, sem indicar presença.
+            </p>
+          </div>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center rounded-lg border border-border overflow-hidden">
               {situacaoTabs.map(([value, label, count]) => (

@@ -1854,7 +1854,7 @@ export default function Agenda() {
                                       )}
 
                                       <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                        <Activity className="w-3.5 h-3.5" /> Em Atendimento
+                                        <Activity className="w-3.5 h-3.5" /> Em Sessão
                                       </button>
 
                                       {isAdmin && (

@@ -48,7 +48,7 @@ export function printDashboardReport(data: DashboardReport): void {
 
   const topCards = [
     statCard("Total de Cadastros", data.totalPatients, "todos os pacientes na base"),
-    statCard("Em Atendimento", data.activePatients, "com agendamento ativo"),
+    statCard("Em Atendimento", data.activePatients, "vínculo ativo na unidade"),
     statCard("Fila de Espera", data.waitingCount, "aguardando vaga"),
     statCard("Profissionais", data.totalProfessionals, "equipe ativa"),
   ].join("");

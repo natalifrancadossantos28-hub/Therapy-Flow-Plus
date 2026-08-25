@@ -672,10 +672,10 @@ export default function AgendaProfissionais() {
     setActionMenuId(null);
     try {
       await patchStatus(apt, "atendimento");
-      await logNotificacao(apt, "Em Atendimento");
-      toast({ title: "✅ Em Atendimento", description: `${apt.patientName} marcado como em atendimento.` });
+      await logNotificacao(apt, "Em Sessão");
+      toast({ title: "✅ Em Sessão", description: `${apt.patientName} está em sessão agora.` });
     } catch (err: any) {
-      toast({ title: "Erro ao iniciar atendimento", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
+      toast({ title: "Erro ao iniciar a sessão", description: err?.message ?? "Falha inesperada.", variant: "destructive" });
     }
   };
 
@@ -1575,7 +1575,7 @@ export default function AgendaProfissionais() {
                                             ) : (
                                               <>
                                                 <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                                  <Activity className="w-3.5 h-3.5" /> Em Atendimento
+                                                  <Activity className="w-3.5 h-3.5" /> Em Sessão
                                                 </button>
                                                 <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
                                                   <CheckCircle className="w-3.5 h-3.5" /> Falta Justificada

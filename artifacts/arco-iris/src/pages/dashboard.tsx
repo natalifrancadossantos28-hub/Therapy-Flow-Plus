@@ -556,7 +556,7 @@ export default function Dashboard() {
 
   const topCards = [
     { title: "Total de Cadastros", subtitle: "todos os pacientes na base", value: totalPatients, icon: Users, color: "text-[#a855f7]", bg: "bg-[#a855f7]/10" },
-    { title: "Em Atendimento", subtitle: "pacientes com agendamento ativo", value: activePatients, icon: HeartPulse, color: "text-[#00d4ff]", bg: "bg-[#00d4ff]/10" },
+    { title: "Em Atendimento", subtitle: "vínculo ativo na unidade (não é presença de hoje)", value: activePatients, icon: HeartPulse, color: "text-[#00d4ff]", bg: "bg-[#00d4ff]/10" },
     { title: "Fila de Espera", subtitle: "aguardando vaga", value: waitingCount, icon: ListTodo, color: "text-[#ff9f20]", bg: "bg-[#ff9f20]/10" },
     { title: "Profissionais", subtitle: "equipe ativa", value: totalProfessionals, icon: UserRound, color: "text-primary", bg: "bg-primary/10" },
   ];
