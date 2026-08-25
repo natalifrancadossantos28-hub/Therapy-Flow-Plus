@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   ArrowRightLeft,
+  Pencil,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -121,6 +122,7 @@ export default function Professionals() {
   const [saving, setSaving] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Professional | null>(null);
   // Transferir Agenda
   const [transferFrom, setTransferFrom] = useState<Professional | null>(null);
   const [transferToId, setTransferToId] = useState<string>("");
@@ -161,11 +163,42 @@ export default function Professionals() {
   const salarioNum = parseInt(formData.salario) || 0;
   const prejuizoForm = salarioNum > tetoForm ? salarioNum - tetoForm : 0;
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setFormData({ name: "", specialty: "", email: "", phone: "", pin: "", cargaHoraria: "30h", tipoContrato: "Contratado", salario: "" });
+  };
+
+  const openCreate = () => {
+    setEditing(null);
+    resetForm();
+    setIsDialogOpen(true);
+  };
+
+  const openEdit = (prof: Professional) => {
+    setEditing(prof);
+    setFormData({
+      name: prof.name,
+      specialty: prof.specialty ?? "",
+      email: prof.email ?? "",
+      phone: prof.phone ?? "",
+      pin: prof.pin ?? "",
+      cargaHoraria: prof.cargaHoraria || "30h",
+      tipoContrato: prof.tipoContrato || "Contratado",
+      salario: prof.salario != null ? String(prof.salario) : "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setEditing(null);
+    resetForm();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const created = await upsertProfessional(null, {
+      const saved = await upsertProfessional(editing?.id ?? null, {
         name: formData.name,
         specialty: formData.specialty || null,
         email: formData.email || null,
@@ -175,14 +208,23 @@ export default function Professionals() {
         tipoContrato: formData.tipoContrato,
         salario: salarioNum || null,
       });
-      setProfessionals(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-      toast({ title: "Sucesso", description: "Profissional cadastrado." });
-      setIsDialogOpen(false);
-      setFormData({ name: "", specialty: "", email: "", phone: "", pin: "", cargaHoraria: "30h", tipoContrato: "Contratado", salario: "" });
+      setProfessionals(prev =>
+        (editing
+          ? prev.map(p => (p.id === saved.id ? saved : p))
+          : [...prev, saved]
+        ).sort((a, b) => a.name.localeCompare(b.name))
+      );
+      toast({
+        title: "Sucesso",
+        description: editing
+          ? `Dados de ${saved.name} atualizados.`
+          : "Profissional cadastrado.",
+      });
+      closeDialog();
     } catch (err: any) {
       toast({
         title: "Erro",
-        description: err?.message || "Falha ao criar profissional.",
+        description: err?.message || (editing ? "Falha ao salvar alterações." : "Falha ao criar profissional."),
         variant: "destructive",
       });
     } finally {
@@ -250,7 +292,7 @@ export default function Professionals() {
             Profissionais com 30h atendem até 30 pacientes · 20h atendem até 20 pacientes.
           </p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
+        <Button onClick={openCreate} className="gap-2">
           <Plus className="w-4 h-4" /> Novo Profissional
         </Button>
       </div>
@@ -277,9 +319,20 @@ export default function Professionals() {
                     <UserRound className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg text-foreground leading-none">
-                      {prof.name}
-                    </h3>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-bold text-lg text-foreground leading-none">
+                        {prof.name}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(prof)}
+                        title="Editar dados do profissional"
+                        aria-label={`Editar ${prof.name}`}
+                        className="text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     <div className="flex items-center gap-1 text-sm mt-1">
                       <Stethoscope className="w-3 h-3 text-muted-foreground" />
                       <span
@@ -323,6 +376,13 @@ export default function Professionals() {
               <PinManager prof={prof} onUpdated={updateProfessionalInList} />
 
               <div className="mt-5 flex gap-2">
+                <Button
+                  variant="outline"
+                  className="gap-2 px-3"
+                  onClick={() => openEdit(prof)}
+                >
+                  <Pencil className="w-4 h-4" /> Editar
+                </Button>
                 <Link href={`/agenda-profissionais?prof=${prof.id}`} className="flex-1">
                   <Button
                     variant="outline"
@@ -434,8 +494,10 @@ export default function Professionals() {
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
           >
-            <h2 className="text-2xl font-bold mb-6">Novo Profissional</h2>
-            <form onSubmit={handleCreate} className="space-y-4">
+            <h2 className="text-2xl font-bold mb-6">
+              {editing ? "Editar Profissional" : "Novo Profissional"}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label>Nome Completo</Label>
                 <Input
@@ -557,7 +619,7 @@ export default function Professionals() {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setIsDialogOpen(false)}
+                  onClick={closeDialog}
                 >
                   Cancelar
                 </Button>
