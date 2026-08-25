@@ -578,14 +578,58 @@ export async function listPatients(opts?: {
 }): Promise<Patient[]> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
-  const { data, error } = await supabase.rpc("list_patients", {
+  // O PostgREST devolve no máximo 1000 linhas por requisição: acima disso a
+  // lista de pacientes vinha cortada. A RPC ordena por created_at/id.
+  const PAGE = 1000;
+  const MAX_PAGES = 30;
+  const rows: PatientRow[] = [];
+  const seen = new Set<number>();
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * PAGE;
+    const { data, error } = await supabase
+      .rpc("list_patients", {
+        p_slug: slug,
+        p_password: password,
+        p_status: opts?.status ?? null,
+        p_professional_id: opts?.professionalId ?? null,
+      })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const chunk = (data ?? []) as PatientRow[];
+    for (const r of chunk) {
+      const id = Number(r.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      rows.push(r);
+    }
+    if (chunk.length < PAGE) break;
+  }
+  return rows.map(mapPatient);
+}
+
+// Profissionais ativos por paciente, agregados no banco. A tela de Pacientes
+// usava list_appointments(dateFrom = hoje) só para montar a coluna
+// "Profissional"/"Multi", trazendo todos os agendamentos futuros.
+export async function listPatientActiveProfessionals(opts?: {
+  dateFrom?: string | null;
+  dateTo?: string | null;
+}): Promise<Map<number, string[]>> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_patient_active_professionals", {
     p_slug: slug,
     p_password: password,
-    p_status: opts?.status ?? null,
-    p_professional_id: opts?.professionalId ?? null,
+    p_date_from: opts?.dateFrom ?? null,
+    p_date_to: opts?.dateTo ?? null,
   });
   if (error) throw error;
-  return ((data ?? []) as PatientRow[]).map(mapPatient);
+  const rows = (data ?? []) as Array<{ patient_id: number | string; professional_names: string[] | null }>;
+  const map = new Map<number, string[]>();
+  for (const r of rows) {
+    const names = (r.professional_names ?? []).filter((n) => n && n.trim() !== "");
+    if (names.length > 0) map.set(Number(r.patient_id), names);
+  }
+  return map;
 }
 
 export async function getPatient(id: number): Promise<Patient | null> {

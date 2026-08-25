@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
 import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download, User, Printer, Stethoscope } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,7 @@ import {
   deletePatient,
   listProfessionals,
   listAppointments,
+  listPatientActiveProfessionals,
   nextProntuario as fetchNextProntuarioRpc,
   checkProntuario as checkProntuarioRpc,
   type Patient,
@@ -28,6 +29,51 @@ const STATUS_OPTIONS = [
 ];
 
 const today = () => new Date().toISOString().split("T")[0];
+
+// Janela usada para descobrir os profissionais ativos do paciente.
+const JANELA_PROFISSIONAIS_DIAS = 30;
+
+// Quantas linhas a tabela desenha por vez (a lista tem milhares de pacientes).
+const PAGE_SIZE = 100;
+
+const addDays = (iso: string, days: number) => {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
+// Enquanto a RPC agregada não estiver publicada no banco, cai para a leitura
+// dos agendamentos — mas só da janela, nunca de todo o futuro.
+async function loadPatientProfs(dateFrom: string, dateTo: string): Promise<Map<number, string[]>> {
+  try {
+    return await listPatientActiveProfessionals({ dateFrom, dateTo });
+  } catch {
+    try {
+      const apts = await listAppointments({ dateFrom, dateTo });
+      const byPatient = new Map<number, Map<number, string>>();
+      for (const a of apts) {
+        if (!["agendado", "atendimento", "presente"].includes(a.status)) continue;
+        if (!byPatient.has(a.patientId)) byPatient.set(a.patientId, new Map());
+        byPatient.get(a.patientId)!.set(a.professionalId, a.professionalName);
+      }
+      const map = new Map<number, string[]>();
+      for (const [pid, profs] of byPatient) map.set(pid, Array.from(profs.values()));
+      return map;
+    } catch {
+      return new Map();
+    }
+  }
+}
+
+// Evita refiltrar a lista inteira a cada tecla digitada.
+function useDebounced<T>(value: T, delay = 250): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
 
 type AlertaIdade = { tipo: "critico" | "alerta" | "ok"; text: string | null; idade: number };
 
@@ -78,7 +124,15 @@ export default function Patients() {
   const [patientProfs, setPatientProfs] = useState<Map<number, { names: string[]; count: number }>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { toast } = useToast();
+
+  const debouncedSearch = useDebounced(search);
+  const debouncedCid = useDebounced(cidFilter);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [debouncedSearch, debouncedCid, statusFilter, redeFilter, idadeAlertaFilter]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -110,24 +164,16 @@ export default function Patients() {
     setIsLoading(true);
     try {
       const todayStr = new Date().toISOString().slice(0, 10);
-      const [ps, pros, apts] = await Promise.all([
+      const dateTo = addDays(todayStr, JANELA_PROFISSIONAIS_DIAS);
+      const [ps, pros, profsByPatient] = await Promise.all([
         listPatients(),
         listProfessionals(),
-        listAppointments({ dateFrom: todayStr }).catch(() => []),
+        loadPatientProfs(todayStr, dateTo),
       ]);
       setPatients(ps);
       setProfessionals(pros);
-      // Group active appointments by patient to count distinct professionals
-      const pMap = new Map<number, Map<number, string>>();
-      for (const a of apts) {
-        if (["agendado", "atendimento", "presente"].includes(a.status)) {
-          if (!pMap.has(a.patientId)) pMap.set(a.patientId, new Map());
-          pMap.get(a.patientId)!.set(a.professionalId, a.professionalName);
-        }
-      }
       const ppMap = new Map<number, { names: string[]; count: number }>();
-      for (const [pid, profMap] of pMap) {
-        const names = Array.from(profMap.values());
+      for (const [pid, names] of profsByPatient) {
         ppMap.set(pid, { names, count: names.length });
       }
       setPatientProfs(ppMap);
@@ -248,22 +294,37 @@ export default function Patients() {
     toast({ title: "Relatório exportado!", description: `${patients.length} pacientes exportados para CSV.` });
   };
 
-  const filteredPatients = patients.filter(p => {
-    const matchName = p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.prontuario || "").toLowerCase().includes(search.toLowerCase());
-    const matchStatus = !statusFilter || p.status === statusFilter;
-    const matchCid = !cidFilter || (p.diagnosis || "").toLowerCase().includes(cidFilter.toLowerCase());
-    const matchRede = !redeFilter || p.escolaPublica === true;
-    const matchIdade = !idadeAlertaFilter || (() => {
-      const a = alertaIdade(p.dateOfBirth);
-      return a && a.tipo !== "ok";
-    })();
-    return matchName && matchStatus && matchCid && matchRede && matchIdade;
-  }).sort((a, b) => {
-    const pa = parseInt(a.prontuario || "0", 10) || 0;
-    const pb = parseInt(b.prontuario || "0", 10) || 0;
-    return pa - pb;
-  });
+  const filteredPatients = useMemo(() => {
+    const termo = debouncedSearch.trim().toLowerCase();
+    const cid = debouncedCid.trim().toLowerCase();
+    return patients.filter(p => {
+      const matchName = !termo || p.name.toLowerCase().includes(termo) ||
+        (p.prontuario || "").toLowerCase().includes(termo);
+      const matchStatus = !statusFilter || p.status === statusFilter;
+      const matchCid = !cid || (p.diagnosis || "").toLowerCase().includes(cid);
+      const matchRede = !redeFilter || p.escolaPublica === true;
+      const matchIdade = !idadeAlertaFilter || (() => {
+        const a = alertaIdade(p.dateOfBirth);
+        return a && a.tipo !== "ok";
+      })();
+      return matchName && matchStatus && matchCid && matchRede && matchIdade;
+    }).sort((a, b) => {
+      const pa = parseInt(a.prontuario || "0", 10) || 0;
+      const pb = parseInt(b.prontuario || "0", 10) || 0;
+      return pa - pb;
+    });
+  }, [patients, debouncedSearch, debouncedCid, statusFilter, redeFilter, idadeAlertaFilter]);
+
+  const profById = useMemo(() => {
+    const m = new Map<number, Professional>();
+    for (const p of professionals) m.set(p.id, p);
+    return m;
+  }, [professionals]);
+
+  const visiblePatients = useMemo(
+    () => filteredPatients.slice(0, visibleCount),
+    [filteredPatients, visibleCount],
+  );
 
   // Levantamento por CID/diagnóstico: agrupa os pacientes pelo código CID-10
   // encontrado no texto do diagnóstico (ex.: "G80"); quando não há código,
@@ -434,8 +495,8 @@ export default function Patients() {
               ) : filteredPatients.length === 0 ? (
                 <tr><td colSpan={hasAdminScope() ? 8 : 7} className="text-center py-8 text-muted-foreground">Nenhum paciente encontrado.</td></tr>
               ) : (
-                filteredPatients.map((patient) => {
-                  const prof = professionals.find(p => p.id === patient.professionalId);
+                visiblePatients.map((patient) => {
+                  const prof = patient.professionalId != null ? profById.get(patient.professionalId) : undefined;
                   const hasWarning = patient.absenceCount >= 3;
                   const idAlerta = alertaIdade(patient.dateOfBirth);
                   const isRede = patient.escolaPublica;
@@ -454,7 +515,7 @@ export default function Patients() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
                           {patient.photoUrl ? (
-                            <img src={patient.photoUrl} alt={patient.name} className="w-8 h-8 rounded-full object-cover border border-border shrink-0" />
+                            <img src={patient.photoUrl} alt={patient.name} loading="lazy" decoding="async" className="w-8 h-8 rounded-full object-cover border border-border shrink-0" />
                           ) : (
                             <span className="w-8 h-8 rounded-full flex items-center justify-center bg-secondary/40 border border-border shrink-0">
                               <User className="w-4 h-4 text-muted-foreground" />
@@ -536,6 +597,17 @@ export default function Patients() {
             </tbody>
           </table>
         </div>
+
+        {!isLoading && filteredPatients.length > visiblePatients.length && (
+          <div className="flex flex-col items-center gap-2 mt-4">
+            <p className="text-xs text-muted-foreground">
+              Mostrando {visiblePatients.length} de {filteredPatients.length} pacientes
+            </p>
+            <Button variant="outline" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
+              Carregar mais {Math.min(PAGE_SIZE, filteredPatients.length - visiblePatients.length)}
+            </Button>
+          </div>
+        )}
       </Card>
 
       {isDialogOpen && (
