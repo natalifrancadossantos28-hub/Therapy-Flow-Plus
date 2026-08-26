@@ -1102,25 +1102,6 @@ export default function Reception() {
 
   const atestadoCount = atestados.length;
 
-  // ── Gatilho Automático: detecta pacientes cujo horário já passou sem "Presente" ──
-  const missedAppointments = (() => {
-    if (!appointments || appointments.length === 0) return [];
-    const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    return appointments.filter((apt) => {
-      const s = apt.status?.toLowerCase() ?? "agendado";
-      const isUntouched = s === "agendado" || s === "agendada" || s === "scheduled";
-      if (!isUntouched) return false;
-      const [h, m] = apt.time.split(":").map(Number);
-      if (isNaN(h) || isNaN(m)) return false;
-      const aptMinutes = h * 60 + m + 50; // 50 min after start = session should be over
-      return nowMinutes > aptMinutes;
-    });
-  })();
-
-  const [dismissedMissed, setDismissedMissed] = useState<Set<number>>(new Set());
-  const visibleMissed = missedAppointments.filter((a) => !dismissedMissed.has(a.id));
-
   const situacaoTabs: [SituacaoFilter, string, number][] = [
     ["pendentes", "Pendentes", appointments.filter(isPendente).length],
     ["presente", "Presente", appointments.filter(isPresente).length],
@@ -1154,13 +1135,6 @@ export default function Reception() {
                 ⚠️ {atestadoCount} atestado{atestadoCount > 1 ? "s" : ""} pendente{atestadoCount > 1 ? "s" : ""}
               </span>
             )}
-            {visibleMissed.length > 0 && (
-              <span className="ml-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold animate-pulse"
-                style={{ background: "rgba(251,146,60,0.15)", border: "1px solid rgba(251,146,60,0.50)", color: "#fb923c",
-                  boxShadow: "0 0 12px rgba(251,146,60,0.3)" }}>
-                <BellRing className="w-3 h-3" /> {visibleMissed.length} faltoso{visibleMissed.length > 1 ? "s" : ""} detectado{visibleMissed.length > 1 ? "s" : ""}
-              </span>
-            )}
           </p>
         </div>
         <NotificationBell />
@@ -1174,99 +1148,6 @@ export default function Reception() {
           <span className="font-semibold">
             Hoje é feriado{todayHoliday.descricao ? ` — ${todayHoliday.descricao}` : ""}. Nenhum atendimento agendado.
           </span>
-        </div>
-      )}
-
-      {/* ── Painel de Faltosos Automáticos ── */}
-      {visibleMissed.length > 0 && (
-        <div className="rounded-2xl border p-4 space-y-3"
-          style={{
-            background: "linear-gradient(135deg, rgba(251,146,60,0.08), rgba(239,68,68,0.04))",
-            borderColor: "rgba(251,146,60,0.40)",
-            boxShadow: "0 0 20px rgba(251,146,60,0.15)",
-          }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center animate-pulse"
-                style={{ background: "rgba(251,146,60,0.20)", color: "#fb923c" }}>
-                <BellRing className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-sm font-bold" style={{ color: "#fb923c" }}>
-                  Sininho de Faltas — Pacientes sem presença registrada
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Horário já passou e o status continua como &quot;Agendado&quot;. Clique para notificar via WhatsApp.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {visibleMissed.map((apt) => {
-              const enriched = { ...apt, prontuario: apt.prontuario || prontuarioMap.get(apt.patientId) || null } as Appointment;
-              const specKey = `${apt.patientId}::${apt.professionalSpecialty}`;
-              const specCount = specialtyAbsences.get(specKey) ?? 0;
-              return (
-                <div key={apt.id}
-                  className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 border transition-colors hover:border-orange-400/60"
-                  style={{
-                    background: "rgba(251,146,60,0.05)",
-                    borderColor: "rgba(251,146,60,0.25)",
-                  }}>
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-sm shrink-0"
-                      style={{ background: "rgba(251,146,60,0.12)", color: "#fb923c" }}>
-                      {apt.time}
-                    </div>
-                    <PatientAvatar url={photoMap.get(apt.patientId)} name={apt.patientName} size={56} />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">
-                        {enriched.prontuario ? `${enriched.prontuario} - ` : ""}{apt.patientName}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {apt.professionalName} • {apt.professionalSpecialty}
-                        {specCount > 0 && (
-                          <span className={cn(
-                            "ml-2 font-bold",
-                            specCount >= 3 ? "text-rose-400" : specCount >= 2 ? "text-amber-400" : "text-orange-400"
-                          )}>
-                            ({specCount}ª falta anterior)
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      className="h-9 px-3 rounded-lg flex items-center gap-2 text-xs font-bold transition-all"
-                      style={{
-                        background: "rgba(251,146,60,0.12)",
-                        border: "1px solid rgba(251,146,60,0.45)",
-                        color: "#fb923c",
-                        boxShadow: "0 0 10px rgba(251,146,60,0.25)",
-                      }}
-                      onClick={() => {
-                        const newCount = specCount + 1;
-                        setAbsenceBellData({ apt: enriched, absenceCount: newCount });
-                      }}
-                      title="Registrar falta e notificar via WhatsApp"
-                    >
-                      <BellRing className="w-3.5 h-3.5" />
-                      Notificar
-                    </button>
-                    <button
-                      className="h-9 w-9 rounded-lg flex items-center justify-center border border-border/40 text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => setDismissedMissed((prev) => new Set(prev).add(apt.id))}
-                      title="Dispensar alerta"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 
@@ -1373,6 +1254,7 @@ export default function Reception() {
             <p className="text-xs text-muted-foreground mt-1">
               <strong>Presente</strong> só com o check-in da recepção (botão ✓). <strong>Agendado</strong> = paciente recém-puxado,
               ainda sem a primeira avaliação; depois dela ele fica <strong>Ativo</strong> até receber alta.
+              Faltas e presenças são registradas só pelos botões desta tela — o sistema não marca nem avisa falta sozinho.
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
