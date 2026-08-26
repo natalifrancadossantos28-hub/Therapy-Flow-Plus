@@ -8,6 +8,7 @@ import {
   updateAppointment,
   deletePatient,
   countAbsencesBySpecialty,
+  listFirstEvaluationDone,
   listFeriados,
   listAusencias,
   type Professional as ArcoProfessional,
@@ -403,9 +404,10 @@ function AbsenceBellModal({
 }
 
 function AppointmentRow({
-  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, photoUrl, drivers,
+  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, photoUrl, drivers, emAcompanhamento,
 }: {
   apt: Appointment;
+  emAcompanhamento: boolean;
   photoUrl?: string | null;
   drivers: string[];
   index: number;
@@ -433,7 +435,14 @@ function AppointmentRow({
   const isFalta = statusLower === "ausente" || statusLower === "falta_nao_justificada";
   const isJustificado = statusLower === "falta_justificada" || statusLower === "justificado" || statusLower === "abonado";
   const isPresente = statusLower === "presente";
-  const recepcaoStatus = statusLower === "atendimento" || statusLower === "em_atendimento" ? "agendado" : (apt.status ?? "");
+  // Ainda não marcado hoje: "Agendado" só enquanto a primeira avaliação não
+  // aconteceu; depois dela o paciente segue "Ativo" até a alta.
+  const aguardandoCheckin =
+    statusLower === "" || statusLower === "agendado" ||
+    statusLower === "atendimento" || statusLower === "em_atendimento";
+  const recepcaoStatus = aguardandoCheckin
+    ? (emAcompanhamento ? "ativo" : "agendado")
+    : (apt.status ?? "");
 
   return (
     <MotionCard
@@ -681,6 +690,7 @@ export default function Reception() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMutating, setIsMutating] = useState<boolean>(false);
   const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
+  const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
   const [feriados, setFeriados] = useState<Feriado[]>([]);
   const feriadosRef = useRef<Feriado[]>([]);
   const ausenciasRef = useRef<Ausencia[]>([]);
@@ -699,6 +709,7 @@ export default function Reception() {
         setSpecialtyAbsences(map);
       })
       .catch(console.error);
+    listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
   }, []);
 
   const reloadAppointments = useCallback(() => {
@@ -1360,8 +1371,8 @@ export default function Reception() {
           <div>
             <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              <strong>Presente</strong> só com o check-in da recepção (botão ✓). <strong>Em Atendimento</strong> (cadastro) = paciente
-              com vínculo ativo na unidade, sem indicar presença hoje.
+              <strong>Presente</strong> só com o check-in da recepção (botão ✓). <strong>Agendado</strong> = paciente recém-puxado,
+              ainda sem a primeira avaliação; depois dela ele fica <strong>Ativo</strong> até receber alta.
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -1445,6 +1456,7 @@ export default function Reception() {
                 onFirstApptMsg={setFirstApptMsgApt}
                 onAbsenceBell={(a, count) => setAbsenceBellData({ apt: a, absenceCount: count })}
                 drivers={transportByPatient.get(apt.patientId) ?? []}
+                emAcompanhamento={firstEvalDone.has(`${apt.patientId}::${apt.professionalSpecialty}`)}
               />
               </div>
             );})
