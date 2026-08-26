@@ -1611,6 +1611,23 @@ export async function countAbsencesBySpecialty(): Promise<AbsenceBySpecialty[]> 
   return (data ?? []) as AbsenceBySpecialty[];
 }
 
+/**
+ * Pares paciente::especialidade que já passaram pela primeira avaliação (têm
+ * atendimento anterior a hoje que não foi cancelado nem virou falta).
+ * A Recepção usa para diferenciar "Agendado" (recém-puxado) de "Ativo".
+ */
+export async function listFirstEvaluationDone(): Promise<Set<string>> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_first_evaluation_done", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{ patient_id: number; specialty: string | null }>;
+  return new Set(rows.map((r) => `${r.patient_id}::${r.specialty ?? ""}`));
+}
+
 export async function deleteRecurrenceForward(
   recurrenceGroupId: string,
   fromDate: string,
