@@ -286,10 +286,10 @@ function AbsenceBellModal({
   // Mensagens regulares
   const msg1 = `Olá! Notamos que ${apt.patientName} não pôde comparecer à terapia hoje. E estamos passando para avisar que registramos esta como a primeira falta. Qualquer dúvida estamos a disposição. Atenciosamente, Recepção.`;
   const msg2 = `Olá! Sentimos a falta de ${apt.patientName} hoje novamente. Estamos registrando essa como a segunda falta dos atendimentos. Queremos lembrar que, se houver uma terceira falta, teremos que encerrar o atendimento com a especialidade ${apt.professionalSpecialty}.`;
-  const msg3 = `Olá! Infelizmente, devido à terceira falta consecutiva de ${apt.patientName}, conforme as regras da unidade, estamos encerrando o ciclo de atendimentos. E o paciente ${apt.patientName} estará retornando à fila de espera.`;
+  const msg3 = `Olá! Notamos que o(a) paciente ${apt.patientName} atingiu o limite de faltas permitido pelas normas da unidade. Pedimos que compareça à unidade o quanto antes para conversarmos sobre a situação do atendimento de ${apt.professionalSpecialty} e verificarmos os próximos passos. Estamos à disposição!\nEquipe Núcleo de Atendimento Novo Arco-íris 🌈`;
 
   const regularMsg = absenceCount >= 3 ? msg3 : absenceCount === 2 ? msg2 : msg1;
-  const regularLabel = absenceCount >= 3 ? "3ª Falta — Alta/Desligamento" : absenceCount === 2 ? "2ª Falta — Aviso" : "1ª Falta — Registro";
+  const regularLabel = absenceCount >= 3 ? "3ª Falta — Limite atingido" : absenceCount === 2 ? "2ª Falta — Aviso" : "1ª Falta — Registro";
   const regularColor = absenceCount >= 3 ? "text-rose-400" : absenceCount === 2 ? "text-amber-400" : "text-orange-400";
 
   return (
@@ -379,10 +379,10 @@ function AbsenceBellModal({
             {absenceCount >= 3 && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-400/30">
                 <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                <p className="text-xs text-rose-300 font-semibold">Paciente será encaminhado para a fila de espera</p>
+                <p className="text-xs text-rose-300 font-semibold">Responsável será convidado a comparecer à unidade para conversar sobre o atendimento</p>
               </div>
             )}
-            <p className="text-sm leading-relaxed border border-border/30 rounded-lg p-3 bg-background/50">{regularMsg}</p>
+            <p className="text-sm leading-relaxed whitespace-pre-line border border-border/30 rounded-lg p-3 bg-background/50">{regularMsg}</p>
             <div className="flex gap-2">
               <Button
                 className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
