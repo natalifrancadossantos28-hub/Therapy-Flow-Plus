@@ -9,10 +9,11 @@ import {
   getProfessional,
   upsertProfessional,
   listAppointments,
+  listFirstEvaluationDone,
   type Professional,
   type AppointmentListItem,
 } from "@/lib/arco-rpc";
-import { getStatusColor, getStatusLabel } from "@/lib/utils";
+import { getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey } from "@/lib/utils";
 
 export default function ProfessionalDetail() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +26,7 @@ export default function ProfessionalDetail() {
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<AppointmentListItem[]>([]);
   const [apptLoading, setApptLoading] = useState(false);
+  const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -45,6 +47,10 @@ export default function ProfessionalDetail() {
   }, [profId, toast]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (!profId || !date) return;
@@ -177,19 +183,25 @@ export default function ProfessionalDetail() {
                 {appointments
                   .slice()
                   .sort((a, b) => a.time.localeCompare(b.time))
-                  .map((a) => (
+                  .map((a) => {
+                    const status = displayApptStatus(
+                      a.status,
+                      firstEvalDone.has(firstEvalKey(a.patientId, professional.specialty)),
+                    );
+                    return (
                     <div key={a.id} className="flex items-center gap-4 px-6 py-4">
                       <div className="font-mono text-sm font-bold text-primary w-16">{a.time}</div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{a.patientName ?? `Paciente #${a.patientId}`}</p>
                       </div>
                       <span
-                        className={`text-xs font-semibold px-2 py-1 rounded ${getStatusColor(a.status)}`}
+                        className={`text-xs font-semibold px-2 py-1 rounded ${getStatusColor(status)}`}
                       >
-                        {getStatusLabel(a.status)}
+                        {getStatusLabel(status)}
                       </span>
                     </div>
-                  ))}
+                    );
+                  })}
               </div>
             )}
           </Card>

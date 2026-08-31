@@ -20,7 +20,7 @@ import {
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { supabase } from "@/lib/supabase";
 import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom";
-import { getStatusColor, getStatusLabel, cn } from "@/lib/utils";
+import { getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, cn } from "@/lib/utils";
 import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
@@ -435,14 +435,7 @@ function AppointmentRow({
   const isFalta = statusLower === "ausente" || statusLower === "falta_nao_justificada";
   const isJustificado = statusLower === "falta_justificada" || statusLower === "justificado" || statusLower === "abonado";
   const isPresente = statusLower === "presente";
-  // Ainda não marcado hoje: "Agendado" só enquanto a primeira avaliação não
-  // aconteceu; depois dela o paciente segue "Ativo" até a alta.
-  const aguardandoCheckin =
-    statusLower === "" || statusLower === "agendado" ||
-    statusLower === "atendimento" || statusLower === "em_atendimento";
-  const recepcaoStatus = aguardandoCheckin
-    ? (emAcompanhamento ? "ativo" : "agendado")
-    : (apt.status ?? "");
+  const recepcaoStatus = displayApptStatus(apt.status, emAcompanhamento);
 
   return (
     <MotionCard
@@ -1338,7 +1331,7 @@ export default function Reception() {
                 onFirstApptMsg={setFirstApptMsgApt}
                 onAbsenceBell={(a, count) => setAbsenceBellData({ apt: a, absenceCount: count })}
                 drivers={transportByPatient.get(apt.patientId) ?? []}
-                emAcompanhamento={firstEvalDone.has(`${apt.patientId}::${apt.professionalSpecialty}`)}
+                emAcompanhamento={firstEvalDone.has(firstEvalKey(apt.patientId, apt.professionalSpecialty))}
               />
               </div>
             );})

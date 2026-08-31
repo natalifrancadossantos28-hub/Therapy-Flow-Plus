@@ -10,7 +10,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
+import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -39,6 +39,7 @@ import {
   undoMultiAppointment,
   listFeriados,
   listAusencias,
+  listFirstEvaluationDone,
   type Professional as ArcoProfessional,
   type AppointmentListItem,
   type Feriado,
@@ -485,6 +486,7 @@ export default function Agenda() {
   const [pauseSending, setPauseSending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
+  const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
   const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
   const [docsById, setDocsById] = useState<Map<number, { cpf: string | null; cns: string | null }>>(new Map());
   const { toast } = useToast();
@@ -529,6 +531,7 @@ export default function Agenda() {
     }).catch(console.error);
     listFeriados().then(setFeriados).catch(console.error);
     listAusencias().then(setAusencias).catch(console.error);
+    listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
   }, []);
 
   const canView = isAdmin || pinVerified;
@@ -1443,6 +1446,13 @@ export default function Agenda() {
   // Por fim, oculta feriados e ausências do profissional (férias/folga/falta).
   const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
   const viewingDriver = isTransportSpecialty(selectedProf?.specialty);
+  // "Agendado" só para quem ainda não passou pela primeira avaliação; os demais
+  // aparecem "Ativo" até a alta (mesma regra da Recepção).
+  const apptStatus = (apt: { patientId: number; status: string }): string =>
+    displayApptStatus(
+      apt.status,
+      firstEvalDone.has(firstEvalKey(apt.patientId, selectedProf?.specialty)),
+    );
 
   // Dias em que o paciente ainda tem atendimento de pé (profissional presente,
   // sem feriado). Só usado na agenda do motorista.
@@ -1487,7 +1497,7 @@ export default function Agenda() {
         patientId: a.patientId,
         patientName: a.patientName ?? null,
         prontuario: a.prontuario ?? null,
-        status: a.status,
+        status: apptStatus(a),
       }));
   };
 
@@ -1775,8 +1785,8 @@ export default function Agenda() {
                                         )}
                                       </span>
                                     </div>
-                                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apt.status))}>
-                                      {getStatusLabel(apt.status)}
+                                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
+                                      {getStatusLabel(apptStatus(apt))}
                                     </span>
                                     {apt.paused && (
                                       <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
@@ -2029,7 +2039,7 @@ export default function Agenda() {
                   <span className={apt ? "font-semibold text-foreground" : "text-muted-foreground italic"}>
                     {apt ? (apt.patientName || `Paciente #${apt.patientId}`) : "Livre"}
                   </span>
-                  {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>}
+                  {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>}
                 </div>
               );
             })}
