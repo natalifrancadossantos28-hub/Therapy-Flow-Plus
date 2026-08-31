@@ -139,13 +139,16 @@ export default function Dashboard() {
     const histFrom = format(subMonths(hoje, 12), "yyyy-MM-dd");
     const hojeStr = format(hoje, "yyyy-MM-dd");
     const futTo = format(addMonths(hoje, 6), "yyyy-MM-dd");
+    const profsPromise = listProfessionals();
+    // A lista de profissionais não espera as janelas de agendamento (bem mais
+    // lentas): o card "Profissionais" precisa aparecer assim que ela chega.
+    profsPromise.then(setProfessionals).catch(console.error);
     Promise.allSettled([
-      listProfessionals(),
+      profsPromise,
       listAppointments({ dateFrom: histFrom, dateTo: hojeStr }),
       listAppointments({ dateFrom: hojeStr, dateTo: futTo }),
     ]).then(([pr, pastRes, futRes]) => {
       const profs = pr.status === "fulfilled" ? pr.value : [];
-      setProfessionals(profs);
       const pastApts = pastRes.status === "fulfilled" ? pastRes.value : [];
       const futApts = futRes.status === "fulfilled" ? futRes.value : [];
       if (pastRes.status !== "fulfilled" && futRes.status !== "fulfilled") {
@@ -250,19 +253,29 @@ export default function Dashboard() {
   const totalPatients = patients?.length || 0;
   const totalProfessionals = (professionals || []).filter(p => !isTransportSpecialty(p.specialty)).length;
 
-  // Pacientes ATIVOS em atendimento (naquele momento): distintos com agendamento
-  // ativo/futuro. Difere do total de CADASTROS (todos já cadastrados na base).
+  // Pacientes com VÍNCULO ATIVO na unidade — não é presença de hoje. Conta o
+  // cadastro em tratamento (status "Atendimento") e também quem tem agendamento
+  // de hoje em diante, mesmo que o cadastro ainda não tenha sido atualizado.
   const activePatients = useMemo(() => {
     const hojeStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-    const ACTIVE = new Set(["agendado", "atendimento", "em_atendimento", "em atendimento", "presente", "remanejado", "remarcado"]);
+    const ENCERRADOS = new Set(["óbito", "obito", "desistência", "desistencia"]);
+    const VINCULO = new Set(["atendimento", "em atendimento", "em_atendimento", "ativo"]);
+    const ATIVO_APT = new Set(["agendado", "atendimento", "em_atendimento", "em atendimento", "presente", "ativo", "remanejado", "remarcado"]);
+    const encerrados = new Set<number>();
     const ids = new Set<number>();
+    for (const p of patients || []) {
+      const st = (p.status || "").toLowerCase();
+      if (ENCERRADOS.has(st)) { encerrados.add(p.id); continue; }
+      if (VINCULO.has(st)) ids.add(p.id);
+    }
     for (const a of allAppointments) {
       if ((a.date || "") < hojeStr) continue;
-      if (!ACTIVE.has((a.status || "").toLowerCase())) continue;
+      if (!ATIVO_APT.has((a.status || "").toLowerCase())) continue;
+      if (encerrados.has(a.patientId)) continue;
       ids.add(a.patientId);
     }
     return ids.size;
-  }, [allAppointments]);
+  }, [allAppointments, patients]);
   const todayCount = (todayAppointments || []).filter(a => {
     const st = (a.status || "agendado").toLowerCase();
     return st !== "desmarcado" && st !== "cancelado";
