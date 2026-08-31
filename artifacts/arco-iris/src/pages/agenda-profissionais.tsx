@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
+import { AbsenceBadge } from "@/components/AbsenceBadge";
 import { DocCopyRow } from "@/components/PatientDocs";
 import { supabase } from "@/lib/supabase";
 import {
@@ -34,6 +35,7 @@ import {
   listFeriados,
   listAusencias,
   listFirstEvaluationDone,
+  countAbsencesBySpecialty,
   type AppointmentListItem,
   type Feriado,
   type Ausencia,
@@ -249,6 +251,7 @@ export default function AgendaProfissionais() {
       : "";
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
+  const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
   const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
   const [docsById, setDocsById] = useState<Map<number, { cpf: string | null; cns: string | null }>>(new Map());
   const [selectedProfId, setSelectedProfId] = useState(
@@ -339,6 +342,9 @@ export default function AgendaProfissionais() {
       firstEvalDone.has(firstEvalKey(apt.patientId, selectedProf?.specialty)),
     );
 
+  const absenceCount = (patientId: number): number =>
+    specialtyAbsences.get(`${patientId}::${selectedProf?.specialty ?? ""}`) ?? 0;
+
   useEffect(() => {
     listProfessionals()
       .then((list) =>
@@ -365,6 +371,9 @@ export default function AgendaProfissionais() {
     listFeriados().then(setFeriados).catch(console.error);
     listAusencias().then(setAusencias).catch(console.error);
     listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
+    countAbsencesBySpecialty()
+      .then(rows => setSpecialtyAbsences(new Map(rows.map(r => [`${r.patient_id}::${r.specialty}`, Number(r.absence_count)]))))
+      .catch(console.error);
   }, []);
 
   const loadedRangeRef = useRef<{ from: string; to: string } | null>(null);
@@ -1512,6 +1521,7 @@ export default function AgendaProfissionais() {
                                             )}
                                           </div>
                                           <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>
+                                          <AbsenceBadge count={absenceCount(apt.patientId)} compact />
                                           {(apt.paused || (apt.status || "").toLowerCase() === "pausado") && (
                                             <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
                                               <Snowflake className="w-2.5 h-2.5" /> Pausado
@@ -1740,6 +1750,7 @@ export default function AgendaProfissionais() {
                       <span className={apt ? "font-semibold text-foreground" : "text-muted-foreground italic"}>
                         {apt ? (apt.patientName || `Paciente #${apt.patientId}`) : "Livre"}
                       </span>
+                      {apt && <AbsenceBadge count={absenceCount(apt.patientId)} />}
                       {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>}
                     </div>
                   );
