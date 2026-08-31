@@ -3,7 +3,7 @@ import { format, startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns
 import { ptBR } from "date-fns/locale";
 import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/lib/print-agenda";
 import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play, Bus } from "lucide-react";
-import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
+import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -33,6 +33,7 @@ import {
   undoMultiAppointment,
   listFeriados,
   listAusencias,
+  listFirstEvaluationDone,
   type AppointmentListItem,
   type Feriado,
   type Ausencia,
@@ -247,6 +248,7 @@ export default function AgendaProfissionais() {
       ? new URLSearchParams(window.location.search).get("prof") || ""
       : "";
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
   const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
   const [docsById, setDocsById] = useState<Map<number, { cpf: string | null; cns: string | null }>>(new Map());
   const [selectedProfId, setSelectedProfId] = useState(
@@ -329,6 +331,13 @@ export default function AgendaProfissionais() {
   const weekDates = weekDays.map(d => format(d, "yyyy-MM-dd"));
   const today = format(new Date(), "yyyy-MM-dd");
   const selectedProf = professionals.find(p => String(p.id) === selectedProfId);
+  // "Agendado" só antes da primeira avaliação; depois dela o paciente aparece
+  // "Ativo" até a alta (mesma regra da Recepção e da Agenda Geral).
+  const apptStatus = (apt: { patientId: number; status: string }): string =>
+    displayApptStatus(
+      apt.status,
+      firstEvalDone.has(firstEvalKey(apt.patientId, selectedProf?.specialty)),
+    );
 
   useEffect(() => {
     listProfessionals()
@@ -355,6 +364,7 @@ export default function AgendaProfissionais() {
     }).catch(console.error);
     listFeriados().then(setFeriados).catch(console.error);
     listAusencias().then(setAusencias).catch(console.error);
+    listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
   }, []);
 
   const loadedRangeRef = useRef<{ from: string; to: string } | null>(null);
@@ -500,7 +510,7 @@ export default function AgendaProfissionais() {
         patientId: a.patientId,
         patientName: a.patientName ?? null,
         prontuario: a.prontuario ?? null,
-        status: a.status,
+        status: apptStatus(a),
       }));
   };
 
@@ -1501,7 +1511,7 @@ export default function AgendaProfissionais() {
                                               <Lock className="w-3 h-3 shrink-0" style={{ color: "#22d3ee", filter: "drop-shadow(0 0 4px rgba(6,182,212,0.7))" }} />
                                             )}
                                           </div>
-                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>
+                                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>
                                           {(apt.paused || (apt.status || "").toLowerCase() === "pausado") && (
                                             <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
                                               <Snowflake className="w-2.5 h-2.5" /> Pausado
@@ -1730,7 +1740,7 @@ export default function AgendaProfissionais() {
                       <span className={apt ? "font-semibold text-foreground" : "text-muted-foreground italic"}>
                         {apt ? (apt.patientName || `Paciente #${apt.patientId}`) : "Livre"}
                       </span>
-                      {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>}
+                      {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>}
                     </div>
                   );
                 })}

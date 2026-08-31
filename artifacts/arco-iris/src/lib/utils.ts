@@ -61,6 +61,27 @@ export const getStatusLabel = (status: string): string => {
   return status;
 };
 
+/** Chave do conjunto devolvido por listFirstEvaluationDone(). */
+export const firstEvalKey = (patientId: number, specialty: string | null | undefined): string =>
+  `${patientId}::${specialty ?? ""}`;
+
+/**
+ * Status exibido nas agendas, na Recepção e nas listagens: "Agendado" vale só
+ * para quem ainda não passou pela primeira avaliação naquela especialidade;
+ * depois dela o paciente segue "Ativo" até a alta. Faltas, justificativas,
+ * remarcações e cancelamentos são preservados como estão.
+ */
+export const displayApptStatus = (
+  status: string | null | undefined,
+  emAcompanhamento: boolean,
+): string => {
+  const s = (status ?? "").toLowerCase();
+  const semMarcacao =
+    s === "" || s === "agendado" || s === "atendimento" || s === "em_atendimento";
+  if (!semMarcacao) return status ?? "";
+  return emAcompanhamento ? "ativo" : "agendado";
+};
+
 /**
  * Calcula a idade em anos completos a partir de uma data de nascimento.
  * Aceita YYYY-MM-DD, DD/MM/YYYY e ISO timestamps.

@@ -13,10 +13,10 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, CalendarDays, X } from "lucide-react";
-import { listAppointments, listProfessionals, type AppointmentListItem, type Professional } from "@/lib/arco-rpc";
+import { listAppointments, listProfessionals, listFirstEvaluationDone, type AppointmentListItem, type Professional } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { Card, Button } from "@/components/ui-custom";
-import { cn } from "@/lib/utils";
+import { cn, displayApptStatus, firstEvalKey } from "@/lib/utils";
 import { specialtyTone, specialtyShortLabel, specialtyKey } from "@/lib/specialty-colors";
 import { listDrivers } from "@/lib/transporte";
 
@@ -26,6 +26,7 @@ import { listDrivers } from "@/lib/transporte";
 
 const STATUS_STYLE: Record<string, { label: string; cls: string; dot: string }> = {
   agendado:               { label: "Agendado",          cls: "bg-blue-500/15 text-blue-300 border-blue-500/30",     dot: "bg-blue-400" },
+  ativo:                  { label: "Ativo",             cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400" },
   atendimento:            { label: "Em atendimento",    cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400" },
   presente:               { label: "Presente",          cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400" },
   ausente:                { label: "Ausente",           cls: "bg-amber-500/15 text-amber-300 border-amber-500/30",  dot: "bg-amber-400" },
@@ -53,6 +54,7 @@ export default function AgendaMensal() {
   const [appointmentsRaw, setAppointments] = useState<AppointmentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
 
   // Transporte só aparece (e só conta) quando o mês está filtrado pelo próprio
   // motorista — é a agenda administrativa dele, não atendimento clínico.
@@ -84,6 +86,7 @@ export default function AgendaMensal() {
 
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
+    listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
   }, []);
 
   const fetchAppointments = () => {
@@ -154,6 +157,14 @@ export default function AgendaMensal() {
   const specialtyOf = (a: AppointmentListItem): string | null =>
     specialtyByProfId.get(a.professionalId) ?? null;
 
+  // "Agendado" só antes da primeira avaliação; depois dela o paciente aparece
+  // "Ativo" até a alta (mesma regra da Recepção e das agendas).
+  const apptStatus = (a: AppointmentListItem): string =>
+    displayApptStatus(
+      a.status,
+      firstEvalDone.has(firstEvalKey(a.patientId, specialtyOf(a))),
+    );
+
   const goPrev = () => setMonthRef((d) => addMonths(d, -1));
   const goNext = () => setMonthRef((d) => addMonths(d, 1));
   const goToday = () => setMonthRef(new Date());
@@ -169,11 +180,12 @@ export default function AgendaMensal() {
       const d = new Date(a.date + "T00:00:00");
       if (!isSameMonth(d, monthRef)) continue;
       total++;
-      const k = (a.status ?? "agendado").toLowerCase();
+      const k = apptStatus(a).toLowerCase();
       perStatus[k] = (perStatus[k] ?? 0) + 1;
     }
     return { total, perStatus };
-  }, [appointments, monthRef]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointments, monthRef, firstEvalDone, specialtyByProfId]);
 
   const selectedAppointments = selectedDay ? byDate.get(selectedDay) ?? [] : [];
 
@@ -260,7 +272,7 @@ export default function AgendaMensal() {
             // Conta por especialidade (cor neon de cada área).
             const especialidades: Record<string, number> = {};
             for (const a of apts) {
-              const k = (a.status ?? "agendado").toLowerCase();
+              const k = apptStatus(a).toLowerCase();
               counts[k] = (counts[k] ?? 0) + 1;
               const sk = specialtyKey(specialtyOf(a));
               especialidades[sk] = (especialidades[sk] ?? 0) + 1;
@@ -342,6 +354,7 @@ export default function AgendaMensal() {
           dateKey={selectedDay}
           appointments={selectedAppointments}
           specialtyByProfId={specialtyByProfId}
+          statusOfAppointment={apptStatus}
           onClose={() => setSelectedDay(null)}
         />
       )}
@@ -405,11 +418,13 @@ function DayDetailModal({
   dateKey,
   appointments,
   specialtyByProfId,
+  statusOfAppointment,
   onClose,
 }: {
   dateKey: string;
   appointments: AppointmentListItem[];
   specialtyByProfId: Map<number, string | null>;
+  statusOfAppointment: (a: AppointmentListItem) => string;
   onClose: () => void;
 }) {
   const d = new Date(dateKey + "T00:00:00");
@@ -438,7 +453,7 @@ function DayDetailModal({
             </div>
           )}
           {appointments.map((a) => {
-            const s = statusOf(a.status);
+            const s = statusOf(statusOfAppointment(a));
             const specialty = specialtyByProfId.get(a.professionalId) ?? null;
             const tone = specialtyTone(specialty);
             const lbl = specialtyShortLabel(specialty);
