@@ -15,6 +15,7 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
+import { AbsenceBadge } from "@/components/AbsenceBadge";
 import { DocCopyRow } from "@/components/PatientDocs";
 import {
   listProfessionals,
@@ -40,6 +41,7 @@ import {
   listFeriados,
   listAusencias,
   listFirstEvaluationDone,
+  countAbsencesBySpecialty,
   type Professional as ArcoProfessional,
   type AppointmentListItem,
   type Feriado,
@@ -487,6 +489,7 @@ export default function Agenda() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
+  const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
   const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
   const [docsById, setDocsById] = useState<Map<number, { cpf: string | null; cns: string | null }>>(new Map());
   const { toast } = useToast();
@@ -532,6 +535,9 @@ export default function Agenda() {
     listFeriados().then(setFeriados).catch(console.error);
     listAusencias().then(setAusencias).catch(console.error);
     listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
+    countAbsencesBySpecialty()
+      .then(rows => setSpecialtyAbsences(new Map(rows.map(r => [`${r.patient_id}::${r.specialty}`, Number(r.absence_count)]))))
+      .catch(console.error);
   }, []);
 
   const canView = isAdmin || pinVerified;
@@ -1454,6 +1460,9 @@ export default function Agenda() {
       firstEvalDone.has(firstEvalKey(apt.patientId, selectedProf?.specialty)),
     );
 
+  const absenceCount = (patientId: number): number =>
+    specialtyAbsences.get(`${patientId}::${selectedProf?.specialty ?? ""}`) ?? 0;
+
   // Dias em que o paciente ainda tem atendimento de pé (profissional presente,
   // sem feriado). Só usado na agenda do motorista.
   const careDays = useMemo(
@@ -1785,6 +1794,7 @@ export default function Agenda() {
                                         )}
                                       </span>
                                     </div>
+                                    <AbsenceBadge count={absenceCount(apt.patientId)} compact />
                                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
                                       {getStatusLabel(apptStatus(apt))}
                                     </span>
@@ -2039,6 +2049,7 @@ export default function Agenda() {
                   <span className={apt ? "font-semibold text-foreground" : "text-muted-foreground italic"}>
                     {apt ? (apt.patientName || `Paciente #${apt.patientId}`) : "Livre"}
                   </span>
+                  {apt && <AbsenceBadge count={absenceCount(apt.patientId)} />}
                   {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>}
                 </div>
               );
