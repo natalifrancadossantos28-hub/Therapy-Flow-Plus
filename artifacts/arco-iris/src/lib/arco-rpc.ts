@@ -1612,6 +1612,24 @@ export async function countAbsencesBySpecialty(): Promise<AbsenceBySpecialty[]> 
 }
 
 /**
+ * Marca falta sem justificativa nos atendimentos de hoje que passaram da
+ * tolerância (em minutos) sem marcação da recepção. Feriado, ausência do
+ * profissional e transporte ficam de fora. Retorna quantos foram marcados.
+ */
+export async function autoMarkAbsences(toleranceMinutes = 60): Promise<number> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("auto_marcar_faltas", {
+    p_slug: slug,
+    p_password: password,
+    p_tolerancia: toleranceMinutes,
+  });
+  if (error) throw error;
+  const result = (data ?? {}) as { marcadas?: number };
+  return Number(result.marcadas ?? 0);
+}
+
+/**
  * Pares paciente::especialidade que já passaram pela primeira avaliação (têm
  * atendimento anterior a hoje que não foi cancelado nem virou falta).
  * A Recepção usa para diferenciar "Agendado" (recém-puxado) de "Ativo".

@@ -8,6 +8,7 @@ import {
   updateAppointment,
   deletePatient,
   countAbsencesBySpecialty,
+  autoMarkAbsences,
   listFirstEvaluationDone,
   listFeriados,
   listAusencias,
@@ -671,6 +672,9 @@ function isFaltaSemJustificativa(apt: { status?: string | null }): boolean {
 
 type SituacaoFilter = "pendentes" | "presente" | "justificada" | "falta" | "todos";
 
+// Minutos após o horário agendado em que a falta é registrada sozinha.
+const AUTO_ABSENCE_MINUTES = 60;
+
 export default function Reception() {
   useDocumentTitle("Recepção");
   const [profIdFilter, setProfIdFilter] = useState<string>("");
@@ -709,7 +713,9 @@ export default function Reception() {
     // Busca o dia inteiro e filtra aqui: o aviso de transporte precisa dos
     // motoristas mesmo quando a tela está filtrada por um profissional.
     const filterId = profIdFilter ? parseInt(profIdFilter) : null;
-    return listAppointmentsToday()
+    return autoMarkAbsences(AUTO_ABSENCE_MINUTES)
+      .catch((e) => { console.error(e); return 0; })
+      .then(() => listAppointmentsToday())
       .then((data) => {
         // Oculta pacientes encerrados por completo. "Alta" vale por especialidade,
         // então quem tem horário hoje em outra área continua aparecendo.
@@ -1247,7 +1253,8 @@ export default function Reception() {
             <p className="text-xs text-muted-foreground mt-1">
               <strong>Presente</strong> só com o check-in da recepção (botão ✓). <strong>Agendado</strong> = paciente recém-puxado,
               ainda sem a primeira avaliação; depois dela ele fica <strong>Ativo</strong> até receber alta.
-              Faltas e presenças são registradas só pelos botões desta tela — o sistema não marca nem avisa falta sozinho.
+              Sem marcação da recepção até 1 hora depois do horário, o sistema registra <strong>Falta sem Justificativa</strong> automaticamente
+              (use "Cancelar Falta" para desfazer).
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
