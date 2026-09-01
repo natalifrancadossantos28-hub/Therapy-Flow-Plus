@@ -23,6 +23,7 @@ import {
   listPatients,
   listAppointments,
   updateAppointment,
+  reverterFalta,
   deleteAppointmentAlta,
   dischargePatientSpecialty,
   deleteRecurrenceForward,
@@ -836,7 +837,14 @@ export default function Agenda() {
   const handleCancelarFalta = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      await patchStatus(apt, "agendado");
+      // RPC própria: devolve o contador do paciente e impede que a marcação
+      // automática de 1h volte a lançar a falta no mesmo atendimento.
+      if (apt.id > 0) {
+        await reverterFalta(apt.id);
+        setAppointments(prev => prev.map(a => (a.id === apt.id ? { ...a, status: "agendado" } : a)));
+      } else {
+        await patchStatus(apt, "agendado");
+      }
       await logNotificacao(apt, "Falta Cancelada");
       toast({ title: "Falta cancelada", description: `${apt.patientName} voltou para status "Agendado".` });
     } catch {
