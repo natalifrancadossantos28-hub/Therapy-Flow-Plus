@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/lib/print-agenda";
-import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play, Bus } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Lock, ShieldCheck, Printer, LogOut, AlertTriangle, RotateCcw, XCircle, Plus, Activity, X, CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserX, XOctagon, Users, UserPlus, Repeat, Info, Trash2, Snowflake, Play, Bus, UserCheck } from "lucide-react";
 import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +35,8 @@ import {
   listFeriados,
   listAusencias,
   listFirstEvaluationDone,
+  marcarPrimeiraAvaliacao,
+  listRecurrenceCuts,
   countAbsencesBySpecialty,
   type AppointmentListItem,
   type Feriado,
@@ -121,6 +123,7 @@ function isAllowedWeek(refDate: string, targetDate: string, freq: string): boole
 function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string; frequency?: string | null }>(
   allApts: T[],
   weekDates: string[],
+  cuts?: Map<string, string>,
 ): T[] {
   if (weekDates.length === 0) return allApts;
   const todayStr = todayBR();
@@ -147,6 +150,10 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (!target) continue;
     if (target < (activeApts[0] ?? nonTerminalApts[0] ?? sorted[0]).date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
+
+    // Recorrência excluída pela Administração: não reprojetar as ocorrências apagadas.
+    const cutFrom = refApt.recurrenceGroupId ? cuts?.get(refApt.recurrenceGroupId) : undefined;
+    if (cutFrom && target >= cutFrom) continue;
 
     // A recorrência cujas linhas reais já terminaram antes de hoje (ex.: foi cortada
     // via "Remover" ou "Encaminhamento Interno" com "remover da agenda") NÃO deve ser
@@ -251,6 +258,7 @@ export default function AgendaProfissionais() {
       : "";
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
+  const [recurrenceCuts, setRecurrenceCuts] = useState<Map<string, string>>(new Map());
   const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
   const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
   const [docsById, setDocsById] = useState<Map<number, { cpf: string | null; cns: string | null }>>(new Map());
@@ -371,6 +379,7 @@ export default function AgendaProfissionais() {
     listFeriados().then(setFeriados).catch(console.error);
     listAusencias().then(setAusencias).catch(console.error);
     listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
+    listRecurrenceCuts().then(setRecurrenceCuts).catch(console.error);
     countAbsencesBySpecialty()
       .then(rows => setSpecialtyAbsences(new Map(rows.map(r => [`${r.patient_id}::${r.specialty}`, Number(r.absence_count)]))))
       .catch(console.error);
@@ -510,7 +519,7 @@ export default function AgendaProfissionais() {
   };
 
   const buildPrintApts = (dates: string[]): PrintAppointment[] => {
-    const exp = applyFrequencyFilter(expandRecurrence(appointments, dates), dates);
+    const exp = applyFrequencyFilter(expandRecurrence(appointments, dates, recurrenceCuts), dates);
     return exp
       .filter(a => dates.includes(a.date) && !INACTIVE_STATUSES.includes((a.status || "").toLowerCase()))
       .map(a => ({
@@ -675,6 +684,20 @@ export default function AgendaProfissionais() {
       }
     } finally {
       setRemanejSending(false);
+    }
+  };
+
+  // ── Ativo: paciente passou pela primeira avaliação da especialidade ──
+  const handleAtivo = async (apt: Appointment) => {
+    setActionMenuId(null);
+    const specialty = selectedProf?.specialty;
+    if (!specialty) return;
+    try {
+      await marcarPrimeiraAvaliacao(apt.patientId, specialty);
+      setFirstEvalDone(prev => new Set(prev).add(firstEvalKey(apt.patientId, specialty)));
+      toast({ title: "Ativo", description: `${apt.patientName} agora aparece como Ativo em ${specialty}.` });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message ?? "Não foi possível marcar como Ativo.", variant: "destructive" });
     }
   };
 
@@ -1111,10 +1134,20 @@ export default function AgendaProfissionais() {
           excluirConfirm.date,
           excluirConfirm.patientId,
         );
+        setRecurrenceCuts(prev => {
+          const next = new Map(prev);
+          const atual = next.get(excluirConfirm.recurrenceGroupId!);
+          if (!atual || excluirConfirm.date < atual) next.set(excluirConfirm.recurrenceGroupId!, excluirConfirm.date);
+          return next;
+        });
       } else if (excluirConfirm.id > 0) {
         await deleteAppointmentAlta(excluirConfirm.id);
+      } else if (excluirConfirm.sourceId && excluirConfirm.sourceId > 0) {
+        await deleteAppointmentAlta(excluirConfirm.sourceId);
+      } else {
+        throw new Error("Agendamento sem registro no banco — recarregue a agenda e tente de novo.");
       }
-      await markNotificacoesLidoByAppointment(excluirConfirm.id);
+      if (excluirConfirm.id > 0) await markNotificacoesLidoByAppointment(excluirConfirm.id);
       // Remove from local state: appointments in the same recurrence group from this date onward
       setAppointments(prev =>
         prev.filter(a => {
@@ -1154,7 +1187,7 @@ export default function AgendaProfissionais() {
   const careDays = useMemo(
     () =>
       activeCareDays(
-        applyFrequencyFilter(expandRecurrence(clinicalApts, weekDates), weekDates),
+        applyFrequencyFilter(expandRecurrence(clinicalApts, weekDates, recurrenceCuts), weekDates),
         feriados,
         ausencias,
         driverIds,
@@ -1162,7 +1195,7 @@ export default function AgendaProfissionais() {
     [clinicalApts, weekDates[0], feriados, ausencias, driverIds],
   );
 
-  const expanded = applyFrequencyFilter(expandRecurrence(appointments, weekDates), weekDates)
+  const expanded = applyFrequencyFilter(expandRecurrence(appointments, weekDates, recurrenceCuts), weekDates)
     .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias))
     // Motorista não busca quem ficou sem nenhum atendimento no dia (férias/ausência/feriado).
     .filter(a => !viewingDriver || careDays.has(transportKey(a.patientId, a.date)));
@@ -1585,6 +1618,11 @@ export default function AgendaProfissionais() {
                                               <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">🔒 Falta registrada — apenas Admin/Recepção pode alterar</p>
                                             ) : (
                                               <>
+                                                {!firstEvalDone.has(firstEvalKey(apt.patientId, selectedProf?.specialty)) && (
+                                                  <button style={NEON.green} onClick={() => handleAtivo(apt)}>
+                                                    <UserCheck className="w-3.5 h-3.5" /> Ativo
+                                                  </button>
+                                                )}
                                                 <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
                                                   <Activity className="w-3.5 h-3.5" /> Em Sessão
                                                 </button>

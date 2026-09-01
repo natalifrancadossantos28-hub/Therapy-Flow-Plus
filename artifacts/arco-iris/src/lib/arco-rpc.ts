@@ -1646,6 +1646,41 @@ export async function listFirstEvaluationDone(): Promise<Set<string>> {
   return new Set(rows.map((r) => `${r.patient_id}::${r.specialty ?? ""}`));
 }
 
+/**
+ * Marca na hora que o paciente passou pela primeira avaliação naquela
+ * especialidade — o selo do card vira "Ativo" sem esperar o dia seguinte.
+ */
+export async function marcarPrimeiraAvaliacao(
+  patientId: number,
+  specialty: string,
+): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("marcar_primeira_avaliacao", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId,
+    p_specialty: specialty,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Data a partir da qual cada recorrência foi excluída pela Administração.
+ * As agendas usam para não reprojetar ocorrências virtuais já excluídas.
+ */
+export async function listRecurrenceCuts(): Promise<Map<string, string>> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_recurrence_cuts", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{ recurrence_group_id: string; cut_from: string }>;
+  return new Map(rows.map((r) => [r.recurrence_group_id, r.cut_from]));
+}
+
 export async function deleteRecurrenceForward(
   recurrenceGroupId: string,
   fromDate: string,
