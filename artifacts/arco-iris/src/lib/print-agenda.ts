@@ -40,9 +40,10 @@ function statusLabel(status: string): string {
   const s = (status || "").toLowerCase();
   const map: Record<string, string> = {
     agendado: "Agendado",
-    atendimento: "Em atendimento",
-    em_atendimento: "Em atendimento",
-    "em atendimento": "Em atendimento",
+    ativo: "Ativo",
+    atendimento: "Em sessão",
+    em_atendimento: "Em sessão",
+    "em atendimento": "Em sessão",
     presente: "Presente",
     falta: "Falta",
     falta_justificada: "Falta justificada",

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
 import {
@@ -8,6 +8,9 @@ import {
   updateAppointment,
   deletePatient,
   countAbsencesBySpecialty,
+  autoMarkAbsences,
+  reverterFalta,
+  listFirstEvaluationDone,
   listFeriados,
   listAusencias,
   type Professional as ArcoProfessional,
@@ -19,7 +22,7 @@ import {
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { supabase } from "@/lib/supabase";
 import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom";
-import { getStatusColor, getStatusLabel, cn } from "@/lib/utils";
+import { getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, cn } from "@/lib/utils";
 import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
@@ -285,10 +288,10 @@ function AbsenceBellModal({
   // Mensagens regulares
   const msg1 = `Olá! Notamos que ${apt.patientName} não pôde comparecer à terapia hoje. E estamos passando para avisar que registramos esta como a primeira falta. Qualquer dúvida estamos a disposição. Atenciosamente, Recepção.`;
   const msg2 = `Olá! Sentimos a falta de ${apt.patientName} hoje novamente. Estamos registrando essa como a segunda falta dos atendimentos. Queremos lembrar que, se houver uma terceira falta, teremos que encerrar o atendimento com a especialidade ${apt.professionalSpecialty}.`;
-  const msg3 = `Olá! Infelizmente, devido à terceira falta consecutiva de ${apt.patientName}, conforme as regras da unidade, estamos encerrando o ciclo de atendimentos. E o paciente ${apt.patientName} estará retornando à fila de espera.`;
+  const msg3 = `Olá! Notamos que o(a) paciente ${apt.patientName} atingiu o limite de faltas permitido pelas normas da unidade. Pedimos que compareça à unidade o quanto antes para conversarmos sobre a situação do atendimento de ${apt.professionalSpecialty} e verificarmos os próximos passos. Estamos à disposição!\nEquipe Núcleo de Atendimento Novo Arco-íris 🌈`;
 
   const regularMsg = absenceCount >= 3 ? msg3 : absenceCount === 2 ? msg2 : msg1;
-  const regularLabel = absenceCount >= 3 ? "3ª Falta — Alta/Desligamento" : absenceCount === 2 ? "2ª Falta — Aviso" : "1ª Falta — Registro";
+  const regularLabel = absenceCount >= 3 ? "3ª Falta — Limite atingido" : absenceCount === 2 ? "2ª Falta — Aviso" : "1ª Falta — Registro";
   const regularColor = absenceCount >= 3 ? "text-rose-400" : absenceCount === 2 ? "text-amber-400" : "text-orange-400";
 
   return (
@@ -378,10 +381,10 @@ function AbsenceBellModal({
             {absenceCount >= 3 && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-400/30">
                 <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                <p className="text-xs text-rose-300 font-semibold">Paciente será encaminhado para a fila de espera</p>
+                <p className="text-xs text-rose-300 font-semibold">Responsável será convidado a comparecer à unidade para conversar sobre o atendimento</p>
               </div>
             )}
-            <p className="text-sm leading-relaxed border border-border/30 rounded-lg p-3 bg-background/50">{regularMsg}</p>
+            <p className="text-sm leading-relaxed whitespace-pre-line border border-border/30 rounded-lg p-3 bg-background/50">{regularMsg}</p>
             <div className="flex gap-2">
               <Button
                 className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
@@ -403,9 +406,10 @@ function AbsenceBellModal({
 }
 
 function AppointmentRow({
-  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, photoUrl, drivers,
+  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, photoUrl, drivers, emAcompanhamento,
 }: {
   apt: Appointment;
+  emAcompanhamento: boolean;
   photoUrl?: string | null;
   drivers: string[];
   index: number;
@@ -432,7 +436,8 @@ function AppointmentRow({
   const statusLower = apt.status?.toLowerCase() ?? "";
   const isFalta = statusLower === "ausente" || statusLower === "falta_nao_justificada";
   const isJustificado = statusLower === "falta_justificada" || statusLower === "justificado" || statusLower === "abonado";
-  const isPresente = statusLower === "presente" || statusLower === "atendimento";
+  const isPresente = statusLower === "presente";
+  const recepcaoStatus = displayApptStatus(apt.status, emAcompanhamento);
 
   return (
     <MotionCard
@@ -511,7 +516,7 @@ function AppointmentRow({
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <Badge className={getStatusColor(apt.status)}>{getStatusLabel(apt.status)}</Badge>
+          <Badge className={getStatusColor(recepcaoStatus)}>{getStatusLabel(recepcaoStatus)}</Badge>
 
           <div className="flex gap-2 ml-4 pl-4 border-l border-border">
             {/* ✓ Presente */}
@@ -642,9 +647,39 @@ function AppointmentRow({
   );
 }
 
+/**
+ * Atendimento ainda não marcado pela recepção (segue na lista de pendentes).
+ * "atendimento" é herdado da recorrência pelo banco, então não indica presença.
+ */
+function isPendente(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "" || s === "agendado" || s === "pausado" || s === "atendimento" || s === "em_atendimento";
+}
+
+/** Presença confirmada no balcão (check-in manual da recepção). */
+function isPresente(apt: { status?: string | null }): boolean {
+  return (apt.status ?? "").toLowerCase() === "presente";
+}
+
+function isFaltaJustificada(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "falta_justificada" || s === "justificado" || s === "abonado";
+}
+
+function isFaltaSemJustificativa(apt: { status?: string | null }): boolean {
+  const s = (apt.status ?? "").toLowerCase();
+  return s === "ausente" || s === "falta_nao_justificada";
+}
+
+type SituacaoFilter = "pendentes" | "presente" | "justificada" | "falta" | "todos";
+
+// Minutos após o horário agendado em que a falta é registrada sozinha.
+const AUTO_ABSENCE_MINUTES = 60;
+
 export default function Reception() {
   useDocumentTitle("Recepção");
   const [profIdFilter, setProfIdFilter] = useState<string>("");
+  const [situacao, setSituacao] = useState<SituacaoFilter>("todos");
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [transportByPatient, setTransportByPatient] = useState<Map<number, string[]>>(new Map());
   const [appointments, setAppointments] = useState<AppointmentToday[]>([]);
@@ -653,6 +688,7 @@ export default function Reception() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMutating, setIsMutating] = useState<boolean>(false);
   const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
+  const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
   const [feriados, setFeriados] = useState<Feriado[]>([]);
   const feriadosRef = useRef<Feriado[]>([]);
   const ausenciasRef = useRef<Ausencia[]>([]);
@@ -671,13 +707,16 @@ export default function Reception() {
         setSpecialtyAbsences(map);
       })
       .catch(console.error);
+    listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
   }, []);
 
   const reloadAppointments = useCallback(() => {
     // Busca o dia inteiro e filtra aqui: o aviso de transporte precisa dos
     // motoristas mesmo quando a tela está filtrada por um profissional.
     const filterId = profIdFilter ? parseInt(profIdFilter) : null;
-    return listAppointmentsToday()
+    return autoMarkAbsences(AUTO_ABSENCE_MINUTES)
+      .catch((e) => { console.error(e); return 0; })
+      .then(() => listAppointmentsToday())
       .then((data) => {
         // Oculta pacientes encerrados por completo. "Alta" vale por especialidade,
         // então quem tem horário hoje em outra área continua aparecendo.
@@ -964,9 +1003,20 @@ export default function Reception() {
     let newAbsenceCount = apt?.patientAbsenceCount ?? 0;
     const isAusente = status === "ausente" || status === "falta_nao_justificada";
     const wasAusente = apt?.status === "ausente" || apt?.status === "falta_nao_justificada";
+    const wasFalta = wasAusente
+      || apt?.status === "falta_justificada"
+      || apt?.status === "justificado"
+      || apt?.status === "abonado";
+    // Desfazer falta usa a RPC própria: além de devolver o contador, impede que a
+    // marcação automática de 1h volte a lançar a falta no mesmo atendimento.
+    const isCancelarFalta = status === "agendado" && wasFalta;
     setIsMutating(true);
     try {
-      await updateAppointment(id, { status });
+      if (isCancelarFalta) {
+        await reverterFalta(id);
+      } else {
+        await updateAppointment(id, { status });
+      }
       await reloadAppointments();
 
       if (isAusente && !wasAusente) {
@@ -975,13 +1025,29 @@ export default function Reception() {
         newAbsenceCount = Math.max(0, (apt?.patientAbsenceCount ?? 1) - 1);
       }
 
+      if (isCancelarFalta) {
+        toast({
+          title: "↩ Falta cancelada",
+          description: `${apt?.patientName} voltou para "Agendado" e não será marcado automaticamente.`,
+        });
+        return newAbsenceCount;
+      }
+
       const label = getStatusLabel(status);
-      const toastTitle = status === "presente" || status === "atendimento"
+      const toastTitle = status === "presente"
         ? "✅ Presente"
         : status === "falta_justificada"
         ? "📄 Falta Justificada"
         : "🔴 Ausente";
-      toast({ title: toastTitle, description: `${apt?.patientName} — ${label}.` });
+      const aba = status === "presente"
+        ? "Presente"
+        : status === "falta_justificada"
+        ? "Falta Justificada"
+        : "Falta sem Justificativa";
+      toast({
+        title: toastTitle,
+        description: `${apt?.patientName} — ${label}. Saiu dos Pendentes; para rever, use o filtro "${aba}".`,
+      });
     } catch {
       toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
     } finally {
@@ -1055,24 +1121,25 @@ export default function Reception() {
 
   const atestadoCount = atestados.length;
 
-  // ── Gatilho Automático: detecta pacientes cujo horário já passou sem "Presente" ──
-  const missedAppointments = (() => {
-    if (!appointments || appointments.length === 0) return [];
-    const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    return appointments.filter((apt) => {
-      const s = apt.status?.toLowerCase() ?? "agendado";
-      const isUntouched = s === "agendado" || s === "agendada" || s === "scheduled";
-      if (!isUntouched) return false;
-      const [h, m] = apt.time.split(":").map(Number);
-      if (isNaN(h) || isNaN(m)) return false;
-      const aptMinutes = h * 60 + m + 50; // 50 min after start = session should be over
-      return nowMinutes > aptMinutes;
-    });
-  })();
+  const situacaoTabs: [SituacaoFilter, string, number][] = [
+    ["pendentes", "Pendentes", appointments.filter(isPendente).length],
+    ["presente", "Presente", appointments.filter(isPresente).length],
+    ["justificada", "Falta Justificada", appointments.filter(isFaltaJustificada).length],
+    ["falta", "Falta sem Justificativa", appointments.filter(isFaltaSemJustificativa).length],
+    ["todos", "Todos", appointments.length],
+  ];
 
-  const [dismissedMissed, setDismissedMissed] = useState<Set<number>>(new Set());
-  const visibleMissed = missedAppointments.filter((a) => !dismissedMissed.has(a.id));
+  // Marcado (presente/ausente/em atendimento) sai da lista de pendentes; em
+  // "Todos" ele desce para o fim, para a recepção não perder o próximo paciente.
+  const visibleAppointments = useMemo(() => {
+    if (situacao === "pendentes") return appointments.filter(isPendente);
+    if (situacao === "presente") return appointments.filter(isPresente);
+    if (situacao === "justificada") return appointments.filter(isFaltaJustificada);
+    if (situacao === "falta") return appointments.filter(isFaltaSemJustificativa);
+    return [...appointments].sort(
+      (a, b) => Number(isPendente(b)) - Number(isPendente(a)),
+    );
+  }, [appointments, situacao]);
 
   return (
     <div className="space-y-8">
@@ -1085,13 +1152,6 @@ export default function Reception() {
               <span className="ml-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold"
                 style={{ background: "rgba(255,220,0,0.12)", border: "1px solid rgba(255,220,0,0.35)", color: "#ffd700" }}>
                 ⚠️ {atestadoCount} atestado{atestadoCount > 1 ? "s" : ""} pendente{atestadoCount > 1 ? "s" : ""}
-              </span>
-            )}
-            {visibleMissed.length > 0 && (
-              <span className="ml-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold animate-pulse"
-                style={{ background: "rgba(251,146,60,0.15)", border: "1px solid rgba(251,146,60,0.50)", color: "#fb923c",
-                  boxShadow: "0 0 12px rgba(251,146,60,0.3)" }}>
-                <BellRing className="w-3 h-3" /> {visibleMissed.length} faltoso{visibleMissed.length > 1 ? "s" : ""} detectado{visibleMissed.length > 1 ? "s" : ""}
               </span>
             )}
           </p>
@@ -1107,99 +1167,6 @@ export default function Reception() {
           <span className="font-semibold">
             Hoje é feriado{todayHoliday.descricao ? ` — ${todayHoliday.descricao}` : ""}. Nenhum atendimento agendado.
           </span>
-        </div>
-      )}
-
-      {/* ── Painel de Faltosos Automáticos ── */}
-      {visibleMissed.length > 0 && (
-        <div className="rounded-2xl border p-4 space-y-3"
-          style={{
-            background: "linear-gradient(135deg, rgba(251,146,60,0.08), rgba(239,68,68,0.04))",
-            borderColor: "rgba(251,146,60,0.40)",
-            boxShadow: "0 0 20px rgba(251,146,60,0.15)",
-          }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center animate-pulse"
-                style={{ background: "rgba(251,146,60,0.20)", color: "#fb923c" }}>
-                <BellRing className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-sm font-bold" style={{ color: "#fb923c" }}>
-                  Sininho de Faltas — Pacientes sem presença registrada
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Horário já passou e o status continua como &quot;Agendado&quot;. Clique para notificar via WhatsApp.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {visibleMissed.map((apt) => {
-              const enriched = { ...apt, prontuario: apt.prontuario || prontuarioMap.get(apt.patientId) || null } as Appointment;
-              const specKey = `${apt.patientId}::${apt.professionalSpecialty}`;
-              const specCount = specialtyAbsences.get(specKey) ?? 0;
-              return (
-                <div key={apt.id}
-                  className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 border transition-colors hover:border-orange-400/60"
-                  style={{
-                    background: "rgba(251,146,60,0.05)",
-                    borderColor: "rgba(251,146,60,0.25)",
-                  }}>
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-sm shrink-0"
-                      style={{ background: "rgba(251,146,60,0.12)", color: "#fb923c" }}>
-                      {apt.time}
-                    </div>
-                    <PatientAvatar url={photoMap.get(apt.patientId)} name={apt.patientName} size={56} />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">
-                        {enriched.prontuario ? `${enriched.prontuario} - ` : ""}{apt.patientName}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {apt.professionalName} • {apt.professionalSpecialty}
-                        {specCount > 0 && (
-                          <span className={cn(
-                            "ml-2 font-bold",
-                            specCount >= 3 ? "text-rose-400" : specCount >= 2 ? "text-amber-400" : "text-orange-400"
-                          )}>
-                            ({specCount}ª falta anterior)
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      className="h-9 px-3 rounded-lg flex items-center gap-2 text-xs font-bold transition-all"
-                      style={{
-                        background: "rgba(251,146,60,0.12)",
-                        border: "1px solid rgba(251,146,60,0.45)",
-                        color: "#fb923c",
-                        boxShadow: "0 0 10px rgba(251,146,60,0.25)",
-                      }}
-                      onClick={() => {
-                        const newCount = specCount + 1;
-                        setAbsenceBellData({ apt: enriched, absenceCount: newCount });
-                      }}
-                      title="Registrar falta e notificar via WhatsApp"
-                    >
-                      <BellRing className="w-3.5 h-3.5" />
-                      Notificar
-                    </button>
-                    <button
-                      className="h-9 w-9 rounded-lg flex items-center justify-center border border-border/40 text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => setDismissedMissed((prev) => new Set(prev).add(apt.id))}
-                      title="Dispensar alerta"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 
@@ -1300,9 +1267,33 @@ export default function Reception() {
       )}
 
       <Card className="p-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">
-          <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
+        <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 bg-card/95 backdrop-blur flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">
+          <div>
+            <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              <strong>Presente</strong> só com o check-in da recepção (botão ✓). <strong>Agendado</strong> = paciente recém-puxado,
+              ainda sem a primeira avaliação; depois dela ele fica <strong>Ativo</strong> até receber alta.
+              Sem marcação da recepção até 1 hora depois do horário, o sistema registra <strong>Falta sem Justificativa</strong> automaticamente
+              (use "Cancelar Falta" para desfazer).
+            </p>
+          </div>
           <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center rounded-lg border border-border overflow-hidden">
+              {situacaoTabs.map(([value, label, count]) => (
+                <button
+                  key={value}
+                  onClick={() => setSituacao(value)}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-bold transition-colors",
+                    situacao === value
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-secondary",
+                  )}
+                >
+                  {label} ({count})
+                </button>
+              ))}
+            </div>
             <span className="text-sm font-semibold text-muted-foreground">Filtrar:</span>
             <Select className="w-48" value={profIdFilter} onChange={(e) => setProfIdFilter(e.target.value)}>
               <option value="">Todos os Profissionais</option>
@@ -1322,20 +1313,39 @@ export default function Reception() {
         <div className="space-y-4">
           {isLoading ? (
             <div className="text-center py-12 animate-pulse text-muted-foreground">Carregando agenda do dia...</div>
-          ) : appointments?.length === 0 ? (
+          ) : visibleAppointments.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4">
-                <CalendarClock className="w-8 h-8 text-muted-foreground" />
+                {situacao === "pendentes" && appointments.length > 0
+                  ? <CheckCircle className="w-8 h-8 text-emerald-500" />
+                  : <CalendarClock className="w-8 h-8 text-muted-foreground" />}
               </div>
-              <p className="text-lg font-bold text-foreground">Agenda Vazia</p>
-              <p className="text-muted-foreground">Nenhuma consulta encontrada para os filtros selecionados.</p>
+              <p className="text-lg font-bold text-foreground">
+                {situacao === "pendentes" && appointments.length > 0 ? "Tudo marcado!" : "Agenda Vazia"}
+              </p>
+              <p className="text-muted-foreground">
+                {situacao === "pendentes" && appointments.length > 0
+                  ? "Nenhum atendimento pendente. Use os outros filtros para revisar."
+                  : "Nenhuma consulta encontrada para os filtros selecionados."}
+              </p>
             </div>
           ) : (
-            appointments?.map((apt, i) => {
+            visibleAppointments.map((apt, i) => {
               const enriched = { ...apt, prontuario: apt.prontuario || prontuarioMap.get(apt.patientId) || null } as Appointment;
+              const abreMarcados =
+                situacao === "todos" && !isPendente(apt) &&
+                (i === 0 || isPendente(visibleAppointments[i - 1]));
               return (
+              <div key={apt.id} className={cn(situacao === "todos" && !isPendente(apt) && "opacity-70")}>
+              {abreMarcados && (
+                <div className="flex items-center gap-3 pt-4 pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Já marcados ({visibleAppointments.filter((a) => !isPendente(a)).length})
+                  </span>
+                  <span className="flex-1 h-px bg-border" />
+                </div>
+              )}
               <AppointmentRow
-                key={apt.id}
                 apt={enriched}
                 photoUrl={photoMap.get(apt.patientId) ?? null}
                 index={i}
@@ -1348,7 +1358,9 @@ export default function Reception() {
                 onFirstApptMsg={setFirstApptMsgApt}
                 onAbsenceBell={(a, count) => setAbsenceBellData({ apt: a, absenceCount: count })}
                 drivers={transportByPatient.get(apt.patientId) ?? []}
+                emAcompanhamento={firstEvalDone.has(firstEvalKey(apt.patientId, apt.professionalSpecialty))}
               />
+              </div>
             );})
           )}
         </div>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Card, Button, Badge, MotionCard, Input, Label } from "@/components/ui-custom";
 import { generatePatientPdf } from "@/hooks/use-pdf";
-import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon, ShieldOff, Users } from "lucide-react";
+import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon, ShieldOff, Users, Undo2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
 import { PatientPhotoUploader } from "@/components/PatientPhotoUploader";
@@ -15,6 +15,7 @@ import {
   addPatientToFila,
   listAppointments,
   updateAppointment,
+  reverterFalta,
   listPatientDischarges,
   type Patient,
   type PatientPdfData,
@@ -77,6 +78,7 @@ export default function PatientDetail() {
   const [absenceInfo, setAbsenceInfo] = useState<PatientAbsencesInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [revertingAbsenceId, setRevertingAbsenceId] = useState<number | null>(null);
 
   // Equipe de Atendimento
   type TeamMember = { professionalId: number; professionalName: string; specialty: string; status: "Ativo" | "Alta" };
@@ -283,6 +285,25 @@ export default function PatientDetail() {
   }, [patientId, toast]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Estorno de falta retroativa: volta o atendimento para "Agendado" e devolve
+  // o contador do paciente, em qualquer data.
+  const handleReverterFalta = async (absenceId: number, date: string) => {
+    setRevertingAbsenceId(absenceId);
+    try {
+      const ok = await reverterFalta(absenceId);
+      if (!ok) {
+        toast({ title: "Nada a desfazer", description: "Este atendimento não está marcado como falta." });
+        return;
+      }
+      await load();
+      toast({ title: "Falta desfeita", description: `A falta de ${formatDate(date)} foi revertida para "Agendado".` });
+    } catch (err: any) {
+      toast({ title: "Erro ao desfazer", description: err?.message || "Falha inesperada.", variant: "destructive" });
+    } finally {
+      setRevertingAbsenceId(null);
+    }
+  };
 
   const handleDownloadPdf = () => {
     if (pdfData) {
@@ -758,11 +779,22 @@ export default function PatientDetail() {
                       <span className="text-xs font-semibold text-foreground">{abs.specialty}</span>
                       <span className="text-xs text-muted-foreground truncate">{abs.professionalName}</span>
                     </div>
-                    {abs.justificada && (
-                      <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-500">
-                        falta justificada
-                      </span>
-                    )}
+                    <div className="flex justify-between items-center gap-2 mt-1">
+                      {abs.justificada ? (
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-amber-500">
+                          falta justificada
+                        </span>
+                      ) : <span />}
+                      <button
+                        onClick={() => void handleReverterFalta(abs.id, abs.date)}
+                        disabled={revertingAbsenceId === abs.id}
+                        title="Desfazer esta falta (volta para Agendado)"
+                        className="inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-md border border-cyan-500/40 text-cyan-500 hover:bg-cyan-500/10 transition-colors disabled:opacity-40"
+                      >
+                        <Undo2 className="w-3.5 h-3.5" />
+                        {revertingAbsenceId === abs.id ? "Desfazendo..." : "Desfazer falta"}
+                      </button>
+                    </div>
                   </div>
                 ))
               ) : (

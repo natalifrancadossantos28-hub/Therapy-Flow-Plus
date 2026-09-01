@@ -15,7 +15,7 @@ import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
  * Central de Notificações da Recepção.
  *
  * Sininho com contador de não-lidas + painel lateral mostrando avisos gerados
- * pelas ações dos profissionais (Desmarcar, Remanejar, Em Atendimento, etc).
+ * pelas ações dos profissionais (Desmarcar, Remanejar, Em Sessão, etc).
  *
  * Dois botões de ação por item:
  *  - "Ciente"             → marca como lido E remove da lista na hora.
@@ -515,7 +515,7 @@ function getAcaoColor(acao: string): AcaoColor {
       glow: "rgba(251,146,60,0.35)",
     };
   }
-  if (a.includes("agend") || a.includes("atendim") || a.includes("alta") || a.includes("conclu")) {
+  if (a.includes("agend") || a.includes("atendim") || a.includes("sess") || a.includes("alta") || a.includes("conclu")) {
     return {
       bg: "rgba(74,222,128,0.14)",
       fg: "#86efac",
@@ -539,7 +539,7 @@ function formatAcaoLabel(acao: string): string {
   if (a.includes("remanej")) return "Remanejado";
   if (a.includes("remarc")) return "Remarcado";
   if (a.includes("agend")) return "Novo agendamento";
-  if (a.includes("atendim")) return "Em atendimento";
+  if (a.includes("sess") || a.includes("atendim")) return "Em sessão";
   if (a.includes("falta")) {
     const m = a.match(/falta\s+(\d+)/);
     return m ? `Falta ${m[1]}` : "Falta";
@@ -581,7 +581,7 @@ function buildWhatsAppMessage(n: NotificacaoRecepcao): string {
   }
 
   // 2. Em Atendimento
-  if (acao.includes("atendim") || acao.includes("conclu")) {
+  if (acao.includes("sess") || acao.includes("atendim") || acao.includes("conclu")) {
     return `Olá, informamos que o(a) ${n.patientName} iniciou o atendimento com o(a) profissional ${n.professionalName} no dia ${data || "hoje"} às ${hora || "—"}.\nSolicitamos, por gentileza, a chegada com 10 minutos de antecedência.\nAtenciosamente, Recepção.`;
   }
 

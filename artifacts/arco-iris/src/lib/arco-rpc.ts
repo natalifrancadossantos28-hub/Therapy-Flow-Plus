@@ -579,14 +579,58 @@ export async function listPatients(opts?: {
 }): Promise<Patient[]> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
-  const { data, error } = await supabase.rpc("list_patients", {
+  // O PostgREST devolve no máximo 1000 linhas por requisição: acima disso a
+  // lista de pacientes vinha cortada. A RPC ordena por created_at/id.
+  const PAGE = 1000;
+  const MAX_PAGES = 30;
+  const rows: PatientRow[] = [];
+  const seen = new Set<number>();
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * PAGE;
+    const { data, error } = await supabase
+      .rpc("list_patients", {
+        p_slug: slug,
+        p_password: password,
+        p_status: opts?.status ?? null,
+        p_professional_id: opts?.professionalId ?? null,
+      })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const chunk = (data ?? []) as PatientRow[];
+    for (const r of chunk) {
+      const id = Number(r.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      rows.push(r);
+    }
+    if (chunk.length < PAGE) break;
+  }
+  return rows.map(mapPatient);
+}
+
+// Profissionais ativos por paciente, agregados no banco. A tela de Pacientes
+// usava list_appointments(dateFrom = hoje) só para montar a coluna
+// "Profissional"/"Multi", trazendo todos os agendamentos futuros.
+export async function listPatientActiveProfessionals(opts?: {
+  dateFrom?: string | null;
+  dateTo?: string | null;
+}): Promise<Map<number, string[]>> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_patient_active_professionals", {
     p_slug: slug,
     p_password: password,
-    p_status: opts?.status ?? null,
-    p_professional_id: opts?.professionalId ?? null,
+    p_date_from: opts?.dateFrom ?? null,
+    p_date_to: opts?.dateTo ?? null,
   });
   if (error) throw error;
-  return ((data ?? []) as PatientRow[]).map(mapPatient);
+  const rows = (data ?? []) as Array<{ patient_id: number | string; professional_names: string[] | null }>;
+  const map = new Map<number, string[]>();
+  for (const r of rows) {
+    const names = (r.professional_names ?? []).filter((n) => n && n.trim() !== "");
+    if (names.length > 0) map.set(Number(r.patient_id), names);
+  }
+  return map;
 }
 
 export async function getPatient(id: number): Promise<Patient | null> {
@@ -769,6 +813,24 @@ export async function getPatientAbsences(id: number): Promise<PatientAbsencesInf
   });
   if (error) throw error;
   return data as PatientAbsencesInfo;
+}
+
+/**
+ * Desfaz uma falta (justificada ou não) de qualquer data, ajustando os
+ * contadores do paciente. O atendimento revertido não volta a ser marcado
+ * pela falta automática do dia.
+ */
+export async function reverterFalta(appointmentId: number): Promise<boolean> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("reverter_falta", {
+    p_slug: slug,
+    p_password: password,
+    p_id: appointmentId,
+  });
+  if (error) throw error;
+  const result = (data ?? {}) as { revertida?: boolean };
+  return Boolean(result.revertida);
 }
 
 export type PatientPdfData = {
@@ -1624,6 +1686,76 @@ export async function countAbsencesBySpecialty(): Promise<AbsenceBySpecialty[]> 
   });
   if (error) throw error;
   return (data ?? []) as AbsenceBySpecialty[];
+}
+
+/**
+ * Marca falta sem justificativa nos atendimentos de hoje que passaram da
+ * tolerância (em minutos) sem marcação da recepção. Feriado, ausência do
+ * profissional e transporte ficam de fora. Retorna quantos foram marcados.
+ */
+export async function autoMarkAbsences(toleranceMinutes = 60): Promise<number> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("auto_marcar_faltas", {
+    p_slug: slug,
+    p_password: password,
+    p_tolerancia: toleranceMinutes,
+  });
+  if (error) throw error;
+  const result = (data ?? {}) as { marcadas?: number };
+  return Number(result.marcadas ?? 0);
+}
+
+/**
+ * Pares paciente::especialidade que já passaram pela primeira avaliação (têm
+ * atendimento anterior a hoje que não foi cancelado nem virou falta).
+ * A Recepção usa para diferenciar "Agendado" (recém-puxado) de "Ativo".
+ */
+export async function listFirstEvaluationDone(): Promise<Set<string>> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_first_evaluation_done", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{ patient_id: number; specialty: string | null }>;
+  return new Set(rows.map((r) => `${r.patient_id}::${r.specialty ?? ""}`));
+}
+
+/**
+ * Marca na hora que o paciente passou pela primeira avaliação naquela
+ * especialidade — o selo do card vira "Ativo" sem esperar o dia seguinte.
+ */
+export async function marcarPrimeiraAvaliacao(
+  patientId: number,
+  specialty: string,
+): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("marcar_primeira_avaliacao", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId,
+    p_specialty: specialty,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Data a partir da qual cada recorrência foi excluída pela Administração.
+ * As agendas usam para não reprojetar ocorrências virtuais já excluídas.
+ */
+export async function listRecurrenceCuts(): Promise<Map<string, string>> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_recurrence_cuts", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{ recurrence_group_id: string; cut_from: string }>;
+  return new Map(rows.map((r) => [r.recurrence_group_id, r.cut_from]));
 }
 
 export async function deleteRecurrenceForward(

@@ -7,14 +7,15 @@ import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus
+  ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { cn, getStatusColor, getStatusLabel, todayBR } from "@/lib/utils";
+import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
+import { AbsenceBadge } from "@/components/AbsenceBadge";
 import { DocCopyRow } from "@/components/PatientDocs";
 import {
   listProfessionals,
@@ -22,6 +23,7 @@ import {
   listPatients,
   listAppointments,
   updateAppointment,
+  reverterFalta,
   deleteAppointmentAlta,
   dischargePatientSpecialty,
   deleteRecurrenceForward,
@@ -41,6 +43,10 @@ import {
   listMultiPartnerAppointments,
   listFeriados,
   listAusencias,
+  listFirstEvaluationDone,
+  marcarPrimeiraAvaliacao,
+  listRecurrenceCuts,
+  countAbsencesBySpecialty,
   type Professional as ArcoProfessional,
   type AppointmentListItem,
   type Feriado,
@@ -117,6 +123,7 @@ function isAllowedWeek(refDate: string, targetDate: string, freq: string): boole
 function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string; frequency?: string | null }>(
   allApts: T[],
   weekDates: string[],
+  cuts?: Map<string, string>,
 ): T[] {
   if (weekDates.length === 0) return allApts;
   const todayStr = todayBR();
@@ -145,6 +152,11 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     if (!target) continue;
     if (target < (activeApts[0] ?? nonTerminalApts[0] ?? sorted[0]).date) continue;
     if (gApts.some(a => weekDates.includes(a.date))) continue;
+
+    // Recorrência excluída pela Administração: nada de projetar de volta as
+    // ocorrências apagadas da data do corte em diante.
+    const cutFrom = refApt.recurrenceGroupId ? cuts?.get(refApt.recurrenceGroupId) : undefined;
+    if (cutFrom && target >= cutFrom) continue;
 
     // A recorrência cujas linhas reais já terminaram antes de hoje (ex.: foi cortada
     // via "Remover" ou "Encaminhamento Interno" com "remover da agenda") NÃO deve ser
@@ -492,6 +504,9 @@ export default function Agenda() {
   const [pauseSending, setPauseSending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
+  const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
+  const [recurrenceCuts, setRecurrenceCuts] = useState<Map<string, string>>(new Map());
+  const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
   const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
   const [docsById, setDocsById] = useState<Map<number, { cpf: string | null; cns: string | null }>>(new Map());
   const { toast } = useToast();
@@ -536,6 +551,11 @@ export default function Agenda() {
     }).catch(console.error);
     listFeriados().then(setFeriados).catch(console.error);
     listAusencias().then(setAusencias).catch(console.error);
+    listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
+    listRecurrenceCuts().then(setRecurrenceCuts).catch(console.error);
+    countAbsencesBySpecialty()
+      .then(rows => setSpecialtyAbsences(new Map(rows.map(r => [`${r.patient_id}::${r.specialty}`, Number(r.absence_count)]))))
+      .catch(console.error);
   }, []);
 
   const canView = isAdmin || pinVerified;
@@ -752,15 +772,6 @@ export default function Agenda() {
     const data = await updateAppointment(realId, { status });
     setAppointments(prev => prev.map(a => {
       if (a.id === apt.id || a.id === realId) return { ...a, id: realId, status };
-      if (
-        status === "atendimento"
-        && apt.recurrenceGroupId
-        && a.recurrenceGroupId === apt.recurrenceGroupId
-        && a.date > apt.date
-        && (a.status?.toLowerCase() ?? "agendado") === "agendado"
-      ) {
-        return { ...a, status: "atendimento" };
-      }
       return a;
     }));
     return data;
@@ -779,6 +790,20 @@ export default function Agenda() {
         horaConsulta: apt.time,
       });
     } catch { /* silencioso — log não crítico */ }
+  };
+
+  // ── Ativo: paciente passou pela primeira avaliação da especialidade ──
+  const handleAtivo = async (apt: Appointment) => {
+    setActionMenuId(null);
+    const specialty = selectedProf?.specialty;
+    if (!specialty) return;
+    try {
+      await marcarPrimeiraAvaliacao(apt.patientId, specialty);
+      setFirstEvalDone(prev => new Set(prev).add(firstEvalKey(apt.patientId, specialty)));
+      toast({ title: "Ativo", description: `${apt.patientName} agora aparece como Ativo em ${specialty}.` });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message ?? "Não foi possível marcar como Ativo.", variant: "destructive" });
+    }
   };
 
   // ── Concluir (era Atendimento) ──
@@ -865,7 +890,14 @@ export default function Agenda() {
   const handleCancelarFalta = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      await patchStatus(apt, "agendado");
+      // RPC própria: devolve o contador do paciente e impede que a marcação
+      // automática de 1h volte a lançar a falta no mesmo atendimento.
+      if (apt.id > 0) {
+        await reverterFalta(apt.id);
+        setAppointments(prev => prev.map(a => (a.id === apt.id ? { ...a, status: "agendado" } : a)));
+      } else {
+        await patchStatus(apt, "agendado");
+      }
       await logNotificacao(apt, "Falta Cancelada");
       toast({ title: "Falta cancelada", description: `${apt.patientName} voltou para status "Agendado".` });
     } catch {
@@ -981,12 +1013,22 @@ export default function Agenda() {
           excluirConfirm.date,
           excluirConfirm.patientId,
         );
+        setRecurrenceCuts(prev => {
+          const next = new Map(prev);
+          const atual = next.get(excluirConfirm.recurrenceGroupId!);
+          if (!atual || excluirConfirm.date < atual) next.set(excluirConfirm.recurrenceGroupId!, excluirConfirm.date);
+          return next;
+        });
       } else if (excluirConfirm.id > 0) {
         await deleteAppointmentAlta(excluirConfirm.id);
+      } else if (excluirConfirm.sourceId && excluirConfirm.sourceId > 0) {
+        await deleteAppointmentAlta(excluirConfirm.sourceId);
+      } else {
+        throw new Error("Agendamento sem registro no banco — recarregue a agenda e tente de novo.");
       }
       // Limpa avisos pendentes desse agendamento na Central de Avisos (não deixa
       // "Novo Agendamento" antigo pendurado depois de excluir).
-      await markNotificacoesLidoByAppointment(excluirConfirm.id);
+      if (excluirConfirm.id > 0) await markNotificacoesLidoByAppointment(excluirConfirm.id);
       // Remove from local state: appointments in the same recurrence group from this date onward
       setAppointments(prev =>
         prev.filter(a => {
@@ -1482,14 +1524,14 @@ export default function Agenda() {
   const selectedProf = professionals?.find(p => String(p.id) === selectedProfId);
 
   // Expande recorrência: projeta agendamentos recorrentes em semanas sem linha real no banco.
-  const ownExpanded = expandRecurrence(appointments, weekDates);
+  const ownExpanded = expandRecurrence(appointments, weekDates, recurrenceCuts);
 
   // Atendimento Multi: horários em que este profissional participa como convidado
   // e não tem linha própria (série do parceiro criada sem recorrência, renovada
   // depois, etc.). Sem isso o horário aparecia livre nesta grade.
   const multiGuestApts = selectedProf
     ? (buildMultiGuestAppointments(
-        expandRecurrence(multiPartnerRows, weekDates),
+        expandRecurrence(multiPartnerRows, weekDates, recurrenceCuts),
         ownExpanded,
         selectedProf,
         professionals,
@@ -1499,18 +1541,28 @@ export default function Agenda() {
   // Filtra: se frequência é quinzenal/mensal, esconde "agendado" nas semanas erradas.
   // Por fim, oculta feriados e ausências do profissional (férias/folga/falta).
   const viewingDriver = isTransportSpecialty(selectedProf?.specialty);
+  // "Agendado" só para quem ainda não passou pela primeira avaliação; os demais
+  // aparecem "Ativo" até a alta (mesma regra da Recepção).
+  const apptStatus = (apt: { patientId: number; status: string }): string =>
+    displayApptStatus(
+      apt.status,
+      firstEvalDone.has(firstEvalKey(apt.patientId, selectedProf?.specialty)),
+    );
+
+  const absenceCount = (patientId: number): number =>
+    specialtyAbsences.get(`${patientId}::${selectedProf?.specialty ?? ""}`) ?? 0;
 
   // Dias em que o paciente ainda tem atendimento de pé (profissional presente,
   // sem feriado). Só usado na agenda do motorista.
   const careDays = useMemo(
     () =>
       activeCareDays(
-        applyFrequencyFilter(expandRecurrence(clinicalApts, weekDates), weekDates),
+        applyFrequencyFilter(expandRecurrence(clinicalApts, weekDates, recurrenceCuts), weekDates),
         feriados,
         ausencias,
         driverIds,
       ),
-    [clinicalApts, weekDates[0], feriados, ausencias, driverIds],
+    [clinicalApts, weekDates[0], feriados, ausencias, driverIds, recurrenceCuts],
   );
 
   const expanded = applyFrequencyFilter([...ownExpanded, ...multiGuestApts], weekDates)
@@ -1534,9 +1586,9 @@ export default function Agenda() {
   const isPaula = worksThroughLunch(selectedProf?.name);
 
   const buildPrintApts = (dates: string[]): PrintAppointment[] => {
-    const own = expandRecurrence(appointments, dates);
+    const own = expandRecurrence(appointments, dates, recurrenceCuts);
     const guests = selectedProf
-      ? (buildMultiGuestAppointments(expandRecurrence(multiPartnerRows, dates), own, selectedProf, professionals) as Appointment[])
+      ? (buildMultiGuestAppointments(expandRecurrence(multiPartnerRows, dates, recurrenceCuts), own, selectedProf, professionals) as Appointment[])
       : [];
     const exp = applyFrequencyFilter([...own, ...guests], dates);
     return exp
@@ -1547,7 +1599,7 @@ export default function Agenda() {
         patientId: a.patientId,
         patientName: a.patientName ?? null,
         prontuario: a.prontuario ?? null,
-        status: a.status,
+        status: apptStatus(a),
       }));
   };
 
@@ -1848,8 +1900,9 @@ export default function Agenda() {
                                         )}
                                       </span>
                                     </div>
-                                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apt.status))}>
-                                      {getStatusLabel(apt.status)}
+                                    <AbsenceBadge count={absenceCount(apt.patientId)} compact />
+                                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
+                                      {getStatusLabel(apptStatus(apt))}
                                     </span>
                                     {apt.paused && (
                                       <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
@@ -1918,8 +1971,14 @@ export default function Agenda() {
                                         <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⏪ Ajuste Retroativo (Admin)</p>
                                       )}
 
+                                      {!firstEvalDone.has(firstEvalKey(apt.patientId, selectedProf?.specialty)) && (
+                                        <button style={NEON.green} onClick={() => handleAtivo(apt)}>
+                                          <UserCheck className="w-3.5 h-3.5" /> Ativo
+                                        </button>
+                                      )}
+
                                       <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                        <Activity className="w-3.5 h-3.5" /> Em Atendimento
+                                        <Activity className="w-3.5 h-3.5" /> Em Sessão
                                       </button>
 
                                       {isAdmin && (
@@ -2103,7 +2162,8 @@ export default function Agenda() {
                   <span className={apt ? "font-semibold text-foreground" : "text-muted-foreground italic"}>
                     {apt ? (apt.patientName || `Paciente #${apt.patientId}`) : "Livre"}
                   </span>
-                  {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apt.status))}>{getStatusLabel(apt.status)}</span>}
+                  {apt && <AbsenceBadge count={absenceCount(apt.patientId)} />}
+                  {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>}
                 </div>
               );
             })}
