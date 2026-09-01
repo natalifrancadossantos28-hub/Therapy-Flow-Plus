@@ -9,6 +9,7 @@ import {
   deletePatient,
   countAbsencesBySpecialty,
   autoMarkAbsences,
+  reverterFalta,
   listFirstEvaluationDone,
   listFeriados,
   listAusencias,
@@ -1002,15 +1003,34 @@ export default function Reception() {
     let newAbsenceCount = apt?.patientAbsenceCount ?? 0;
     const isAusente = status === "ausente" || status === "falta_nao_justificada";
     const wasAusente = apt?.status === "ausente" || apt?.status === "falta_nao_justificada";
+    const wasFalta = wasAusente
+      || apt?.status === "falta_justificada"
+      || apt?.status === "justificado"
+      || apt?.status === "abonado";
+    // Desfazer falta usa a RPC própria: além de devolver o contador, impede que a
+    // marcação automática de 1h volte a lançar a falta no mesmo atendimento.
+    const isCancelarFalta = status === "agendado" && wasFalta;
     setIsMutating(true);
     try {
-      await updateAppointment(id, { status });
+      if (isCancelarFalta) {
+        await reverterFalta(id);
+      } else {
+        await updateAppointment(id, { status });
+      }
       await reloadAppointments();
 
       if (isAusente && !wasAusente) {
         newAbsenceCount = (apt?.patientAbsenceCount ?? 0) + 1;
       } else if (!isAusente && wasAusente) {
         newAbsenceCount = Math.max(0, (apt?.patientAbsenceCount ?? 1) - 1);
+      }
+
+      if (isCancelarFalta) {
+        toast({
+          title: "↩ Falta cancelada",
+          description: `${apt?.patientName} voltou para "Agendado" e não será marcado automaticamente.`,
+        });
+        return newAbsenceCount;
       }
 
       const label = getStatusLabel(status);

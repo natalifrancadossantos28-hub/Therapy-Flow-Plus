@@ -814,6 +814,24 @@ export async function getPatientAbsences(id: number): Promise<PatientAbsencesInf
   return data as PatientAbsencesInfo;
 }
 
+/**
+ * Desfaz uma falta (justificada ou não) de qualquer data, ajustando os
+ * contadores do paciente. O atendimento revertido não volta a ser marcado
+ * pela falta automática do dia.
+ */
+export async function reverterFalta(appointmentId: number): Promise<boolean> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("reverter_falta", {
+    p_slug: slug,
+    p_password: password,
+    p_id: appointmentId,
+  });
+  if (error) throw error;
+  const result = (data ?? {}) as { revertida?: boolean };
+  return Boolean(result.revertida);
+}
+
 export type PatientPdfData = {
   patient: Patient;
   professional: Professional | null;
