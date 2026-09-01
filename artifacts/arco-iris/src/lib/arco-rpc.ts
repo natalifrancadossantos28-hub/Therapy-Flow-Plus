@@ -1,4 +1,5 @@
 import { requireSupabase } from "./supabase";
+import { MULTI_PREFIX, isPartnerOf, multiNote } from "./multi-agenda";
 
 /**
  * Arco-iris RPC wrappers (Fase 4A - cadastros).
@@ -1247,6 +1248,64 @@ export async function listAppointments(opts?: {
   return rows.map(mapAppointmentListItem);
 }
 
+/**
+ * Linhas de OUTROS profissionais que citam `professionalName` como parceiro de
+ * Atendimento Multi. O filtro `ilike` é aplicado pelo PostgREST em cima do
+ * resultado da RPC — não precisa de função nova no banco e traz poucas linhas.
+ */
+export async function listMultiPartnerAppointments(opts: {
+  professionalName: string;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+}): Promise<AppointmentListItem[]> {
+  const name = opts.professionalName.trim();
+  if (!name) return [];
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase
+    .rpc("list_appointments", {
+      p_slug: slug,
+      p_password: password,
+      p_date: null,
+      p_date_from: opts.dateFrom ?? null,
+      p_date_to: opts.dateTo ?? null,
+      p_professional_id: null,
+      p_patient_id: null,
+    })
+    .ilike("notes", `${MULTI_PREFIX}${name}%`);
+  if (error) throw error;
+  const rows = (data ?? []) as AppointmentListRow[];
+  return rows.map(mapAppointmentListItem);
+}
+
+/**
+ * Cria o Atendimento Multi garantindo o vínculo dos DOIS lados: a linha do
+ * convidado espelha a recorrência do anfitrião (mesma frequência, ou ocorrência
+ * única quando o anfitrião não é recorrente) e as duas linhas ficam etiquetadas.
+ */
+export async function createMultiAppointment(params: {
+  hostAppointmentId: number;
+  patientId: number;
+  date: string;
+  time: string;
+  host: { id: number; name: string; specialty?: string | null };
+  guest: { id: number; name: string; specialty?: string | null };
+  frequency?: AppointmentFrequency;
+  recurring: boolean;
+}): Promise<CreateAppointmentsResult> {
+  const created = await createAppointments({
+    patientId: params.patientId,
+    professionalId: params.guest.id,
+    date: params.date,
+    time: params.time,
+    notes: multiNote(params.host),
+    frequency: params.frequency ?? "semanal",
+    noRecurrence: !params.recurring,
+  });
+  await updateAppointment(params.hostAppointmentId, { notes: multiNote(params.guest) });
+  return created;
+}
+
 export type NextAppointment = {
   id: number;
   date: string;
@@ -1738,19 +1797,22 @@ export async function undoMultiAppointment(params: {
   date: string;
   time: string;
   keepProfessionalId: number;
+  keepProfessionalName?: string | null;
 }): Promise<{ removedNames: string[]; deletedCount: number }> {
   const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   const cutoff = params.date < todayStr ? params.date : todayStr;
   const all = await listAppointments({ patientId: params.patientId });
 
-  const MULTI = "Atendimento Multi com ";
+  const MULTI = MULTI_PREFIX;
+  const keepName = params.keepProfessionalName?.trim() || null;
   // Parceiro(s) no MESMO horário da ocorrência clicada (mesma data+hora, outro
-  // profissional, com a etiqueta de Multi).
+  // profissional, com a etiqueta de Multi apontando para quem fica).
   const slotPartners = all.filter(a =>
     a.date === params.date &&
     a.time === params.time &&
     a.professionalId !== params.keepProfessionalId &&
-    (a.notes || "").startsWith(MULTI)
+    (a.notes || "").startsWith(MULTI) &&
+    (!keepName || isPartnerOf(a.notes, keepName))
   );
   const partnerGroups = new Set(
     slotPartners.map(a => a.recurrenceGroupId).filter((g): g is string => !!g && g.trim() !== "")
@@ -1765,7 +1827,7 @@ export async function undoMultiAppointment(params: {
     if (a.id <= 0) return false;          // ignora projeções virtuais
     if (a.date < cutoff) return false;    // preserva histórico
     const byGroup = !!a.recurrenceGroupId && partnerGroups.has(a.recurrenceGroupId);
-    const bySlot = partnerProfIds.has(a.professionalId) && a.time === params.time && (a.notes || "").startsWith(MULTI);
+    const bySlot = partnerProfIds.has(a.professionalId) && a.time === params.time && (a.notes || "").startsWith(MULTI) && (!keepName || isPartnerOf(a.notes, keepName));
     return byGroup || bySlot;
   });
   await Promise.all(toDelete.map(a => deleteAppointment(a.id)));
