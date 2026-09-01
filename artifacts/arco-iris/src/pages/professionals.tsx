@@ -137,6 +137,7 @@ export default function Professionals() {
     cargaHoraria: "30h",
     tipoContrato: "Contratado",
     salario: "",
+    birthDate: "",
   });
 
   const loadProfessionals = useCallback(async () => {
@@ -164,7 +165,7 @@ export default function Professionals() {
   const prejuizoForm = salarioNum > tetoForm ? salarioNum - tetoForm : 0;
 
   const resetForm = () => {
-    setFormData({ name: "", specialty: "", email: "", phone: "", pin: "", cargaHoraria: "30h", tipoContrato: "Contratado", salario: "" });
+    setFormData({ name: "", specialty: "", email: "", phone: "", pin: "", cargaHoraria: "30h", tipoContrato: "Contratado", salario: "", birthDate: "" });
   };
 
   const openCreate = () => {
@@ -184,6 +185,7 @@ export default function Professionals() {
       cargaHoraria: prof.cargaHoraria || "30h",
       tipoContrato: prof.tipoContrato || "Contratado",
       salario: prof.salario != null ? String(prof.salario) : "",
+      birthDate: prof.birthDate ?? "",
     });
     setIsDialogOpen(true);
   };
@@ -207,6 +209,7 @@ export default function Professionals() {
         cargaHoraria: formData.cargaHoraria,
         tipoContrato: formData.tipoContrato,
         salario: salarioNum || null,
+        birthDate: formData.birthDate || null,
       });
       setProfessionals(prev =>
         (editing
@@ -572,6 +575,17 @@ export default function Professionals() {
                     placeholder="(00) 00000-0000"
                   />
                 </div>
+              </div>
+              <div>
+                <Label>Data de Nascimento</Label>
+                <Input
+                  type="date"
+                  value={formData.birthDate}
+                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Usada no aviso de aniversário na agenda do profissional e na Central de Mensagens.
+                </p>
               </div>
               {formData.tipoContrato !== "Concursado" && (
                 <div>
