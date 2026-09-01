@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { AbsenceBadge } from "@/components/AbsenceBadge";
+import { CelebrationBanner } from "@/components/CelebrationBanner";
 import { DocCopyRow } from "@/components/PatientDocs";
 import { supabase } from "@/lib/supabase";
 import {
@@ -213,7 +214,7 @@ function applyFrequencyFilter<T extends { date: string; recurrenceGroupId?: stri
   return allApts.filter(a => !hide.has(a));
 }
 
-type Professional = { id: number; name: string; specialty: string; pin?: string };
+type Professional = { id: number; name: string; specialty: string; pin?: string; birthDate?: string | null };
 type Appointment = { id: number; sourceId?: number | null; patientId: number; patientName?: string; patientStatus?: string | null; guardianName?: string | null; professionalName?: string | null; date: string; time: string; status: string; professionalId: number; recurrenceGroupId?: string | null; frequency?: string | null; escolaPublica?: boolean | null; trabalhoNaRoca?: boolean | null; consecutiveUnjustifiedAbsences?: number | null; prontuario?: string | null; notes?: string | null; paused?: boolean; pausedAt?: string | null; pausedReason?: string | null; pausedReturnDate?: string | null; multiGuest?: boolean; multiHostName?: string | null; };
 
 type AbsenceAlert = { patientName: string; professionalName: string; professionalSpecialty: string; consecutive: number; escolaPublica: boolean; trabalhoNaRoca: boolean; };
@@ -366,6 +367,7 @@ export default function AgendaProfissionais() {
             name: p.name,
             specialty: p.specialty ?? "",
             pin: p.pin ?? undefined,
+            birthDate: p.birthDate,
           }))
         )
       )
@@ -1481,6 +1483,12 @@ export default function AgendaProfissionais() {
                 </button>
               </div>
             </div>
+
+            <CelebrationBanner
+              name={selectedProf?.name}
+              specialty={selectedProf?.specialty}
+              birthDate={selectedProf?.birthDate}
+            />
 
             {/* Weekly grid */}
             <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.4)]">

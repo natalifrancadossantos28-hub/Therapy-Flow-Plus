@@ -52,6 +52,7 @@ export type Professional = {
   cargaHoraria: string;
   tipoContrato: string;
   salario: number | null;
+  birthDate: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -88,6 +89,7 @@ type ProfessionalRow = {
   carga_horaria: string;
   tipo_contrato: string;
   salario: string | number | null;
+  birth_date: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -104,6 +106,7 @@ function mapProfessional(r: ProfessionalRow): Professional {
     cargaHoraria: r.carga_horaria,
     tipoContrato: r.tipo_contrato,
     salario: r.salario == null ? null : Number(r.salario),
+    birthDate: r.birth_date ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -256,6 +259,7 @@ export type ProfessionalPayload = {
   cargaHoraria?: string | null;
   tipoContrato?: string | null;
   salario?: number | null;
+  birthDate?: string | null;
 };
 
 export async function upsertProfessional(
