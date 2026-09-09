@@ -843,7 +843,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     try {
       await patchStatus(apt, "presente");
       await logNotificacao(apt, "Presente");
-      toast({ title: "✅ Presença registrada", description: `${apt.patientName} marcado como Presente hoje.` });
+      toast({ title: "✅ Presença registrada", description: `${apt.patientName} marcado como Presente em ${apt.date.split("-").reverse().join("/")}.` });
     } catch (err: any) {
       toast({ title: "Erro", description: err?.message ?? "Não foi possível registrar a presença.", variant: "destructive" });
     }
@@ -2006,8 +2006,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       {isGhost && (
                                         <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⚠ Paciente sem dados — clique em Excluir para limpar</p>
                                       )}
-                                      {isPastDate && isAdmin && (
-                                        <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⏪ Ajuste Retroativo (Admin)</p>
+                                      {isPastDate && (
+                                        <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⏪ Ajuste Retroativo</p>
                                       )}
 
                                       {!firstEvalDone.has(firstEvalKey(apt.patientId, selectedProf?.specialty)) && (
@@ -2016,9 +2016,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </button>
                                       )}
 
-                                      {date === today && apt.status?.toLowerCase() !== "presente" && (
+                                      {date <= today && apt.status?.toLowerCase() !== "presente" && (
                                         <button style={NEON.green} onClick={() => handlePresente(apt)}>
-                                          <Check className="w-3.5 h-3.5" /> Presente (hoje)
+                                          <Check className="w-3.5 h-3.5" /> {isPastDate ? "Presente (retroativo)" : "Presente (hoje)"}
                                         </button>
                                       )}
 
