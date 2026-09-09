@@ -465,6 +465,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   useDocumentTitle(portal ? "Agenda do Profissional" : "Agenda Geral");
   // No portal, o profissional tem as mesmas opções da Administração.
   const isAdmin = isAdminSession() || !!portal;
+  // Perfil de profissional (portal sem sessão admin): sem ações exclusivas da administração.
+  const isProfessionalProfile = !!portal && !isAdminSession();
   const [selectedProfId, setSelectedProfIdState] = useState<string>(portal?.professionalId ?? "");
   const setSelectedProfId = (id: string) => {
     setSelectedProfIdState(id);
@@ -1796,7 +1798,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         {canView && selectedProfId && (
           <div className={`flex items-center gap-2 font-semibold text-sm px-4 py-2 rounded-xl border ${isAdmin ? "text-blue-700 bg-blue-50 border-blue-200" : "text-green-600 bg-green-50 border-green-200"}`}>
             <ShieldCheck className="w-4 h-4" />
-            {portal && !isAdminSession() ? "Profissional – Acesso Total" : isAdmin ? "Administrador – Acesso Total" : "Acesso liberado"}
+            {isProfessionalProfile ? "Profissional – Acesso Total" : isAdmin ? "Administrador – Acesso Total" : "Acesso liberado"}
           </div>
         )}
       </Card>
@@ -2022,9 +2024,11 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </button>
                                       )}
 
-                                      <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                        <Activity className="w-3.5 h-3.5" /> Em Atendimento
-                                      </button>
+                                      {!isProfessionalProfile && (
+                                        <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
+                                          <Activity className="w-3.5 h-3.5" /> Em Atendimento
+                                        </button>
+                                      )}
 
                                       {isAdmin && (
                                         <>
@@ -2034,10 +2038,14 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                           <button style={NEON.red} onClick={() => handleFaltaNaoJustificada(apt)}>
                                             <AlertTriangle className="w-3.5 h-3.5" /> Falta N. Justificada
                                           </button>
-                                          <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
-                                          <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
-                                            <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
-                                          </button>
+                                          {!isProfessionalProfile && (
+                                            <>
+                                              <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                              <button style={NEON.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
+                                                <AlertTriangle className="w-3.5 h-3.5" /> Desmarcar
+                                              </button>
+                                            </>
+                                          )}
                                           {(isFaltaJustificada || isFaltaNaoJustificada) && (
                                             <>
                                               <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
@@ -2128,7 +2136,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </button>
                                       )}
 
-                                      {isAdmin && drivers.length > 0 && !isTransportSpecialty(selectedProf?.specialty) && (
+                                      {isAdmin && !isProfessionalProfile && drivers.length > 0 && !isTransportSpecialty(selectedProf?.specialty) && (
                                         <button style={NEON.blue} onClick={() => handleTransporte(apt)}>
                                           <Bus className="w-3.5 h-3.5" /> Transporte (Motorista)
                                         </button>
@@ -2140,7 +2148,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </button>
                                       )}
 
-                                      {isAdmin && (
+                                      {isAdmin && !isProfessionalProfile && (
                                         <>
                                           <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                           <p className="text-[9px] text-white/40 uppercase font-bold px-1">Admin</p>
