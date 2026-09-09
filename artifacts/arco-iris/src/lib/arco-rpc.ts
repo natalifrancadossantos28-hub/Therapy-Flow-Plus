@@ -1697,7 +1697,7 @@ export async function countAbsencesBySpecialty(): Promise<AbsenceBySpecialty[]> 
  * tolerância (em minutos) sem marcação da recepção. Feriado, ausência do
  * profissional e transporte ficam de fora. Retorna quantos foram marcados.
  */
-export async function autoMarkAbsences(toleranceMinutes = 60): Promise<number> {
+export async function autoMarkAbsences(toleranceMinutes = 24 * 60): Promise<number> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
   const { data, error } = await supabase.rpc("auto_marcar_faltas", {

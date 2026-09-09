@@ -84,9 +84,9 @@ function isSameSpecialty(profSpecialty: string, otherSpecialty: string | null | 
 }
 
 const FREQUENCY_OPTIONS = [
-  { value: "semanal",   label: "Semanal",   desc: "Toda semana — 52 sessões/ano", icon: "📅" },
+  { value: "semanal",   label: "Semanal",   desc: "Toda semana — 52 atendimentos/ano", icon: "📅" },
   { value: "quinzenal", label: "Quinzenal", desc: "A cada 14 dias — Semana A e B", icon: "🔄" },
-  { value: "mensal",    label: "Mensal",    desc: "Uma vez por mês — 13 sessões/ano", icon: "📆" },
+  { value: "mensal",    label: "Mensal",    desc: "Uma vez por mês — 13 atendimentos/ano", icon: "📆" },
 ];
 
 export default function BookingModal({

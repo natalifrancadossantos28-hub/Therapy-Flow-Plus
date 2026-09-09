@@ -673,8 +673,8 @@ function isFaltaSemJustificativa(apt: { status?: string | null }): boolean {
 
 type SituacaoFilter = "pendentes" | "presente" | "justificada" | "falta" | "todos";
 
-// Minutos após o horário agendado em que a falta é registrada sozinha.
-const AUTO_ABSENCE_MINUTES = 60;
+// Minutos após o horário agendado em que a falta é registrada sozinha (24h).
+const AUTO_ABSENCE_MINUTES = 24 * 60;
 
 export default function Reception() {
   useDocumentTitle("Recepção");
@@ -1271,9 +1271,9 @@ export default function Reception() {
           <div>
             <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              <strong>Presente</strong> só com o check-in da recepção (botão ✓). <strong>Agendado</strong> = paciente recém-puxado,
-              ainda sem a primeira avaliação; depois dela ele fica <strong>Ativo</strong> até receber alta.
-              Sem marcação da recepção até 1 hora depois do horário, o sistema registra <strong>Falta sem Justificativa</strong> automaticamente
+              <strong>Presente</strong> com o check-in da recepção (botão ✓) ou pelo profissional na agenda. <strong>Agendado</strong> = paciente recém-puxado,
+              ainda sem a primeira avaliação; depois dela ele fica <strong>Em Atendimento</strong> até receber alta.
+              Sem marcação até 24 horas depois do horário, o sistema registra <strong>Falta sem Justificativa</strong> automaticamente
               (use "Cancelar Falta" para desfazer).
             </p>
           </div>
@@ -1418,7 +1418,7 @@ export default function Reception() {
                       Recebi um atestado de <strong>{abonarDialog.apt.patientName}</strong> via WhatsApp. Deseja abonar a falta na agenda de <strong>{abonarDialog.apt.professionalName}</strong>?
                     </p>
                     <p className="text-xs text-amber-700 mt-2">
-                      A sessão não precisa ser cobrada nem a falta será contabilizada.
+                      O atendimento não precisa ser cobrado nem a falta será contabilizada.
                     </p>
                   </div>
 

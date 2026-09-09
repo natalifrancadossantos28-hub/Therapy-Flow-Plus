@@ -207,7 +207,7 @@ export default function RelatorioRepasse() {
               {[
                 { label: "Contratante", value: "Prefeitura de Ibiúna" },
                 { label: "Contratada", value: `${NOME_EMPRESA} Gestão Terapêutica` },
-                { label: "Valor unitário", value: fmtMoney(VALOR_SESSAO) + " / sessão" },
+                { label: "Valor unitário", value: fmtMoney(VALOR_SESSAO) + " / atendimento" },
                 { label: "Período", value: `${range.dateFrom} a ${range.dateTo}` },
               ].map(item => (
                 <div key={item.label}>
@@ -268,7 +268,7 @@ export default function RelatorioRepasse() {
                       <span className="text-base font-bold font-display" style={{ color: "#00d4ff" }}>
                         {row.count}
                       </span>
-                      <span className="text-[11px] text-muted-foreground">sessões</span>
+                      <span className="text-[11px] text-muted-foreground">atendimentos</span>
                     </div>
                     <div className="col-span-2 text-right">
                       <span className="text-base font-bold font-display" style={{ color: "#00ff9f" }}>
