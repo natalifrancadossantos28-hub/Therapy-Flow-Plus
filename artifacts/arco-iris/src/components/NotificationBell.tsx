@@ -15,7 +15,7 @@ import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
  * Central de Notificações da Recepção.
  *
  * Sininho com contador de não-lidas + painel lateral mostrando avisos gerados
- * pelas ações dos profissionais (Desmarcar, Remanejar, Em Sessão, etc).
+ * pelas ações dos profissionais (Desmarcar, Remanejar, Em Atendimento, Presente, etc).
  *
  * Dois botões de ação por item:
  *  - "Ciente"             → marca como lido E remove da lista na hora.
@@ -539,7 +539,8 @@ function formatAcaoLabel(acao: string): string {
   if (a.includes("remanej")) return "Remanejado";
   if (a.includes("remarc")) return "Remarcado";
   if (a.includes("agend")) return "Novo agendamento";
-  if (a.includes("sess") || a.includes("atendim")) return "Em sessão";
+  if (a.includes("presen")) return "Presente";
+  if (a.includes("sess") || a.includes("atendim")) return "Em atendimento";
   if (a.includes("falta")) {
     const m = a.match(/falta\s+(\d+)/);
     return m ? `Falta ${m[1]}` : "Falta";

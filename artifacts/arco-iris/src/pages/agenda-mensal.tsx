@@ -26,7 +26,7 @@ import { listDrivers } from "@/lib/transporte";
 
 const STATUS_STYLE: Record<string, { label: string; cls: string; dot: string }> = {
   agendado:               { label: "Agendado",          cls: "bg-blue-500/15 text-blue-300 border-blue-500/30",     dot: "bg-blue-400" },
-  ativo:                  { label: "Ativo",             cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400" },
+  ativo:                  { label: "Em atendimento",    cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400" },
   atendimento:            { label: "Em atendimento",    cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400" },
   presente:               { label: "Presente",          cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400" },
   ausente:                { label: "Ausente",           cls: "bg-amber-500/15 text-amber-300 border-amber-500/30",  dot: "bg-amber-400" },

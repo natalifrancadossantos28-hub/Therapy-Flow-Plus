@@ -140,7 +140,7 @@ export default function Lucratividade() {
         </div>
         <div className="px-3 py-1.5 rounded-full text-xs font-bold border"
           style={{ background: "rgba(0,212,255,0.08)", borderColor: "rgba(0,212,255,0.25)", color: NEON_BLUE }}>
-          Repasse: {fmt(VALOR_REPASSE)}/sessão · 20h = {fmt(3600)} · 30h = {fmt(5400)}
+          Repasse: {fmt(VALOR_REPASSE)}/atendimento · 20h = {fmt(3600)} · 30h = {fmt(5400)}
         </div>
       </div>
 
@@ -389,7 +389,7 @@ export default function Lucratividade() {
             {/* Mini cards */}
             <div className="grid grid-cols-3 gap-3 mt-2 relative">
               {[
-                { label: "Sessões na agenda", value: totalPacientesMes, sub: `${totalAtendidos} realizadas`, color: NEON_BLUE },
+                { label: "Atendimentos na agenda", value: totalPacientesMes, sub: `${totalAtendidos} realizadas`, color: NEON_BLUE },
                 { label: "Faturamento bruto", value: fmt(faturamento), sub: `${VALOR_REPASSE}×${totalPacientesMes} sess.`, color: NEON_BLUE },
                 { label: "Custo mensal", value: fmt(custoSelecionado), sub: selectedProfessional?.salario ? "definido" : "teto estimado", color: "rgba(255,255,255,0.4)" },
               ].map(card => (
@@ -422,7 +422,7 @@ export default function Lucratividade() {
             <div className="mb-2 flex items-center justify-between text-xs font-semibold">
               <span className="text-muted-foreground">Progresso do mês</span>
               <span style={{ color: pctMeta >= 100 ? NEON_GREEN : NEON_BLUE }}>
-                {totalPacientesMes} / {breakEvenMes} sessões ({pctMeta}%)
+                {totalPacientesMes} / {breakEvenMes} atendimentos ({pctMeta}%)
               </span>
             </div>
             <div className="h-3 rounded-full overflow-hidden"
@@ -444,7 +444,7 @@ export default function Lucratividade() {
             {faltam > 0 && (
               <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5" style={{ color: "#f97316" }} />
-                Faltam <strong className="text-white">{faltam} sessões</strong> para atingir o ponto de equilíbrio
+                Faltam <strong className="text-white">{faltam} atendimentos</strong> para atingir o ponto de equilíbrio
               </p>
             )}
             {faltam === 0 && (
@@ -487,14 +487,14 @@ export default function Lucratividade() {
                   </div>
                   <p className="text-xs text-muted-foreground mb-5">
                     Cada horário atendendo <strong className="text-white">2 crianças</strong> → repasse de{" "}
-                    <strong className="text-white">{fmt(VALOR_GRUPO)}/sessão</strong>
+                    <strong className="text-white">{fmt(VALOR_GRUPO)}/atendimento</strong>
                   </p>
 
                   <div className="grid grid-cols-3 gap-3">
                     {[
                       { label: "Faturamento grupos", value: fmt(faturamentoGrupo), sub: `${VALOR_GRUPO}×${totalPacientesMes}`, color: "#a78bfa" },
                       { label: "Saldo com grupos", value: fmt(Math.abs(saldoGrupo)), sub: saldoGrupo >= 0 ? "SUPERÁVIT" : "DÉFICIT", color: saldoGrupo >= 0 ? NEON_GREEN : NEON_RED },
-                      { label: "Aumento de receita", value: fmt(faturamentoGrupo - faturamento), sub: `+${fmt(VALOR_GRUPO - VALOR_REPASSE)}/sessão`, color: "#a78bfa" },
+                      { label: "Aumento de receita", value: fmt(faturamentoGrupo - faturamento), sub: `+${fmt(VALOR_GRUPO - VALOR_REPASSE)}/atendimento`, color: "#a78bfa" },
                     ].map(card => (
                       <div key={card.label} className="rounded-2xl p-4 text-center"
                         style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(139,92,246,0.15)" }}>

@@ -6,7 +6,7 @@ import { ptBR } from "date-fns/locale";
 import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/lib/print-agenda";
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
-  X, MessageCircle, CheckCircle, Activity, RotateCcw, LogOut, AlertTriangle,
+  X, MessageCircle, CheckCircle, Check, Activity, RotateCcw, LogOut, AlertTriangle,
   ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -450,10 +450,29 @@ const isAdminSession = (): boolean => {
   return sessionStorage.getItem("nfs_admin_auth") === "true";
 };
 
-export default function Agenda() {
-  useDocumentTitle("Agenda Geral");
-  const isAdmin = isAdminSession();
-  const [selectedProfId, setSelectedProfId] = useState<string>("");
+/**
+ * Modo "Portal do Profissional": a mesma agenda da Administração, já
+ * autenticada (sessão do portal ou PIN validado pelo wrapper), com o
+ * profissional fixado. Admin pode continuar escolhendo o profissional.
+ */
+export type AgendaPortalMode = {
+  professionalId: string;
+  allowPickProfessional: boolean;
+  onProfessionalChange?: (id: string) => void;
+};
+
+export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
+  useDocumentTitle(portal ? "Agenda do Profissional" : "Agenda Geral");
+  // No portal, o profissional tem as mesmas opções da Administração.
+  const isAdmin = isAdminSession() || !!portal;
+  const [selectedProfId, setSelectedProfIdState] = useState<string>(portal?.professionalId ?? "");
+  const setSelectedProfId = (id: string) => {
+    setSelectedProfIdState(id);
+    portal?.onProfessionalChange?.(id);
+  };
+  useEffect(() => {
+    if (portal && portal.professionalId !== selectedProfId) setSelectedProfIdState(portal.professionalId);
+  }, [portal?.professionalId]);
   const [pinInput, setPinInput] = useState("");
   const [pinVerified, setPinVerified] = useState(false);
   const [pinError, setPinError] = useState("");
@@ -806,15 +825,27 @@ export default function Agenda() {
     }
   };
 
-  // ── Concluir (era Atendimento) ──
+  // ── Em Atendimento (paciente em atendimento agora) ──
   const handleAtendimento = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
       await patchStatus(apt, "atendimento");
-      await logNotificacao(apt, "Concluir");
-      toast({ title: "✅ Concluído", description: `${apt.patientName} confirmado na sessão.` });
+      await logNotificacao(apt, "Em Atendimento");
+      toast({ title: "✅ Em Atendimento", description: `${apt.patientName} está em atendimento agora.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível atualizar.", variant: "destructive" });
+    }
+  };
+
+  // ── Presente (só no dia de hoje) ──
+  const handlePresente = async (apt: Appointment) => {
+    setActionMenuId(null);
+    try {
+      await patchStatus(apt, "presente");
+      await logNotificacao(apt, "Presente");
+      toast({ title: "✅ Presença registrada", description: `${apt.patientName} marcado como Presente hoje.` });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message ?? "Não foi possível registrar a presença.", variant: "destructive" });
     }
   };
 
@@ -891,7 +922,7 @@ export default function Agenda() {
     setActionMenuId(null);
     try {
       // RPC própria: devolve o contador do paciente e impede que a marcação
-      // automática de 1h volte a lançar a falta no mesmo atendimento.
+      // automática (24h) volte a lançar a falta no mesmo atendimento.
       if (apt.id > 0) {
         await reverterFalta(apt.id);
         setAppointments(prev => prev.map(a => (a.id === apt.id ? { ...a, status: "agendado" } : a)));
@@ -1720,21 +1751,29 @@ export default function Agenda() {
               )}
             </div>
           )}
-          <Link href="/agenda-profissionais">
-            <Button variant="outline" className="gap-2 text-sm">
-              <ExternalLink className="w-4 h-4" /> Portal do Profissional
-            </Button>
-          </Link>
+          {!portal && (
+            <Link href="/agenda-profissionais">
+              <Button variant="outline" className="gap-2 text-sm">
+                <ExternalLink className="w-4 h-4" /> Portal do Profissional
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
       <Card className="p-5 flex flex-col sm:flex-row items-start sm:items-end gap-4">
         <div className="flex-1">
           <Label className="mb-2 block">Profissional</Label>
-          <Select value={selectedProfId} onChange={e => handleProfChange(e.target.value)}>
-            <option value="">Selecione o profissional...</option>
-            {professionals?.map(p => <option key={p.id} value={p.id}>{p.name} – {p.specialty}</option>)}
-          </Select>
+          {portal && !portal.allowPickProfessional ? (
+            <p className="font-semibold text-foreground px-1 py-2">
+              {selectedProf ? `${selectedProf.name} – ${selectedProf.specialty}` : "—"}
+            </p>
+          ) : (
+            <Select value={selectedProfId} onChange={e => handleProfChange(e.target.value)}>
+              <option value="">Selecione o profissional...</option>
+              {professionals?.map(p => <option key={p.id} value={p.id}>{p.name} – {p.specialty}</option>)}
+            </Select>
+          )}
         </div>
         {selectedProfId && !canView && (
           <div className="flex-1">
@@ -1757,7 +1796,7 @@ export default function Agenda() {
         {canView && selectedProfId && (
           <div className={`flex items-center gap-2 font-semibold text-sm px-4 py-2 rounded-xl border ${isAdmin ? "text-blue-700 bg-blue-50 border-blue-200" : "text-green-600 bg-green-50 border-green-200"}`}>
             <ShieldCheck className="w-4 h-4" />
-            {isAdmin ? "Administrador – Acesso Total" : "Acesso liberado"}
+            {portal && !isAdminSession() ? "Profissional – Acesso Total" : isAdmin ? "Administrador – Acesso Total" : "Acesso liberado"}
           </div>
         )}
       </Card>
@@ -1977,8 +2016,14 @@ export default function Agenda() {
                                         </button>
                                       )}
 
+                                      {date === today && apt.status?.toLowerCase() !== "presente" && (
+                                        <button style={NEON.green} onClick={() => handlePresente(apt)}>
+                                          <Check className="w-3.5 h-3.5" /> Presente (hoje)
+                                        </button>
+                                      )}
+
                                       <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                        <Activity className="w-3.5 h-3.5" /> Em Sessão
+                                        <Activity className="w-3.5 h-3.5" /> Em Atendimento
                                       </button>
 
                                       {isAdmin && (
@@ -2184,7 +2229,7 @@ export default function Agenda() {
           onSuccess={() => {
             setBookingSlot(null);
             fetchAppointments();
-            toast({ title: "Agendado!", description: "Sessão(ões) criada(s) com sucesso." });
+            toast({ title: "Agendado!", description: "Atendimento(s) criado(s) com sucesso." });
           }}
         />
       )}
@@ -2818,7 +2863,7 @@ export default function Agenda() {
                 <>
                   <div className="bg-blue-50 border border-blue-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
                     <p className="text-sm text-slate-800 leading-relaxed">
-                      Vi que você {remanejFlow.kind === "remarcar" ? "remarcou" : "remanejou"} a sessão de{" "}
+                      Vi que você {remanejFlow.kind === "remarcar" ? "remarcou" : "remanejou"} o atendimento de{" "}
                       <strong>{remanejFlow.apt.patientName}</strong> para{" "}
                       <strong>{remanejFlow.newTime} — {
                         (() => {
@@ -2886,7 +2931,7 @@ export default function Agenda() {
                 <>
                   <div className="bg-violet-50 border border-violet-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
                     <p className="text-sm text-slate-800 leading-relaxed">
-                      Vi que você desmarcou a sessão de <strong>{cancelDialog.profName}</strong>.{" "}
+                      Vi que você desmarcou o atendimento de <strong>{cancelDialog.profName}</strong>.{" "}
                       Posso avisar o responsável pelo(a) <strong>{cancelDialog.apt.patientName || "Paciente"}</strong> agora?
                     </p>
                   </div>
