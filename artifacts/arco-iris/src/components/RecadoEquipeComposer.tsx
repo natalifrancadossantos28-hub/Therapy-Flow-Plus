@@ -26,7 +26,19 @@ export function RecadoEquipeComposer({ professionalId, professionalName, special
       setOpen(false);
       toast({ title: "Recado enviado", description: "A administração receberá sua mensagem em \"Recados da Equipe\"." });
     } catch (e) {
-      toast({ title: "Não foi possível enviar", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
+      const msg =
+        e instanceof Error ? e.message
+        : typeof e === "object" && e !== null && "message" in e && typeof (e as { message: unknown }).message === "string"
+          ? (e as { message: string }).message
+          : "Tente novamente.";
+      const semFuncao = /create_recado_equipe|schema cache|does not exist/i.test(msg);
+      toast({
+        title: "Não foi possível enviar",
+        description: semFuncao
+          ? "O módulo de recados ainda não foi ativado no banco de dados (migração 0097 pendente). Avise a administração."
+          : msg,
+        variant: "destructive",
+      });
     } finally {
       setSending(false);
     }
