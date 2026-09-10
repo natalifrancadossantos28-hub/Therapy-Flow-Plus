@@ -1,19 +1,18 @@
 /**
- * ABC — Autism Behavior Checklist (Krug, Arick & Almond), versão brasileira
- * ICA (Inventário de Comportamentos Autísticos, Marteleto & Pedromônico).
- *
- * 57 itens, cada um com peso 1–4, distribuídos em 5 áreas:
+ * ABC — Autism Behavior Checklist, versão brasileira. Mesmo protocolo do app
+ * NFs – Triagem (artifacts/triagem): 57 itens com peso 1–4 e explicação
+ * simplificada, em 5 áreas:
  *   ES  Estímulo Sensorial            (máx. 26)
  *   RE  Relacionamento                (máx. 38)
- *   CO  Uso do Corpo e Objetos        (máx. 38)
- *   LG  Linguagem                     (máx. 31)
- *   PS  Desenvolvimento Pessoal-Social (máx. 25)
+ *   CO  Uso do Corpo e Objetos        (máx. 40)
+ *   LG  Linguagem                     (máx. 29)
+ *   PS  Desenv. Pessoal e Social      (máx. 25)
  * Total máximo: 158.
  *
- * Grau de impacto (pontos de corte clássicos do ABC):
+ * Grau de impacto:
  *   Nível 1 — Alto impacto     total >= 68  (vermelho)
- *   Nível 2 — Impacto moderado 47..67       (amarelo)
- *   Nível 3 — Baixo impacto    total <  47  (verde)
+ *   Nível 2 — Impacto moderado 55..67       (amarelo)
+ *   Nível 3 — Baixo impacto    total <  55  (verde)
  */
 
 export type AbcAreaKey = "sensorial" | "relacionamento" | "corpo" | "linguagem" | "pessoalSocial";
@@ -24,74 +23,80 @@ export type AbcItem = {
   area: AbcAreaKey;
   peso: 1 | 2 | 3 | 4;
   texto: string;
+  /** Explicação simplificada para a família/aplicador. */
+  hint: string;
 };
 
-export const ABC_AREAS: { key: AbcAreaKey; label: string; short: string; color: string }[] = [
-  { key: "sensorial",      label: "Estímulo Sensorial",              short: "Sensorial",   color: "#38bdf8" },
-  { key: "relacionamento", label: "Relacionamento",                  short: "Relacion.",   color: "#f472b6" },
-  { key: "corpo",          label: "Uso do Corpo e Objetos",          short: "Corpo/Obj.",  color: "#a78bfa" },
-  { key: "linguagem",      label: "Linguagem",                       short: "Linguagem",   color: "#fbbf24" },
-  { key: "pessoalSocial",  label: "Desenvolvimento Pessoal e Social", short: "Pessoal-Soc.", color: "#34d399" },
+export type AbcArea = { key: AbcAreaKey; code: string; label: string; short: string; color: string; bg: string; printColor: string };
+
+export const ABC_AREAS: AbcArea[] = [
+  { key: "sensorial",      code: "ES", label: "Estímulo Sensorial",       short: "Sensorial",    color: "#a855f7", bg: "rgba(168,85,247,0.12)", printColor: "#7c3aed" },
+  { key: "relacionamento", code: "RE", label: "Relacionamento",           short: "Relacion.",    color: "#3b82f6", bg: "rgba(59,130,246,0.12)", printColor: "#2563eb" },
+  { key: "corpo",          code: "CO", label: "Uso do Corpo e Objetos",   short: "Corpo/Obj.",   color: "#f97316", bg: "rgba(249,115,22,0.12)", printColor: "#ea580c" },
+  { key: "linguagem",      code: "LG", label: "Linguagem",                short: "Linguagem",    color: "#22c55e", bg: "rgba(34,197,94,0.12)",  printColor: "#16a34a" },
+  { key: "pessoalSocial",  code: "PS", label: "Desenv. Pessoal e Social", short: "Pessoal-Soc.", color: "#ef4444", bg: "rgba(239,68,68,0.12)",  printColor: "#dc2626" },
 ];
 
+export const ABC_AREA_BY_KEY: Record<AbcAreaKey, AbcArea> = Object.fromEntries(ABC_AREAS.map(a => [a.key, a])) as Record<AbcAreaKey, AbcArea>;
+
 export const ABC_ITEMS: AbcItem[] = [
-  { id: 1,  area: "corpo",          peso: 4, texto: "Gira em torno de si mesmo por longos períodos de tempo" },
-  { id: 2,  area: "pessoalSocial",  peso: 2, texto: "Aprende uma tarefa simples, mas a esquece rapidamente" },
-  { id: 3,  area: "sensorial",      peso: 4, texto: "Frequentemente não presta atenção a estímulos sociais/ambientais" },
-  { id: 4,  area: "linguagem",      peso: 1, texto: "Não segue ordens simples dadas uma única vez (sente-se, venha aqui, levante-se)" },
-  { id: 5,  area: "corpo",          peso: 2, texto: "Não usa os brinquedos de forma adequada (gira rodas, enfileira, bate)" },
-  { id: 6,  area: "sensorial",      peso: 2, texto: "Discriminação visual pobre — fixa-se em uma característica do objeto (cor, posição)" },
-  { id: 7,  area: "relacionamento", peso: 2, texto: "Não sorri socialmente (sorriso de resposta)" },
-  { id: 8,  area: "linguagem",      peso: 3, texto: "Usa pronomes de modo inadequado (refere-se a si mesmo como 'ele', 'você')" },
-  { id: 9,  area: "corpo",          peso: 3, texto: "Insiste em manter certos objetos consigo" },
-  { id: 10, area: "sensorial",      peso: 3, texto: "Parece não ouvir, a ponto de se suspeitar de surdez" },
-  { id: 11, area: "linguagem",      peso: 4, texto: "Fala sem entonação e sem ritmo (monótona)" },
-  { id: 12, area: "corpo",          peso: 4, texto: "Balança-se por longos períodos de tempo" },
-  { id: 13, area: "relacionamento", peso: 2, texto: "Não estende os braços para ser pego (não antecipa ser carregado)" },
-  { id: 14, area: "relacionamento", peso: 3, texto: "Reage fortemente a mudanças na rotina e no ambiente" },
-  { id: 15, area: "relacionamento", peso: 2, texto: "Não responde ao próprio nome quando chamado entre dois outros nomes" },
-  { id: 16, area: "corpo",          peso: 4, texto: "Faz movimentos repetitivos com as mãos ou objetos (agita, gira, bate) por longos períodos" },
-  { id: 17, area: "sensorial",      peso: 3, texto: "Não reage a estímulos dolorosos (não se importa em se machucar)" },
-  { id: 18, area: "linguagem",      peso: 4, texto: "Repete frases ou perguntas ouvidas anteriormente fora de contexto (ecolalia tardia)" },
-  { id: 19, area: "relacionamento", peso: 4, texto: "Olha 'através' das pessoas (olhar vazio, evita contato visual)" },
-  { id: 20, area: "sensorial",      peso: 4, texto: "Cobre os ouvidos com frequência diante de sons" },
-  { id: 21, area: "corpo",          peso: 3, texto: "Bate, agride ou morde a si mesmo (autoagressão)" },
-  { id: 22, area: "relacionamento", peso: 3, texto: "Não imita outras crianças em brincadeiras" },
-  { id: 23, area: "sensorial",      peso: 3, texto: "Não reage a barulhos altos ou reage de forma exagerada a barulhos leves" },
-  { id: 24, area: "pessoalSocial",  peso: 2, texto: "Fica ativo/agitado por longos períodos e não se cansa" },
-  { id: 25, area: "linguagem",      peso: 2, texto: "Repete sons ou palavras várias vezes seguidas (ecolalia imediata)" },
-  { id: 26, area: "pessoalSocial",  peso: 3, texto: "Precisa que as tarefas sejam mostradas ou modeladas diversas vezes" },
-  { id: 27, area: "pessoalSocial",  peso: 2, texto: "Fica sozinho por longos períodos, sem procurar companhia" },
-  { id: 28, area: "relacionamento", peso: 3, texto: "Não busca conforto quando machucado ou aborrecido" },
-  { id: 29, area: "pessoalSocial",  peso: 3, texto: "Não segue rotinas de autocuidado adequadas à idade (vestir-se, lavar-se)" },
-  { id: 30, area: "corpo",          peso: 3, texto: "Bate a cabeça ou se joga no chão com frequência" },
-  { id: 31, area: "linguagem",      peso: 3, texto: "Não consegue apontar para 5 objetos nomeados" },
-  { id: 32, area: "relacionamento", peso: 4, texto: "Não faz amizade / não busca outras crianças" },
-  { id: 33, area: "sensorial",      peso: 2, texto: "Fixa-se em luzes, objetos que giram ou padrões visuais" },
-  { id: 34, area: "linguagem",      peso: 2, texto: "Usa a mão do adulto como ferramenta para pegar o que quer" },
-  { id: 35, area: "pessoalSocial",  peso: 3, texto: "Não brinca de faz-de-conta ou brincadeiras simbólicas" },
-  { id: 36, area: "corpo",          peso: 3, texto: "Anda na ponta dos pés" },
-  { id: 37, area: "linguagem",      peso: 3, texto: "Não usa frases de duas palavras ou mais para se comunicar (quando esperado para a idade)" },
-  { id: 38, area: "relacionamento", peso: 3, texto: "Prefere brincar sozinho e ignora tentativas de aproximação" },
-  { id: 39, area: "pessoalSocial",  peso: 2, texto: "Não reconhece o perigo em situações comuns" },
-  { id: 40, area: "corpo",          peso: 3, texto: "Cheira, lambe ou coloca na boca objetos não comestíveis" },
-  { id: 41, area: "linguagem",      peso: 2, texto: "Não responde a perguntas simples com sim/não ou gestos" },
-  { id: 42, area: "relacionamento", peso: 2, texto: "Não gosta de ser tocado ou abraçado (evita contato físico)" },
-  { id: 43, area: "linguagem",      peso: 1, texto: "Não aponta para pedir ou mostrar interesse" },
-  { id: 44, area: "pessoalSocial",  peso: 2, texto: "Não reage a elogios ou reforços sociais" },
-  { id: 45, area: "sensorial",      peso: 3, texto: "Reage de forma exagerada a texturas, cheiros ou sabores" },
-  { id: 46, area: "corpo",          peso: 3, texto: "Faz caretas, movimentos de dedos ou posturas estranhas repetidamente" },
-  { id: 47, area: "relacionamento", peso: 4, texto: "Não demonstra afeto por familiares (indiferente à chegada/saída)" },
-  { id: 48, area: "pessoalSocial",  peso: 2, texto: "Tem birras intensas e prolongadas com mudanças pequenas" },
-  { id: 49, area: "sensorial",      peso: 2, texto: "Encara as próprias mãos ou objetos bem próximos aos olhos" },
-  { id: 50, area: "linguagem",      peso: 3, texto: "Não inicia conversa nem mantém diálogo simples" },
-  { id: 51, area: "relacionamento", peso: 3, texto: "Não demonstra atenção compartilhada (não olha para onde o adulto aponta)" },
-  { id: 52, area: "corpo",          peso: 3, texto: "Corre em círculos ou anda de um lado para o outro sem objetivo" },
-  { id: 53, area: "pessoalSocial",  peso: 1, texto: "Recusa alimentos novos, come poucos alimentos (seletividade alimentar)" },
-  { id: 54, area: "linguagem",      peso: 3, texto: "Não compreende ordens com duas etapas (pegue o copo e ponha na mesa)" },
-  { id: 55, area: "corpo",          peso: 3, texto: "Manipula objetos de forma repetitiva (abre/fecha, liga/desliga)" },
-  { id: 56, area: "relacionamento", peso: 3, texto: "Não consegue brincar em grupo ou seguir regras de jogos simples" },
-  { id: 57, area: "pessoalSocial",  peso: 3, texto: "Não é independente para comer, ir ao banheiro ou vestir-se conforme a idade" },
+  { id:  1, area: "corpo",          peso: 4, texto: "Gira em torno de si por longo período de tempo", hint: "Ele fica rodando o próprio corpo várias vezes, como se fosse um peão?" },
+  { id:  2, area: "pessoalSocial",  peso: 2, texto: "Aprende uma tarefa, mas esquece rapidamente", hint: "Você ensina algo hoje e amanhã ele já não lembra mais como fazer?" },
+  { id:  3, area: "relacionamento", peso: 4, texto: "É raro atender estímulo não verbal social/ambiente (expressões, gestos, situações)", hint: "Ele costuma ignorar quando você faz gestos, aponta para algo ou faz expressões faciais?" },
+  { id:  4, area: "linguagem",      peso: 1, texto: "Ausência de resposta para solicitações verbais — venha cá; sente-se", hint: "Quando você pede 'vem cá' ou 'senta aqui', ele não responde ou ignora?" },
+  { id:  5, area: "corpo",          peso: 2, texto: "Usa brinquedos inapropriadamente", hint: "Em vez de brincar do jeito esperado (ex: empurrar o carrinho), ele faz outra coisa (ex: só gira a rodinha)?" },
+  { id:  6, area: "sensorial",      peso: 2, texto: "Pobre uso da discriminação visual (fixa uma característica do objeto)", hint: "Ele fica olhando só para uma parte do brinquedo (ex: só a roda, só a cor) em vez de ver o todo?" },
+  { id:  7, area: "relacionamento", peso: 2, texto: "Ausência do sorriso social", hint: "Ele não sorri de volta quando alguém sorri para ele?" },
+  { id:  8, area: "linguagem",      peso: 3, texto: "Uso inadequado de pronomes (eu por ele)", hint: "Ele fala de si mesmo na terceira pessoa? (Ex: 'Ele quer água' em vez de 'Eu quero água')" },
+  { id:  9, area: "corpo",          peso: 3, texto: "Insiste em manter certos objetos consigo", hint: "Ele anda para todo lado segurando sempre o mesmo objeto e não quer largar de jeito nenhum?" },
+  { id: 10, area: "sensorial",      peso: 3, texto: "Parece não escutar (suspeita-se de perda de audição)", hint: "Às vezes parece que ele não ouve quando você chama, mesmo estando perto?" },
+  { id: 11, area: "linguagem",      peso: 4, texto: "Fala monótona e sem ritmo", hint: "A fala dele é sempre no mesmo tom, sem variação, quase como um robô?" },
+  { id: 12, area: "corpo",          peso: 4, texto: "Balança-se por longos períodos de tempo", hint: "Ele fica se balançando para frente e para trás por muito tempo, sentado ou em pé?" },
+  { id: 13, area: "relacionamento", peso: 2, texto: "Não estende o braço para ser pego (nem o fez quando bebê)", hint: "Quando você vai pegá-lo no colo, ele não levanta os bracinhos para você?" },
+  { id: 14, area: "pessoalSocial",  peso: 3, texto: "Fortes reações frente a mudanças no ambiente", hint: "Ele fica muito irritado ou nervoso quando algo muda na rotina ou no ambiente (ex: trocar de caminho, mudar os móveis)?" },
+  { id: 15, area: "corpo",          peso: 2, texto: "Ausência de atenção ao seu nome quando entre 2 outras crianças", hint: "Quando está perto de outras crianças e você chama o nome dele, ele não olha?" },
+  { id: 16, area: "corpo",          peso: 4, texto: "Corre interrompendo com giros em torno de si, balanceio de mãos", hint: "Ele sai correndo e no meio da corrida para, gira o corpo ou sacode as mãos?" },
+  { id: 17, area: "relacionamento", peso: 3, texto: "Ausência de resposta para expressão facial/sentimento de outros", hint: "Se alguém está chorando ou triste perto dele, ele não reage nem parece perceber?" },
+  { id: 18, area: "linguagem",      peso: 2, texto: "Raramente usa 'sim' ou 'eu'", hint: "Ele quase nunca diz 'sim' ou 'eu' quando fala?" },
+  { id: 19, area: "pessoalSocial",  peso: 4, texto: "Possui habilidade numa área do desenvolvimento", hint: "Ele é muito bom em uma coisa específica (ex: decorar números, montar puzzles), mas tem dificuldade em outras?" },
+  { id: 20, area: "linguagem",      peso: 1, texto: "Ausência de respostas a solicitações verbal envolvendo o uso de referenciais de espaço", hint: "Quando você diz 'coloca em cima da mesa' ou 'pega embaixo da cadeira', ele não entende?" },
+  { id: 21, area: "sensorial",      peso: 3, texto: "Reação de sobressalto a som intenso (suspeita de surdez)", hint: "Ele não se assusta com barulhos fortes (fogos, porta batendo) como outras crianças?" },
+  { id: 22, area: "corpo",          peso: 4, texto: "Balança as mãos", hint: "Ele fica sacudindo ou abanando as mãos repetidamente, como se estivesse 'batendo asas'?" },
+  { id: 23, area: "pessoalSocial",  peso: 3, texto: "Intensos acessos de raiva e/ou frequentes 'chiliques'", hint: "Ele tem crises de raiva muito fortes ou faz birra intensa com frequência?" },
+  { id: 24, area: "relacionamento", peso: 4, texto: "Evita ativamente o contato visual", hint: "Ele desvia o olhar de propósito quando você tenta olhar nos olhos dele?" },
+  { id: 25, area: "relacionamento", peso: 4, texto: "Resiste ao toque / ao ser pego / ao carinho", hint: "Ele não gosta de ser abraçado, tocado ou pegado no colo? Fica incomodado?" },
+  { id: 26, area: "sensorial",      peso: 3, texto: "Não reage a estímulos dolorosos", hint: "Quando se machuca (cai, bate), ele não chora nem parece sentir dor?" },
+  { id: 27, area: "relacionamento", peso: 3, texto: "Difícil e rígido no colo (ou foi quando bebê)", hint: "Quando você pega ele no colo, o corpo fica duro, esticado, difícil de acomodar?" },
+  { id: 28, area: "relacionamento", peso: 2, texto: "Flácido quando no colo", hint: "Quando está no colo, ele fica 'mole demais', sem firmeza, como se não segurasse o corpo?" },
+  { id: 29, area: "linguagem",      peso: 2, texto: "Aponta para indicar objeto desejado", hint: "Ele aponta com o dedo para mostrar o que quer? (Se SIM, marque este item)" },
+  { id: 30, area: "corpo",          peso: 2, texto: "Anda nas pontas dos pés", hint: "Ele caminha na ponta dos pés em vez de pisar com o pé inteiro no chão?" },
+  { id: 31, area: "pessoalSocial",  peso: 2, texto: "Machuca outros mordendo, batendo, etc", hint: "Ele morde, bate ou arranha outras crianças ou adultos?" },
+  { id: 32, area: "linguagem",      peso: 3, texto: "Repete a mesma frase muitas vezes", hint: "Ele fica repetindo a mesma frase várias vezes, mesmo fora de contexto?" },
+  { id: 33, area: "relacionamento", peso: 3, texto: "Ausência de imitação de brincadeiras de outras crianças", hint: "Ele não copia o que as outras crianças estão fazendo na brincadeira?" },
+  { id: 34, area: "sensorial",      peso: 1, texto: "Ausência de reação do piscar quando luz forte incide em seus olhos", hint: "Quando uma luz forte bate nos olhos dele, ele não pisca nem fecha os olhos?" },
+  { id: 35, area: "corpo",          peso: 2, texto: "Machuca-se mordendo, batendo a cabeça, etc", hint: "Ele se morde, bate a cabeça na parede ou se machuca de propósito?" },
+  { id: 36, area: "pessoalSocial",  peso: 2, texto: "Não espera para ser atendido (quer as coisas imediatamente)", hint: "Ele não consegue esperar sua vez? Quer tudo na hora, sem paciência?" },
+  { id: 37, area: "linguagem",      peso: 1, texto: "Não aponta para mais que cinco objetos", hint: "Ele quase não usa o dedo para apontar e mostrar coisas para você?" },
+  { id: 38, area: "relacionamento", peso: 4, texto: "Dificuldade de fazer amigos", hint: "Ele tem dificuldade de brincar junto com outras crianças ou de fazer amizades?" },
+  { id: 39, area: "sensorial",      peso: 4, texto: "Tapa as orelhas para vários sons", hint: "Ele cobre ou tapa as orelhas quando ouve certos sons (aspirador, liquidificador, música alta)?" },
+  { id: 40, area: "corpo",          peso: 4, texto: "Gira, bate objetos muitas vezes", hint: "Ele fica girando ou batendo objetos de forma repetitiva por muito tempo?" },
+  { id: 41, area: "pessoalSocial",  peso: 1, texto: "Dificuldade para o treino de toalete", hint: "Ele tem muita dificuldade para aprender a usar o banheiro sozinho?" },
+  { id: 42, area: "linguagem",      peso: 2, texto: "Usa de 0 a 5 palavras/dia para indicar necessidades e o que quer", hint: "No dia a dia, ele fala muito pouco (menos de 5 palavras) para pedir o que precisa?" },
+  { id: 43, area: "relacionamento", peso: 3, texto: "Frequentemente muito ansioso ou medroso", hint: "Ele demonstra medo ou ansiedade excessiva em situações do dia a dia?" },
+  { id: 44, area: "sensorial",      peso: 3, texto: "Franze, cobre ou virar os olhos quando em presença de luz natural", hint: "Ele fecha os olhos, faz careta ou vira o rosto quando está em ambientes com luz do sol?" },
+  { id: 45, area: "pessoalSocial",  peso: 1, texto: "Não se veste sem ajuda", hint: "Ele não consegue colocar a roupa sozinho, mesmo peças simples?" },
+  { id: 46, area: "linguagem",      peso: 3, texto: "Repete constantemente as mesmas palavras e/ou sons", hint: "Ele fica repetindo as mesmas palavras ou sons o tempo todo, como um 'eco'?" },
+  { id: 47, area: "relacionamento", peso: 4, texto: "'Olha através' das pessoas", hint: "Quando alguém está na frente dele, ele olha como se a pessoa fosse transparente, sem enxergar de verdade?" },
+  { id: 48, area: "linguagem",      peso: 4, texto: "Repete perguntas e frases ditas por outras pessoas", hint: "Se você pergunta 'quer água?', ele repete 'quer água?' em vez de responder sim ou não?" },
+  { id: 49, area: "pessoalSocial",  peso: 2, texto: "Frequentemente inconsciente dos perigos de situações e do ambiente", hint: "Ele não percebe perigos (rua movimentada, altura, objetos quentes) como outras crianças?" },
+  { id: 50, area: "pessoalSocial",  peso: 4, texto: "Prefere manipular e ocupar-se com objetos inanimados", hint: "Ele prefere ficar mexendo em objetos (chaves, tampas, fios) em vez de brincar com pessoas?" },
+  { id: 51, area: "corpo",          peso: 3, texto: "Toca, cheira ou lambe objetos do ambiente", hint: "Ele tem o hábito de cheirar, lamber ou passar a mão em objetos ou superfícies?" },
+  { id: 52, area: "sensorial",      peso: 3, texto: "Frequentemente não reage visualmente à presença de novas pessoas", hint: "Quando alguém novo chega perto, ele não olha nem demonstra curiosidade?" },
+  { id: 53, area: "corpo",          peso: 4, texto: "Repete sequências de comportamentos complicados (cobrir coisas, por ex.)", hint: "Ele faz rituais repetitivos (ex: cobrir e descobrir objetos, abrir e fechar portas várias vezes)?" },
+  { id: 54, area: "corpo",          peso: 2, texto: "Destrutivo com seus brinquedos e coisas da família", hint: "Ele quebra ou destrói brinquedos e objetos da casa com frequência?" },
+  { id: 55, area: "pessoalSocial",  peso: 1, texto: "O atraso no desenvolvimento identificado antes dos 30 meses", hint: "Algum atraso no desenvolvimento (fala, andar, socializar) foi percebido antes dos 2 anos e meio?" },
+  { id: 56, area: "linguagem",      peso: 3, texto: "Usa mais que 15 e menos que 30 frases diárias para comunicar-se", hint: "No dia a dia, ele fala entre 15 e 30 frases para se comunicar (vocabulário limitado)?" },
+  { id: 57, area: "sensorial",      peso: 4, texto: "Olha fixamente o ambiente por longos períodos de tempo", hint: "Ele fica parado olhando para o nada ou para um ponto fixo por muito tempo?" },
 ];
 
 export const ABC_AREA_MAX: Record<AbcAreaKey, number> = ABC_ITEMS.reduce(
@@ -104,7 +109,7 @@ export const ABC_TOTAL_MAX = ABC_ITEMS.reduce((s, it) => s + it.peso, 0);
 export type AbcNivel = 1 | 2 | 3;
 
 export const ABC_NIVEL_ALTO_MIN = 68;
-export const ABC_NIVEL_MODERADO_MIN = 47;
+export const ABC_NIVEL_MODERADO_MIN = 55;
 
 export function abcNivel(total: number): AbcNivel {
   if (total >= ABC_NIVEL_ALTO_MIN) return 1;
@@ -112,11 +117,13 @@ export function abcNivel(total: number): AbcNivel {
   return 3;
 }
 
-export const ABC_NIVEL_INFO: Record<AbcNivel, { label: string; short: string; color: string; bg: string; border: string }> = {
-  1: { label: "Nível 1 — Alto Impacto",     short: "Alto",     color: "#f87171", bg: "rgba(239,68,68,0.15)",   border: "rgba(239,68,68,0.5)" },
-  2: { label: "Nível 2 — Impacto Moderado", short: "Moderado", color: "#fbbf24", bg: "rgba(251,191,36,0.15)",  border: "rgba(251,191,36,0.5)" },
-  3: { label: "Nível 3 — Baixo Impacto",    short: "Baixo",    color: "#4ade80", bg: "rgba(74,222,128,0.15)",  border: "rgba(74,222,128,0.5)" },
+export const ABC_NIVEL_INFO: Record<AbcNivel, { nivel: string; nome: string; label: string; short: string; desc: string; color: string; bg: string; border: string }> = {
+  1: { nivel: "Nível 1", nome: "Alto Impacto",     label: "Nível 1 — Alto Impacto",     short: "Alto",     desc: "Comportamentos com prejuízo significativo na interação, autorregulação e participação", color: "#ef4444", bg: "rgba(239,68,68,0.12)",  border: "rgba(239,68,68,0.5)" },
+  2: { nivel: "Nível 2", nome: "Impacto Moderado", label: "Nível 2 — Impacto Moderado", short: "Moderado", desc: "Comportamentos que interferem parcialmente no engajamento e desempenho funcional",      color: "#f59e0b", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.5)" },
+  3: { nivel: "Nível 3", nome: "Baixo Impacto",    label: "Nível 3 — Baixo Impacto",    short: "Baixo",    desc: "Pouca interferência comportamental na participação e nas atividades",                     color: "#22c55e", bg: "rgba(34,197,94,0.12)",  border: "rgba(34,197,94,0.5)" },
 };
+
+export const ABC_DISCLAIMER = "A classificação tem caráter organizacional e não diagnóstico, sendo utilizada exclusivamente para definição de prioridade assistencial e direcionamento terapêutico.";
 
 export type AbcScores = {
   porArea: Record<AbcAreaKey, number>;
@@ -139,4 +146,134 @@ export function calcAbcScores(marcados: Iterable<number>): AbcScores {
 
 export function abcItemsByArea(area: AbcAreaKey): AbcItem[] {
   return ABC_ITEMS.filter(i => i.area === area);
+}
+
+export type AbcPrintInput = {
+  nome: string;
+  prontuario?: string | null;
+  dataNascimento?: string | null;
+  /** Data da aplicação (YYYY-MM-DD ou ISO). */
+  dataAplicacao?: string | null;
+  tipo?: "entrada" | "alta";
+  marcados: Iterable<number>;
+  observacoes?: string | null;
+  profissional?: string | null;
+};
+
+function escHtml(s: string): string {
+  return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] || c));
+}
+
+function fmtData(d?: string | null): string {
+  if (!d) return "—";
+  const iso = d.length === 10 ? `${d}T00:00:00` : d;
+  const dt = new Date(iso);
+  return isNaN(dt.getTime()) ? d : dt.toLocaleDateString("pt-BR");
+}
+
+/** Abre a folha de impressão do Checklist ABC (mesmo layout do app NFs – Triagem). */
+export function printAbcChecklist(input: AbcPrintInput): void {
+  const set = new Set(input.marcados);
+  const scores = calcAbcScores(set);
+  const nivel = ABC_NIVEL_INFO[scores.nivel];
+  const marcados = ABC_ITEMS.filter(i => set.has(i.id));
+  const naoMarcados = ABC_ITEMS.filter(i => !set.has(i.id));
+
+  const itemRow = (item: AbcItem, on: boolean) => {
+    const a = ABC_AREA_BY_KEY[item.area];
+    return `<tr style="border-bottom:1px solid #e5e7eb;${on ? "background:#fef9c3;" : ""}">
+      <td style="padding:6px 10px;font-weight:bold;color:${a.printColor};text-align:center;width:40px">${String(item.id).padStart(2, "0")}</td>
+      <td style="padding:6px 10px;">
+        <div style="font-size:13px;${on ? "font-weight:600;" : ""}">${escHtml(item.texto)}</div>
+        <div style="font-size:11px;color:#6b7280;font-style:italic;margin-top:2px">${escHtml(item.hint)}</div>
+      </td>
+      <td style="padding:6px 10px;text-align:center;width:60px">
+        <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:${a.printColor}18;color:${a.printColor};border:1px solid ${a.printColor}30">${a.code}</span>
+      </td>
+      <td style="padding:6px 10px;text-align:center;width:50px;font-weight:bold">${item.peso}</td>
+      <td style="padding:6px 10px;text-align:center;width:50px;font-size:18px">${on ? "✔" : ""}</td>
+    </tr>`;
+  };
+  const tabela = (titulo: string, lista: AbcItem[], on: boolean, cor?: string) => lista.length === 0 ? "" : `
+    <div class="section-title"${cor ? ` style="color:${cor}"` : ""}>${titulo} (${lista.length})</div>
+    <table><thead><tr>
+      <th style="width:40px;text-align:center">Nº</th>
+      <th>Descrição / Explicação Simplificada</th>
+      <th style="width:60px;text-align:center">Cat.</th>
+      <th style="width:50px;text-align:center">Peso</th>
+      <th style="width:50px;text-align:center">✔</th>
+    </tr></thead><tbody>${lista.map(i => itemRow(i, on)).join("")}</tbody></table>`;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ABC - ${escHtml(input.nome || "Paciente")}</title>
+  <style>
+    @page { size: A4; margin: 15mm; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; color: #1f2937; margin: 0; padding: 20px; }
+    .header { text-align: center; border-bottom: 3px solid #1e40af; padding-bottom: 16px; margin-bottom: 20px; }
+    .header h1 { margin: 0; font-size: 20px; color: #1e40af; }
+    .header p { margin: 4px 0 0; font-size: 12px; color: #6b7280; }
+    .patient-info { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 16px; background: #f0f9ff; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+    .patient-info span { font-weight: 600; color: #1e40af; }
+    .result-box { text-align: center; padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 2px solid; }
+    .subtotals { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .subtotals > div { flex: 1; min-width: 80px; text-align: center; padding: 8px; border-radius: 8px; border: 1px solid #e5e7eb; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th { background: #f3f4f6; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: #6b7280; border-bottom: 2px solid #d1d5db; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+    .section-title { font-size: 14px; font-weight: 700; margin: 20px 0 8px; padding: 6px 12px; background: #f3f4f6; border-radius: 6px; }
+    .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+    .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
+    .toolbar button { padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; border: 1px solid #cbd5e1; background: #f1f5f9; color: #334155; }
+    .toolbar button.primary { background: #1e40af; color: #fff; border-color: #1e40af; }
+    @media print { body { padding: 0; } .toolbar { display: none; } }
+  </style></head><body>
+  <div class="toolbar">
+    <button onclick="window.close()">← Voltar ao Sistema</button>
+    <button class="primary" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
+  </div>
+  <div class="header">
+    <h1>NFS – Gestão Terapêutica</h1>
+    <p>Avaliação multidisciplinar para crianças e adolescentes</p>
+    <p style="margin-top:8px;font-size:16px;font-weight:700;color:#1e40af">ABC — Autism Behavior Checklist</p>
+    <p style="font-size:11px;color:#6b7280">Checklist de Comportamento Autístico · Versão Brasileira${input.tipo ? ` · ${input.tipo === "alta" ? "Avaliação de Alta (reavaliação)" : "Avaliação de Entrada"}` : ""}</p>
+  </div>
+
+  <div class="patient-info">
+    <div><span>Paciente:</span> ${escHtml(input.nome || "—")}</div>
+    <div><span>Prontuário:</span> ${escHtml(input.prontuario || "—")}</div>
+    <div><span>Nascimento:</span> ${fmtData(input.dataNascimento)}</div>
+    <div><span>Data da Aplicação:</span> ${fmtData(input.dataAplicacao ?? new Date().toISOString())}</div>
+    ${input.profissional ? `<div><span>Aplicado por:</span> ${escHtml(input.profissional)}</div>` : ""}
+  </div>
+
+  <div class="result-box" style="border-color:${nivel.color};background:${nivel.color}08">
+    <div style="font-size:22px;font-weight:800;color:${nivel.color}">${nivel.nivel} — ${nivel.nome}</div>
+    <div style="font-size:32px;font-weight:900;color:${nivel.color};margin:4px 0">${scores.total} pontos</div>
+    <div style="font-size:12px;color:#6b7280">${nivel.desc}</div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:4px">${marcados.length} de ${ABC_ITEMS.length} itens marcados</div>
+  </div>
+
+  <div class="subtotals">
+    ${ABC_AREAS.map(a => `
+      <div style="border-color:${a.printColor}30">
+        <div style="font-size:20px;font-weight:800;color:${a.printColor}">${scores.porArea[a.key]}</div>
+        <div style="font-size:10px;font-weight:700;color:#6b7280">${a.code}</div>
+        <div style="font-size:9px;color:#9ca3af">${a.label}</div>
+      </div>`).join("")}
+  </div>
+
+  ${input.observacoes ? `<div class="section-title">Observações</div><p style="font-size:12px;padding:0 12px;white-space:pre-wrap">${escHtml(input.observacoes)}</p>` : ""}
+
+  ${tabela("✔ Itens Marcados", marcados, true)}
+  ${tabela("Itens Não Marcados", naoMarcados, false, "#9ca3af")}
+
+  <div class="footer">
+    <p>${ABC_DISCLAIMER}</p>
+    <p style="margin-top:6px">© ${new Date().getFullYear()} NFS – Gestão Terapêutica · Gerado em ${new Date().toLocaleString("pt-BR")}</p>
+  </div>
+  </body></html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
 }

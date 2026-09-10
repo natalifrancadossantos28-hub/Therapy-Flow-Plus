@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Card, Button, Badge, MotionCard, Input, Label } from "@/components/ui-custom";
 import { generatePatientPdf } from "@/hooks/use-pdf";
-import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon, ShieldOff, Users, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon, ShieldOff, Users, Undo2, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
 import { PatientPhotoUploader } from "@/components/PatientPhotoUploader";
@@ -13,6 +13,7 @@ import {
   upsertPatient,
   deletePatient,
   addPatientToFila,
+  enqueueAfterAbcEntrada,
   listAppointments,
   updateAppointment,
   reverterFalta,
@@ -28,7 +29,7 @@ import {
 import { AREA_MAX_UI, areaToDb, areaToUi } from "@/lib/score-scale";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
 import { AbcChecklistForm, AbcNivelBadge } from "@/components/AbcChecklistForm";
-import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, type AbcAreaKey } from "@/lib/abc-checklist";
+import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, printAbcChecklist, type AbcAreaKey } from "@/lib/abc-checklist";
 import { getProfessionalSession } from "@/lib/portal-session";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
@@ -388,6 +389,21 @@ export default function PatientDetail() {
       }
     }
     return { added, skipped };
+  };
+
+  const enqueueAfterAbc = async (a: AbcAvaliacao) => {
+    if (!patient) return;
+    try {
+      const r = await enqueueAfterAbcEntrada(patient, a);
+      if (r.status === "adicionado") {
+        setPatient(prev => prev && prev.status !== "Atendimento" ? { ...prev, status: "Fila de Espera" } : prev);
+        toast({ title: "Paciente na Fila de Espera", description: `Posição definida pelo impacto ABC (${ABC_NIVEL_INFO[a.nivel].label}).` });
+      } else if (r.status === "ja_na_fila") {
+        toast({ title: "Fila atualizada", description: "O paciente já estava na fila; a posição segue a nova pontuação ABC." });
+      }
+    } catch (err: any) {
+      toast({ title: "Não foi possível colocar na fila", description: err?.message || "Tente pela Fila de Espera.", variant: "destructive" });
+    }
   };
 
   const saveTriagem = async () => {
@@ -790,6 +806,17 @@ export default function PatientDetail() {
                                 {a.scoreTotal}<span className="text-xs text-muted-foreground font-normal">/{ABC_TOTAL_MAX}</span>
                               </p>
                               <p className="text-xs text-muted-foreground">{formatDate(a.createdAt.slice(0, 10))}{a.professionalName ? ` · ${a.professionalName}` : ""}</p>
+                              <button
+                                type="button"
+                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
+                                onClick={() => patient && printAbcChecklist({
+                                  nome: patient.name, prontuario: patient.prontuario, dataNascimento: patient.dateOfBirth,
+                                  dataAplicacao: a.createdAt, tipo: a.tipo, marcados: a.respostas,
+                                  observacoes: a.observacoes, profissional: a.professionalName,
+                                })}
+                              >
+                                <Printer className="w-3.5 h-3.5" /> Imprimir checklist
+                              </button>
                             </>
                           ) : (
                             <p className="text-xs text-muted-foreground italic mt-2">{label === "Alta" ? "Registrada ao dar alta na agenda." : "—"}</p>
@@ -918,6 +945,9 @@ export default function PatientDetail() {
             <AbcChecklistForm
               patientId={patient.id}
               tipo={abcForm.tipo}
+              patientName={patient.name}
+              patientProntuario={patient.prontuario}
+              patientDateOfBirth={patient.dateOfBirth}
               initialRespostas={abcForm.base}
               professionalId={getProfessionalSession()?.professionalId ?? null}
               professionalName={getProfessionalSession()?.professionalName ?? null}
@@ -926,6 +956,7 @@ export default function PatientDetail() {
                 setAbcHist(prev => [a, ...prev]);
                 setAbcForm(null);
                 toast({ title: "Avaliação ABC salva", description: `${a.scoreTotal} pontos — ${ABC_NIVEL_INFO[a.nivel].label}` });
+                if (a.tipo === "entrada") void enqueueAfterAbc(a);
               }}
             />
           </MotionCard>

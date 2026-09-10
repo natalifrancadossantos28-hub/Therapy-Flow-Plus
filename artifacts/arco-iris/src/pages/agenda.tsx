@@ -2392,6 +2392,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 key={`alta-abc-${altaConfirm.patientId}`}
                 patientId={altaConfirm.patientId}
                 tipo="alta"
+                patientName={altaConfirm.patientName}
                 initialRespostas={altaAbcBase}
                 professionalId={altaConfirm.professionalId}
                 professionalName={altaConfirm.professionalName || selectedProf?.name || null}
