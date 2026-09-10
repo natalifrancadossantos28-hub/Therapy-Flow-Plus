@@ -407,7 +407,7 @@ export default function Patients() {
     const w = window.open("", "_blank");
     if (!w) return;
 
-    const td = "padding:8px 10px;border-bottom:1px solid #e2e8f0;color:#334155;vertical-align:top;";
+    const td = "padding:6px;border-bottom:1px solid #e2e8f0;color:#334155;vertical-align:top;";
     const body = lista.map(p => {
       const telefone = [p.phone, p.guardianPhone].filter(Boolean).join(" / ");
       const profs = patientProfs.get(p.id)?.names.join(", ") || "";
@@ -416,7 +416,7 @@ export default function Patients() {
         <td style="${td}font-weight:600;color:#0f172a;">${esc(p.name)}</td>
         <td style="${td}">${esc(p.motherName || "—")}</td>
         <td style="${td}">${esc(p.address || "—")}</td>
-        <td style="${td}white-space:nowrap;">${esc(telefone || "—")}</td>
+        <td style="${td}">${esc(telefone || "—")}</td>
         <td style="${td}">${esc(profs || "—")}</td>
       </tr>`;
     }).join("");
@@ -424,9 +424,10 @@ export default function Patients() {
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pacientes em Atendimento</title>
     <style>body{font-family:Arial,sans-serif;padding:32px;color:#0f172a;}h1{font-size:20px;margin-bottom:4px;}
     .sub{color:#64748b;font-size:13px;margin-bottom:20px;}
-    table{width:100%;border-collapse:collapse;font-size:12px;}
-    th{text-align:left;padding:10px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
-    @media print{@page{size:A4 landscape;margin:12mm;}button{display:none}html,body{height:auto!important;overflow:visible!important;}body{padding:0;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
+    table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;}
+    td{word-break:break-word;}
+    th{text-align:left;padding:8px 6px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:10px;text-transform:uppercase;letter-spacing:.03em;}
+    @media print{@page{size:A4 portrait;margin:10mm;}button{display:none}html,body{height:auto!important;overflow:visible!important;}body{padding:0;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
     <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
       <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
       <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
@@ -434,7 +435,8 @@ export default function Patients() {
     <h1>Pacientes em Atendimento</h1>
     <p class="sub">${todayStr} · ${lista.length} paciente(s) em atendimento</p>
     <table>
-      <thead><tr><th>Prontuário</th><th>Nome</th><th>Nome da Mãe</th><th>Endereço</th><th>Telefone</th><th>Profissional(is)</th></tr></thead>
+      <colgroup><col style="width:9%"><col style="width:20%"><col style="width:19%"><col style="width:24%"><col style="width:13%"><col style="width:15%"></colgroup>
+      <thead><tr><th>Pront.</th><th>Nome</th><th>Nome da Mãe</th><th>Endereço</th><th>Telefone</th><th>Profissional(is)</th></tr></thead>
       <tbody>${body || `<tr><td colspan="6" style="padding:16px;color:#94a3b8;font-style:italic;text-align:center;">Nenhum paciente em atendimento.</td></tr>`}</tbody>
     </table>
     <p style="margin-top:24px;font-size:11px;color:#94a3b8;">NFS – Gestão Terapêutica · Telefone: paciente / responsável.</p>
