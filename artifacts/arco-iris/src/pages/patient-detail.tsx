@@ -17,6 +17,9 @@ import {
   updateAppointment,
   reverterFalta,
   listPatientDischarges,
+  listAbcAvaliacoes,
+  type AbcAvaliacao,
+  type AbcTipo,
   type Patient,
   type PatientPdfData,
   type PatientAbsencesInfo,
@@ -24,6 +27,9 @@ import {
 } from "@/lib/arco-rpc";
 import { AREA_MAX_UI, areaToDb, areaToUi } from "@/lib/score-scale";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
+import { AbcChecklistForm, AbcNivelBadge } from "@/components/AbcChecklistForm";
+import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, type AbcAreaKey } from "@/lib/abc-checklist";
+import { getProfessionalSession } from "@/lib/portal-session";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
@@ -86,6 +92,8 @@ export default function PatientDetail() {
   const [discharges, setDischarges] = useState<PatientDischarge[]>([]);
 
   const [triagemEdit, setTriagemEdit] = useState(false);
+  const [abcHist, setAbcHist] = useState<AbcAvaliacao[]>([]);
+  const [abcForm, setAbcForm] = useState<{ tipo: AbcTipo; base?: number[] } | null>(null);
   const [sPsicologia, setSPsicologia] = useState("");
   const [sPsicomotricidade, setSPsicomotricidade] = useState("");
   const [sFisioterapia, setSFisioterapia] = useState("");
@@ -237,17 +245,19 @@ export default function PatientDetail() {
     setIsLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const [p, pdf, abs, allApts, alts] = await Promise.all([
+      const [p, pdf, abs, allApts, alts, abcs] = await Promise.all([
         getPatient(patientId),
         getPatientPdf(patientId).catch(() => null),
         getPatientAbsences(patientId).catch(() => null),
         listAppointments({ patientId }).catch(() => [] as any[]),
         listPatientDischarges(patientId).catch(() => [] as PatientDischarge[]),
+        listAbcAvaliacoes(patientId).catch(() => [] as AbcAvaliacao[]),
       ]);
       setPatient(p);
       setPdfData(pdf);
       setAbsenceInfo(abs);
       setDischarges(alts);
+      setAbcHist(abcs);
       // Derive team from appointments
       const profMap = new Map<number, { name: string; hasActive: boolean }>();
       for (const apt of allApts) {
@@ -728,6 +738,99 @@ export default function PatientDetail() {
               </p>
             )}
           </Card>
+
+          {(() => {
+            const entrada = abcHist.find(a => a.tipo === "entrada") ?? null;
+            const alta = abcHist.find(a => a.tipo === "alta") ?? null;
+            const atual = alta ?? entrada;
+            const nivelInfo = atual ? ABC_NIVEL_INFO[atual.nivel] : null;
+            const areaVal = (a: AbcAvaliacao, k: AbcAreaKey) => ({
+              sensorial: a.scoreSensorial, relacionamento: a.scoreRelacionamento, corpo: a.scoreCorpo,
+              linguagem: a.scoreLinguagem, pessoalSocial: a.scorePessoalSocial,
+            })[k];
+            return (
+              <Card className="p-6 border-2 transition-colors" style={{ borderColor: nivelInfo?.border ?? "rgba(148,163,184,0.3)" }}>
+                <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+                      style={{ background: nivelInfo?.bg ?? "rgba(148,163,184,0.15)", color: nivelInfo?.color ?? "#94a3b8" }}>
+                      <ClipboardCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold font-display text-lg">Triagem / Avaliação ABC</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Autism Behavior Checklist — {abcHist.length === 0 ? "nenhuma avaliação registrada" : `${abcHist.length} avaliação(ões)`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => setAbcForm({ tipo: "entrada" })}>
+                      <ClipboardCheck className="w-4 h-4" /> {entrada ? "Nova avaliação de entrada" : "Avaliação de entrada"}
+                    </Button>
+                    {entrada && (
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => setAbcForm({ tipo: "alta", base: entrada.respostas })}>
+                        <CheckCircle2 className="w-4 h-4" /> Avaliação de alta
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {atual ? (
+                  <div className="space-y-3 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[{ label: "Entrada", a: entrada }, { label: "Alta", a: alta }].map(({ label, a }) => (
+                        <div key={label} className="p-3 rounded-xl border" style={{ borderColor: a ? ABC_NIVEL_INFO[a.nivel].border : "rgba(148,163,184,0.3)", background: a ? ABC_NIVEL_INFO[a.nivel].bg : "transparent" }}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-muted-foreground font-semibold text-xs uppercase tracking-wider">Avaliação de {label}</p>
+                            <AbcNivelBadge nivel={a?.nivel ?? null} />
+                          </div>
+                          {a ? (
+                            <>
+                              <p className="text-2xl font-bold" style={{ color: ABC_NIVEL_INFO[a.nivel].color }}>
+                                {a.scoreTotal}<span className="text-xs text-muted-foreground font-normal">/{ABC_TOTAL_MAX}</span>
+                              </p>
+                              <p className="text-xs text-muted-foreground">{formatDate(a.createdAt.slice(0, 10))}{a.professionalName ? ` · ${a.professionalName}` : ""}</p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic mt-2">{label === "Alta" ? "Registrada ao dar alta na agenda." : "—"}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {ABC_AREAS.map(area => (
+                        <div key={area.key} className="p-2 bg-secondary/30 rounded-xl text-center">
+                          <p className="text-muted-foreground font-semibold text-[10px] mb-1 truncate" title={area.label}>{area.short}</p>
+                          <p className="font-bold" style={{ color: area.color }}>
+                            {entrada ? areaVal(entrada, area.key) : "—"}
+                            {alta && <span className="text-muted-foreground font-normal"> → {areaVal(alta, area.key)}</span>}
+                            <span className="text-[10px] text-muted-foreground font-normal">/{ABC_AREA_MAX[area.key]}</span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {abcHist.length > 2 && (
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-muted-foreground font-semibold">Histórico completo ({abcHist.length})</summary>
+                        <ul className="mt-2 space-y-1">
+                          {abcHist.map(a => (
+                            <li key={a.id} className="flex items-center justify-between p-2 rounded-lg bg-secondary/30">
+                              <span>{formatDate(a.createdAt.slice(0, 10))} · {a.tipo === "entrada" ? "Entrada" : "Alta"}{a.professionalName ? ` · ${a.professionalName}` : ""}</span>
+                              <AbcNivelBadge nivel={a.nivel} total={a.scoreTotal} />
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Registre a avaliação ABC de entrada para classificar o grau de impacto (Nível 1 alto · Nível 2 moderado · Nível 3 baixo) e priorizar a fila de espera.
+                  </p>
+                )}
+              </Card>
+            );
+          })()}
         </div>
 
         <div className="space-y-6">
@@ -804,6 +907,30 @@ export default function PatientDetail() {
           </Card>
         </div>
       </div>
+
+      {abcForm && patient && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <MotionCard className="w-full max-w-2xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <h2 className="text-2xl font-bold font-display mb-1">
+              {abcForm.tipo === "entrada" ? "Avaliação ABC — Entrada" : "Avaliação ABC — Alta"}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-5">{patient.name}</p>
+            <AbcChecklistForm
+              patientId={patient.id}
+              tipo={abcForm.tipo}
+              initialRespostas={abcForm.base}
+              professionalId={getProfessionalSession()?.professionalId ?? null}
+              professionalName={getProfessionalSession()?.professionalName ?? null}
+              onCancel={() => setAbcForm(null)}
+              onSaved={(a) => {
+                setAbcHist(prev => [a, ...prev]);
+                setAbcForm(null);
+                toast({ title: "Avaliação ABC salva", description: `${a.scoreTotal} pontos — ${ABC_NIVEL_INFO[a.nivel].label}` });
+              }}
+            />
+          </MotionCard>
+        </div>
+      )}
 
       {triagemEdit && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">

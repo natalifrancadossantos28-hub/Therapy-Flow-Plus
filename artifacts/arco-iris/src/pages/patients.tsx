@@ -7,6 +7,8 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PatientPhotoUploader } from "@/components/PatientPhotoUploader";
 import {
   listPatients,
+  listAbcResumo,
+  type AbcResumo,
   upsertPatient,
   deletePatient,
   listProfessionals,
@@ -18,6 +20,7 @@ import {
   type Professional,
 } from "@/lib/arco-rpc";
 import { hasAdminScope } from "@/lib/portal-session";
+import { AbcNivelBadge } from "@/components/AbcChecklistForm";
 
 const STATUS_OPTIONS = [
   { value: "Aguardando Triagem", label: "Aguardando Triagem" },
@@ -120,6 +123,7 @@ export default function Patients() {
   const [idadeAlertaFilter, setIdadeAlertaFilter] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [abcByPatient, setAbcByPatient] = useState<Map<number, AbcResumo>>(new Map());
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [patientProfs, setPatientProfs] = useState<Map<number, { names: string[]; count: number }>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
@@ -165,13 +169,15 @@ export default function Patients() {
     try {
       const todayStr = new Date().toISOString().slice(0, 10);
       const dateTo = addDays(todayStr, JANELA_PROFISSIONAIS_DIAS);
-      const [ps, pros, profsByPatient] = await Promise.all([
+      const [ps, pros, profsByPatient, abcs] = await Promise.all([
         listPatients(),
         listProfessionals(),
         loadPatientProfs(todayStr, dateTo),
+        listAbcResumo().catch(() => [] as AbcResumo[]),
       ]);
       setPatients(ps);
       setProfessionals(pros);
+      setAbcByPatient(new Map(abcs.map(a => [a.patientId, a])));
       const ppMap = new Map<number, { names: string[]; count: number }>();
       for (const [pid, names] of profsByPatient) {
         ppMap.set(pid, { names, count: names.length });
@@ -485,15 +491,16 @@ export default function Patients() {
                 <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Idade</th>
                 <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Profissional</th>
                 <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider" title="Grau de impacto (Checklist ABC)">Impacto ABC</th>
                 <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Faltas</th>
                 {hasAdminScope() && <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Ações</th>}
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={hasAdminScope() ? 8 : 7} className="text-center py-8 animate-pulse text-muted-foreground">Carregando...</td></tr>
+                <tr><td colSpan={hasAdminScope() ? 9 : 8} className="text-center py-8 animate-pulse text-muted-foreground">Carregando...</td></tr>
               ) : filteredPatients.length === 0 ? (
-                <tr><td colSpan={hasAdminScope() ? 8 : 7} className="text-center py-8 text-muted-foreground">Nenhum paciente encontrado.</td></tr>
+                <tr><td colSpan={hasAdminScope() ? 9 : 8} className="text-center py-8 text-muted-foreground">Nenhum paciente encontrado.</td></tr>
               ) : (
                 visiblePatients.map((patient) => {
                   const prof = patient.professionalId != null ? profById.get(patient.professionalId) : undefined;
@@ -549,6 +556,13 @@ export default function Patients() {
                       </td>
                       <td className="px-4 py-3">
                         <Badge className={getStatusColor(patient.status)}>{patient.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const r = abcByPatient.get(patient.id);
+                          const atual = r?.alta ?? r?.entrada ?? null;
+                          return <AbcNivelBadge nivel={atual?.nivel ?? null} total={atual?.scoreTotal ?? null} />;
+                        })()}
                       </td>
                       <td className="px-4 py-3">
                         {hasWarning ? (

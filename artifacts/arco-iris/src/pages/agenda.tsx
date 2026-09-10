@@ -51,7 +51,11 @@ import {
   type AppointmentListItem,
   type Feriado,
   type Ausencia,
+  listAbcAvaliacoes,
+  type AbcAvaliacao,
 } from "@/lib/arco-rpc";
+import { AbcChecklistForm } from "@/components/AbcChecklistForm";
+import { ABC_NIVEL_INFO } from "@/lib/abc-checklist";
 import { buildMultiGuestAppointments } from "@/lib/multi-agenda";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
 import {
@@ -515,6 +519,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
   const [altaMotivo, setAltaMotivo] = useState("");
   const [saidaTipo, setSaidaTipo] = useState<"Alta" | "Óbito" | "Desistência">("Alta");
+  // Alta exige reavaliação ABC salva antes de liberar o motivo/confirmação.
+  const [altaAbc, setAltaAbc] = useState<AbcAvaliacao | null>(null);
+  const [altaAbcBase, setAltaAbcBase] = useState<number[] | undefined>(undefined);
   const [absenceAlert, setAbsenceAlert] = useState<AbsenceAlert | null>(null);
   const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
   const [remanejSending, setRemanejSending] = useState(false);
@@ -1108,11 +1115,19 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     setActionMenuId(null);
     setAltaMotivo("");
     setSaidaTipo(tipo);
+    setAltaAbc(null);
+    setAltaAbcBase(undefined);
     setAltaConfirm(apt);
+    if (tipo === "Alta") {
+      listAbcAvaliacoes(apt.patientId)
+        .then(hist => setAltaAbcBase(hist.find(a => a.tipo === "entrada")?.respostas ?? []))
+        .catch(() => setAltaAbcBase([]));
+    }
   };
 
   const confirmSaida = async () => {
     if (!altaConfirm || !altaMotivo.trim()) return;
+    if (saidaTipo === "Alta" && !altaAbc) return;
     const label = saidaTipo;
     try {
       if (altaConfirm.id > 0) {
@@ -1123,7 +1138,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         );
         if (realSibling) await deleteAppointmentAlta(realSibling.id);
       }
-      await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}`);
+      const abcInfo = altaAbc ? ` — ABC alta: ${altaAbc.scoreTotal} pts (Nível ${altaAbc.nivel})` : "";
+      await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}${abcInfo}`);
 
       const todayStr = todayBR();
       const profSpecialty = selectedProf?.specialty ?? null;
@@ -1150,7 +1166,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         const existing = await getPatient(altaConfirm.patientId);
         const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
         await upsertPatient(altaConfirm.patientId, {
-          notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")} — ${profSpecialty ?? "Geral"}] Motivo: ${altaMotivo.trim()}`,
+          notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")} — ${profSpecialty ?? "Geral"}] Motivo: ${altaMotivo.trim()}${abcInfo}`,
         });
       } catch {
         toast({ title: "Aviso", description: "Motivo registrado na notificação, mas houve falha ao gravar no prontuário.", variant: "destructive" });
@@ -2354,7 +2370,41 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       )}
 
       {/* ── Modal de Saída (Alta / Óbito / Desistência) ── */}
-      {altaConfirm && (
+      {altaConfirm && saidaTipo === "Alta" && !altaAbc && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl shadow-2xl my-4 px-6 py-5" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444" }}>
+                <LogOut className="w-5 h-5" style={{ color: "#f87171" }} />
+              </div>
+              <div>
+                <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>Dar Alta — Reavaliação ABC obrigatória</p>
+                <p className="text-xs text-white/50">Passo 1 de 2 · <strong className="text-white/80">{altaConfirm.patientName}</strong></p>
+              </div>
+            </div>
+            <p className="text-xs text-white/60 mb-4">
+              Preencha o checklist ABC com o quadro atual do paciente. Esta avaliação é salva como <strong className="text-white/80">Avaliação de Alta</strong>, sem alterar a avaliação de entrada, e alimenta o Dashboard de Evolução Clínica.
+            </p>
+            {altaAbcBase === undefined ? (
+              <p className="text-sm text-white/60 animate-pulse py-6 text-center">Carregando avaliação de entrada…</p>
+            ) : (
+              <AbcChecklistForm
+                key={`alta-abc-${altaConfirm.patientId}`}
+                patientId={altaConfirm.patientId}
+                tipo="alta"
+                initialRespostas={altaAbcBase}
+                professionalId={altaConfirm.professionalId}
+                professionalName={altaConfirm.professionalName || selectedProf?.name || null}
+                saveLabel="Salvar reavaliação e continuar →"
+                onSaved={(a) => { setAltaAbc(a); toast({ title: "Reavaliação ABC salva", description: `${a.scoreTotal} pontos — ${ABC_NIVEL_INFO[a.nivel].label}` }); }}
+                onCancel={() => { setAltaConfirm(null); setAltaMotivo(""); }}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {altaConfirm && (saidaTipo !== "Alta" || altaAbc) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <div className="px-6 py-5">
@@ -2374,6 +2424,11 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 e da fila desta especialidade. Agendamentos em outras especialidades não serão afetados.
               </p>
               <p className="text-xs text-white/50 mt-1">Status global só será alterado se não houver outros atendimentos ativos.</p>
+              {altaAbc && (
+                <p className="text-xs mt-2 font-semibold" style={{ color: ABC_NIVEL_INFO[altaAbc.nivel].color }}>
+                  ✓ Reavaliação ABC salva: {altaAbc.scoreTotal} pts — {ABC_NIVEL_INFO[altaAbc.nivel].label}
+                </p>
+              )}
               {altaConfirm.recurrenceGroupId && (
                 <p className="text-xs text-orange-400/80 mt-2">
                   ⚠ Este é um agendamento recorrente. Todos os próximos serão cancelados.

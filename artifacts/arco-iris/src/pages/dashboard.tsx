@@ -16,7 +16,11 @@ import {
   type WaitingListEntry,
   type LongAttendancePatient,
   type PausedOverviewItem,
+  listAbcResumo,
+  type AbcResumo,
+  type AbcResumoItem,
 } from "@/lib/arco-rpc";
+import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, ABC_NIVEL_ALTO_MIN, ABC_NIVEL_MODERADO_MIN } from "@/lib/abc-checklist";
 import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3, Snowflake, Clock, ChevronLeft, ChevronRight, HeartHandshake, Printer } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
 import { Link } from "wouter";
@@ -1119,6 +1123,8 @@ export default function Dashboard() {
       {/* Pacientes Pausados — Fila + Agenda */}
       <PausedOverviewWidget />
 
+      <EvolucaoClinicaWidget />
+
       {/* Alertas de Faltas — por profissional */}
       {absentByPatient.length > 0 && (
         <Card className="p-6 border-[rgba(255,30,90,0.3)] shadow-[0_0_24px_rgba(255,30,90,0.08)]">
@@ -1148,6 +1154,198 @@ export default function Dashboard() {
         </Card>
       )}
     </div>
+  );
+}
+
+// ── EvolucaoClinicaWidget ─────────────────────────────────────────────────────────────
+// Checklist ABC: cruza a avaliação de entrada com a de alta de cada paciente.
+
+function EvolucaoClinicaWidget() {
+  const [resumo, setResumo] = useState<AbcResumo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listAbcResumo()
+      .then(setResumo)
+      .catch(() => setResumo([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const data = useMemo(() => {
+    const comEntrada = resumo.filter(r => r.entrada);
+    const concluidos = comEntrada.filter(r => r.alta) as Array<AbcResumo & { entrada: AbcResumoItem; alta: AbcResumoItem }>;
+
+    const nivelEntrada = [1, 2, 3].map(n => ({
+      nivel: n as 1 | 2 | 3,
+      name: ABC_NIVEL_INFO[n as 1 | 2 | 3].short,
+      value: comEntrada.filter(r => r.entrada!.nivel === n).length,
+      color: ABC_NIVEL_INFO[n as 1 | 2 | 3].color,
+    }));
+
+    // Transições entrada → alta
+    const transicoes = new Map<string, number>();
+    for (const r of concluidos) {
+      const k = `${r.entrada.nivel}→${r.alta.nivel}`;
+      transicoes.set(k, (transicoes.get(k) ?? 0) + 1);
+    }
+    const transData = [1, 2, 3].flatMap(de => [1, 2, 3].map(para => ({
+      de: de as 1 | 2 | 3, para: para as 1 | 2 | 3,
+      name: `${ABC_NIVEL_INFO[de as 1 | 2 | 3].short} → ${ABC_NIVEL_INFO[para as 1 | 2 | 3].short}`,
+      value: transicoes.get(`${de}→${para}`) ?? 0,
+    }))).filter(t => t.value > 0);
+
+    const melhoraram = concluidos.filter(r => r.alta.nivel > r.entrada.nivel).length;
+    const mantiveram = concluidos.filter(r => r.alta.nivel === r.entrada.nivel).length;
+    const pioraram = concluidos.filter(r => r.alta.nivel < r.entrada.nivel).length;
+    const altoParaBaixo = transicoes.get("1→3") ?? 0;
+
+    const mediaReducao = concluidos.length
+      ? Math.round(concluidos.reduce((s, r) => s + (r.entrada.scoreTotal - r.alta.scoreTotal), 0) / concluidos.length)
+      : 0;
+
+    const areaKeys: Array<{ key: keyof AbcResumoItem; label: string; color: string; max: number }> = [
+      { key: "scoreSensorial",      label: "Sensorial",    color: ABC_AREAS[0].color, max: ABC_AREA_MAX.sensorial },
+      { key: "scoreRelacionamento", label: "Relacion.",    color: ABC_AREAS[1].color, max: ABC_AREA_MAX.relacionamento },
+      { key: "scoreCorpo",          label: "Corpo/Obj.",   color: ABC_AREAS[2].color, max: ABC_AREA_MAX.corpo },
+      { key: "scoreLinguagem",      label: "Linguagem",    color: ABC_AREAS[3].color, max: ABC_AREA_MAX.linguagem },
+      { key: "scorePessoalSocial",  label: "Pessoal-Soc.", color: ABC_AREAS[4].color, max: ABC_AREA_MAX.pessoalSocial },
+    ];
+    const porArea = areaKeys.map(a => {
+      const n = concluidos.length || 1;
+      const ent = concluidos.reduce((s, r) => s + Number(r.entrada[a.key] ?? 0), 0) / n;
+      const alt = concluidos.reduce((s, r) => s + Number(r.alta[a.key] ?? 0), 0) / n;
+      return { area: a.label, Entrada: Math.round(ent * 10) / 10, Alta: Math.round(alt * 10) / 10, max: a.max };
+    });
+
+    return { comEntrada, concluidos, nivelEntrada, transData, melhoraram, mantiveram, pioraram, altoParaBaixo, mediaReducao, porArea };
+  }, [resumo]);
+
+  if (loading || data.comEntrada.length === 0) return null;
+
+  const { concluidos } = data;
+
+  return (
+    <Card className="p-6 border-[rgba(167,139,250,0.3)] shadow-[0_0_24px_rgba(167,139,250,0.08)]">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
+        <h2 className="text-xl font-bold font-display flex items-center gap-2 text-violet-400" style={{ textShadow: "0 0 12px rgba(167,139,250,0.5)" }}>
+          <TrendingUp className="w-5 h-5" />
+          Evolução Clínica — Checklist ABC (Entrada × Alta)
+        </h2>
+        <span className="text-xs text-muted-foreground">
+          {data.comEntrada.length} avaliados na entrada · {concluidos.length} com alta reavaliada
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground mb-5">
+        Nível 1 = alto impacto (≥{ABC_NIVEL_ALTO_MIN} pts) · Nível 2 = moderado · Nível 3 = baixo impacto (&lt;{ABC_NIVEL_MODERADO_MIN} pts). Menos pontos = melhor.
+      </p>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="p-4 rounded-xl border" style={{ borderColor: ABC_NIVEL_INFO[3].border, background: ABC_NIVEL_INFO[3].bg }}>
+          <p className="text-xs text-muted-foreground font-semibold">Melhoraram de nível</p>
+          <p className="text-3xl font-bold" style={{ color: ABC_NIVEL_INFO[3].color }}>{data.melhoraram}</p>
+          <p className="text-[11px] text-muted-foreground">de {concluidos.length} com alta</p>
+        </div>
+        <div className="p-4 rounded-xl border" style={{ borderColor: ABC_NIVEL_INFO[1].border, background: ABC_NIVEL_INFO[1].bg }}>
+          <p className="text-xs text-muted-foreground font-semibold">Alto → Baixo impacto</p>
+          <p className="text-3xl font-bold" style={{ color: ABC_NIVEL_INFO[1].color }}>{data.altoParaBaixo}</p>
+          <p className="text-[11px] text-muted-foreground">saíram do Nível 1 para o Nível 3</p>
+        </div>
+        <div className="p-4 rounded-xl border border-border/60 bg-secondary/30">
+          <p className="text-xs text-muted-foreground font-semibold">Mantiveram / Pioraram</p>
+          <p className="text-3xl font-bold text-foreground">{data.mantiveram} <span className="text-base text-muted-foreground">/ {data.pioraram}</span></p>
+          <p className="text-[11px] text-muted-foreground">mesmo nível / nível pior</p>
+        </div>
+        <div className="p-4 rounded-xl border border-border/60 bg-secondary/30">
+          <p className="text-xs text-muted-foreground font-semibold">Redução média de pontos</p>
+          <p className="text-3xl font-bold text-violet-400">{data.mediaReducao > 0 ? `−${data.mediaReducao}` : data.mediaReducao}</p>
+          <p className="text-[11px] text-muted-foreground">entrada → alta (máx. {ABC_TOTAL_MAX})</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div>
+          <p className="text-sm font-bold mb-2">Grau de impacto na entrada</p>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={data.nivelEntrada.filter(n => n.value > 0)} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={3}>
+                  {data.nivelEntrada.filter(n => n.value > 0).map(n => <Cell key={n.nivel} fill={n.color} />)}
+                </Pie>
+                <Tooltip contentStyle={{ background: "rgba(10,10,20,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-bold mb-2">Transições de nível (entrada → alta)</p>
+          {data.transData.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic py-8 text-center">Nenhum paciente com avaliação de alta ainda.</p>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.transData} layout="vertical" margin={{ left: 10, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: "rgba(10,10,20,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="value" name="Pacientes" radius={[0, 6, 6, 0]}>
+                    {data.transData.map(t => (
+                      <Cell key={t.name} fill={t.para > t.de ? ABC_NIVEL_INFO[3].color : t.para === t.de ? ABC_NIVEL_INFO[2].color : ABC_NIVEL_INFO[1].color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <p className="text-sm font-bold mb-2">Progresso por categoria (média de pontos)</p>
+          {concluidos.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic py-8 text-center">Disponível quando houver avaliações de alta.</p>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.porArea} margin={{ left: -10, right: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis dataKey="area" tick={{ fontSize: 10 }} interval={0} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: "rgba(10,10,20,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="Entrada" fill={ABC_NIVEL_INFO[1].color} radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Alta" fill={ABC_NIVEL_INFO[3].color} radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {concluidos.length > 0 && (
+        <details className="mt-5 text-xs">
+          <summary className="cursor-pointer text-muted-foreground font-semibold">Pacientes com alta reavaliada ({concluidos.length})</summary>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {concluidos
+              .slice()
+              .sort((a, b) => (b.entrada.scoreTotal - b.alta.scoreTotal) - (a.entrada.scoreTotal - a.alta.scoreTotal))
+              .map(r => (
+                <Link key={r.patientId} href={`/patients/${r.patientId}`}>
+                  <div className="p-3 rounded-xl bg-secondary/30 border border-border/50 hover:border-violet-400/50 transition-colors flex items-center justify-between gap-2">
+                    <span className="font-semibold truncate">{r.patientName}</span>
+                    <span className="whitespace-nowrap font-mono">
+                      <span style={{ color: ABC_NIVEL_INFO[r.entrada.nivel].color }}>{r.entrada.scoreTotal}</span>
+                      {" → "}
+                      <span style={{ color: ABC_NIVEL_INFO[r.alta.nivel].color }}>{r.alta.scoreTotal}</span>
+                    </span>
+                  </div>
+                </Link>
+              ))}
+          </div>
+        </details>
+      )}
+    </Card>
   );
 }
 
