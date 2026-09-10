@@ -262,10 +262,31 @@ export default function Patients() {
     });
   };
 
+  const filteredPatients = useMemo(() => {
+    const termo = debouncedSearch.trim().toLowerCase();
+    const cid = debouncedCid.trim().toLowerCase();
+    return patients.filter(p => {
+      const matchName = !termo || p.name.toLowerCase().includes(termo) ||
+        (p.prontuario || "").toLowerCase().includes(termo);
+      const matchStatus = !statusFilter || p.status === statusFilter;
+      const matchCid = !cid || (p.diagnosis || "").toLowerCase().includes(cid);
+      const matchRede = !redeFilter || p.escolaPublica === true;
+      const matchIdade = !idadeAlertaFilter || (() => {
+        const a = alertaIdade(p.dateOfBirth);
+        return a && a.tipo !== "ok";
+      })();
+      return matchName && matchStatus && matchCid && matchRede && matchIdade;
+    }).sort((a, b) => {
+      const pa = parseInt(a.prontuario || "0", 10) || 0;
+      const pb = parseInt(b.prontuario || "0", 10) || 0;
+      return pa - pb;
+    });
+  }, [patients, debouncedSearch, debouncedCid, statusFilter, redeFilter, idadeAlertaFilter]);
+
   const handleExportCSV = () => {
     const BOM = "\uFEFF";
     const header = ["Prontuário", "Nome", "Mãe", "Data Nascimento", "Idade", "CPF", "CNS", "Telefone", "Responsável", "Tel. Responsável", "Endereço", "Diagnóstico", "Status", "Data Entrada", "Tipo Registro", "Faltas", "Observações"];
-    const rows = patients.map(p => {
+    const rows = filteredPatients.map(p => {
       const raw = p.dateOfBirth ? calcIdade(p.dateOfBirth) : NaN;
       const idade = isNaN(raw) ? "" : String(raw);
       const notes = (p.notes || "").replace(/"/g, '""');
@@ -297,29 +318,8 @@ export default function Patients() {
     a.download = `pacientes_nfs_${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Relatório exportado!", description: `${patients.length} pacientes exportados para CSV.` });
+    toast({ title: "Relatório exportado!", description: `${filteredPatients.length} pacientes exportados para CSV${statusFilter ? ` (status: ${statusFilter})` : ""}.` });
   };
-
-  const filteredPatients = useMemo(() => {
-    const termo = debouncedSearch.trim().toLowerCase();
-    const cid = debouncedCid.trim().toLowerCase();
-    return patients.filter(p => {
-      const matchName = !termo || p.name.toLowerCase().includes(termo) ||
-        (p.prontuario || "").toLowerCase().includes(termo);
-      const matchStatus = !statusFilter || p.status === statusFilter;
-      const matchCid = !cid || (p.diagnosis || "").toLowerCase().includes(cid);
-      const matchRede = !redeFilter || p.escolaPublica === true;
-      const matchIdade = !idadeAlertaFilter || (() => {
-        const a = alertaIdade(p.dateOfBirth);
-        return a && a.tipo !== "ok";
-      })();
-      return matchName && matchStatus && matchCid && matchRede && matchIdade;
-    }).sort((a, b) => {
-      const pa = parseInt(a.prontuario || "0", 10) || 0;
-      const pb = parseInt(b.prontuario || "0", 10) || 0;
-      return pa - pb;
-    });
-  }, [patients, debouncedSearch, debouncedCid, statusFilter, redeFilter, idadeAlertaFilter]);
 
   const profById = useMemo(() => {
     const m = new Map<number, Professional>();
@@ -395,6 +395,53 @@ export default function Patients() {
     w.document.close();
   };
 
+  // Folha imprimível dos pacientes em atendimento com os dados de contato
+  // (mãe, endereço, telefone) para uso da recepção/administração.
+  const handlePrintEmAtendimento = () => {
+    const lista = patients
+      .filter(p => p.status === "Atendimento")
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] || c));
+    const todayStr = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+
+    const w = window.open("", "_blank");
+    if (!w) return;
+
+    const td = "padding:8px 10px;border-bottom:1px solid #e2e8f0;color:#334155;vertical-align:top;";
+    const body = lista.map(p => {
+      const telefone = [p.phone, p.guardianPhone].filter(Boolean).join(" / ");
+      const profs = patientProfs.get(p.id)?.names.join(", ") || "";
+      return `<tr>
+        <td style="${td}white-space:nowrap;font-weight:700;color:#059669;">${esc(p.prontuario || "—")}</td>
+        <td style="${td}font-weight:600;color:#0f172a;">${esc(p.name)}</td>
+        <td style="${td}">${esc(p.motherName || "—")}</td>
+        <td style="${td}">${esc(p.address || "—")}</td>
+        <td style="${td}white-space:nowrap;">${esc(telefone || "—")}</td>
+        <td style="${td}">${esc(profs || "—")}</td>
+      </tr>`;
+    }).join("");
+
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pacientes em Atendimento</title>
+    <style>body{font-family:Arial,sans-serif;padding:32px;color:#0f172a;}h1{font-size:20px;margin-bottom:4px;}
+    .sub{color:#64748b;font-size:13px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;font-size:12px;}
+    th{text-align:left;padding:10px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+    @media print{@page{size:A4 landscape;margin:12mm;}button{display:none}html,body{height:auto!important;overflow:visible!important;}body{padding:0;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
+    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
+      <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
+      <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
+    </div>
+    <h1>Pacientes em Atendimento</h1>
+    <p class="sub">${todayStr} · ${lista.length} paciente(s) em atendimento</p>
+    <table>
+      <thead><tr><th>Prontuário</th><th>Nome</th><th>Nome da Mãe</th><th>Endereço</th><th>Telefone</th><th>Profissional(is)</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="6" style="padding:16px;color:#94a3b8;font-style:italic;text-align:center;">Nenhum paciente em atendimento.</td></tr>`}</tbody>
+    </table>
+    <p style="margin-top:24px;font-size:11px;color:#94a3b8;">NFS – Gestão Terapêutica · Telefone: paciente / responsável.</p>
+    </body></html>`);
+    w.document.close();
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (prontuarioAlerta) {
@@ -444,6 +491,9 @@ export default function Patients() {
             </Button>
             <Button variant="outline" className="gap-2" onClick={handlePrintCidReport}>
               <Printer className="w-4 h-4" /> Relatório por CID
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={handlePrintEmAtendimento}>
+              <Printer className="w-4 h-4" /> Em Atendimento (Mãe/Endereço/Tel.)
             </Button>
           </div>
         </div>
