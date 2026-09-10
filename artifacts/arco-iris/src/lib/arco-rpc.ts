@@ -774,6 +774,35 @@ export async function addPatientToFila(
   return data as AddToFilaResult;
 }
 
+export type AbcFilaResult =
+  | { status: "adicionado"; entry: AddToFilaResult }
+  | { status: "ja_na_fila" }
+  | { status: "ignorado"; motivo: string };
+
+/**
+ * Após a avaliação ABC de entrada, coloca o paciente na fila geral
+ * automaticamente. A posição na fila é ordenada pela pontuação ABC
+ * (list_waiting_list). Pacientes já em atendimento/alta não são enfileirados.
+ */
+export async function enqueueAfterAbcEntrada(
+  patient: { id: number; status: string },
+  abc: { scoreTotal: number; nivel: 1 | 2 | 3 },
+): Promise<AbcFilaResult> {
+  if (["Atendimento", "Alta", "Óbito", "Desistência"].includes(patient.status)) {
+    return { status: "ignorado", motivo: `Paciente com status ${patient.status}.` };
+  }
+  try {
+    const entry = await addPatientToFila(
+      patient.id, null, `Triagem ABC: ${abc.scoreTotal} pts — Nível ${abc.nivel}`, true,
+    );
+    return { status: "adicionado", entry };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/ja na fila/i.test(msg)) return { status: "ja_na_fila" };
+    throw e;
+  }
+}
+
 export type PatientAbsence = {
   id: number;
   date: string;

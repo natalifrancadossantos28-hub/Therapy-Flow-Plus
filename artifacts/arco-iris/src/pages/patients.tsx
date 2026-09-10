@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
-import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download, User, Printer, Stethoscope } from "lucide-react";
+import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download, User, Printer, Stethoscope, ClipboardCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getStatusColor, cn, calcIdade } from "@/lib/utils";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -9,6 +9,8 @@ import {
   listPatients,
   listAbcResumo,
   type AbcResumo,
+  type AbcAvaliacao,
+  enqueueAfterAbcEntrada,
   upsertPatient,
   deletePatient,
   listProfessionals,
@@ -19,8 +21,9 @@ import {
   type Patient,
   type Professional,
 } from "@/lib/arco-rpc";
-import { hasAdminScope } from "@/lib/portal-session";
-import { AbcNivelBadge } from "@/components/AbcChecklistForm";
+import { hasAdminScope, getProfessionalSession } from "@/lib/portal-session";
+import { AbcNivelBadge, AbcChecklistForm } from "@/components/AbcChecklistForm";
+import { ABC_NIVEL_INFO } from "@/lib/abc-checklist";
 
 const STATUS_OPTIONS = [
   { value: "Aguardando Triagem", label: "Aguardando Triagem" },
@@ -124,6 +127,7 @@ export default function Patients() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [abcByPatient, setAbcByPatient] = useState<Map<number, AbcResumo>>(new Map());
+  const [abcTriagem, setAbcTriagem] = useState<Patient | null>(null);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [patientProfs, setPatientProfs] = useState<Map<number, { names: string[]; count: number }>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
@@ -457,9 +461,10 @@ export default function Patients() {
         status: "Aguardando Triagem",
       });
       setPatients(prev => [created, ...prev]);
-      toast({ title: "Paciente cadastrado!", description: `Prontuário ${formData.prontuario || "—"} • Aguardando Triagem.` });
+      toast({ title: "Paciente cadastrado!", description: `Prontuário ${formData.prontuario || "—"} • Agora faça a Triagem ABC.` });
       setIsDialogOpen(false);
       resetForm();
+      setAbcTriagem(created);
     } catch (err: any) {
       toast({
         title: "Erro",
@@ -468,6 +473,36 @@ export default function Patients() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAbcSaved = async (a: AbcAvaliacao) => {
+    const pat = abcTriagem;
+    if (!pat) return;
+    setAbcByPatient(prev => {
+      const next = new Map(prev);
+      const cur = next.get(pat.id);
+      next.set(pat.id, {
+        patientId: pat.id,
+        patientName: pat.name,
+        status: cur?.status ?? pat.status,
+        entrada: a,
+        alta: cur?.alta ?? null,
+      });
+      return next;
+    });
+    setAbcTriagem(null);
+    toast({ title: "Triagem ABC salva", description: `${a.scoreTotal} pontos — ${ABC_NIVEL_INFO[a.nivel].label}` });
+    try {
+      const r = await enqueueAfterAbcEntrada(pat, a);
+      if (r.status === "adicionado") {
+        setPatients(prev => prev.map(p => p.id === pat.id && p.status !== "Atendimento" ? { ...p, status: "Fila de Espera" } : p));
+        toast({ title: "Paciente na Fila de Espera", description: `Posição definida pelo impacto ABC (${ABC_NIVEL_INFO[a.nivel].label}).` });
+      } else if (r.status === "ja_na_fila") {
+        toast({ title: "Fila atualizada", description: "O paciente já estava na fila; a posição segue a nova pontuação ABC." });
+      }
+    } catch (err: any) {
+      toast({ title: "Não foi possível colocar na fila", description: err?.message || "Tente pela Fila de Espera.", variant: "destructive" });
     }
   };
 
@@ -627,6 +662,15 @@ export default function Patients() {
                       </td>
                       {hasAdminScope() && (
                         <td className="px-4 py-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setAbcTriagem(patient); }}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                            style={{ background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.4)", color: "#a855f7" }}
+                            title="Triagem ABC — Checklist de Comportamento Autístico (imprimir e colocar na fila pelo impacto)"
+                          >
+                            <ClipboardCheck className="w-3.5 h-3.5" /> {abcByPatient.get(patient.id)?.entrada ? "ABC" : "Triagem ABC"}
+                          </button>
                           {["Alta", "Óbito", "Desistência"].includes(patient.status) && (
                             <button
                               onClick={(e) => {
@@ -654,6 +698,7 @@ export default function Patients() {
                               <Trash2 className="w-3.5 h-3.5" /> Excluir
                             </button>
                           )}
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -675,6 +720,29 @@ export default function Patients() {
           </div>
         )}
       </Card>
+
+      {abcTriagem && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <MotionCard className="w-full max-w-3xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <p className="text-xs text-muted-foreground mb-4">
+              Ao salvar, o paciente entra automaticamente na <strong>Fila de Espera</strong>, ordenado pelo grau de impacto.
+            </p>
+            <AbcChecklistForm
+              key={`abc-${abcTriagem.id}`}
+              patientId={abcTriagem.id}
+              tipo="entrada"
+              patientName={abcTriagem.name}
+              patientProntuario={abcTriagem.prontuario}
+              patientDateOfBirth={abcTriagem.dateOfBirth}
+              professionalId={getProfessionalSession()?.professionalId ?? null}
+              professionalName={getProfessionalSession()?.professionalName ?? null}
+              saveLabel="Salvar triagem e colocar na fila"
+              onCancel={() => setAbcTriagem(null)}
+              onSaved={(a) => { void handleAbcSaved(a); }}
+            />
+          </MotionCard>
+        </div>
+      )}
 
       {isDialogOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
