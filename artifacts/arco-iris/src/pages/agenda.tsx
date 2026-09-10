@@ -492,6 +492,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   // sempre a semana visível atual (evita closure "presa" numa semana antiga).
   const weekRefLatest = useRef(weekRef);
   weekRefLatest.current = weekRef;
+  const selectedProfIdRef = useRef(selectedProfId);
+  selectedProfIdRef.current = selectedProfId;
   const goPrevWeek = () => setWeekRef(prev => addDays(prev, -7));
   const goNextWeek = () => setWeekRef(prev => addDays(prev, 7));
   const goThisWeek = () => {
@@ -601,6 +603,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
   const fetchAppointments = (refDate?: Date) => {
     if (!selectedProfId) return;
+    const profIdAtRequest = selectedProfId;
     const ref = refDate ?? weekRef;
     const rangeStart = addDays(startOfWeek(ref, { weekStartsOn: 1 }), -56);
     const rangeEnd = addDays(startOfWeek(ref, { weekStartsOn: 1 }), 60);
@@ -613,14 +616,19 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       dateFrom,
       dateTo,
     })
-      .then((list) => setAppointments(
+      .then((list) => {
+        // Resposta de um profissional que já não é o selecionado: descarta.
+        if (selectedProfIdRef.current !== profIdAtRequest) return;
+        setAppointments(
         withCiclo(
           // Oculta pacientes com status terminal (Alta/Óbito/Desistência):
           // mesmo com agendamento, não devem aparecer na agenda (evita "fantasmas").
           list.filter(a => !PATIENT_HIDDEN_STATUSES.includes((a.patientStatus ?? "").toLowerCase()))
         ) as Appointment[]
-      ))
+        );
+      })
       .catch((err) => {
+        if (selectedProfIdRef.current !== profIdAtRequest) return;
         console.error("fetchAppointments error:", err);
         toast({ title: "Erro ao carregar agenda", description: err?.message || String(err), variant: "destructive" });
       });
@@ -831,8 +839,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const handleAtendimento = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      await patchStatus(apt, "atendimento");
-      await logNotificacao(apt, "Em Atendimento");
+      const data = await patchStatus(apt, "atendimento");
+      await logNotificacao({ ...apt, id: data.id }, "Em Atendimento");
       toast({ title: "✅ Em Atendimento", description: `${apt.patientName} está em atendimento agora.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível atualizar.", variant: "destructive" });
@@ -843,8 +851,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const handlePresente = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      await patchStatus(apt, "presente");
-      await logNotificacao(apt, "Presente");
+      const data = await patchStatus(apt, "presente");
+      await logNotificacao({ ...apt, id: data.id }, "Presente");
       toast({ title: "✅ Presença registrada", description: `${apt.patientName} marcado como Presente em ${apt.date.split("-").reverse().join("/")}.` });
     } catch (err: any) {
       toast({ title: "Erro", description: err?.message ?? "Não foi possível registrar a presença.", variant: "destructive" });
@@ -884,8 +892,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const handleFaltaJustificada = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      await patchStatus(apt, "falta_justificada");
-      await logNotificacao(apt, "Falta Justificada");
+      const data = await patchStatus(apt, "falta_justificada");
+      await logNotificacao({ ...apt, id: data.id }, "Falta Justificada");
       toast({ title: "✅ Falta Justificada registrada", description: `${apt.patientName} — sequência de alertas zerada.` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" });
@@ -898,7 +906,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     try {
       const result = await patchStatus(apt, "falta_nao_justificada");
       const consecutive: number = result?.consecutiveUnjustifiedAbsences ?? 1;
-      await logNotificacao(apt, `Falta ${consecutive} — Não Justificada`);
+      await logNotificacao({ ...apt, id: result.id }, `Falta ${consecutive} — Não Justificada`);
       const profName = result?.professionalName || apt.professionalName || "";
       const profSpec = result?.professionalSpecialty || "";
       if (consecutive >= 2) {
@@ -2006,7 +2014,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </div>
                                       )}
                                       {isGhost && (
-                                        <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⚠ Paciente sem dados — clique em Excluir para limpar</p>
+                                        <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">
+                                          {isProfessionalProfile ? "⚠ Paciente sem dados — peça à administração para limpar" : "⚠ Paciente sem dados — clique em Excluir para limpar"}
+                                        </p>
                                       )}
                                       {isPastDate && (
                                         <p className="text-[9px] text-amber-400/80 font-semibold px-1 mb-1">⏪ Ajuste Retroativo</p>
@@ -2024,11 +2034,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </button>
                                       )}
 
-                                      {!isProfessionalProfile && (
-                                        <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
-                                          <Activity className="w-3.5 h-3.5" /> Em Atendimento
-                                        </button>
-                                      )}
+                                      <button style={NEON.green} onClick={() => handleAtendimento(apt)}>
+                                        <Activity className="w-3.5 h-3.5" /> Em Atendimento
+                                      </button>
 
                                       {isAdmin && (
                                         <>
