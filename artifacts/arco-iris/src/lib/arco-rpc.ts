@@ -934,6 +934,10 @@ export type WaitingListEntry = {
   pausedAt?: string | null;
   /** Motivo do congelamento (ex.: "busca ativa"). */
   pausedReason?: string | null;
+  /** Pontuação total do Checklist ABC (avaliação de entrada mais recente). */
+  abcTotal?: number | null;
+  /** Grau de impacto ABC: 1 alto, 2 moderado, 3 baixo. */
+  abcNivel?: 1 | 2 | 3 | null;
 };
 
 export async function listWaitingList(opts?: {
@@ -2341,6 +2345,158 @@ export async function deleteAusencia(id: number): Promise<void> {
     p_slug: slug,
     p_password: password,
     p_id: id,
+  });
+  if (error) throw error;
+}
+
+// ─── Avaliação ABC (entrada / alta) ─────────────────────────────────────────
+
+export type AbcTipo = "entrada" | "alta";
+
+export type AbcAvaliacao = {
+  id: number;
+  patientId: number;
+  tipo: AbcTipo;
+  professionalId: number | null;
+  professionalName: string | null;
+  respostas: number[];
+  scoreSensorial: number;
+  scoreRelacionamento: number;
+  scoreCorpo: number;
+  scoreLinguagem: number;
+  scorePessoalSocial: number;
+  scoreTotal: number;
+  nivel: 1 | 2 | 3;
+  observacoes: string | null;
+  createdAt: string;
+};
+
+export type AbcResumoItem = Pick<
+  AbcAvaliacao,
+  | "id" | "scoreTotal" | "nivel" | "createdAt"
+  | "scoreSensorial" | "scoreRelacionamento" | "scoreCorpo" | "scoreLinguagem" | "scorePessoalSocial"
+>;
+
+export type AbcResumo = {
+  patientId: number;
+  patientName: string;
+  status: string | null;
+  entrada: AbcResumoItem | null;
+  alta: AbcResumoItem | null;
+};
+
+export async function createAbcAvaliacao(input: {
+  patientId: number;
+  tipo: AbcTipo;
+  respostas: number[];
+  scoreSensorial: number;
+  scoreRelacionamento: number;
+  scoreCorpo: number;
+  scoreLinguagem: number;
+  scorePessoalSocial: number;
+  scoreTotal: number;
+  nivel: 1 | 2 | 3;
+  professionalId?: number | null;
+  professionalName?: string | null;
+  observacoes?: string | null;
+}): Promise<AbcAvaliacao> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("create_abc_avaliacao", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: input.patientId,
+    p_tipo: input.tipo,
+    p_respostas: input.respostas,
+    p_score_sensorial: input.scoreSensorial,
+    p_score_relacionamento: input.scoreRelacionamento,
+    p_score_corpo: input.scoreCorpo,
+    p_score_linguagem: input.scoreLinguagem,
+    p_score_pessoal_social: input.scorePessoalSocial,
+    p_score_total: input.scoreTotal,
+    p_nivel: input.nivel,
+    p_professional_id: input.professionalId ?? null,
+    p_professional_name: input.professionalName ?? null,
+    p_observacoes: input.observacoes ?? null,
+  });
+  if (error) throw error;
+  return data as AbcAvaliacao;
+}
+
+export async function listAbcAvaliacoes(patientId: number): Promise<AbcAvaliacao[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_abc_avaliacoes", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId,
+  });
+  if (error) throw error;
+  return (data ?? []) as AbcAvaliacao[];
+}
+
+export async function listAbcResumo(): Promise<AbcResumo[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_abc_resumo", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return (data ?? []) as AbcResumo[];
+}
+
+// ─── Recados da equipe → administração ──────────────────────────────────────
+
+export type RecadoEquipe = {
+  id: number;
+  professionalId: number | null;
+  professionalName: string;
+  specialty: string | null;
+  mensagem: string;
+  lido: boolean;
+  createdAt: string;
+};
+
+export async function createRecadoEquipe(input: {
+  professionalId: number | null;
+  professionalName: string;
+  specialty?: string | null;
+  mensagem: string;
+}): Promise<RecadoEquipe> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("create_recado_equipe", {
+    p_slug: slug,
+    p_password: password,
+    p_professional_id: input.professionalId,
+    p_professional_name: input.professionalName,
+    p_specialty: input.specialty ?? null,
+    p_mensagem: input.mensagem,
+  });
+  if (error) throw error;
+  return data as RecadoEquipe;
+}
+
+export async function listRecadosEquipe(): Promise<RecadoEquipe[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_recados_equipe", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return (data ?? []) as RecadoEquipe[];
+}
+
+export async function markRecadoEquipeLido(id: number, lido = true): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("mark_recado_equipe_lido", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_lido: lido,
   });
   if (error) throw error;
 }

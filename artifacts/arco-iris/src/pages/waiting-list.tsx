@@ -8,6 +8,7 @@ import { specialtyTone, specialtyShortLabel, SPECIALTIES } from "@/lib/specialty
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { supabase } from "@/lib/supabase";
 import { AREA_MAX_UI, areaToUi } from "@/lib/score-scale";
+import { AbcNivelBadge } from "@/components/AbcChecklistForm";
 import {
   listWaitingList,
   deleteWaitingListEntry,
@@ -573,6 +574,14 @@ export default function WaitingList() {
                         <Badge className={getPriorityColor(entry.priority)}>
                           {PRIORITY_LABEL[entry.priority] ?? entry.priority}
                         </Badge>
+                        <div
+                          className="mt-1"
+                          title={entry.abcNivel
+                            ? `Checklist ABC (avaliação de entrada): ${entry.abcTotal} pontos. A fila é ordenada pela pontuação ABC — maior urgência primeiro.`
+                            : "Sem avaliação ABC: entra na fila depois dos pacientes já avaliados."}
+                        >
+                          <AbcNivelBadge nivel={entry.abcNivel ?? null} total={entry.abcTotal ?? null} />
+                        </div>
                         {entry.atendeFora && (
                           <div
                             title={`Já faz atendimento terapêutico fora da unidade${entry.localAtendimento ? ` (${entry.localAtendimento})` : ""}: não recebe Prioridade Máxima nem bônus de idade.`}

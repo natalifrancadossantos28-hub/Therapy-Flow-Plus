@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Calendar as CalendarIcon, Lock, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CelebrationBanner } from "@/components/CelebrationBanner";
+import { RecadoEquipeComposer } from "@/components/RecadoEquipeComposer";
 import { listProfessionals, verifyProfessionalPin } from "@/lib/arco-rpc";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
@@ -170,6 +171,13 @@ export default function AgendaProfissionais() {
               specialty={selectedProf?.specialty}
               birthDate={selectedProf?.birthDate}
             />
+            {!isAdminViewing && selectedProf && (
+              <RecadoEquipeComposer
+                professionalId={selectedProf.id}
+                professionalName={selectedProf.name}
+                specialty={selectedProf.specialty}
+              />
+            )}
             <Agenda
               portal={{
                 professionalId: selectedProfId,
