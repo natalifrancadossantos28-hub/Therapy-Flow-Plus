@@ -38,6 +38,7 @@ language plpgsql
 security definer
 set search_path = public, extensions, pg_temp
 as $$
+#variable_conflict use_column
 declare
   v_today text := to_char((now() at time zone 'America/Sao_Paulo')::date, 'YYYY-MM-DD');
 begin
@@ -87,7 +88,7 @@ begin
          and k."date" = a."date"
          and k."time" = a."time"
          and k.professional_id <> a.professional_id
-         and k.id not in (select removed_id from _dup_remover)
+         and k.id not in (select d.removed_id from _dup_remover d)
          and lower(coalesce(k.status, 'agendado')) in ('agendado', 'agendada', 'atendimento', 'scheduled', 'presente')
          and coalesce(k.notes, '') not like 'Atendimento Multi com %'
          and lower(coalesce(kp.specialty, '')) not like '%parental%'
@@ -105,7 +106,7 @@ begin
   on conflict do nothing;
 
   delete from public.appointments x
-   where x.id in (select removed_id from _dup_remover);
+   where x.id in (select d.removed_id from _dup_remover d);
 
   return query
     select d.removed_id, d.motivo, d.patient_id, d.patient_name, d.professional_name, d."date", d."time", d.mantido_com
