@@ -2,10 +2,10 @@
 // padrão de "Almoço — Pausa". Comparação por substring, minúsculas.
 const LUNCH_WORKERS = ["paula", "karla"];
 
-// Especialidades em que a mãe/responsável é atendida no MESMO horário em que a
-// criança está em terapia com outro profissional: o mesmo prontuário pode
-// ocupar dois horários iguais sem ser duplicidade.
-const SAME_SLOT_SPECIALTIES = ["parental", "oficina"];
+// Especialidades que podem coincidir com o horário de terapia do paciente sem
+// ser duplicidade: Parental/Oficina (mãe/responsável atendida no mesmo horário)
+// e Motorista (só transporta, não faz atendimento — agenda livre).
+const SAME_SLOT_SPECIALTIES = ["parental", "oficina", "motorista", "transporte"];
 
 export function allowsSameSlotAsPatient(specialty: string | null | undefined): boolean {
   const s = (specialty || "").toLowerCase();
