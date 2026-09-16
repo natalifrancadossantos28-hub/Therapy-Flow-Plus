@@ -114,7 +114,11 @@ function weeksBetween(dateA: string, dateB: string): number {
   return Math.round((msB - msA) / (7 * 86_400_000));
 }
 
-/** Returns true if the target date is an "allowed" week for the given frequency relative to refDate. */
+/**
+ * Returns true if the target date is an "allowed" week for the given frequency relative to refDate.
+ * refDate must be a real row of the series (the DB generates quinzenal/mensal rows every 14/28 days),
+ * never the first row of whatever date window happens to be loaded.
+ */
 function isAllowedWeek(refDate: string, targetDate: string, freq: string): boolean {
   if (freq === "semanal") return true;
   const weeks = weeksBetween(refDate, targetDate);
@@ -123,7 +127,11 @@ function isAllowedWeek(refDate: string, targetDate: string, freq: string): boole
   return true;
 }
 
-/** Projects recurring appointments into weeks that have no real DB row yet. */
+/**
+ * Projects recurring appointments into weeks that have no real DB row yet.
+ * Real rows are never hidden here: the database is the source of truth for every
+ * agenda view (semanal, mensal, recepção, portal do profissional).
+ */
 function expandRecurrence<T extends { date: string; time: string; patientId: number; recurrenceGroupId?: string | null; status: string; frequency?: string | null }>(
   allApts: T[],
   weekDates: string[],
@@ -174,8 +182,8 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     const targetMs = new Date(target + "T12:00:00").getTime();
     if (targetMs > lastRefMs + 28 * 86_400_000) continue;
 
-    const freq = (refApt as any).frequency ?? "semanal";
-    if (!isAllowedWeek(sorted[0].date, target, freq)) continue;
+    const freq = refApt.frequency ?? "semanal";
+    if (!isAllowedWeek(lastRefDate, target, freq)) continue;
 
     const key = `${target}|${refApt.time}|${refApt.patientId}`;
     if (existing.has(key)) continue;
@@ -185,37 +193,6 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     virtual.push({ ...refApt, date: target, status: virtualStatus, id: stableVirtualId(target, refApt.time, refApt.patientId, refApt.recurrenceGroupId!), sourceId: (refApt as { id?: number }).id } as T);
   }
   return [...allApts, ...virtual];
-}
-
-/**
- * Filters out appointments that fall on "wrong" weeks for their frequency.
- * Hides ALL appointments in wrong weeks (regardless of status) so quinzenal/mensal
- * patients only appear on the correct weeks.
- */
-function applyFrequencyFilter<T extends { date: string; recurrenceGroupId?: string | null; status: string; frequency?: string | null }>(
-  allApts: T[],
-  weekDates: string[],
-): T[] {
-  if (weekDates.length === 0) return allApts;
-  const groups = new Map<string, T[]>();
-  for (const a of allApts) {
-    if (!a.recurrenceGroupId) continue;
-    const g = groups.get(a.recurrenceGroupId) ?? [];
-    g.push(a);
-    groups.set(a.recurrenceGroupId, g);
-  }
-  const hide = new Set<T>();
-  for (const [, gApts] of groups) {
-    const sorted = [...gApts].sort((a, b) => a.date.localeCompare(b.date));
-    const freq = (sorted[0] as any).frequency ?? "semanal";
-    if (freq === "semanal") continue;
-    const refDate = sorted[0].date;
-    for (const apt of gApts) {
-      if (!weekDates.includes(apt.date)) continue;
-      if (!isAllowedWeek(refDate, apt.date, freq)) hide.add(apt);
-    }
-  }
-  return allApts.filter(a => !hide.has(a));
 }
 
 function isoWeekNumber(dateStr: string): number {
@@ -1595,8 +1572,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       ) as Appointment[])
     : [];
 
-  // Filtra: se frequência é quinzenal/mensal, esconde "agendado" nas semanas erradas.
-  // Por fim, oculta feriados e ausências do profissional (férias/folga/falta).
+  // Oculta feriados e ausências do profissional (férias/folga/falta).
   const viewingDriver = isTransportSpecialty(selectedProf?.specialty);
   // "Agendado" só para quem ainda não passou pela primeira avaliação; os demais
   // aparecem "Ativo" até a alta (mesma regra da Recepção).
@@ -1614,7 +1590,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const careDays = useMemo(
     () =>
       activeCareDays(
-        applyFrequencyFilter(expandRecurrence(clinicalApts, weekDates, recurrenceCuts), weekDates),
+        expandRecurrence(clinicalApts, weekDates, recurrenceCuts),
         feriados,
         ausencias,
         driverIds,
@@ -1622,7 +1598,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     [clinicalApts, weekDates[0], feriados, ausencias, driverIds, recurrenceCuts],
   );
 
-  const expanded = applyFrequencyFilter([...ownExpanded, ...multiGuestApts], weekDates)
+  const expanded = [...ownExpanded, ...multiGuestApts]
     .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias))
     // Motorista não busca quem ficou sem nenhum atendimento no dia (férias/ausência/feriado).
     .filter(a => !viewingDriver || careDays.has(transportKey(a.patientId, a.date)));
@@ -1647,8 +1623,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     const guests = selectedProf
       ? (buildMultiGuestAppointments(expandRecurrence(multiPartnerRows, dates, recurrenceCuts), own, selectedProf, professionals) as Appointment[])
       : [];
-    const exp = applyFrequencyFilter([...own, ...guests], dates);
-    return exp
+    return [...own, ...guests]
       .filter(a => dates.includes(a.date) && !INACTIVE_STATUSES.includes((a.status || "").toLowerCase()))
       .map(a => ({
         date: a.date,
