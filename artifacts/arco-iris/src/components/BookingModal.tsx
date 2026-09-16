@@ -7,6 +7,7 @@ import { listWaitingList, listPatients, createAppointments, listAppointments, de
 import { supabase } from "@/lib/supabase";
 import { cn, todayBR, formatDate } from "@/lib/utils";
 import { specialtyKey } from "@/lib/specialty-colors";
+import { allowsSameSlotAsPatient } from "@/lib/schedule";
 
 type WaitingEntry = {
   id: number; patientId: number; patientName: string;
@@ -110,15 +111,15 @@ export default function BookingModal({
   const [profSpecialtyMap, setProfSpecialtyMap] = useState<Map<number, string>>(new Map());
   const [notesExpanded, setNotesExpanded] = useState(false);
 
-  // Psicologia Parental: a mãe/responsável passa na orientação no MESMO horário em
+  // Psicologia Parental / Oficina: a mãe/responsável passa no MESMO horário em
   // que a criança é atendida por outro profissional (ex.: Fisio). Como o prontuário
   // é o mesmo da criança, liberamos o conflito de horário cross-especialidade só
-  // para esta especialidade.
-  const isParentalBooking = (professionalSpecialty || "").toLowerCase().includes("parental");
+  // para essas especialidades.
+  const isParentalBooking = allowsSameSlotAsPatient(professionalSpecialty);
 
   // Busca Direta liberada para o Admin e para a Psicologia Parental (atendimento
   // da mãe/responsável, sem fila por prioridade). Nos demais casos, só via fila.
-  const allowDirect = adminMode || isParentalBooking;
+  const allowDirect = adminMode || (professionalSpecialty || "").toLowerCase().includes("parental");
 
   const loadData = useCallback(async () => {
     try {
@@ -180,9 +181,10 @@ export default function BookingModal({
       const allAptsOnDate = await listAppointments({ date });
       const bookedIds = new Set<number>();
       for (const a of allAptsOnDate) {
-        if (a.time === time && (a.status === "agendado" || a.status === "atendimento") && a.professionalId !== professionalId) {
-          bookedIds.add(a.patientId);
-        }
+        if (a.time !== time || a.professionalId === professionalId) continue;
+        if (a.status !== "agendado" && a.status !== "atendimento") continue;
+        if (allowsSameSlotAsPatient(specMap.get(a.professionalId))) continue;
+        bookedIds.add(a.patientId);
       }
       setBookedAtSlotIds(bookedIds);
     } catch (err) { console.error(err); }
@@ -319,7 +321,8 @@ export default function BookingModal({
       const freshApts = await listAppointments({ date });
       const slotConflicts = freshApts.filter(
         a => a.patientId === targetPatientId && a.time === time &&
-             (a.status === "agendado" || a.status === "atendimento")
+             (a.status === "agendado" || a.status === "atendimento") &&
+             (a.professionalId === professionalId || !allowsSameSlotAsPatient(profSpecialtyMap.get(a.professionalId)))
       );
       // Psicologia Parental: permite o mesmo horário com OUTRO profissional
       // (a criança em terapia + a mãe na orientação). Só bloqueia duplicata
@@ -611,14 +614,14 @@ export default function BookingModal({
               )}
               {selectedDirect && selectedDirectBookedAtSlot && isParentalBooking && (
                 <p className="mt-2 text-xs font-semibold text-cyan-500 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-3 py-2">
-                  {selectedDirect.name} tem atendimento neste horário ({time}) com outro profissional — permitido na Psicologia Parental (orientação à mãe/responsável).
+                  {selectedDirect.name} tem atendimento neste horário ({time}) com outro profissional — permitido na Psicologia Parental/Oficina (mãe/responsável no mesmo horário da terapia).
                 </p>
               )}
               {selectedDirect && selectedDirectAlreadyScheduled && !selectedDirectBookedAtSlot && (
                 <p className="mt-2 text-xs font-semibold text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
                   Atenção: {selectedDirect.name} já tem horário ativo com {professionalName}.{" "}
                   {isParentalBooking
-                    ? "Na Psicologia Parental é permitido agendar mesmo assim."
+                    ? "Na Psicologia Parental/Oficina é permitido agendar mesmo assim."
                     : "Só o administrador pode adicionar um segundo horário."}
                 </p>
               )}

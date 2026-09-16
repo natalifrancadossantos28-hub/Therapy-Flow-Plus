@@ -68,7 +68,7 @@ import {
   type TransportMap,
 } from "@/lib/transporte";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
-import { worksThroughLunch } from "@/lib/schedule";
+import { worksThroughLunch, allowsSameSlotAsPatient } from "@/lib/schedule";
 import { buildSlotOptions, callOrder } from "@/lib/agenda-slots";
 
 const TIME_SLOTS = [
@@ -1442,6 +1442,28 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     const acao = isRemarcar ? "Remarcado" : "Remanejado";
     setRemanejSending(true);
     try {
+      // Duplicidade: o paciente não pode estar em dois horários iguais com
+      // profissionais diferentes, exceto Psicologia Parental/Oficina (mãe/responsável
+      // no mesmo horário da terapia) e o parceiro do Atendimento Multi.
+      const selfSpecialty = selectedProf?.specialty;
+      if (!allowsSameSlotAsPatient(selfSpecialty)) {
+        const sameDay = await listAppointments({ patientId: remanejFlow.apt.patientId, date: remanejFlow.newDate });
+        const conflict = sameDay.find(a =>
+          a.time === remanejFlow.newTime &&
+          a.professionalId !== parseInt(selectedProfId) &&
+          ["agendado", "atendimento", "presente"].includes(a.status.toLowerCase()) &&
+          !(a.notes ?? "").startsWith("Atendimento Multi com ") &&
+          !allowsSameSlotAsPatient(professionals.find(p => p.id === a.professionalId)?.specialty),
+        );
+        if (conflict) {
+          toast({
+            title: "Paciente já tem horário neste dia/hora",
+            description: `${remanejFlow.apt.patientName ?? "O paciente"} já está com ${conflict.professionalName ?? "outro profissional"} às ${remanejFlow.newTime}.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
       // Se a ocorrência clicada é virtual (projeção de semana futura, id negativo),
       // materializa ANTES de mexer — senão a ação cai na ocorrência base e a semana
       // de frente não pode ser editada de forma independente.
