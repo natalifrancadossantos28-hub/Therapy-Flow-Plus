@@ -1199,7 +1199,7 @@ function EvolucaoFuncionalWidget() {
     const porPergunta = AVF_PERGUNTAS.map((p, i) => {
       const e = concluidos.length ? concluidos.reduce((s, r) => s + (r.entrada.respostas[i] ?? 0), 0) / concluidos.length : 0;
       const a = concluidos.length ? concluidos.reduce((s, r) => s + (r.alta.respostas[i] ?? 0), 0) / concluidos.length : 0;
-      return { pergunta: p.titulo.split(" / ")[0].split(" e ")[0], Entrada: Math.round(e * 10) / 10, Alta: Math.round(a * 10) / 10 };
+      return { pergunta: p.curto, Entrada: Math.round(e * 10) / 10, Alta: Math.round(a * 10) / 10 };
     });
 
     const porEspecialidade = Array.from(
