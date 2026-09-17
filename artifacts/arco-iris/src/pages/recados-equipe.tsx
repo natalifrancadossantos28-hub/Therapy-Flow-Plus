@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Inbox, Check, RotateCcw, Filter, UserRound } from "lucide-react";
+import { Inbox, Check, RotateCcw, Filter, UserRound, CircleDot, Loader2, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui-custom";
-import { listRecadosEquipe, markRecadoEquipeLido, type RecadoEquipe } from "@/lib/arco-rpc";
+import { listRecadosEquipe, markRecadoEquipeLido, setRecadoEquipeStatus, type RecadoEquipe, type RecadoEquipeStatus } from "@/lib/arco-rpc";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
@@ -27,6 +27,16 @@ function dayLabel(key: string) {
   return dt.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
 }
 
+type FiltroStatus = RecadoEquipeStatus | "todos";
+
+const STATUS_META: Record<RecadoEquipeStatus, { label: string; badge: string; dot: string }> = {
+  pendente:     { label: "Pendente",     badge: "bg-amber-500/15 text-amber-300 border-amber-400/40",     dot: "bg-amber-400" },
+  em_andamento: { label: "Em andamento", badge: "bg-sky-500/15 text-sky-300 border-sky-400/40",           dot: "bg-sky-400" },
+  resolvido:    { label: "Resolvido",    badge: "bg-emerald-500/15 text-emerald-300 border-emerald-400/40", dot: "bg-emerald-400" },
+};
+
+const statusOf = (r: RecadoEquipe): RecadoEquipeStatus => r.status ?? "pendente";
+
 export default function RecadosEquipePage() {
   useDocumentTitle("Recados da Equipe");
   const { toast } = useToast();
@@ -34,6 +44,7 @@ export default function RecadosEquipePage() {
   const [loading, setLoading] = useState(true);
   const [filtroProf, setFiltroProf] = useState<string>("");
   const [somenteNaoLidos, setSomenteNaoLidos] = useState(false);
+  const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("pendente");
   const [agrupar, setAgrupar] = useState<"data" | "profissional">("data");
 
   const load = useCallback(() => {
@@ -56,9 +67,16 @@ export default function RecadosEquipePage() {
     return recados
       .filter(r => !filtroProf || r.professionalName === filtroProf)
       .filter(r => !somenteNaoLidos || !r.lido)
+      .filter(r => filtroStatus === "todos" || statusOf(r) === filtroStatus)
       .slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [recados, filtroProf, somenteNaoLidos]);
+  }, [recados, filtroProf, somenteNaoLidos, filtroStatus]);
+
+  const porStatus = useMemo(() => {
+    const c: Record<RecadoEquipeStatus, number> = { pendente: 0, em_andamento: 0, resolvido: 0 };
+    for (const r of recados) c[statusOf(r)]++;
+    return c;
+  }, [recados]);
 
   const grupos = useMemo(() => {
     const m = new Map<string, RecadoEquipe[]>();
@@ -86,6 +104,19 @@ export default function RecadosEquipePage() {
     }
   };
 
+  const mudarStatus = async (r: RecadoEquipe, status: RecadoEquipeStatus) => {
+    const anterior = statusOf(r);
+    if (anterior === status) return;
+    setRecados(prev => prev.map(x => x.id === r.id ? { ...x, status, lido: status === "pendente" ? x.lido : true } : x));
+    try {
+      const atualizado = await setRecadoEquipeStatus(r.id, status);
+      setRecados(prev => prev.map(x => x.id === r.id ? { ...x, ...atualizado } : x));
+    } catch (e) {
+      setRecados(prev => prev.map(x => x.id === r.id ? { ...x, status: anterior, lido: r.lido } : x));
+      toast({ title: "Não foi possível atualizar o status", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+    }
+  };
+
   const marcarTodosLidos = async () => {
     const pendentes = filtrados.filter(r => !r.lido);
     if (pendentes.length === 0) return;
@@ -108,6 +139,7 @@ export default function RecadosEquipePage() {
           <p className="text-sm text-muted-foreground mt-1">
             Mensagens e sugestões enviadas pelos profissionais no Portal do Profissional.
             {naoLidos > 0 && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-violet-500/20 text-violet-300 border border-violet-400/40">{naoLidos} não lido{naoLidos > 1 ? "s" : ""}</span>}
+            {porStatus.pendente > 0 && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-400/40">{porStatus.pendente} pendente{porStatus.pendente > 1 ? "s" : ""}</span>}
           </p>
         </div>
         <button
@@ -121,6 +153,18 @@ export default function RecadosEquipePage() {
       </div>
 
       <Card className="p-4 flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-xl border border-border overflow-hidden text-sm">
+          {(["pendente", "em_andamento", "resolvido", "todos"] as FiltroStatus[]).map(s => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setFiltroStatus(s)}
+              className={cn("px-3 py-2 font-semibold transition-colors", filtroStatus === s ? "bg-violet-500 text-white" : "bg-secondary hover:bg-secondary/70")}
+            >
+              {s === "todos" ? `Todos (${recados.length})` : `${STATUS_META[s].label} (${porStatus[s]})`}
+            </button>
+          ))}
+        </div>
         <Filter className="w-4 h-4 text-muted-foreground" />
         <select
           value={filtroProf}
@@ -145,7 +189,7 @@ export default function RecadosEquipePage() {
       ) : grupos.length === 0 ? (
         <Card className="p-10 text-center text-muted-foreground">
           <Inbox className="w-10 h-10 mx-auto mb-3 opacity-40" />
-          Nenhum recado {somenteNaoLidos ? "não lido" : "recebido"}{filtroProf ? ` de ${filtroProf}` : ""}.
+          Nenhum recado {filtroStatus !== "todos" ? STATUS_META[filtroStatus].label.toLowerCase() : somenteNaoLidos ? "não lido" : "recebido"}{filtroProf ? ` de ${filtroProf}` : ""}.
         </Card>
       ) : (
         grupos.map(([chave, itens]) => (
@@ -161,7 +205,7 @@ export default function RecadosEquipePage() {
                   key={r.id}
                   className={cn(
                     "p-4 flex flex-col gap-2 transition-all",
-                    r.lido ? "opacity-70" : "border-violet-400/40 shadow-[0_0_18px_rgba(167,139,250,0.12)]",
+                    statusOf(r) === "resolvido" ? "opacity-60" : r.lido ? "opacity-90" : "border-violet-400/40 shadow-[0_0_18px_rgba(167,139,250,0.12)]",
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -171,10 +215,30 @@ export default function RecadosEquipePage() {
                         {r.specialty ? `${r.specialty} · ` : ""}{fmtDateTime(r.createdAt)}
                       </p>
                     </div>
-                    {!r.lido && <span className="shrink-0 w-2.5 h-2.5 rounded-full bg-violet-400 mt-1.5" title="Não lido" />}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border", STATUS_META[statusOf(r)].badge)}>
+                        <span className={cn("w-1.5 h-1.5 rounded-full", STATUS_META[statusOf(r)].dot)} />
+                        {STATUS_META[statusOf(r)].label}
+                      </span>
+                      {!r.lido && <span className="w-2.5 h-2.5 rounded-full bg-violet-400" title="Não lido" />}
+                    </div>
                   </div>
                   <p className="text-sm text-foreground whitespace-pre-wrap break-words">{r.mensagem}</p>
-                  <div className="flex justify-end">
+                  {statusOf(r) === "resolvido" && r.resolvedAt && (
+                    <p className="text-[11px] text-emerald-300/80">Resolvido em {fmtDateTime(r.resolvedAt)}</p>
+                  )}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="inline-flex rounded-lg border border-border overflow-hidden text-xs">
+                      <button type="button" onClick={() => mudarStatus(r, "pendente")} title="Marcar como pendente" className={cn("inline-flex items-center gap-1 px-2.5 py-1.5 font-semibold transition-colors", statusOf(r) === "pendente" ? "bg-amber-500/25 text-amber-200" : "hover:bg-secondary/70")}>
+                        <CircleDot className="w-3.5 h-3.5" /> Pendente
+                      </button>
+                      <button type="button" onClick={() => mudarStatus(r, "em_andamento")} title="Marcar como em andamento" className={cn("inline-flex items-center gap-1 px-2.5 py-1.5 font-semibold transition-colors border-l border-border", statusOf(r) === "em_andamento" ? "bg-sky-500/25 text-sky-200" : "hover:bg-secondary/70")}>
+                        <Loader2 className="w-3.5 h-3.5" /> Em andamento
+                      </button>
+                      <button type="button" onClick={() => mudarStatus(r, "resolvido")} title="Marcar como resolvido" className={cn("inline-flex items-center gap-1 px-2.5 py-1.5 font-semibold transition-colors border-l border-border", statusOf(r) === "resolvido" ? "bg-emerald-500/25 text-emerald-200" : "hover:bg-secondary/70")}>
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Resolvido
+                      </button>
+                    </div>
                     <button
                       type="button"
                       onClick={() => toggleLido(r)}

@@ -2567,8 +2567,12 @@ export type RecadoEquipe = {
   specialty: string | null;
   mensagem: string;
   lido: boolean;
+  status?: RecadoEquipeStatus;
+  resolvedAt?: string | null;
   createdAt: string;
 };
+
+export type RecadoEquipeStatus = "pendente" | "em_andamento" | "resolvido";
 
 export async function createRecadoEquipe(input: {
   professionalId: number | null;
@@ -2611,6 +2615,19 @@ export async function markRecadoEquipeLido(id: number, lido = true): Promise<voi
     p_lido: lido,
   });
   if (error) throw error;
+}
+
+export async function setRecadoEquipeStatus(id: number, status: RecadoEquipeStatus): Promise<RecadoEquipe> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("set_recado_equipe_status", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_status: status,
+  });
+  if (error) throw error;
+  return data as RecadoEquipe;
 }
 
 // ── Triagem Multidisciplinar (tabela `triagens`, compartilhada com o app NFs Triagem) ──
