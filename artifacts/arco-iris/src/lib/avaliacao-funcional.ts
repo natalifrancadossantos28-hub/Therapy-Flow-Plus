@@ -5,49 +5,55 @@
 export type AvfPergunta = {
   key: string;
   titulo: string;
+  curto: string;
   texto: string;
   dica: string;
 };
 
 export const AVF_PERGUNTAS: readonly AvfPergunta[] = [
   {
-    key: "independencia",
-    titulo: "Independência / Funcionalidade nas Atividades",
-    texto: "Qual o nível de independência e autonomia do paciente para realizar as atividades propostas ou cotidianas relacionadas a esta especialidade?",
-    dica: "1 = totalmente dependente · 5 = plenamente independente",
+    key: "autonomia",
+    titulo: "Autonomia e Desempenho Funcional",
+    curto: "Autonomia",
+    texto: "Qual o nível de independência e funcionalidade do paciente para realizar as atividades e demandas da rotina relacionadas a esta área (seja motora, de comunicação, alimentar, sensorial ou emocional)?",
+    dica: "1 = Totalmente dependente / com grande dificuldade · 5 = Plenamente autônomo / adequado para a idade",
   },
   {
-    key: "sintomas",
-    titulo: "Severidade dos Sintomas / Queixas Principais",
-    texto: "Como você avalia a intensidade e a frequência dos sintomas ou dificuldades que motivaram o início do atendimento?",
-    dica: "1 = sintomas muito intensos/frequentes · 5 = sintomas ausentes/controlados",
+    key: "desafios",
+    titulo: "Intensidade das Dificuldades / Desafios",
+    curto: "Desafios",
+    texto: "Como você avalia a frequência e a intensidade dos desafios apresentados pelo paciente que motivaram o acompanhamento nesta especialidade?",
+    dica: "1 = Desafios constantes e de alto impacto · 5 = Desafios ausentes ou totalmente controlados",
   },
   {
     key: "engajamento",
-    titulo: "Engajamento e Resposta ao Tratamento",
-    texto: "Qual tem sido o nível de aproveitamento, resposta aos estímulos e engajamento do paciente/família frente às intervenções da especialidade?",
-    dica: "1 = sem resposta/engajamento · 5 = excelente aproveitamento",
+    titulo: "Engajamento e Resposta ao Processo Terapêutico",
+    curto: "Engajamento",
+    texto: "Como tem sido a adesão, a participação ativa e a resposta do paciente (e da família, quando aplicável) frente aos estímulos e propostas da intervenção?",
+    dica: "1 = Sem engajamento / resistência acentuada · 5 = Excelente engajamento e evolução rápida",
   },
   {
     key: "rotina",
-    titulo: "Impacto na Rotina e Qualidade de Vida",
-    texto: "Em que medida as dificuldades atuais impactam negativamente o bem-estar e a rotina diária do paciente e da família?",
-    dica: "1 = impacto máximo · 5 = nenhum impacto",
+    titulo: "Impacto na Rotina e Qualidade de Vida (Dinâmica Familiar/Pessoal)",
+    curto: "Rotina",
+    texto: "Em que medida as dificuldades atuais afetam o bem-estar, a participação social e a rotina diária do paciente e de sua família?",
+    dica: "1 = Impacto máximo, prejuízo severo na rotina · 5 = Nenhum impacto / rotina harmoniosa e funcional",
   },
   {
-    key: "evolucao",
-    titulo: "Evolução Geral na Especialidade",
-    texto: "Considerando o quadro geral na entrada da especialidade até o momento atual (alta), como você classifica a evolução clínica do paciente?",
-    dica: "1 = piora/crítico · 5 = evolução excelente",
+    key: "objetivos",
+    titulo: "Atingimento dos Objetivos Terapêuticos",
+    curto: "Objetivos",
+    texto: "Considerando as metas traçadas para este acompanhamento, qual é o grau de alcance dos objetivos propostos para o desenvolvimento do paciente?",
+    dica: "1 = Metas não alcançadas · 5 = Metas integralmente alcançadas / Conclusão com sucesso",
   },
 ];
 
 export const AVF_ESCALA: readonly { valor: 1 | 2 | 3 | 4 | 5; label: string; color: string }[] = [
-  { valor: 1, label: "Muito Baixo / Incapaz / Crítico",             color: "#ef4444" },
-  { valor: 2, label: "Baixo / Dificuldade acentuada",               color: "#f97316" },
-  { valor: 3, label: "Moderado / Parcialmente independente",        color: "#eab308" },
-  { valor: 4, label: "Bom / Desenvolvido com leve apoio",           color: "#84cc16" },
-  { valor: 5, label: "Excelente / Plenamente desenvolvido ou adequado", color: "#22c55e" },
+  { valor: 1, label: "Cenário mais desafiador / difícil",   color: "#ef4444" },
+  { valor: 2, label: "Dificuldade acentuada",                color: "#f97316" },
+  { valor: 3, label: "Moderado / parcialmente adequado",     color: "#eab308" },
+  { valor: 4, label: "Bom / adequado com leve apoio",        color: "#84cc16" },
+  { valor: 5, label: "Cenário ideal / superado",             color: "#22c55e" },
 ];
 
 export const AVF_MIN = AVF_PERGUNTAS.length;      // 5
