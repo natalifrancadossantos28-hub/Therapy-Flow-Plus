@@ -393,3 +393,11 @@
   thead { display: table-header-group; }
   tr { break-inside: avoid; page-break-inside: avoid; }
 }
+
+/* Triagem Multidisciplinar: ao imprimir o modal, sai só o relatório (A4 retrato). */
+@media print {
+  body:has([data-triagem-print]) > #root > *:not(:has([data-triagem-print])) { display: none !important; }
+  body:has([data-triagem-print]) .no-print { display: none !important; }
+  body:has([data-triagem-print]) #main-content > *:not(:has([data-triagem-print])) { display: none !important; }
+  @page { size: A4 portrait; margin: 12mm; }
+}

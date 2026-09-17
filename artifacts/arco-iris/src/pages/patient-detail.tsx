@@ -19,6 +19,8 @@ import {
   reverterFalta,
   listPatientDischarges,
   listAbcAvaliacoes,
+  listTriagensDoPaciente,
+  type TriagemMulti,
   type AbcAvaliacao,
   type AbcTipo,
   type Patient,
@@ -31,6 +33,7 @@ import { isTransportSpecialty } from "@/lib/specialty-colors";
 import { AbcChecklistForm, AbcNivelBadge } from "@/components/AbcChecklistForm";
 import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, printAbcChecklist, type AbcAreaKey } from "@/lib/abc-checklist";
 import { getProfessionalSession } from "@/lib/portal-session";
+import { TriagemMultiForm, TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
@@ -95,6 +98,9 @@ export default function PatientDetail() {
   const [triagemEdit, setTriagemEdit] = useState(false);
   const [abcHist, setAbcHist] = useState<AbcAvaliacao[]>([]);
   const [abcForm, setAbcForm] = useState<{ tipo: AbcTipo; base?: number[] } | null>(null);
+  const [triagensMulti, setTriagensMulti] = useState<TriagemMulti[]>([]);
+  const [triagemMultiForm, setTriagemMultiForm] = useState<{ base: TriagemMulti | null } | null>(null);
+  const [triagemMultiView, setTriagemMultiView] = useState<TriagemMulti | null>(null);
   const [sPsicologia, setSPsicologia] = useState("");
   const [sPsicomotricidade, setSPsicomotricidade] = useState("");
   const [sFisioterapia, setSFisioterapia] = useState("");
@@ -259,6 +265,7 @@ export default function PatientDetail() {
       setAbsenceInfo(abs);
       setDischarges(alts);
       setAbcHist(abcs);
+      if (p) listTriagensDoPaciente(p).then(setTriagensMulti).catch(() => setTriagensMulti([]));
       // Derive team from appointments
       const profMap = new Map<number, { name: string; hasActive: boolean }>();
       for (const apt of allApts) {
@@ -693,17 +700,47 @@ export default function PatientDetail() {
                   {triagemFeita ? <CheckCircle2 className="w-5 h-5" /> : <ClipboardCheck className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h3 className="font-bold font-display text-lg">Triagem Clínica</h3>
+                  <h3 className="font-bold font-display text-lg">Triagem Multidisciplinar</h3>
                   <p className={cn("text-sm font-semibold", triagemFeita ? "text-emerald-600" : "text-amber-600")}>
                     {triagemFeita ? "Triagem realizada — paciente apto para a fila" : "Aguardando triagem para entrar na fila"}
                   </p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={openTriagemEdit} className="gap-2">
-                <ClipboardCheck className="w-4 h-4" />
-                {triagemFeita ? "Editar Triagem" : "Registrar Triagem"}
-              </Button>
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button size="sm" onClick={() => setTriagemMultiForm({ base: null })} className="gap-2">
+                  <ClipboardCheck className="w-4 h-4" />
+                  {triagensMulti.length > 0 ? "Nova Triagem" : "Fazer Triagem"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={openTriagemEdit} className="gap-2">
+                  <Pencil className="w-4 h-4" />
+                  Notas por área
+                </Button>
+              </div>
             </div>
+
+            {triagensMulti.length > 0 && (
+              <div className="mb-5 space-y-3">
+                <TriagemMultiResultado triagem={triagensMulti[0]} patient={patient} compact />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setTriagemMultiView(triagensMulti[0])}>
+                    <FileText className="w-4 h-4" /> Ver completa / Imprimir
+                  </Button>
+                  <Button variant="ghost" size="sm" className="gap-2" onClick={() => setTriagemMultiForm({ base: triagensMulti[0] })}>
+                    <Pencil className="w-4 h-4" /> Editar respostas
+                  </Button>
+                  {triagensMulti.length > 1 && (
+                    <span className="text-xs text-muted-foreground">
+                      Anteriores:{" "}
+                      {triagensMulti.slice(1).map((t) => (
+                        <button key={t.id} type="button" className="underline mr-2 hover:text-primary" onClick={() => setTriagemMultiView(t)}>
+                          {t.data || formatDate(t.createdAt.slice(0, 10))}
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {triagemFeita ? (
               <div className="space-y-3 text-sm">
@@ -750,7 +787,7 @@ export default function PatientDetail() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground italic">
-                Registre a triagem com as notas por área (0–30 cada) para liberar o botão <strong>"Adicionar à Fila"</strong>.
+                Clique em <strong>"Fazer Triagem"</strong> para responder o questionário multidisciplinar (9 áreas × 10 perguntas). Ao salvar, as notas por área são gravadas e o paciente entra automaticamente na fila pelo grau de sinalização.
               </p>
             )}
           </Card>
@@ -934,6 +971,52 @@ export default function PatientDetail() {
           </Card>
         </div>
       </div>
+
+      {triagemMultiForm && patient && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto print:static print:p-0 print:bg-white">
+          <MotionCard className="w-full max-w-4xl p-6 my-4 print:shadow-none print:border-0" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <h2 className="text-2xl font-bold font-display mb-1">Triagem Multidisciplinar</h2>
+            <p className="text-sm text-muted-foreground mb-5">{patient.name} — avaliação multidisciplinar para crianças e adolescentes (0–18 anos)</p>
+            <TriagemMultiForm
+              patient={patient}
+              base={triagemMultiForm.base}
+              professionalName={getProfessionalSession()?.professionalName ?? null}
+              professionalSpecialty={getProfessionalSession()?.specialty ?? null}
+              onCancel={() => setTriagemMultiForm(null)}
+              onSaved={async (t, link) => {
+                setTriagemMultiForm(null);
+                setTriagensMulti(prev => [t, ...prev.filter(x => x.id !== t.id)]);
+                try { const fresh = await getPatient(patientId); if (fresh) setPatient(fresh); } catch { /* mantém estado atual */ }
+                if (link?.addedToQueue && link.addedSpecialties?.length) {
+                  toast({ title: "Triagem salva e paciente na fila!", description: `Fila: ${link.addedSpecialties.join(", ")}${link.priority ? ` · Prioridade: ${link.priority}` : ""}` });
+                } else if (link?.reason === "all_already_queued") {
+                  toast({ title: "Triagem salva", description: "O paciente já estava na fila; as notas por área foram atualizadas." });
+                } else {
+                  toast({ title: "Triagem salva", description: link?.reason === "blocked_status" ? "Paciente com status que não entra na fila; notas atualizadas." : "Notas por área atualizadas no prontuário." });
+                }
+              }}
+            />
+          </MotionCard>
+        </div>
+      )}
+
+      {triagemMultiView && patient && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto print:static print:p-0 print:bg-white">
+          <MotionCard className="w-full max-w-4xl p-6 my-4 print:shadow-none print:border-0" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <div className="flex items-start justify-between gap-3 mb-5">
+              <div>
+                <h2 className="text-2xl font-bold font-display">Triagem Multidisciplinar</h2>
+                <p className="text-sm text-muted-foreground">{patient.name} · {triagemMultiView.data || formatDate(triagemMultiView.createdAt.slice(0, 10))}</p>
+              </div>
+              <div className="flex gap-2 no-print">
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => window.print()}><Printer className="w-4 h-4" />Imprimir</Button>
+                <Button variant="ghost" size="sm" onClick={() => setTriagemMultiView(null)}><XIcon className="w-4 h-4" /></Button>
+              </div>
+            </div>
+            <TriagemMultiResultado triagem={triagemMultiView} patient={patient} />
+          </MotionCard>
+        </div>
+      )}
 
       {abcForm && patient && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
