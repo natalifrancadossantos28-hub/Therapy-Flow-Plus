@@ -2475,6 +2475,89 @@ export async function listAbcResumo(): Promise<AbcResumo[]> {
   return (data ?? []) as AbcResumo[];
 }
 
+// ─── Avaliação Funcional Multidisciplinar (5 perguntas, 5–25 pts) ───────────
+
+export type AvaliacaoFuncionalTipo = "entrada" | "alta";
+
+export type AvaliacaoFuncional = {
+  id: number;
+  patientId: number;
+  tipo: AvaliacaoFuncionalTipo;
+  specialty: string | null;
+  professionalId: number | null;
+  professionalName: string | null;
+  respostas: number[];
+  scoreTotal: number;
+  observacoes: string | null;
+  createdAt: string;
+};
+
+export type AvaliacaoFuncionalResumoItem = {
+  id: number;
+  scoreTotal: number;
+  respostas: number[];
+  createdAt: string;
+  professionalName: string | null;
+};
+
+export type AvaliacaoFuncionalResumo = {
+  patientId: number;
+  patientName: string;
+  status: string | null;
+  specialty: string | null;
+  entrada: AvaliacaoFuncionalResumoItem | null;
+  alta: AvaliacaoFuncionalResumoItem | null;
+};
+
+export async function createAvaliacaoFuncional(input: {
+  patientId: number;
+  tipo: AvaliacaoFuncionalTipo;
+  respostas: number[];
+  specialty?: string | null;
+  professionalId?: number | null;
+  professionalName?: string | null;
+  observacoes?: string | null;
+}): Promise<AvaliacaoFuncional> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("create_avaliacao_funcional", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: input.patientId,
+    p_tipo: input.tipo,
+    p_respostas: input.respostas,
+    p_specialty: input.specialty ?? null,
+    p_professional_id: input.professionalId ?? null,
+    p_professional_name: input.professionalName ?? null,
+    p_observacoes: input.observacoes ?? null,
+  });
+  if (error) throw error;
+  return data as AvaliacaoFuncional;
+}
+
+export async function listAvaliacoesFuncionais(patientId: number): Promise<AvaliacaoFuncional[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_avaliacoes_funcionais", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId,
+  });
+  if (error) throw error;
+  return (data ?? []) as AvaliacaoFuncional[];
+}
+
+export async function listAvaliacoesFuncionaisResumo(): Promise<AvaliacaoFuncionalResumo[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_avaliacoes_funcionais_resumo", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return (data ?? []) as AvaliacaoFuncionalResumo[];
+}
+
 // ─── Recados da equipe → administração ──────────────────────────────────────
 
 export type RecadoEquipe = {

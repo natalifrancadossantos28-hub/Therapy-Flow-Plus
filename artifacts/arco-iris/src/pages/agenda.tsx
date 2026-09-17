@@ -7,7 +7,7 @@ import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Check, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck
+  ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck, ClipboardList
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
@@ -51,11 +51,11 @@ import {
   type AppointmentListItem,
   type Feriado,
   type Ausencia,
-  listAbcAvaliacoes,
-  type AbcAvaliacao,
+  listAvaliacoesFuncionais,
+  type AvaliacaoFuncional,
 } from "@/lib/arco-rpc";
-import { AbcChecklistForm } from "@/components/AbcChecklistForm";
-import { ABC_NIVEL_INFO } from "@/lib/abc-checklist";
+import { AvaliacaoFuncionalForm } from "@/components/AvaliacaoFuncionalForm";
+import { avfFaixa, AVF_MAX } from "@/lib/avaliacao-funcional";
 import { buildMultiGuestAppointments } from "@/lib/multi-agenda";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
 import {
@@ -496,9 +496,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
   const [altaMotivo, setAltaMotivo] = useState("");
   const [saidaTipo, setSaidaTipo] = useState<"Alta" | "Óbito" | "Desistência">("Alta");
-  // Alta exige reavaliação ABC salva antes de liberar o motivo/confirmação.
-  const [altaAbc, setAltaAbc] = useState<AbcAvaliacao | null>(null);
-  const [altaAbcBase, setAltaAbcBase] = useState<number[] | undefined>(undefined);
+  // Alta exige a Avaliação Funcional de alta (5 perguntas) salva antes de liberar o motivo/confirmação.
+  const [altaAvf, setAltaAvf] = useState<AvaliacaoFuncional | null>(null);
+  const [altaAvfEntrada, setAltaAvfEntrada] = useState<AvaliacaoFuncional | null | undefined>(undefined);
+  const [avfEntradaApt, setAvfEntradaApt] = useState<Appointment | null>(null);
   const [absenceAlert, setAbsenceAlert] = useState<AbsenceAlert | null>(null);
   const [remanejFlow, setRemanejFlow] = useState<RemanejFlow | null>(null);
   const [remanejSending, setRemanejSending] = useState(false);
@@ -1092,19 +1093,24 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     setActionMenuId(null);
     setAltaMotivo("");
     setSaidaTipo(tipo);
-    setAltaAbc(null);
-    setAltaAbcBase(undefined);
+    setAltaAvf(null);
+    setAltaAvfEntrada(undefined);
     setAltaConfirm(apt);
     if (tipo === "Alta") {
-      listAbcAvaliacoes(apt.patientId)
-        .then(hist => setAltaAbcBase(hist.find(a => a.tipo === "entrada")?.respostas ?? []))
-        .catch(() => setAltaAbcBase([]));
+      const spec = (selectedProf?.specialty ?? "").trim().toLowerCase();
+      listAvaliacoesFuncionais(apt.patientId)
+        .then(hist => {
+          const entradas = hist.filter(a => a.tipo === "entrada");
+          const daEspecialidade = entradas.find(a => (a.specialty ?? "").trim().toLowerCase() === spec);
+          setAltaAvfEntrada(daEspecialidade ?? entradas[0] ?? null);
+        })
+        .catch(() => setAltaAvfEntrada(null));
     }
   };
 
   const confirmSaida = async () => {
     if (!altaConfirm || !altaMotivo.trim()) return;
-    if (saidaTipo === "Alta" && !altaAbc) return;
+    if (saidaTipo === "Alta" && !altaAvf) return;
     const label = saidaTipo;
     try {
       if (altaConfirm.id > 0) {
@@ -1115,8 +1121,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         );
         if (realSibling) await deleteAppointmentAlta(realSibling.id);
       }
-      const abcInfo = altaAbc ? ` — ABC alta: ${altaAbc.scoreTotal} pts (Nível ${altaAbc.nivel})` : "";
-      await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}${abcInfo}`);
+      const avfInfo = altaAvf
+        ? ` — Avaliação Funcional de alta: ${altaAvf.scoreTotal}/${AVF_MAX} pts${altaAvfEntrada ? ` (entrada: ${altaAvfEntrada.scoreTotal})` : ""}`
+        : "";
+      await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}${avfInfo}`);
 
       const todayStr = todayBR();
       const profSpecialty = selectedProf?.specialty ?? null;
@@ -1143,7 +1151,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         const existing = await getPatient(altaConfirm.patientId);
         const prevNotes = existing?.notes ? `${existing.notes}\n` : "";
         await upsertPatient(altaConfirm.patientId, {
-          notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")} — ${profSpecialty ?? "Geral"}] Motivo: ${altaMotivo.trim()}${abcInfo}`,
+          notes: `${prevNotes}[${label.toUpperCase()} ${new Date().toLocaleDateString("pt-BR")} — ${profSpecialty ?? "Geral"}] Motivo: ${altaMotivo.trim()}${avfInfo}`,
         });
       } catch {
         toast({ title: "Aviso", description: "Motivo registrado na notificação, mas houve falha ao gravar no prontuário.", variant: "destructive" });
@@ -2051,6 +2059,11 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         <Activity className="w-3.5 h-3.5" /> Em Atendimento
                                       </button>
 
+                                      <button style={NEON.cyan} onClick={() => { setActionMenuId(null); setAvfEntradaApt(apt); }}
+                                        title="Avaliação Funcional (5 perguntas, 1–5) do início do acompanhamento nesta especialidade">
+                                        <ClipboardList className="w-3.5 h-3.5" /> Avaliação de Entrada
+                                      </button>
+
                                       {isAdmin && (
                                         <>
                                           <button style={NEON.yellow} onClick={() => handleFaltaJustificada(apt)}>
@@ -2367,7 +2380,40 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       )}
 
       {/* ── Modal de Saída (Alta / Óbito / Desistência) ── */}
-      {altaConfirm && saidaTipo === "Alta" && !altaAbc && (
+      {avfEntradaApt && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl shadow-2xl my-4 px-6 py-5" style={{ background: "rgba(0,5,8,0.97)", border: "1px solid rgba(6,182,212,0.3)" }}>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(6,182,212,0.15)", border: "1px solid #06b6d4" }}>
+                <ClipboardList className="w-5 h-5" style={{ color: "#22d3ee" }} />
+              </div>
+              <div>
+                <p className="font-bold" style={{ color: "#22d3ee", textShadow: "0 0 8px rgba(34,211,238,0.8)" }}>Avaliação Funcional — Entrada</p>
+                <p className="text-xs text-white/50"><strong className="text-white/80">{avfEntradaApt.patientName}</strong>{selectedProf?.specialty ? ` · ${selectedProf.specialty}` : ""}</p>
+              </div>
+            </div>
+            <p className="text-xs text-white/60 mb-4">
+              Registre o quadro do paciente no início do acompanhamento nesta especialidade. Na alta, o mesmo questionário é preenchido de novo e o Dashboard compara entrada × alta.
+            </p>
+            <AvaliacaoFuncionalForm
+              key={`avf-entrada-${avfEntradaApt.patientId}`}
+              patientId={avfEntradaApt.patientId}
+              tipo="entrada"
+              specialty={selectedProf?.specialty ?? null}
+              patientName={avfEntradaApt.patientName}
+              professionalId={avfEntradaApt.professionalId}
+              professionalName={avfEntradaApt.professionalName || selectedProf?.name || null}
+              onSaved={(a) => {
+                setAvfEntradaApt(null);
+                toast({ title: "Avaliação de entrada salva", description: `${a.scoreTotal}/${AVF_MAX} pontos — ${avfFaixa(a.scoreTotal).label}` });
+              }}
+              onCancel={() => setAvfEntradaApt(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {altaConfirm && saidaTipo === "Alta" && !altaAvf && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
           <div className="w-full max-w-2xl rounded-2xl shadow-2xl my-4 px-6 py-5" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <div className="flex items-center gap-3 mb-2">
@@ -2375,34 +2421,40 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 <LogOut className="w-5 h-5" style={{ color: "#f87171" }} />
               </div>
               <div>
-                <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>Dar Alta — Reavaliação ABC obrigatória</p>
-                <p className="text-xs text-white/50">Passo 1 de 2 · <strong className="text-white/80">{altaConfirm.patientName}</strong></p>
+                <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>Dar Alta — Avaliação Funcional de Alta</p>
+                <p className="text-xs text-white/50">Passo 1 de 2 · <strong className="text-white/80">{altaConfirm.patientName}</strong>{selectedProf?.specialty ? ` · ${selectedProf.specialty}` : ""}</p>
               </div>
             </div>
             <p className="text-xs text-white/60 mb-4">
-              Preencha o checklist ABC com o quadro atual do paciente. Esta avaliação é salva como <strong className="text-white/80">Avaliação de Alta</strong>, sem alterar a avaliação de entrada, e alimenta o Dashboard de Evolução Clínica.
+              Responda as 5 perguntas com o quadro atual do paciente nesta especialidade. A avaliação é salva como <strong className="text-white/80">Avaliação de Alta</strong>, sem alterar a de entrada, e alimenta o Dashboard de Evolução Clínica. O checklist ABC continua disponível (opcional) no prontuário.
             </p>
-            {altaAbcBase === undefined ? (
+            {altaAvfEntrada === undefined ? (
               <p className="text-sm text-white/60 animate-pulse py-6 text-center">Carregando avaliação de entrada…</p>
             ) : (
-              <AbcChecklistForm
-                key={`alta-abc-${altaConfirm.patientId}`}
-                patientId={altaConfirm.patientId}
-                tipo="alta"
-                patientName={altaConfirm.patientName}
-                initialRespostas={altaAbcBase}
-                professionalId={altaConfirm.professionalId}
-                professionalName={altaConfirm.professionalName || selectedProf?.name || null}
-                saveLabel="Salvar reavaliação e continuar →"
-                onSaved={(a) => { setAltaAbc(a); toast({ title: "Reavaliação ABC salva", description: `${a.scoreTotal} pontos — ${ABC_NIVEL_INFO[a.nivel].label}` }); }}
-                onCancel={() => { setAltaConfirm(null); setAltaMotivo(""); }}
-              />
+              <>
+                {altaAvfEntrada === null && (
+                  <p className="text-xs text-yellow-300/80 mb-3">Este paciente não tem Avaliação Funcional de entrada nesta especialidade — a alta será registrada mesmo assim, sem comparação.</p>
+                )}
+                <AvaliacaoFuncionalForm
+                  key={`alta-avf-${altaConfirm.patientId}`}
+                  patientId={altaConfirm.patientId}
+                  tipo="alta"
+                  specialty={selectedProf?.specialty ?? altaAvfEntrada?.specialty ?? null}
+                  patientName={altaConfirm.patientName}
+                  entradaRef={altaAvfEntrada}
+                  professionalId={altaConfirm.professionalId}
+                  professionalName={altaConfirm.professionalName || selectedProf?.name || null}
+                  saveLabel="Salvar avaliação e continuar →"
+                  onSaved={(a) => { setAltaAvf(a); toast({ title: "Avaliação de alta salva", description: `${a.scoreTotal}/${AVF_MAX} pontos — ${avfFaixa(a.scoreTotal).label}` }); }}
+                  onCancel={() => { setAltaConfirm(null); setAltaMotivo(""); }}
+                />
+              </>
             )}
           </div>
         </div>
       )}
 
-      {altaConfirm && (saidaTipo !== "Alta" || altaAbc) && (
+      {altaConfirm && (saidaTipo !== "Alta" || altaAvf) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <div className="px-6 py-5">
@@ -2422,9 +2474,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 e da fila desta especialidade. Agendamentos em outras especialidades não serão afetados.
               </p>
               <p className="text-xs text-white/50 mt-1">Status global só será alterado se não houver outros atendimentos ativos.</p>
-              {altaAbc && (
-                <p className="text-xs mt-2 font-semibold" style={{ color: ABC_NIVEL_INFO[altaAbc.nivel].color }}>
-                  ✓ Reavaliação ABC salva: {altaAbc.scoreTotal} pts — {ABC_NIVEL_INFO[altaAbc.nivel].label}
+              {altaAvf && (
+                <p className="text-xs mt-2 font-semibold" style={{ color: avfFaixa(altaAvf.scoreTotal).color }}>
+                  ✓ Avaliação de alta salva: {altaAvf.scoreTotal}/{AVF_MAX} pts — {avfFaixa(altaAvf.scoreTotal).label}{altaAvfEntrada ? ` (entrada: ${altaAvfEntrada.scoreTotal})` : ""}
                 </p>
               )}
               {altaConfirm.recurrenceGroupId && (

@@ -19,7 +19,11 @@ import {
   listAbcResumo,
   type AbcResumo,
   type AbcResumoItem,
+  listAvaliacoesFuncionaisResumo,
+  type AvaliacaoFuncionalResumo,
+  type AvaliacaoFuncionalResumoItem,
 } from "@/lib/arco-rpc";
+import { AVF_MAX, AVF_MIN, AVF_PERGUNTAS, avfEvolucao, avfFaixa } from "@/lib/avaliacao-funcional";
 import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, ABC_NIVEL_ALTO_MIN, ABC_NIVEL_MODERADO_MIN } from "@/lib/abc-checklist";
 import { Users, UserRound, ClipboardList, AlertCircle, ListTodo, TrendingUp, CalendarDays, Activity, Briefcase, HeartPulse, CheckCircle2, XCircle, AlertTriangle, Hourglass, Trophy, Star, BarChart3, Snowflake, Clock, ChevronLeft, ChevronRight, HeartHandshake, Printer } from "lucide-react";
 import { Card, MotionCard, Badge, Button } from "@/components/ui-custom";
@@ -1123,6 +1127,7 @@ export default function Dashboard() {
       {/* Pacientes Pausados — Fila + Agenda */}
       <PausedOverviewWidget />
 
+      <EvolucaoFuncionalWidget />
       <EvolucaoClinicaWidget />
 
       {/* Alertas de Faltas — por profissional */}
@@ -1157,8 +1162,196 @@ export default function Dashboard() {
   );
 }
 
+// ── EvolucaoFuncionalWidget ───────────────────────────────────────────────────
+// Avaliação Funcional Multidisciplinar (5 perguntas, 5–25 pts): compara a
+// pontuação de entrada com a de alta por paciente e especialidade.
+
+type AvfConcluido = AvaliacaoFuncionalResumo & { entrada: AvaliacaoFuncionalResumoItem; alta: AvaliacaoFuncionalResumoItem };
+
+function EvolucaoFuncionalWidget() {
+  const [resumo, setResumo] = useState<AvaliacaoFuncionalResumo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [especialidade, setEspecialidade] = useState<string>("");
+
+  useEffect(() => {
+    listAvaliacoesFuncionaisResumo()
+      .then(setResumo)
+      .catch(() => setResumo([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const especialidades = useMemo(
+    () => Array.from(new Set(resumo.map(r => (r.specialty ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [resumo],
+  );
+
+  const data = useMemo(() => {
+    const filtrado = especialidade ? resumo.filter(r => (r.specialty ?? "").trim() === especialidade) : resumo;
+    const comEntrada = filtrado.filter(r => r.entrada);
+    const concluidos = filtrado.filter((r): r is AvfConcluido => !!r.entrada && !!r.alta);
+    const melhoraram = concluidos.filter(r => r.alta.scoreTotal > r.entrada.scoreTotal).length;
+    const mantiveram = concluidos.filter(r => r.alta.scoreTotal === r.entrada.scoreTotal).length;
+    const pioraram = concluidos.filter(r => r.alta.scoreTotal < r.entrada.scoreTotal).length;
+    const mediaEntrada = concluidos.length ? concluidos.reduce((s, r) => s + r.entrada.scoreTotal, 0) / concluidos.length : 0;
+    const mediaAlta = concluidos.length ? concluidos.reduce((s, r) => s + r.alta.scoreTotal, 0) / concluidos.length : 0;
+    const ganhoMedio = Math.round((mediaAlta - mediaEntrada) * 10) / 10;
+
+    const porPergunta = AVF_PERGUNTAS.map((p, i) => {
+      const e = concluidos.length ? concluidos.reduce((s, r) => s + (r.entrada.respostas[i] ?? 0), 0) / concluidos.length : 0;
+      const a = concluidos.length ? concluidos.reduce((s, r) => s + (r.alta.respostas[i] ?? 0), 0) / concluidos.length : 0;
+      return { pergunta: p.titulo.split(" / ")[0].split(" e ")[0], Entrada: Math.round(e * 10) / 10, Alta: Math.round(a * 10) / 10 };
+    });
+
+    const porEspecialidade = Array.from(
+      concluidos.reduce((m, r) => {
+        const k = (r.specialty ?? "").trim() || "Sem especialidade";
+        const cur = m.get(k) ?? { n: 0, e: 0, a: 0 };
+        m.set(k, { n: cur.n + 1, e: cur.e + r.entrada.scoreTotal, a: cur.a + r.alta.scoreTotal });
+        return m;
+      }, new Map<string, { n: number; e: number; a: number }>()),
+    ).map(([k, v]) => ({ especialidade: k, n: v.n, Entrada: Math.round((v.e / v.n) * 10) / 10, Alta: Math.round((v.a / v.n) * 10) / 10 }))
+     .sort((x, y) => x.especialidade.localeCompare(y.especialidade));
+
+    return { comEntrada, concluidos, melhoraram, mantiveram, pioraram, mediaEntrada: Math.round(mediaEntrada * 10) / 10, mediaAlta: Math.round(mediaAlta * 10) / 10, ganhoMedio, porPergunta, porEspecialidade };
+  }, [resumo, especialidade]);
+
+  const { concluidos } = data;
+  const corMelhora = "#22c55e";
+  const corPiora = "#ef4444";
+
+  return (
+    <Card className="p-6 border-[rgba(6,182,212,0.3)] shadow-[0_0_24px_rgba(6,182,212,0.08)]">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
+        <h2 className="text-xl font-bold font-display flex items-center gap-2 text-cyan-400" style={{ textShadow: "0 0 12px rgba(34,211,238,0.5)" }}>
+          <TrendingUp className="w-5 h-5" />
+          Evolução Clínica — Avaliação Funcional (Entrada × Alta)
+        </h2>
+        <div className="flex items-center gap-3 flex-wrap">
+          {especialidades.length > 0 && (
+            <select value={especialidade} onChange={e => setEspecialidade(e.target.value)}
+              className="h-8 rounded-lg border border-border bg-background px-2 text-xs">
+              <option value="">Todas as especialidades</option>
+              {especialidades.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+          <span className="text-xs text-muted-foreground">
+            {data.comEntrada.length} com entrada · {concluidos.length} com alta
+          </span>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground mb-5">
+        Questionário padrão de {AVF_PERGUNTAS.length} perguntas (1–5) para qualquer especialidade · total de {AVF_MIN} a {AVF_MAX} pts · <strong>mais pontos = melhor</strong>. Cada paciente é avaliado por especialidade.
+      </p>
+
+      {loading ? (
+        <p className="text-xs text-muted-foreground italic py-6 text-center animate-pulse">Carregando…</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="p-4 rounded-xl border" style={{ borderColor: `${corMelhora}66`, background: `${corMelhora}1a` }}>
+              <p className="text-xs text-muted-foreground font-semibold">Evoluíram</p>
+              <p className="text-3xl font-bold" style={{ color: corMelhora }}>{data.melhoraram}</p>
+              <p className="text-[11px] text-muted-foreground">de {concluidos.length} com alta</p>
+            </div>
+            <div className="p-4 rounded-xl border border-border/60 bg-secondary/30">
+              <p className="text-xs text-muted-foreground font-semibold">Mantiveram / Pioraram</p>
+              <p className="text-3xl font-bold text-foreground">{data.mantiveram} <span className="text-base text-muted-foreground">/ {data.pioraram}</span></p>
+              <p className="text-[11px] text-muted-foreground">mesma pontuação / pontuação menor</p>
+            </div>
+            <div className="p-4 rounded-xl border border-border/60 bg-secondary/30">
+              <p className="text-xs text-muted-foreground font-semibold">Média entrada → alta</p>
+              <p className="text-3xl font-bold text-foreground">{concluidos.length ? <>{data.mediaEntrada} <span className="text-base text-muted-foreground">→</span> {data.mediaAlta}</> : "—"}</p>
+              <p className="text-[11px] text-muted-foreground">pontos (máx. {AVF_MAX})</p>
+            </div>
+            <div className="p-4 rounded-xl border" style={{ borderColor: "rgba(6,182,212,0.4)", background: "rgba(6,182,212,0.1)" }}>
+              <p className="text-xs text-muted-foreground font-semibold">Ganho médio</p>
+              <p className="text-3xl font-bold text-cyan-400">{concluidos.length ? `${data.ganhoMedio > 0 ? "+" : ""}${data.ganhoMedio}` : "—"}</p>
+              <p className="text-[11px] text-muted-foreground">pontos por paciente</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <p className="text-sm font-bold mb-2">Média por especialidade (entrada × alta)</p>
+              {concluidos.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic py-8 text-center">Disponível quando houver avaliações de alta.</p>
+              ) : (
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.porEspecialidade} margin={{ left: -10, right: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="especialidade" tick={{ fontSize: 10 }} interval={0} />
+                      <YAxis domain={[0, AVF_MAX]} tick={{ fontSize: 11 }} />
+                      <Tooltip contentStyle={{ background: "rgba(10,10,20,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="Entrada" fill="#f97316" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="Alta" fill={corMelhora} radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-bold mb-2">Média por pergunta (1–5)</p>
+              {concluidos.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic py-8 text-center">Disponível quando houver avaliações de alta.</p>
+              ) : (
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.porPergunta} margin={{ left: -10, right: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="pergunta" tick={{ fontSize: 10 }} interval={0} />
+                      <YAxis domain={[0, 5]} tick={{ fontSize: 11 }} />
+                      <Tooltip contentStyle={{ background: "rgba(10,10,20,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="Entrada" fill="#f97316" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="Alta" fill={corMelhora} radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {concluidos.length > 0 && (
+            <details className="mt-5 text-xs">
+              <summary className="cursor-pointer text-muted-foreground font-semibold">Pacientes com alta avaliada ({concluidos.length})</summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {concluidos
+                  .slice()
+                  .sort((a, b) => (b.alta.scoreTotal - b.entrada.scoreTotal) - (a.alta.scoreTotal - a.entrada.scoreTotal))
+                  .map(r => {
+                    const ev = avfEvolucao(r.entrada.scoreTotal, r.alta.scoreTotal);
+                    const cor = ev.tendencia === "melhora" ? corMelhora : ev.tendencia === "piora" ? corPiora : "#eab308";
+                    return (
+                      <Link key={`${r.patientId}-${r.specialty ?? ""}`} href={`/patients/${r.patientId}`}>
+                        <div className="p-3 rounded-xl bg-secondary/30 border border-border/50 hover:border-cyan-400/50 transition-colors flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{r.patientName}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{r.specialty ?? "Sem especialidade"}</p>
+                          </div>
+                          <span className="whitespace-nowrap font-mono">
+                            <span style={{ color: avfFaixa(r.entrada.scoreTotal).color }}>{r.entrada.scoreTotal}</span>
+                            {" → "}
+                            <span style={{ color: avfFaixa(r.alta.scoreTotal).color }}>{r.alta.scoreTotal}</span>
+                            <span className="ml-1 font-bold" style={{ color: cor }}>({ev.delta > 0 ? "+" : ""}{ev.delta})</span>
+                          </span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+              </div>
+            </details>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 // ── EvolucaoClinicaWidget ─────────────────────────────────────────────────────────────
-// Checklist ABC: cruza a avaliação de entrada com a de alta de cada paciente.
+// Checklist ABC (opcional): cruza a avaliação de entrada com a de alta de cada paciente.
 
 function EvolucaoClinicaWidget() {
   const [resumo, setResumo] = useState<AbcResumo[]>([]);
@@ -1229,7 +1422,7 @@ function EvolucaoClinicaWidget() {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
         <h2 className="text-xl font-bold font-display flex items-center gap-2 text-violet-400" style={{ textShadow: "0 0 12px rgba(167,139,250,0.5)" }}>
           <TrendingUp className="w-5 h-5" />
-          Evolução Clínica — Checklist ABC (Entrada × Alta)
+          Checklist ABC (opcional) — Entrada × Alta
         </h2>
         <span className="text-xs text-muted-foreground">
           {data.comEntrada.length} avaliados na entrada · {concluidos.length} com alta reavaliada
