@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
-import { Card, Button, Badge, MotionCard, Input, Label } from "@/components/ui-custom";
+import { Card, Button, Badge, MotionCard, Input, Label, Select } from "@/components/ui-custom";
 import { generatePatientPdf } from "@/hooks/use-pdf";
 import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon, ShieldOff, Users, Undo2, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,9 @@ import {
   reverterFalta,
   listPatientDischarges,
   listAbcAvaliacoes,
+  listAvaliacoesFuncionais,
+  type AvaliacaoFuncional,
+  type AvaliacaoFuncionalTipo,
   listTriagensDoPaciente,
   type TriagemMulti,
   type AbcAvaliacao,
@@ -29,8 +32,10 @@ import {
   type PatientDischarge,
 } from "@/lib/arco-rpc";
 import { AREA_MAX_UI, areaToDb, areaToUi } from "@/lib/score-scale";
-import { isTransportSpecialty } from "@/lib/specialty-colors";
+import { isTransportSpecialty, SPECIALTIES } from "@/lib/specialty-colors";
 import { AbcChecklistForm, AbcNivelBadge } from "@/components/AbcChecklistForm";
+import { AvaliacaoFuncionalForm, AvfScoreBadge, AvfEvolucaoBadge } from "@/components/AvaliacaoFuncionalForm";
+import { AVF_MAX, AVF_PERGUNTAS, avfFaixa } from "@/lib/avaliacao-funcional";
 import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, printAbcChecklist, type AbcAreaKey } from "@/lib/abc-checklist";
 import { getProfessionalSession } from "@/lib/portal-session";
 import { TriagemMultiForm, TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
@@ -98,6 +103,9 @@ export default function PatientDetail() {
   const [triagemEdit, setTriagemEdit] = useState(false);
   const [abcHist, setAbcHist] = useState<AbcAvaliacao[]>([]);
   const [abcForm, setAbcForm] = useState<{ tipo: AbcTipo; base?: number[] } | null>(null);
+  const [avfHist, setAvfHist] = useState<AvaliacaoFuncional[]>([]);
+  const [avfForm, setAvfForm] = useState<{ tipo: AvaliacaoFuncionalTipo; specialty: string; entradaRef: AvaliacaoFuncional | null } | null>(null);
+  const [avfNovaEspecialidade, setAvfNovaEspecialidade] = useState("");
   const [triagensMulti, setTriagensMulti] = useState<TriagemMulti[]>([]);
   const [triagemMultiForm, setTriagemMultiForm] = useState<{ base: TriagemMulti | null } | null>(null);
   const [triagemMultiView, setTriagemMultiView] = useState<TriagemMulti | null>(null);
@@ -252,19 +260,21 @@ export default function PatientDetail() {
     setIsLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const [p, pdf, abs, allApts, alts, abcs] = await Promise.all([
+      const [p, pdf, abs, allApts, alts, abcs, avfs] = await Promise.all([
         getPatient(patientId),
         getPatientPdf(patientId).catch(() => null),
         getPatientAbsences(patientId).catch(() => null),
         listAppointments({ patientId }).catch(() => [] as any[]),
         listPatientDischarges(patientId).catch(() => [] as PatientDischarge[]),
         listAbcAvaliacoes(patientId).catch(() => [] as AbcAvaliacao[]),
+        listAvaliacoesFuncionais(patientId).catch(() => [] as AvaliacaoFuncional[]),
       ]);
       setPatient(p);
       setPdfData(pdf);
       setAbsenceInfo(abs);
       setDischarges(alts);
       setAbcHist(abcs);
+      setAvfHist(avfs);
       if (p) listTriagensDoPaciente(p).then(setTriagensMulti).catch(() => setTriagensMulti([]));
       // Derive team from appointments
       const profMap = new Map<number, { name: string; hasActive: boolean }>();
@@ -793,6 +803,114 @@ export default function PatientDetail() {
           </Card>
 
           {(() => {
+            const norm = (s: string | null | undefined) => (s ?? "").trim();
+            const grupos = new Map<string, { specialty: string; entrada: AvaliacaoFuncional | null; alta: AvaliacaoFuncional | null; total: number }>();
+            for (const a of avfHist) {
+              const key = norm(a.specialty).toLowerCase();
+              const g = grupos.get(key) ?? { specialty: norm(a.specialty) || "Sem especialidade", entrada: null, alta: null, total: 0 };
+              g.total += 1;
+              if (a.tipo === "entrada" && !g.entrada) g.entrada = a;
+              if (a.tipo === "alta" && !g.alta) g.alta = a;
+              grupos.set(key, g);
+            }
+            const avaliadas = new Set(grupos.keys());
+            const sugestoes = Array.from(new Set<string>([
+              ...team.map(m => norm(m.specialty)),
+              ...SPECIALTIES,
+            ])).filter(s => s && !avaliadas.has(s.toLowerCase()) && !isTransportSpecialty(s));
+            const abrir = (tipo: AvaliacaoFuncionalTipo, specialty: string) => {
+              const g = grupos.get(specialty.trim().toLowerCase());
+              setAvfForm({ tipo, specialty: specialty.trim(), entradaRef: g?.entrada ?? null });
+            };
+            return (
+              <Card className="p-6 border-2 transition-colors" style={{ borderColor: "rgba(6,182,212,0.35)" }}>
+                <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "rgba(6,182,212,0.15)", color: "#06b6d4" }}>
+                      <ClipboardCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold font-display text-lg">Avaliação Funcional Multidisciplinar</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {AVF_PERGUNTAS.length} perguntas · escala 1–5 · total até {AVF_MAX} pts · entrada × alta por especialidade — {avfHist.length === 0 ? "nenhuma avaliação registrada" : `${avfHist.length} avaliação(ões)`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-center flex-wrap">
+                    <Select value={avfNovaEspecialidade} onChange={e => setAvfNovaEspecialidade(e.target.value)} className="h-9 text-sm">
+                      <option value="">Especialidade…</option>
+                      {sugestoes.map(s => <option key={s} value={s}>{s}</option>)}
+                    </Select>
+                    <Button variant="outline" size="sm" className="gap-2" disabled={!avfNovaEspecialidade} onClick={() => { abrir("entrada", avfNovaEspecialidade); setAvfNovaEspecialidade(""); }}>
+                      <ClipboardCheck className="w-4 h-4" /> Avaliação de entrada
+                    </Button>
+                  </div>
+                </div>
+
+                {grupos.size > 0 ? (
+                  <div className="space-y-3 text-sm">
+                    {Array.from(grupos.values()).map(g => (
+                      <div key={g.specialty} className="p-3 rounded-xl border border-border/60 bg-secondary/20">
+                        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                          <p className="font-bold">{g.specialty}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {g.entrada && g.alta && <AvfEvolucaoBadge entrada={g.entrada.scoreTotal} alta={g.alta.scoreTotal} />}
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => abrir("entrada", g.specialty)}>Nova entrada</Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => abrir("alta", g.specialty)}>Avaliação de alta</Button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {[{ label: "Entrada", a: g.entrada }, { label: "Alta", a: g.alta }].map(({ label, a }) => (
+                            <div key={label} className="p-3 rounded-xl border" style={{ borderColor: a ? avfFaixa(a.scoreTotal).border : "rgba(148,163,184,0.3)", background: a ? avfFaixa(a.scoreTotal).bg : "transparent" }}>
+                              <div className="flex items-center justify-between">
+                                <p className="text-muted-foreground font-semibold text-xs uppercase tracking-wider">Avaliação de {label}</p>
+                                <AvfScoreBadge total={a?.scoreTotal ?? null} />
+                              </div>
+                              {a ? (
+                                <>
+                                  <p className="text-2xl font-bold" style={{ color: avfFaixa(a.scoreTotal).color }}>
+                                    {a.scoreTotal}<span className="text-xs text-muted-foreground font-normal">/{AVF_MAX}</span>
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">{formatDate(a.createdAt.slice(0, 10))}{a.professionalName ? ` · ${a.professionalName}` : ""}</p>
+                                  <div className="flex gap-1 mt-2">
+                                    {a.respostas.map((r, i) => (
+                                      <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-background/60 border border-border/50" title={AVF_PERGUNTAS[i]?.titulo}>{r}</span>
+                                    ))}
+                                  </div>
+                                  {a.observacoes && <p className="text-xs text-muted-foreground mt-1 italic">{a.observacoes}</p>}
+                                </>
+                              ) : (
+                                <p className="text-xs text-muted-foreground italic mt-2">{label === "Alta" ? "Registrada ao dar alta na agenda." : "—"}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {avfHist.length > grupos.size * 2 && (
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-muted-foreground font-semibold">Histórico completo ({avfHist.length})</summary>
+                        <ul className="mt-2 space-y-1">
+                          {avfHist.map(a => (
+                            <li key={a.id} className="flex items-center justify-between p-2 rounded-lg bg-secondary/30">
+                              <span>{formatDate(a.createdAt.slice(0, 10))} · {a.tipo === "entrada" ? "Entrada" : "Alta"} · {norm(a.specialty) || "Sem especialidade"}{a.professionalName ? ` · ${a.professionalName}` : ""}</span>
+                              <AvfScoreBadge total={a.scoreTotal} />
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Escolha a especialidade e registre a avaliação de entrada (5 perguntas rápidas). Na alta, o mesmo questionário é respondido de novo e o Dashboard de Evolução compara entrada × alta. Serve para todas as áreas, inclusive Psicologia Parental.
+                  </p>
+                )}
+              </Card>
+            );
+          })()}
+
+          {(() => {
             const entrada = abcHist.find(a => a.tipo === "entrada") ?? null;
             const alta = abcHist.find(a => a.tipo === "alta") ?? null;
             const atual = alta ?? entrada;
@@ -810,7 +928,7 @@ export default function PatientDetail() {
                       <ClipboardCheck className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold font-display text-lg">Triagem / Avaliação ABC</h3>
+                      <h3 className="font-bold font-display text-lg">Avaliação ABC <span className="text-xs font-normal text-muted-foreground">(opcional)</span></h3>
                       <p className="text-sm text-muted-foreground">
                         Autism Behavior Checklist — {abcHist.length === 0 ? "nenhuma avaliação registrada" : `${abcHist.length} avaliação(ões)`}
                       </p>
@@ -856,7 +974,7 @@ export default function PatientDetail() {
                               </button>
                             </>
                           ) : (
-                            <p className="text-xs text-muted-foreground italic mt-2">{label === "Alta" ? "Registrada ao dar alta na agenda." : "—"}</p>
+                            <p className="text-xs text-muted-foreground italic mt-2">{label === "Alta" ? "Opcional — registre pelo botão \"Avaliação de alta\"." : "—"}</p>
                           )}
                         </div>
                       ))}
@@ -1014,6 +1132,29 @@ export default function PatientDetail() {
               </div>
             </div>
             <TriagemMultiResultado triagem={triagemMultiView} patient={patient} />
+          </MotionCard>
+        </div>
+      )}
+
+      {avfForm && patient && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <MotionCard className="w-full max-w-2xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <AvaliacaoFuncionalForm
+              key={`avf-${avfForm.tipo}-${avfForm.specialty}`}
+              patientId={patient.id}
+              tipo={avfForm.tipo}
+              specialty={avfForm.specialty || null}
+              patientName={patient.name}
+              entradaRef={avfForm.entradaRef}
+              professionalId={getProfessionalSession()?.professionalId ?? null}
+              professionalName={getProfessionalSession()?.professionalName ?? null}
+              onCancel={() => setAvfForm(null)}
+              onSaved={(a) => {
+                setAvfHist(prev => [a, ...prev]);
+                setAvfForm(null);
+                toast({ title: a.tipo === "entrada" ? "Avaliação de entrada salva" : "Avaliação de alta salva", description: `${a.scoreTotal}/${AVF_MAX} pontos — ${avfFaixa(a.scoreTotal).label}` });
+              }}
+            />
           </MotionCard>
         </div>
       )}
