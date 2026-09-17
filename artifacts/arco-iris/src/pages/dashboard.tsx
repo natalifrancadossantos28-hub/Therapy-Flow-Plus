@@ -321,7 +321,9 @@ export default function Dashboard() {
     // NÃO inclui "agendado" (futuro/pendente), "remanejado", "remarcado", "pausado"
     // que são status transitórios e inflam a contagem.
     const REALIZADOS_ST = ["atendimento", "em_atendimento", "em atendimento", "presente", "alta"];
-    const FALTAS_ST = ["ausente", "falta_justificada", "falta_nao_justificada"];
+    // Falta justificada não é métrica negativa: sai de "Faltas" e vira contagem própria.
+    const FALTAS_ST = ["ausente", "falta_nao_justificada"];
+    const JUSTIFICADAS_ST = ["falta_justificada", "justificado", "abonado"];
     const CANCELADOS_ST = ["cancelado", "desmarcado"];
 
     // Deduplica: mesmo paciente+data+hora conta uma vez (evita dupla do Multi)
@@ -340,6 +342,7 @@ export default function Dashboard() {
 
     const realizados = upToToday.filter(a => REALIZADOS_ST.includes((a.status || "").toLowerCase())).length;
     const faltas = upToToday.filter(a => FALTAS_ST.includes((a.status || "").toLowerCase())).length;
+    const justificadas = upToToday.filter(a => JUSTIFICADAS_ST.includes((a.status || "").toLowerCase())).length;
     const cancelados = upToToday.filter(a => CANCELADOS_ST.includes((a.status || "").toLowerCase())).length;
     // "Agendados" conta por PACIENTE (criança), não por dia/ocorrência: um mesmo
     // paciente com recorrência semanal aparece várias vezes no mês, mas deve
@@ -350,7 +353,7 @@ export default function Dashboard() {
         .map(a => a.patientId)
     ).size;
 
-    return { total: realizados + faltas, realizados, faltas, cancelados, agendados };
+    return { total: realizados + faltas + justificadas, realizados, faltas, justificadas, cancelados, agendados };
   }, [monthAppointments]);
 
   // ── Relatório semanal por profissional (Total + Multi) ────────────────────
@@ -371,18 +374,20 @@ export default function Dashboard() {
 
   // ── Batimento cardíaco da clínica (hoje) ─────────────────────────────────
   // Realizado: atendimento concluído (em andamento, presente ou alta naquele dia).
-  // Falta: ausência registrada (justificada ou não).
+  // Falta: ausência não justificada. Justificada conta à parte (não penaliza).
   // Pendente: ainda não fechado (agendado, remanejado, remarcado).
   const heartbeat = useMemo(() => {
     let realizado = 0;
     let falta = 0;
+    let justificada = 0;
     let pendente = 0;
     let cancelado = 0;
     const porEspecialidade: Record<string, number> = {};
     for (const a of todayAppointments || []) {
       const st = (a.status || "agendado").toLowerCase();
       if (st === "atendimento" || st === "presente" || st === "alta") realizado++;
-      else if (st === "ausente" || st === "falta_justificada" || st === "falta_nao_justificada") falta++;
+      else if (st === "ausente" || st === "falta_nao_justificada") falta++;
+      else if (st === "falta_justificada" || st === "justificado" || st === "abonado") justificada++;
       else if (st === "cancelado" || st === "desmarcado") cancelado++;
       else pendente++;
       if (st !== "cancelado" && st !== "desmarcado") {
@@ -392,7 +397,7 @@ export default function Dashboard() {
     }
     const fechados = realizado + falta;
     const taxaPresenca = fechados > 0 ? Math.round((realizado / fechados) * 100) : null;
-    return { realizado, falta, pendente, cancelado, taxaPresenca, porEspecialidade };
+    return { realizado, falta, justificada, pendente, cancelado, taxaPresenca, porEspecialidade };
   }, [todayAppointments]);
 
   // ── Atendimentos por especialidade no ano (01/01 → hoje) ─────────────────
@@ -773,6 +778,9 @@ export default function Dashboard() {
           <div className="bg-red-500/10 rounded-2xl p-4 text-center border border-red-500/20">
             <p className="text-2xl font-bold font-display text-red-400">{monthlyStats.faltas}</p>
             <p className="text-xs font-semibold text-muted-foreground mt-1">Faltas</p>
+            {monthlyStats.justificadas > 0 && (
+              <p className="text-[10px] text-muted-foreground">+{monthlyStats.justificadas} justificada(s)</p>
+            )}
           </div>
           <div className="bg-amber-500/10 rounded-2xl p-4 text-center border border-amber-500/20">
             <p className="text-2xl font-bold font-display text-amber-400">{monthlyStats.agendados}</p>

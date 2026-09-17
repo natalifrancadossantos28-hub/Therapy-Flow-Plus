@@ -561,9 +561,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     listAusencias().then(setAusencias).catch(console.error);
     listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
     listRecurrenceCuts().then(setRecurrenceCuts).catch(console.error);
-    countAbsencesBySpecialty()
-      .then(rows => setSpecialtyAbsences(new Map(rows.map(r => [`${r.patient_id}::${r.specialty}`, Number(r.absence_count)]))))
-      .catch(console.error);
+    reloadSpecialtyAbsences();
   }, []);
 
   const canView = isAdmin || pinVerified;
@@ -766,6 +764,15 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   // Atualiza o estado local de forma otimista para refletir o mesmo.
   // Se o appointment for virtual (id negativo = projeção de recorrência),
   // materializa-o primeiro no banco preservando recurrence_group_id.
+  // Contador de faltas por especialidade (só não justificadas/ausente —
+  // mesma regra de count_absences_by_specialty). Recarregado a cada mudança
+  // de status para que o card reflita justificativas/cancelamentos na hora.
+  const reloadSpecialtyAbsences = () => {
+    countAbsencesBySpecialty()
+      .then(rows => setSpecialtyAbsences(new Map(rows.map(r => [`${r.patient_id}::${r.specialty}`, Number(r.absence_count)]))))
+      .catch(console.error);
+  };
+
   const patchStatus = async (apt: Appointment, status: string) => {
     let realId = apt.id;
 
@@ -788,6 +795,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       if (a.id === apt.id || a.id === realId) return { ...a, id: realId, status };
       return a;
     }));
+    reloadSpecialtyAbsences();
     return data;
   };
 
@@ -921,6 +929,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       if (apt.id > 0) {
         await reverterFalta(apt.id);
         setAppointments(prev => prev.map(a => (a.id === apt.id ? { ...a, status: "agendado" } : a)));
+        reloadSpecialtyAbsences();
       } else {
         await patchStatus(apt, "agendado");
       }
