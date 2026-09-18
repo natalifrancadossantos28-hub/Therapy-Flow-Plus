@@ -20,7 +20,7 @@ export function AbsenceBadge({ count, compact = false }: { count: number; compac
         compact ? "text-[9px] px-1 py-0.5" : "text-[10px] px-1.5 py-0.5",
         tone,
       )}
-      title={`${count} falta(s) registrada(s) nesta especialidade`}
+      title={`${count} falta(s) não justificada(s) nesta especialidade (justificadas não contam)`}
     >
       <Bell className={compact ? "w-2.5 h-2.5 shrink-0" : "w-3 h-3 shrink-0"} />
       {count} {count === 1 ? "falta" : "faltas"}
