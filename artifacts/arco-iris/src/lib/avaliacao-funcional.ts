@@ -2,6 +2,8 @@
 // (Likert 1–5) que serve para qualquer especialidade, preenchido na entrada
 // e na alta. Pontuação total de 5 a 25; quanto maior, melhor o quadro.
 
+import { specialtyKey } from "@/lib/specialty-colors";
+
 export type AvfPergunta = {
   key: string;
   titulo: string;
@@ -47,6 +49,58 @@ export const AVF_PERGUNTAS: readonly AvfPergunta[] = [
     dica: "1 = Metas não alcançadas · 5 = Metas integralmente alcançadas / Conclusão com sucesso",
   },
 ];
+
+/**
+ * Psicologia Parental atende a mãe/responsável, não a criança. As perguntas
+ * são as mesmas cinco dimensões, escritas de forma simples e voltadas para
+ * quem está em acompanhamento.
+ */
+export const AVF_PERGUNTAS_PARENTAL: readonly AvfPergunta[] = [
+  {
+    key: "autonomia",
+    titulo: "Autonomia no cuidado e na rotina",
+    curto: "Autonomia",
+    texto: "Como está a autonomia da mãe/responsável para lidar com a rotina e com as demandas do dia a dia da família?",
+    dica: "1 = Precisa de apoio o tempo todo · 5 = Conduz a rotina com segurança",
+  },
+  {
+    key: "emocional",
+    titulo: "Sobrecarga emocional",
+    curto: "Emocional",
+    texto: "Com que frequência e intensidade aparecem ansiedade, estresse, culpa ou cansaço que motivaram o acompanhamento?",
+    dica: "1 = Sofrimento constante e intenso · 5 = Bem-estar emocional preservado",
+  },
+  {
+    key: "engajamento",
+    titulo: "Participação nos atendimentos",
+    curto: "Participação",
+    texto: "Como tem sido a presença, a abertura e a aplicação das orientações combinadas nos atendimentos?",
+    dica: "1 = Pouca adesão / resistência · 5 = Participação plena e orientações aplicadas em casa",
+  },
+  {
+    key: "vinculo",
+    titulo: "Vínculo e manejo com a criança",
+    curto: "Vínculo",
+    texto: "Como está a relação com a criança e o manejo das situações difíceis (birras, limites, comunicação)?",
+    dica: "1 = Conflitos frequentes / manejo difícil · 5 = Vínculo tranquilo e manejo seguro",
+  },
+  {
+    key: "objetivos",
+    titulo: "Objetivos combinados",
+    curto: "Objetivos",
+    texto: "Considerando o que foi combinado no início do acompanhamento, quanto já foi alcançado?",
+    dica: "1 = Nada alcançado · 5 = Tudo alcançado / pronta para a alta",
+  },
+];
+
+/** Psicologia Parental tem questionário e nome em destaque próprios. */
+export function isParentalSpecialty(specialty: string | null | undefined): boolean {
+  return specialtyKey(specialty) === "parental";
+}
+
+export function avfPerguntas(specialty: string | null | undefined): readonly AvfPergunta[] {
+  return isParentalSpecialty(specialty) ? AVF_PERGUNTAS_PARENTAL : AVF_PERGUNTAS;
+}
 
 export const AVF_ESCALA: readonly { valor: 1 | 2 | 3 | 4 | 5; label: string; color: string }[] = [
   { valor: 1, label: "Cenário mais desafiador / difícil",   color: "#ef4444" },
