@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui-custom";
 import { cn } from "@/lib/utils";
 import {
   AVF_PERGUNTAS,
   AVF_ESCALA,
+  avfPerguntas,
+  isParentalSpecialty,
   AVF_MIN,
   AVF_MAX,
   avfFaixa,
@@ -13,9 +15,24 @@ import {
 } from "@/lib/avaliacao-funcional";
 import {
   createAvaliacaoFuncional,
+  getPatient,
   type AvaliacaoFuncional,
   type AvaliacaoFuncionalTipo,
 } from "@/lib/arco-rpc";
+
+/** Mensagem real do erro do Supabase (que não é `Error`), com dica da migração. */
+function mensagemDeErro(e: unknown): string {
+  const bruta =
+    e instanceof Error ? e.message
+    : typeof e === "object" && e !== null && "message" in e && typeof (e as { message: unknown }).message === "string"
+      ? (e as { message: string }).message
+      : "";
+  if (!bruta) return "Erro ao salvar avaliação.";
+  if (/create_avaliacao_funcional|schema cache|does not exist|não existe/i.test(bruta)) {
+    return `${bruta} — a migração 0101_avaliacao_funcional_5_perguntas.sql ainda não foi aplicada no banco.`;
+  }
+  return bruta;
+}
 
 export function AvfScoreBadge({ total, size = "sm", className }: { total: number | null | undefined; size?: "sm" | "md"; className?: string }) {
   if (total == null) {
@@ -69,7 +86,11 @@ type Props = {
 export function AvaliacaoFuncionalForm({
   patientId, tipo, specialty, patientName, professionalId, professionalName, entradaRef, onSaved, onCancel, saveLabel,
 }: Props) {
+  const parental = isParentalSpecialty(specialty);
+  const perguntas = useMemo(() => avfPerguntas(specialty), [specialty]);
   const [respostas, setRespostas] = useState<Array<number | null>>(() => AVF_PERGUNTAS.map(() => null));
+  // Na Parental quem está em acompanhamento é a mãe/responsável.
+  const [responsavel, setResponsavel] = useState<string | null>(null);
   const [observacoes, setObservacoes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +99,15 @@ export function AvaliacaoFuncionalForm({
   const total = avfTotal(respostas);
   const respondidas = respostas.filter(r => r != null).length;
   const faixa = useMemo(() => avfFaixa(total), [total]);
+
+  useEffect(() => {
+    if (!parental) { setResponsavel(null); return; }
+    let ativo = true;
+    getPatient(patientId)
+      .then((p) => { if (ativo) setResponsavel(p?.motherName?.trim() || null); })
+      .catch(() => undefined);
+    return () => { ativo = false; };
+  }, [parental, patientId]);
 
   const setResposta = (idx: number, valor: number) => {
     setRespostas(prev => prev.map((r, i) => (i === idx ? valor : r)));
@@ -102,7 +132,7 @@ export function AvaliacaoFuncionalForm({
       });
       onSaved(saved);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao salvar avaliação.");
+      setError(mensagemDeErro(e));
     } finally {
       setSaving(false);
     }
@@ -112,13 +142,22 @@ export function AvaliacaoFuncionalForm({
     <div className="space-y-5">
       <div className="text-center space-y-1">
         <h2 className="text-lg md:text-xl font-bold tracking-tight">
-          <span style={{ color: "#06b6d4" }}>Avaliação Funcional</span> Multidisciplinar
+          <span style={{ color: "#06b6d4" }}>Avaliação Funcional</span> {parental ? "— Psicologia Parental" : "Multidisciplinar"}
         </h2>
         <p className="text-xs text-muted-foreground">
           5 perguntas · escala 1–5 · total {AVF_MIN}–{AVF_MAX} pts · {tipo === "entrada" ? "Avaliação de Entrada" : "Avaliação de Alta"}
           {specialty ? <> · <strong>{specialty}</strong></> : null}
-          {patientName ? <> · {patientName}</> : null}
+          {parental
+            ? responsavel
+              ? <> · <strong>{responsavel}</strong> (mãe/responsável)</>
+              : patientName ? <> · responsável de {patientName}</> : null
+            : patientName ? <> · {patientName}</> : null}
         </p>
+        {parental && (
+          <p className="text-[11px] text-muted-foreground">
+            As perguntas avaliam a mãe/responsável em acompanhamento, não a criança.
+          </p>
+        )}
       </div>
 
       <div className="rounded-2xl border border-border/50 p-3">
@@ -142,7 +181,7 @@ export function AvaliacaoFuncionalForm({
             </span>
             <div>
               <p className="text-sm font-bold" style={{ color: completa ? faixa.color : undefined }}>{completa ? faixa.label : "Responda as 5 perguntas"}</p>
-              <p className="text-xs text-muted-foreground">{respondidas}/{AVF_PERGUNTAS.length} respondidas</p>
+              <p className="text-xs text-muted-foreground">{respondidas}/{perguntas.length} respondidas</p>
             </div>
           </div>
           {tipo === "alta" && entradaRef && completa && (
@@ -155,7 +194,7 @@ export function AvaliacaoFuncionalForm({
       </div>
 
       <div className="space-y-3">
-        {AVF_PERGUNTAS.map((p, idx) => {
+        {perguntas.map((p, idx) => {
           const atual = respostas[idx];
           const ref = entradaRef?.respostas[idx];
           return (
