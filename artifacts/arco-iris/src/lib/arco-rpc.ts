@@ -2619,6 +2619,48 @@ export async function listRecadosEquipeDoProfissional(professionalId: number, li
   return (data ?? []) as RecadoEquipe[];
 }
 
+export type MensagemProfissional = {
+  id: number;
+  professionalId: number;
+  tipo: "aniversario" | "categoria";
+  dataRef: string;
+  titulo: string;
+  mensagem: string;
+  lido: boolean;
+  createdAt: string;
+};
+
+/**
+ * Gera (uma vez por profissional/dia) as mensagens de aniversário e de dia da
+ * categoria. Idempotente no banco: pode ser chamada a cada carga da agenda.
+ */
+export async function gerarMensagensComemorativas(): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("gerar_mensagens_comemorativas", { p_slug: slug, p_password: password });
+  if (error) throw error;
+}
+
+export async function listMensagensProfissional(professionalId: number, limit = 20): Promise<MensagemProfissional[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_mensagens_profissional", {
+    p_slug: slug,
+    p_password: password,
+    p_professional_id: professionalId,
+    p_limit: limit,
+  });
+  if (error) throw error;
+  return (data ?? []) as MensagemProfissional[];
+}
+
+export async function marcarMensagemProfissionalLida(id: number): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("marcar_mensagem_profissional_lida", { p_slug: slug, p_password: password, p_id: id });
+  if (error) throw error;
+}
+
 export async function markRecadoEquipeLido(id: number, lido = true): Promise<void> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
