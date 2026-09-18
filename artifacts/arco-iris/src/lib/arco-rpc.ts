@@ -2605,6 +2605,20 @@ export async function listRecadosEquipe(): Promise<RecadoEquipe[]> {
   return (data ?? []) as RecadoEquipe[];
 }
 
+/** Recados enviados por um profissional, com o status definido pela administração. */
+export async function listRecadosEquipeDoProfissional(professionalId: number, limit = 20): Promise<RecadoEquipe[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_recados_equipe_por_profissional", {
+    p_slug: slug,
+    p_password: password,
+    p_professional_id: professionalId,
+    p_limit: limit,
+  });
+  if (error) throw error;
+  return (data ?? []) as RecadoEquipe[];
+}
+
 export async function markRecadoEquipeLido(id: number, lido = true): Promise<void> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();

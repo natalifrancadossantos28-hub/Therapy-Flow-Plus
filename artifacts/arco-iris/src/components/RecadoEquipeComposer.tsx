@@ -1,7 +1,14 @@
-import { useState } from "react";
-import { MessageSquarePlus, Send, ChevronDown, ChevronUp } from "lucide-react";
-import { createRecadoEquipe } from "@/lib/arco-rpc";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MessageSquarePlus, Send, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { createRecadoEquipe, listRecadosEquipeDoProfissional, type RecadoEquipe, type RecadoEquipeStatus } from "@/lib/arco-rpc";
+import { RECADO_STATUS_META, recadoStatusOf } from "@/lib/recado-status";
 import { useToast } from "@/hooks/use-toast";
+import { useVisibleInterval } from "@/hooks/usePageVisible";
+import { cn } from "@/lib/utils";
+
+function fmtDateTime(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
 
 type Props = {
   professionalId: number | null;
@@ -15,6 +22,24 @@ export function RecadoEquipeComposer({ professionalId, professionalName, special
   const [open, setOpen] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [sending, setSending] = useState(false);
+  const [meus, setMeus] = useState<RecadoEquipe[]>([]);
+
+  // O status é definido pela administração em "Recados da Equipe"; aqui o
+  // profissional só acompanha. Falha silenciosa: o envio continua funcionando
+  // mesmo com a migração 0104 pendente.
+  const carregarMeus = useCallback(() => {
+    if (professionalId == null) return;
+    listRecadosEquipeDoProfissional(professionalId).then(setMeus).catch(() => undefined);
+  }, [professionalId]);
+
+  useEffect(() => { carregarMeus(); }, [carregarMeus]);
+  useVisibleInterval(carregarMeus, 60_000);
+
+  const resumo = useMemo(() => {
+    const c: Record<RecadoEquipeStatus, number> = { pendente: 0, em_andamento: 0, resolvido: 0 };
+    for (const r of meus) c[recadoStatusOf(r)]++;
+    return (Object.entries(c) as [RecadoEquipeStatus, number][]).filter(([, n]) => n > 0);
+  }, [meus]);
 
   const enviar = async () => {
     const texto = mensagem.trim();
@@ -23,7 +48,7 @@ export function RecadoEquipeComposer({ professionalId, professionalName, special
     try {
       await createRecadoEquipe({ professionalId, professionalName, specialty: specialty ?? null, mensagem: texto });
       setMensagem("");
-      setOpen(false);
+      carregarMeus();
       toast({ title: "Recado enviado", description: "A administração receberá sua mensagem em \"Recados da Equipe\"." });
     } catch (e) {
       const msg =
@@ -55,7 +80,18 @@ export function RecadoEquipeComposer({ professionalId, professionalName, special
           <MessageSquarePlus className="w-4 h-4" />
           Recado / sugestão para a administração
         </span>
-        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        <span className="flex items-center gap-2">
+          {!open && resumo.map(([status, n]) => {
+            const meta = RECADO_STATUS_META[status];
+            return (
+              <span key={status} className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border", meta.badge)}>
+                <span className={cn("w-1.5 h-1.5 rounded-full", meta.dot)} />
+                {n} {meta.label}
+              </span>
+            );
+          })}
+          {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </span>
       </button>
       {open && (
         <div className="px-4 pb-4 space-y-3">
@@ -82,6 +118,42 @@ export function RecadoEquipeComposer({ professionalId, professionalName, special
               {sending ? "Enviando..." : "Enviar recado"}
             </button>
           </div>
+
+          {meus.length > 0 && (
+            <div className="pt-2 border-t border-border space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Meus recados e o andamento</span>
+                <button
+                  type="button"
+                  onClick={carregarMeus}
+                  title="Atualizar status"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Atualizar
+                </button>
+              </div>
+              <ul className="space-y-2">
+                {meus.map(r => {
+                  const meta = RECADO_STATUS_META[recadoStatusOf(r)];
+                  return (
+                    <li key={r.id} className="rounded-xl border border-border bg-muted/40 px-3 py-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm text-foreground whitespace-pre-wrap break-words">{r.mensagem}</p>
+                        <span className={cn("shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border", meta.badge)}>
+                          <span className={cn("w-1.5 h-1.5 rounded-full", meta.dot)} />
+                          {meta.label}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Enviado em {fmtDateTime(r.createdAt)}
+                        {recadoStatusOf(r) === "resolvido" && r.resolvedAt ? ` · resolvido em ${fmtDateTime(r.resolvedAt)}` : ""}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

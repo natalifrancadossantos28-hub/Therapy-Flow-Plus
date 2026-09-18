@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Inbox, Check, RotateCcw, Filter, UserRound, CircleDot, Loader2, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui-custom";
 import { listRecadosEquipe, markRecadoEquipeLido, setRecadoEquipeStatus, type RecadoEquipe, type RecadoEquipeStatus } from "@/lib/arco-rpc";
+import { RECADO_STATUS_META as STATUS_META, recadoStatusOf as statusOf } from "@/lib/recado-status";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
@@ -28,14 +29,6 @@ function dayLabel(key: string) {
 }
 
 type FiltroStatus = RecadoEquipeStatus | "todos";
-
-const STATUS_META: Record<RecadoEquipeStatus, { label: string; badge: string; dot: string }> = {
-  pendente:     { label: "Pendente",     badge: "bg-amber-500/15 text-amber-300 border-amber-400/40",     dot: "bg-amber-400" },
-  em_andamento: { label: "Em andamento", badge: "bg-sky-500/15 text-sky-300 border-sky-400/40",           dot: "bg-sky-400" },
-  resolvido:    { label: "Resolvido",    badge: "bg-emerald-500/15 text-emerald-300 border-emerald-400/40", dot: "bg-emerald-400" },
-};
-
-const statusOf = (r: RecadoEquipe): RecadoEquipeStatus => r.status ?? "pendente";
 
 export default function RecadosEquipePage() {
   useDocumentTitle("Recados da Equipe");
