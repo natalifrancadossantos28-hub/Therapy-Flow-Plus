@@ -28,6 +28,7 @@ import { ABC_NIVEL_INFO } from "@/lib/abc-checklist";
 const STATUS_OPTIONS = [
   { value: "Aguardando Triagem", label: "Aguardando Triagem" },
   { value: "Fila de Espera",     label: "Fila de Espera" },
+  { value: "Cadastro Geral",     label: "Cadastro Geral" },
   { value: "Atendimento",        label: "Em Atendimento (vínculo ativo)" },
   { value: "Alta",               label: "Alta" },
   { value: "Óbito",              label: "Óbito" },
