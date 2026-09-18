@@ -21,13 +21,13 @@ import {
 } from "@/lib/arco-rpc";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { supabase } from "@/lib/supabase";
-import { Card, Badge, Button, Select, MotionCard } from "@/components/ui-custom";
+import { Card, Badge, Button, Select, Input, MotionCard } from "@/components/ui-custom";
 import { getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, cn } from "@/lib/utils";
 import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
   UserPlus, PhoneOff, FileCheck, Bell, MessageSquare, Copy,
-  BellRing, Undo2, Bus,
+  BellRing, Undo2, Bus, Search,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
@@ -679,6 +679,7 @@ const AUTO_ABSENCE_MINUTES = 60;
 export default function Reception() {
   useDocumentTitle("Recepção");
   const [profIdFilter, setProfIdFilter] = useState<string>("");
+  const [busca, setBusca] = useState<string>("");
   const [situacao, setSituacao] = useState<SituacaoFilter>("todos");
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [transportByPatient, setTransportByPatient] = useState<Map<number, string[]>>(new Map());
@@ -1121,25 +1122,34 @@ export default function Reception() {
 
   const atestadoCount = atestados.length;
 
+  const buscaAppointments = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return appointments;
+    return appointments.filter(a => {
+      const pront = a.prontuario || prontuarioMap.get(a.patientId) || "";
+      return (a.patientName || "").toLowerCase().includes(termo) || pront.toLowerCase().includes(termo);
+    });
+  }, [appointments, busca, prontuarioMap]);
+
   const situacaoTabs: [SituacaoFilter, string, number][] = [
-    ["pendentes", "Pendentes", appointments.filter(isPendente).length],
-    ["presente", "Presente", appointments.filter(isPresente).length],
-    ["justificada", "Falta Justificada", appointments.filter(isFaltaJustificada).length],
-    ["falta", "Falta sem Justificativa", appointments.filter(isFaltaSemJustificativa).length],
-    ["todos", "Todos", appointments.length],
+    ["pendentes", "Pendentes", buscaAppointments.filter(isPendente).length],
+    ["presente", "Presente", buscaAppointments.filter(isPresente).length],
+    ["justificada", "Falta Justificada", buscaAppointments.filter(isFaltaJustificada).length],
+    ["falta", "Falta sem Justificativa", buscaAppointments.filter(isFaltaSemJustificativa).length],
+    ["todos", "Todos", buscaAppointments.length],
   ];
 
   // Marcado (presente/ausente/em atendimento) sai da lista de pendentes; em
   // "Todos" ele desce para o fim, para a recepção não perder o próximo paciente.
   const visibleAppointments = useMemo(() => {
-    if (situacao === "pendentes") return appointments.filter(isPendente);
-    if (situacao === "presente") return appointments.filter(isPresente);
-    if (situacao === "justificada") return appointments.filter(isFaltaJustificada);
-    if (situacao === "falta") return appointments.filter(isFaltaSemJustificativa);
-    return [...appointments].sort(
+    if (situacao === "pendentes") return buscaAppointments.filter(isPendente);
+    if (situacao === "presente") return buscaAppointments.filter(isPresente);
+    if (situacao === "justificada") return buscaAppointments.filter(isFaltaJustificada);
+    if (situacao === "falta") return buscaAppointments.filter(isFaltaSemJustificativa);
+    return [...buscaAppointments].sort(
       (a, b) => Number(isPendente(b)) - Number(isPendente(a)),
     );
-  }, [appointments, situacao]);
+  }, [buscaAppointments, situacao]);
 
   return (
     <div className="space-y-8">
@@ -1293,6 +1303,24 @@ export default function Reception() {
                   {label} ({count})
                 </button>
               ))}
+            </div>
+            <div className="relative w-56">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar nome ou prontuário"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+              />
+              {busca && (
+                <button
+                  onClick={() => setBusca("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Limpar busca"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
             <span className="text-sm font-semibold text-muted-foreground">Filtrar:</span>
             <Select className="w-48" value={profIdFilter} onChange={(e) => setProfIdFilter(e.target.value)}>
