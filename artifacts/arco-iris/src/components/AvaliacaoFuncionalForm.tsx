@@ -89,7 +89,7 @@ export function AvaliacaoFuncionalForm({
   const parental = isParentalSpecialty(specialty);
   const perguntas = useMemo(() => avfPerguntas(specialty), [specialty]);
   const [respostas, setRespostas] = useState<Array<number | null>>(() => AVF_PERGUNTAS.map(() => null));
-  // Na Parental quem está em acompanhamento é a mãe/responsável.
+  // Na Parental quem está em acompanhamento é o responsável.
   const [responsavel, setResponsavel] = useState<string | null>(null);
   const [observacoes, setObservacoes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -149,13 +149,13 @@ export function AvaliacaoFuncionalForm({
           {specialty ? <> · <strong>{specialty}</strong></> : null}
           {parental
             ? responsavel
-              ? <> · <strong>{responsavel}</strong> (mãe/responsável)</>
+              ? <> · <strong>{responsavel}</strong> (responsável)</>
               : patientName ? <> · responsável de {patientName}</> : null
             : patientName ? <> · {patientName}</> : null}
         </p>
         {parental && (
           <p className="text-[11px] text-muted-foreground">
-            As perguntas avaliam a mãe/responsável em acompanhamento, não a criança.
+            As perguntas avaliam o responsável em acompanhamento, não a criança.
           </p>
         )}
       </div>

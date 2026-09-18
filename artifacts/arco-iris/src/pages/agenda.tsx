@@ -2435,7 +2435,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
               </div>
             </div>
             <p className="text-xs text-white/60 mb-4">
-              Responda as 5 perguntas com o quadro atual {isParentalSpecialty(selectedProf?.specialty) ? "da mãe/responsável em acompanhamento" : "do paciente nesta especialidade"}. A avaliação é salva como <strong className="text-white/80">Avaliação de Alta</strong>, sem alterar a de entrada, e alimenta o Dashboard de Evolução Clínica. O checklist ABC continua disponível (opcional) no prontuário.
+              Responda as 5 perguntas com o quadro atual {isParentalSpecialty(selectedProf?.specialty) ? "do responsável em acompanhamento" : "do paciente nesta especialidade"}. A avaliação é salva como <strong className="text-white/80">Avaliação de Alta</strong>, sem alterar a de entrada, e alimenta o Dashboard de Evolução Clínica. O checklist ABC continua disponível (opcional) no prontuário.
             </p>
             {altaAvfEntrada === undefined ? (
               <p className="text-sm text-white/60 animate-pulse py-6 text-center">Carregando avaliação de entrada…</p>
