@@ -51,45 +51,45 @@ export const AVF_PERGUNTAS: readonly AvfPergunta[] = [
 ];
 
 /**
- * Psicologia Parental atende a mãe/responsável, não a criança. As perguntas
- * são as mesmas cinco dimensões, escritas de forma simples e voltadas para
- * quem está em acompanhamento.
+ * Psicologia Parental atende o responsável, não a criança. As perguntas são
+ * as mesmas cinco dimensões, curtas e diretas, voltadas para quem está em
+ * acompanhamento.
  */
 export const AVF_PERGUNTAS_PARENTAL: readonly AvfPergunta[] = [
   {
     key: "autonomia",
-    titulo: "Autonomia no cuidado e na rotina",
+    titulo: "Autonomia",
     curto: "Autonomia",
-    texto: "Como está a autonomia da mãe/responsável para lidar com a rotina e com as demandas do dia a dia da família?",
-    dica: "1 = Precisa de apoio o tempo todo · 5 = Conduz a rotina com segurança",
+    texto: "Como está a autonomia do responsável para lidar com a rotina e o dia a dia?",
+    dica: "1 = Precisa de muito apoio · 5 = Conduz com total segurança",
   },
   {
     key: "emocional",
-    titulo: "Sobrecarga emocional",
+    titulo: "Bem-estar emocional",
     curto: "Emocional",
-    texto: "Com que frequência e intensidade aparecem ansiedade, estresse, culpa ou cansaço que motivaram o acompanhamento?",
-    dica: "1 = Sofrimento constante e intenso · 5 = Bem-estar emocional preservado",
+    texto: "Como está o controle do estresse, ansiedade e cansaço do responsável?",
+    dica: "1 = Sobrecarga intensa · 5 = Bem-estar equilibrado",
   },
   {
     key: "engajamento",
-    titulo: "Participação nos atendimentos",
+    titulo: "Participação",
     curto: "Participação",
-    texto: "Como tem sido a presença, a abertura e a aplicação das orientações combinadas nos atendimentos?",
-    dica: "1 = Pouca adesão / resistência · 5 = Participação plena e orientações aplicadas em casa",
+    texto: "Como tem sido a adesão do responsável às orientações passadas?",
+    dica: "1 = Baixa adesão · 5 = Aplicação plena em casa",
   },
   {
     key: "vinculo",
-    titulo: "Vínculo e manejo com a criança",
+    titulo: "Vínculo e manejo",
     curto: "Vínculo",
-    texto: "Como está a relação com a criança e o manejo das situações difíceis (birras, limites, comunicação)?",
-    dica: "1 = Conflitos frequentes / manejo difícil · 5 = Vínculo tranquilo e manejo seguro",
+    texto: "Como está a relação e o manejo do responsável diante das dificuldades com a criança?",
+    dica: "1 = Conflitos frequentes · 5 = Vínculo tranquilo e seguro",
   },
   {
     key: "objetivos",
-    titulo: "Objetivos combinados",
+    titulo: "Objetivos",
     curto: "Objetivos",
-    texto: "Considerando o que foi combinado no início do acompanhamento, quanto já foi alcançado?",
-    dica: "1 = Nada alcançado · 5 = Tudo alcançado / pronta para a alta",
+    texto: "Os combinados iniciais do acompanhamento foram atingidos?",
+    dica: "1 = Não alcançados · 5 = Totalmente alcançados / pronto para a alta",
   },
 ];
 
