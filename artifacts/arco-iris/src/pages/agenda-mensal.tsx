@@ -16,7 +16,8 @@ import { ChevronLeft, ChevronRight, CalendarDays, X } from "lucide-react";
 import { listAppointments, listProfessionals, listFirstEvaluationDone, type AppointmentListItem, type Professional } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { Card, Button } from "@/components/ui-custom";
-import { cn, displayApptStatus, firstEvalKey } from "@/lib/utils";
+import { cn, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
+import { isHiddenByPatientStatus } from "@/lib/schedule";
 import { specialtyTone, specialtyShortLabel, specialtyKey } from "@/lib/specialty-colors";
 import { listDrivers } from "@/lib/transporte";
 
@@ -96,7 +97,11 @@ export default function AgendaMensal() {
       dateTo: format(gridEnd, "yyyy-MM-dd"),
       professionalId: profFilter ? parseInt(profFilter) : null,
     })
-      .then(setAppointments)
+      .then((list) =>
+        setAppointments(
+          list.filter((a) => !isHiddenByPatientStatus(a.patientStatus, a.date, todayBR())),
+        ),
+      )
       .catch((e) => {
         console.error(e);
         setAppointments([]);
