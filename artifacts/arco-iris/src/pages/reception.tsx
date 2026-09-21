@@ -13,6 +13,7 @@ import {
   listFirstEvaluationDone,
   listFeriados,
   listAusencias,
+  estenderRecorrencias,
   type Professional as ArcoProfessional,
   type AppointmentToday,
   type AbsenceBySpecialty,
@@ -749,6 +750,11 @@ export default function Reception() {
 
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
+    // Completa as séries recorrentes ativas (as 52 semanas gravadas acabam e o
+    // paciente sumia da lista do dia sem ter recebido alta).
+    estenderRecorrencias()
+      .then(r => { if (r.criados > 0) void reloadAppointments(); })
+      .catch(console.error);
     Promise.all([listFeriados(), listAusencias()])
       .then(([f, a]) => {
         feriadosRef.current = f;

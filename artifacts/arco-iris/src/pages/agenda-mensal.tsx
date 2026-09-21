@@ -13,7 +13,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, CalendarDays, X } from "lucide-react";
-import { listAppointments, listProfessionals, listFirstEvaluationDone, type AppointmentListItem, type Professional } from "@/lib/arco-rpc";
+import { listAppointments, listProfessionals, listFirstEvaluationDone, estenderRecorrencias, type AppointmentListItem, type Professional } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { Card, Button } from "@/components/ui-custom";
 import { cn, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
@@ -88,6 +88,11 @@ export default function AgendaMensal() {
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
     listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
+    // Completa as séries recorrentes ativas antes de montar a grade do mês.
+    estenderRecorrencias()
+      .then(r => { if (r.criados > 0) fetchAppointments(); })
+      .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAppointments = () => {

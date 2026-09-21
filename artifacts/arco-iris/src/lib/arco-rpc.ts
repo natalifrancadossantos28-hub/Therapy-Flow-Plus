@@ -1795,6 +1795,23 @@ export async function listRecurrenceCuts(): Promise<Map<string, string>> {
   return new Map(rows.map((r) => [r.recurrence_group_id, r.cut_from]));
 }
 
+/**
+ * Completa as séries recorrentes ativas até 1 ano à frente. Sem isso o paciente
+ * some de todas as agendas quando as 52 semanas gravadas pelo agendamento
+ * original acabam. Não recria séries encerradas (alta da especialidade,
+ * paciente encerrado, corte de recorrência) nem agenda de transporte.
+ */
+export async function estenderRecorrencias(): Promise<{ ok: true; series: number; criados: number }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("estender_recorrencias", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return data as { ok: true; series: number; criados: number };
+}
+
 export async function deleteRecurrenceForward(
   recurrenceGroupId: string,
   fromDate: string,
