@@ -22,7 +22,8 @@ import {
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { supabase } from "@/lib/supabase";
 import { Card, Badge, Button, Select, Input, MotionCard } from "@/components/ui-custom";
-import { getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, cn } from "@/lib/utils";
+import { getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, cn, todayBR } from "@/lib/utils";
+import { isHiddenByPatientStatus } from "@/lib/schedule";
 import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
@@ -719,12 +720,10 @@ export default function Reception() {
       .catch((e) => { console.error(e); return 0; })
       .then(() => listAppointmentsToday())
       .then((data) => {
-        // Oculta pacientes encerrados por completo. "Alta" vale por especialidade,
-        // então quem tem horário hoje em outra área continua aparecendo.
-        const TERMINAL = ["óbito", "obito", "desistência", "desistencia"];
-        // Oculta atendimentos em feriado ou quando o profissional está ausente (férias/folga/falta).
+        // Oculta pacientes encerrados e atendimentos em feriado ou quando o
+        // profissional está ausente (férias/folga/falta).
         const visible = data.filter(a =>
-          !TERMINAL.includes((a.patientStatus ?? "").toLowerCase()) &&
+          !isHiddenByPatientStatus(a.patientStatus, a.date, todayBR()) &&
           !isBlocked(a.date, a.professionalId, feriadosRef.current, ausenciasRef.current)
         );
         // Transporte não é atendimento: sai da lista e vira aviso no card do paciente.
