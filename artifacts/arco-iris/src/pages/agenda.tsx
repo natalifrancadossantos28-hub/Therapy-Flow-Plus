@@ -46,6 +46,7 @@ import {
   listFirstEvaluationDone,
   marcarPrimeiraAvaliacao,
   listRecurrenceCuts,
+  estenderRecorrencias,
   countAbsencesBySpecialty,
   type Professional as ArcoProfessional,
   type AppointmentListItem,
@@ -81,6 +82,29 @@ function getWeekDays(ref: Date): Date[] {
   const monday = startOfWeek(ref, { weekStartsOn: 1 });
   return Array.from({ length: 5 }, (_, i) => addDays(monday, i));
 }
+
+/**
+ * Tipos de saída de uma especialidade. "Alta" exige a Avaliação Funcional de
+ * Alta; as duas últimas são para quem nunca chegou a fazer terapia (só passou
+ * pela avaliação inicial ou faltou seguidamente) e dispensam o questionário.
+ */
+type SaidaTipo = "Alta" | "Óbito" | "Desistência" | "Cancelou avaliação" | "Alta por falta";
+
+const SAIDA_LABEL: Record<SaidaTipo, string> = {
+  "Alta": "Dar Alta",
+  "Óbito": "Óbito",
+  "Desistência": "Desistência",
+  "Cancelou avaliação": "Cancelar avaliação / não iniciou",
+  "Alta por falta": "Alta por falta / ausência",
+};
+
+const SAIDA_MOTIVO_PLACEHOLDER: Record<SaidaTipo, string> = {
+  "Alta": "Ex.: Melhora clínica, mudou de cidade...",
+  "Óbito": "Ex.: Falecimento...",
+  "Desistência": "Ex.: Mudou de cidade, família desistiu...",
+  "Cancelou avaliação": "Ex.: Fez só a avaliação inicial e não retornou...",
+  "Alta por falta": "Ex.: 3 faltas seguidas sem justificativa...",
+};
 
 const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
 const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
@@ -172,11 +196,14 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     // linhas reais à frente, então isto só afeta séries encerradas/cortadas.
     if (target >= todayStr && !gApts.some(a => a.date >= todayStr)) continue;
 
-    // Allow projection up to 4 weeks beyond the last schedule-reference appointment.
+    // Projeta até 6 meses além da última linha real da série. O limite antigo
+    // (4 semanas) fazia o paciente sumir da grade quando as linhas gravadas
+    // acabavam — a série ativa continua na agenda até haver uma saída de fato
+    // (alta/desistência/óbito) ou um corte da Administração.
     const lastRefDate = (scheduleRefApts.at(-1) ?? nonTerminalApts.at(-1) ?? sorted.at(-1)!).date;
     const lastRefMs = new Date(lastRefDate + "T12:00:00").getTime();
     const targetMs = new Date(target + "T12:00:00").getTime();
-    if (targetMs > lastRefMs + 28 * 86_400_000) continue;
+    if (targetMs > lastRefMs + 183 * 86_400_000) continue;
 
     const freq = refApt.frequency ?? "semanal";
     if (!isAllowedWeek(lastRefDate, target, freq)) continue;
@@ -491,7 +518,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
   const [altaMotivo, setAltaMotivo] = useState("");
-  const [saidaTipo, setSaidaTipo] = useState<"Alta" | "Óbito" | "Desistência">("Alta");
+  const [saidaTipo, setSaidaTipo] = useState<SaidaTipo>("Alta");
   // Alta exige a Avaliação Funcional de alta (5 perguntas) salva antes de liberar o motivo/confirmação.
   const [altaAvf, setAltaAvf] = useState<AvaliacaoFuncional | null>(null);
   const [altaAvfEntrada, setAltaAvfEntrada] = useState<AvaliacaoFuncional | null | undefined>(undefined);
@@ -557,6 +584,11 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     listAusencias().then(setAusencias).catch(console.error);
     listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
     listRecurrenceCuts().then(setRecurrenceCuts).catch(console.error);
+    // Completa as séries recorrentes ativas: o agendamento grava 52 semanas e,
+    // quando elas acabavam, o paciente sumia de todas as agendas sem nenhuma alta.
+    estenderRecorrencias()
+      .then(r => { if (r.criados > 0) fetchAppointments(); })
+      .catch(console.error);
     reloadSpecialtyAbsences();
   }, []);
 
@@ -1091,8 +1123,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     }
   };
 
-  // ── Saída (Alta / Óbito / Desistência) ──
-  const handleSaida = (apt: Appointment, tipo: "Alta" | "Óbito" | "Desistência") => {
+  // ── Saída (Alta / Óbito / Desistência / saídas sem avaliação) ──
+  const handleSaida = (apt: Appointment, tipo: SaidaTipo) => {
     setActionMenuId(null);
     setAltaMotivo("");
     setSaidaTipo(tipo);
@@ -1113,6 +1145,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
   const confirmSaida = async () => {
     if (!altaConfirm || !altaMotivo.trim()) return;
+    // Só a alta clínica exige a Avaliação Funcional: quem não iniciou o
+    // tratamento (cancelou a avaliação) ou saiu por faltas não tem o que avaliar.
     if (saidaTipo === "Alta" && !altaAvf) return;
     const label = saidaTipo;
     try {
@@ -2163,6 +2197,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       <button style={NEON.red} onClick={() => handleSaida(apt, "Óbito")}>
                                         <XOctagon className="w-3.5 h-3.5" /> Óbito
                                       </button>
+                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Cancelou avaliação")}>
+                                        <UserX className="w-3.5 h-3.5" /> Cancelar avaliação / não iniciou
+                                      </button>
+                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Alta por falta")}>
+                                        <AlertTriangle className="w-3.5 h-3.5" /> Alta por falta / ausência
+                                      </button>
 
                                       <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                       <button style={NEON.fuchsia} onClick={() => handleEncaminhamento(apt)}>
@@ -2466,11 +2506,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444" }}>
                   {saidaTipo === "Alta" && <LogOut className="w-5 h-5" style={{ color: "#f87171" }} />}
-                  {saidaTipo === "Desistência" && <UserX className="w-5 h-5" style={{ color: "#f87171" }} />}
+                  {(saidaTipo === "Desistência" || saidaTipo === "Cancelou avaliação") && <UserX className="w-5 h-5" style={{ color: "#f87171" }} />}
+                  {saidaTipo === "Alta por falta" && <AlertTriangle className="w-5 h-5" style={{ color: "#f87171" }} />}
                   {saidaTipo === "Óbito" && <XOctagon className="w-5 h-5" style={{ color: "#f87171" }} />}
                 </div>
                 <div>
-                  <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>{saidaTipo === "Alta" ? "Dar Alta" : saidaTipo}</p>
+                  <p className="font-bold" style={{ color: "#f87171", textShadow: "0 0 8px rgba(248,113,113,0.8)" }}>{SAIDA_LABEL[saidaTipo]}</p>
                   <p className="text-xs text-white/50">Ação permanente e irreversível</p>
                 </div>
               </div>
@@ -2479,6 +2520,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 e da fila desta especialidade. Agendamentos em outras especialidades não serão afetados.
               </p>
               <p className="text-xs text-white/50 mt-1">Status global só será alterado se não houver outros atendimentos ativos.</p>
+              {(saidaTipo === "Cancelou avaliação" || saidaTipo === "Alta por falta") && (
+                <p className="text-xs text-white/50 mt-1">Sem Avaliação Funcional de Alta — o paciente não chegou a fazer as sessões.</p>
+              )}
               {altaAvf && (
                 <p className="text-xs mt-2 font-semibold" style={{ color: avfFaixa(altaAvf.scoreTotal).color }}>
                   ✓ Avaliação de alta salva: {altaAvf.scoreTotal}/{AVF_MAX} pts — {avfFaixa(altaAvf.scoreTotal).label}{altaAvfEntrada ? ` (entrada: ${altaAvfEntrada.scoreTotal})` : ""}
@@ -2490,11 +2534,11 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 </p>
               )}
               <div className="mt-4">
-                <label className="block text-xs font-bold mb-1" style={{ color: "#f87171" }}>Motivo {saidaTipo === "Alta" ? "da Alta" : saidaTipo === "Óbito" ? "do Óbito" : "da Desistência"} *</label>
+                <label className="block text-xs font-bold mb-1" style={{ color: "#f87171" }}>Motivo — {SAIDA_LABEL[saidaTipo]} *</label>
                 <textarea
                   value={altaMotivo}
                   onChange={e => setAltaMotivo(e.target.value)}
-                  placeholder={saidaTipo === "Alta" ? "Ex.: Melhora clínica, mudou de cidade..." : saidaTipo === "Óbito" ? "Ex.: Falecimento..." : "Ex.: Mudou de cidade, família desistiu..."}
+                  placeholder={SAIDA_MOTIVO_PLACEHOLDER[saidaTipo]}
                   rows={3}
                   className="w-full rounded-xl text-sm p-3 resize-none"
                   style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(239,68,68,0.3)", color: "#fff", outline: "none" }}
@@ -2509,9 +2553,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   style={{ ...NEON.red, flex: 1, justifyContent: "center", padding: "10px", opacity: altaMotivo.trim() ? 1 : 0.4, cursor: altaMotivo.trim() ? "pointer" : "not-allowed" }}
                 >
                   {saidaTipo === "Alta" && <LogOut className="w-4 h-4" />}
-                  {saidaTipo === "Desistência" && <UserX className="w-4 h-4" />}
+                  {(saidaTipo === "Desistência" || saidaTipo === "Cancelou avaliação") && <UserX className="w-4 h-4" />}
+                  {saidaTipo === "Alta por falta" && <AlertTriangle className="w-4 h-4" />}
                   {saidaTipo === "Óbito" && <XOctagon className="w-4 h-4" />}
-                  Confirmar {saidaTipo}
+                  Confirmar
                 </button>
                 <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => { setAltaConfirm(null); setAltaMotivo(""); }}>
                   Cancelar
