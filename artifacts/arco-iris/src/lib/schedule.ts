@@ -3,9 +3,9 @@
 const LUNCH_WORKERS = ["paula", "karla"];
 
 // Especialidades que podem coincidir com o horário de terapia do paciente sem
-// ser duplicidade: Parental/Oficina (mãe/responsável atendida no mesmo horário)
-// e Motorista (só transporta, não faz atendimento — agenda livre).
-const SAME_SLOT_SPECIALTIES = ["parental", "oficina", "motorista", "transporte"];
+// ser duplicidade: Parental/Pilates/Oficina (mãe/responsável atendida no mesmo
+// horário) e Motorista (só transporta, não faz atendimento — agenda livre).
+const SAME_SLOT_SPECIALTIES = ["parental", "pilates", "oficina", "motorista", "transporte"];
 
 export function allowsSameSlotAsPatient(specialty: string | null | undefined): boolean {
   const s = (specialty || "").toLowerCase();

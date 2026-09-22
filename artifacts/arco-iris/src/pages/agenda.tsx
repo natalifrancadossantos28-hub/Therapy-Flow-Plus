@@ -438,8 +438,9 @@ const NEON: Record<string, React.CSSProperties> = {
 };
 
 const SPECIALTIES = [
-  "Psicologia", "Psicologia Parental", "Psicomotricidade", "Fisioterapia", "Terapia Ocupacional",
-  "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física", "Motorista",
+  "Psicologia", "Psicologia Parental", "Psicomotricidade", "Fisioterapia", "Fisioterapia Pilates",
+  "Terapia Ocupacional", "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
+  "Oficina", "Motorista",
 ];
 
 const isAdminSession = (): boolean => {
@@ -2053,8 +2054,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         {apt.frequency === "quinzenal" ? "↺ quinzenal" : apt.frequency === "mensal" ? "↺ mensal" : "↺ semanal"}
                                       </span>
                                     )}
-                                    {/* Psicologia Parental: show guardian/mother name */}
-                                    {apt.guardianName && selectedProf?.specialty?.toLowerCase().includes("parental") && (
+                                    {/* Parental/Pilates: show guardian/mother name */}
+                                    {apt.guardianName && isParentalSpecialty(selectedProf?.specialty) && (
                                       <span className="text-[9px] text-pink-400/80 font-semibold truncate">
                                         Mãe: {apt.guardianName}
                                       </span>

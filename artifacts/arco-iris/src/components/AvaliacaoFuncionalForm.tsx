@@ -149,7 +149,7 @@ export function AvaliacaoFuncionalForm({
     <div className="space-y-5">
       <div className="text-center space-y-1">
         <h2 className="text-lg md:text-xl font-bold tracking-tight">
-          <span style={{ color: "#06b6d4" }}>Avaliação Funcional</span> {parental ? "— Psicologia Parental" : "Multidisciplinar"}
+          <span style={{ color: "#06b6d4" }}>Avaliação Funcional</span> {parental ? `— ${specialty ?? "Responsável"}` : "Multidisciplinar"}
         </h2>
         <p className="text-xs text-muted-foreground">
           5 perguntas · escala 1–5 · total {AVF_MIN}–{AVF_MAX} pts · {tipo === "entrada" ? "Avaliação de Entrada" : "Avaliação de Alta"}

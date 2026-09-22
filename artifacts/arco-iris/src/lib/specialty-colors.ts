@@ -122,6 +122,24 @@ const PALETTE: SpecialtyTone[] = [
     border: "rgba(217,70,239,0.55)",
     glow: "rgba(217,70,239,0.4)",
   },
+  // Fisioterapia Pilates (responsável) → verde-limão
+  {
+    key: "pilates",
+    fg: "#bef264",
+    fgLight: "#4d7c0f",
+    bg: "rgba(132,204,22,0.16)",
+    border: "rgba(132,204,22,0.55)",
+    glow: "rgba(132,204,22,0.4)",
+  },
+  // Oficina → vermelho coral
+  {
+    key: "oficina",
+    fg: "#fca5a5",
+    fgLight: "#b91c1c",
+    bg: "rgba(239,68,68,0.16)",
+    border: "rgba(239,68,68,0.55)",
+    glow: "rgba(239,68,68,0.4)",
+  },
   // Motorista (transporte, apoio administrativo) → azul aço
   {
     key: "motorista",
@@ -154,7 +172,9 @@ export const SPECIALTIES = [
   "Psicopedagogia",
   "Nutrição",
   "Psicomotricidade",
+  "Fisioterapia Pilates",
   "Educação Física (Oficina)",
+  "Oficina",
 ] as const;
 
 export type SpecialtyOfficial = typeof SPECIALTIES[number];
@@ -193,8 +213,10 @@ export function specialtyKey(specialty: string | null | undefined): string {
   if (s.includes("psicomot")) return "psicomotricidade";
   if (s.includes("parental")) return "parental";
   if (s.includes("psico")) return "psicologia";
+  if (s.includes("pilates")) return "pilates";
   if (s.includes("fisio")) return "fisio";
   if (s.includes("ed fisica") || s.includes("educacao fisica") || /(^|\s)ef(\s|$)/.test(s)) return "edfisica";
+  if (s.includes("oficina")) return "oficina";
   if (s.includes("nutri")) return "nutricao";
   if (s.includes("motorista") || s.includes("transporte")) return "motorista";
   return "default";
@@ -206,6 +228,26 @@ export function specialtyKey(specialty: string | null | undefined): string {
  */
 export function isTransportSpecialty(specialty: string | null | undefined): boolean {
   return specialtyKey(specialty) === "motorista";
+}
+
+/**
+ * Especialidades em que quem está em acompanhamento é o responsável, não a
+ * criança: questionário próprio, busca direta na agenda e mesmo horário da
+ * terapia do filho.
+ */
+export function isCaregiverSpecialty(specialty: string | null | undefined): boolean {
+  const k = specialtyKey(specialty);
+  return k === "parental" || k === "pilates";
+}
+
+/**
+ * Fisioterapia Pilates é o atendimento das mães/responsáveis que aguardam os
+ * filhos e fica restrita a um único profissional.
+ */
+export const PILATES_PROFESSIONAL = "Leonardo";
+
+export function canHavePilates(professionalName: string | null | undefined): boolean {
+  return normalize(professionalName).includes(normalize(PILATES_PROFESSIONAL));
 }
 
 function isLightTheme(): boolean {
@@ -231,7 +273,9 @@ export function specialtyShortLabel(specialty: string | null | undefined): strin
     case "fisio":              return "Fisio";
     case "psicoped":           return "Psicoped.";
     case "psicomotricidade":   return "Psicomotr.";
+    case "pilates":            return "Pilates";
     case "edfisica":           return "Ed. Física";
+    case "oficina":            return "Oficina";
     case "nutricao":           return "Nutrição";
     case "motorista":          return "Motorista";
     default:                   return (specialty ?? "—").trim() || "—";

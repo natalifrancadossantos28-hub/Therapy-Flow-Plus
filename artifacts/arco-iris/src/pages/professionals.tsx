@@ -26,7 +26,7 @@ import {
   transferAppointments,
   type Professional,
 } from "@/lib/arco-rpc";
-import { PROFESSIONAL_SPECIALTIES, specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
+import { PROFESSIONAL_SPECIALTIES, specialtyTone, specialtyShortLabel, specialtyKey, canHavePilates, PILATES_PROFESSIONAL } from "@/lib/specialty-colors";
 
 function PinManager({
   prof,
@@ -198,6 +198,14 @@ export default function Professionals() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (specialtyKey(formData.specialty) === "pilates" && !canHavePilates(formData.name)) {
+      toast({
+        title: "Especialidade restrita",
+        description: `Fisioterapia Pilates é exclusiva do profissional ${PILATES_PROFESSIONAL}.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
     try {
       const saved = await upsertProfessional(editing?.id ?? null, {
@@ -518,12 +526,16 @@ export default function Professionals() {
                   onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
                 >
                   <option value="" disabled>Selecione…</option>
-                  {PROFESSIONAL_SPECIALTIES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
+                  {PROFESSIONAL_SPECIALTIES
+                    .filter((s) => specialtyKey(s) !== "pilates" || canHavePilates(formData.name))
+                    .map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   Lista oficial — define a cor neon na agenda e nos avisos.
+                  <br />
+                  <strong>Fisioterapia Pilates</strong> é o atendimento das mães/responsáveis e fica disponível só para o {PILATES_PROFESSIONAL}.
                   <br />
                   <strong>Motorista</strong> é função de apoio: agenda o transporte do paciente, mas não conta como atendimento clínico.
                 </p>
