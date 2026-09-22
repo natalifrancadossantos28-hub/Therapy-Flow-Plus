@@ -1143,6 +1143,16 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     }
   };
 
+  /**
+   * Saída escolhida dentro da Avaliação Funcional: o paciente não compareceu,
+   * então não há notas a dar — segue direto para o motivo (passo 2).
+   */
+  const handleSaidaSemAvaliacao = (tipo: SaidaTipo, observacoes: string) => {
+    setSaidaTipo(tipo);
+    setAltaAvf(null);
+    if (observacoes.trim()) setAltaMotivo(observacoes.trim());
+  };
+
   const confirmSaida = async () => {
     if (!altaConfirm || !altaMotivo.trim()) return;
     // Só a alta clínica exige a Avaliação Funcional: quem não iniciou o
@@ -2197,12 +2207,6 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       <button style={NEON.red} onClick={() => handleSaida(apt, "Óbito")}>
                                         <XOctagon className="w-3.5 h-3.5" /> Óbito
                                       </button>
-                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Cancelou avaliação")}>
-                                        <UserX className="w-3.5 h-3.5" /> Cancelar avaliação / não iniciou
-                                      </button>
-                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Alta por falta")}>
-                                        <AlertTriangle className="w-3.5 h-3.5" /> Alta por falta / ausência
-                                      </button>
 
                                       <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                       <button style={NEON.fuchsia} onClick={() => handleEncaminhamento(apt)}>
@@ -2492,6 +2496,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   saveLabel="Salvar avaliação e continuar →"
                   onSaved={(a) => { setAltaAvf(a); toast({ title: "Avaliação de alta salva", description: `${a.scoreTotal}/${AVF_MAX} pontos — ${avfFaixa(a.scoreTotal).label}` }); }}
                   onCancel={() => { setAltaConfirm(null); setAltaMotivo(""); }}
+                  saidasSemAvaliacao={[
+                    { label: "Cancelar avaliação / paciente não compareceu", onSelect: (obs) => handleSaidaSemAvaliacao("Cancelou avaliação", obs) },
+                    { label: "Alta por falta / ausência", onSelect: (obs) => handleSaidaSemAvaliacao("Alta por falta", obs) },
+                  ]}
                 />
               </>
             )}
