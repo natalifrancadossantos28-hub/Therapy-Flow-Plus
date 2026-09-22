@@ -2,7 +2,7 @@
 // (Likert 1–5) que serve para qualquer especialidade, preenchido na entrada
 // e na alta. Pontuação total de 5 a 25; quanto maior, melhor o quadro.
 
-import { specialtyKey } from "@/lib/specialty-colors";
+import { isCaregiverSpecialty } from "@/lib/specialty-colors";
 
 export type AvfPergunta = {
   key: string;
@@ -93,9 +93,9 @@ export const AVF_PERGUNTAS_PARENTAL: readonly AvfPergunta[] = [
   },
 ];
 
-/** Psicologia Parental tem questionário e nome em destaque próprios. */
+/** Quem atende o responsável (Parental, Pilates) tem questionário e nome em destaque próprios. */
 export function isParentalSpecialty(specialty: string | null | undefined): boolean {
-  return specialtyKey(specialty) === "parental";
+  return isCaregiverSpecialty(specialty);
 }
 
 export function avfPerguntas(specialty: string | null | undefined): readonly AvfPergunta[] {

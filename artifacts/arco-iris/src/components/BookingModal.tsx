@@ -6,7 +6,7 @@ import { MotionCard, Button, Label } from "@/components/ui-custom";
 import { listWaitingList, listPatients, createAppointments, listAppointments, deleteWaitingListEntry, listProfessionals, createNotificacao, type Patient } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { cn, todayBR, formatDate } from "@/lib/utils";
-import { specialtyKey } from "@/lib/specialty-colors";
+import { specialtyKey, isCaregiverSpecialty } from "@/lib/specialty-colors";
 import { allowsSameSlotAsPatient } from "@/lib/schedule";
 
 type WaitingEntry = {
@@ -101,7 +101,7 @@ export default function BookingModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"fila" | "direto">(
-    () => ((professionalSpecialty || "").toLowerCase().includes("parental") ? "direto" : "fila")
+    () => (isCaregiverSpecialty(professionalSpecialty) ? "direto" : "fila")
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
@@ -111,15 +111,15 @@ export default function BookingModal({
   const [profSpecialtyMap, setProfSpecialtyMap] = useState<Map<number, string>>(new Map());
   const [notesExpanded, setNotesExpanded] = useState(false);
 
-  // Psicologia Parental / Oficina: a mãe/responsável passa no MESMO horário em
+  // Psicologia Parental / Pilates / Oficina: a mãe/responsável passa no MESMO horário em
   // que a criança é atendida por outro profissional (ex.: Fisio). Como o prontuário
   // é o mesmo da criança, liberamos o conflito de horário cross-especialidade só
   // para essas especialidades.
   const isParentalBooking = allowsSameSlotAsPatient(professionalSpecialty);
 
-  // Busca Direta liberada para o Admin e para a Psicologia Parental (atendimento
-  // da mãe/responsável, sem fila por prioridade). Nos demais casos, só via fila.
-  const allowDirect = adminMode || (professionalSpecialty || "").toLowerCase().includes("parental");
+  // Busca Direta liberada para o Admin e para as especialidades do responsável
+  // (Parental, Pilates — sem fila por prioridade). Nos demais casos, só via fila.
+  const allowDirect = adminMode || isCaregiverSpecialty(professionalSpecialty);
 
   const loadData = useCallback(async () => {
     try {
