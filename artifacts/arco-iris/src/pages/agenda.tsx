@@ -440,7 +440,7 @@ const NEON: Record<string, React.CSSProperties> = {
 const SPECIALTIES = [
   "Psicologia", "Psicologia Parental", "Psicomotricidade", "Fisioterapia", "Fisioterapia Pilates",
   "Terapia Ocupacional", "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
-  "Oficina", "Motorista",
+  "Oficina Mães e Responsáveis", "Oficina Pacientes", "Motorista",
 ];
 
 const isAdminSession = (): boolean => {
