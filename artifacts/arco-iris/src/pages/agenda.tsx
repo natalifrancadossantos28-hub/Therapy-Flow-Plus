@@ -54,6 +54,10 @@ import {
   type Ausencia,
   listAvaliacoesFuncionais,
   type AvaliacaoFuncional,
+  listSalas,
+  listSalaHorarios,
+  type Sala,
+  type SalaHorario,
 } from "@/lib/arco-rpc";
 import { AvaliacaoFuncionalForm } from "@/components/AvaliacaoFuncionalForm";
 import { avfFaixa, AVF_MAX, isParentalSpecialty } from "@/lib/avaliacao-funcional";
@@ -536,6 +540,13 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [pauseSending, setPauseSending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
+  const [salas, setSalas] = useState<Sala[]>([]);
+  const [salaHorarios, setSalaHorarios] = useState<SalaHorario[]>([]);
+  useEffect(() => {
+    Promise.all([listSalas(), listSalaHorarios()])
+      .then(([s, h]) => { setSalas(s); setSalaHorarios(h); })
+      .catch(() => { /* portal do profissional pode não ter acesso às salas */ });
+  }, []);
   const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
   const [recurrenceCuts, setRecurrenceCuts] = useState<Map<string, string>>(new Map());
   const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
@@ -1696,6 +1707,19 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     return null;
   };
   const isPaula = worksThroughLunch(selectedProf?.name);
+  // Sala(s) que o profissional selecionado usa no dia (por período).
+  const daySalas = (date: string): string | null => {
+    if (!selectedProfIdNum) return null;
+    const d = new Date(`${date}T12:00:00`);
+    const dow = d.getDay() === 0 ? 7 : d.getDay();
+    const hs = salaHorarios
+      .filter(h => h.professionalId === selectedProfIdNum && h.diaSemana === dow)
+      .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+    if (hs.length === 0) return null;
+    return hs
+      .map(h => `${salas.find(s => s.id === h.salaId)?.numero ?? "Sala"} ${h.horaInicio}–${h.horaFim}`)
+      .join(" · ");
+  };
 
   const buildPrintApts = (dates: string[]): PrintAppointment[] => {
     const own = expandRecurrence(appointments, dates, recurrenceCuts);
@@ -1922,6 +1946,14 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                           {block.length > 14 ? block.slice(0, 14) + "…" : block}
                         </div>
                       )}
+                      {(() => {
+                        const sl = daySalas(weekDates[i]);
+                        return sl ? (
+                          <div className="mt-0.5 text-[10px] font-semibold normal-case text-cyan-400 truncate" title={sl}>
+                            🚪 {sl}
+                          </div>
+                        ) : null;
+                      })()}
                     </th>
                     );
                   })}
