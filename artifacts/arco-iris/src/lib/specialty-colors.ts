@@ -131,7 +131,7 @@ const PALETTE: SpecialtyTone[] = [
     border: "rgba(132,204,22,0.55)",
     glow: "rgba(132,204,22,0.4)",
   },
-  // Oficina → vermelho coral
+  // Oficina Pacientes → vermelho coral
   {
     key: "oficina",
     fg: "#fca5a5",
@@ -139,6 +139,15 @@ const PALETTE: SpecialtyTone[] = [
     bg: "rgba(239,68,68,0.16)",
     border: "rgba(239,68,68,0.55)",
     glow: "rgba(239,68,68,0.4)",
+  },
+  // Oficina Mães e Responsáveis → rosa salmão
+  {
+    key: "oficina_maes",
+    fg: "#fda4af",
+    fgLight: "#be123c",
+    bg: "rgba(244,63,94,0.16)",
+    border: "rgba(244,63,94,0.55)",
+    glow: "rgba(244,63,94,0.4)",
   },
   // Motorista (transporte, apoio administrativo) → azul aço
   {
@@ -174,7 +183,8 @@ export const SPECIALTIES = [
   "Psicomotricidade",
   "Fisioterapia Pilates",
   "Educação Física (Oficina)",
-  "Oficina",
+  "Oficina Mães e Responsáveis",
+  "Oficina Pacientes",
 ] as const;
 
 export type SpecialtyOfficial = typeof SPECIALTIES[number];
@@ -216,6 +226,7 @@ export function specialtyKey(specialty: string | null | undefined): string {
   if (s.includes("pilates")) return "pilates";
   if (s.includes("fisio")) return "fisio";
   if (s.includes("ed fisica") || s.includes("educacao fisica") || /(^|\s)ef(\s|$)/.test(s)) return "edfisica";
+  if (s.includes("oficina") && /maes|mae(\s|$)|responsav|pais/.test(s)) return "oficina_maes";
   if (s.includes("oficina")) return "oficina";
   if (s.includes("nutri")) return "nutricao";
   if (s.includes("motorista") || s.includes("transporte")) return "motorista";
@@ -237,7 +248,17 @@ export function isTransportSpecialty(specialty: string | null | undefined): bool
  */
 export function isCaregiverSpecialty(specialty: string | null | undefined): boolean {
   const k = specialtyKey(specialty);
-  return k === "parental" || k === "pilates";
+  return k === "parental" || k === "pilates" || k === "oficina_maes";
+}
+
+/**
+ * Especialidades agendadas por busca direta entre todos os pacientes da
+ * unidade, sem passar pela fila por prioridade: as do responsável (Parental,
+ * Pilates, Oficina Mães) e a Oficina Pacientes, aberta a qualquer paciente.
+ */
+export function allowsDirectBooking(specialty: string | null | undefined): boolean {
+  const k = specialtyKey(specialty);
+  return isCaregiverSpecialty(specialty) || k === "oficina" || k === "edfisica";
 }
 
 /**
@@ -276,6 +297,7 @@ export function specialtyShortLabel(specialty: string | null | undefined): strin
     case "pilates":            return "Pilates";
     case "edfisica":           return "Ed. Física";
     case "oficina":            return "Oficina";
+    case "oficina_maes":       return "Oficina Mães";
     case "nutricao":           return "Nutrição";
     case "motorista":          return "Motorista";
     default:                   return (specialty ?? "—").trim() || "—";

@@ -6,7 +6,7 @@ import { MotionCard, Button, Label } from "@/components/ui-custom";
 import { listWaitingList, listPatients, createAppointments, listAppointments, deleteWaitingListEntry, listProfessionals, createNotificacao, type Patient } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { cn, todayBR, formatDate } from "@/lib/utils";
-import { specialtyKey, isCaregiverSpecialty } from "@/lib/specialty-colors";
+import { specialtyKey, allowsDirectBooking } from "@/lib/specialty-colors";
 import { allowsSameSlotAsPatient } from "@/lib/schedule";
 
 type WaitingEntry = {
@@ -101,7 +101,7 @@ export default function BookingModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"fila" | "direto">(
-    () => (isCaregiverSpecialty(professionalSpecialty) ? "direto" : "fila")
+    () => (allowsDirectBooking(professionalSpecialty) ? "direto" : "fila")
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
@@ -117,9 +117,10 @@ export default function BookingModal({
   // para essas especialidades.
   const isParentalBooking = allowsSameSlotAsPatient(professionalSpecialty);
 
-  // Busca Direta liberada para o Admin e para as especialidades do responsável
-  // (Parental, Pilates — sem fila por prioridade). Nos demais casos, só via fila.
-  const allowDirect = adminMode || isCaregiverSpecialty(professionalSpecialty);
+  // Busca Direta liberada para o Admin, para as especialidades do responsável
+  // (Parental, Pilates) e para a Oficina, que atende qualquer paciente da
+  // unidade. Nos demais casos, só via fila.
+  const allowDirect = adminMode || allowsDirectBooking(professionalSpecialty);
 
   const loadData = useCallback(async () => {
     try {
@@ -614,14 +615,14 @@ export default function BookingModal({
               )}
               {selectedDirect && selectedDirectBookedAtSlot && isParentalBooking && (
                 <p className="mt-2 text-xs font-semibold text-cyan-500 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-3 py-2">
-                  {selectedDirect.name} tem atendimento neste horário ({time}) com outro profissional — permitido na Psicologia Parental/Oficina (mãe/responsável no mesmo horário da terapia).
+                  {selectedDirect.name} tem atendimento neste horário ({time}) com outro profissional — permitido na Psicologia Parental/Pilates/Oficina (mãe/responsável no mesmo horário da terapia).
                 </p>
               )}
               {selectedDirect && selectedDirectAlreadyScheduled && !selectedDirectBookedAtSlot && (
                 <p className="mt-2 text-xs font-semibold text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
                   Atenção: {selectedDirect.name} já tem horário ativo com {professionalName}.{" "}
                   {isParentalBooking
-                    ? "Na Psicologia Parental/Oficina é permitido agendar mesmo assim."
+                    ? "Na Psicologia Parental/Pilates/Oficina é permitido agendar mesmo assim."
                     : "Só o administrador pode adicionar um segundo horário."}
                 </p>
               )}
