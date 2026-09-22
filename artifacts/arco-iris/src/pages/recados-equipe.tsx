@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Inbox, Check, RotateCcw, Filter, UserRound, CircleDot, Loader2, CheckCircle2 } from "lucide-react";
+import { Inbox, Check, RotateCcw, Filter, UserRound, CircleDot, Loader2, CheckCircle2, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui-custom";
-import { listRecadosEquipe, markRecadoEquipeLido, setRecadoEquipeStatus, type RecadoEquipe, type RecadoEquipeStatus } from "@/lib/arco-rpc";
+import { listRecadosEquipe, markRecadoEquipeLido, setRecadoEquipeStatus, deleteRecadoEquipe, type RecadoEquipe, type RecadoEquipeStatus } from "@/lib/arco-rpc";
 import { RECADO_STATUS_META as STATUS_META, recadoStatusOf as statusOf } from "@/lib/recado-status";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -107,6 +107,17 @@ export default function RecadosEquipePage() {
     } catch (e) {
       setRecados(prev => prev.map(x => x.id === r.id ? { ...x, status: anterior, lido: r.lido } : x));
       toast({ title: "Não foi possível atualizar o status", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+    }
+  };
+
+  const excluir = async (r: RecadoEquipe) => {
+    if (!confirm(`Excluir o recado de ${r.professionalName}?`)) return;
+    try {
+      await deleteRecadoEquipe(r.id);
+      setRecados(prev => prev.filter(x => x.id !== r.id));
+      toast({ title: "Recado excluído" });
+    } catch (e) {
+      toast({ title: "Não foi possível excluir", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
     }
   };
 
@@ -232,13 +243,23 @@ export default function RecadosEquipePage() {
                         <CheckCircle2 className="w-3.5 h-3.5" /> Resolvido
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleLido(r)}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border hover:border-violet-400/50 transition-colors"
-                    >
-                      {r.lido ? <><RotateCcw className="w-3.5 h-3.5" /> Marcar como não lido</> : <><Check className="w-3.5 h-3.5" /> Marcar como lido</>}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleLido(r)}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border hover:border-violet-400/50 transition-colors"
+                      >
+                        {r.lido ? <><RotateCcw className="w-3.5 h-3.5" /> Marcar como não lido</> : <><Check className="w-3.5 h-3.5" /> Marcar como lido</>}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => excluir(r)}
+                        title="Excluir recado"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-red-400 hover:border-red-400/50 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Excluir
+                      </button>
+                    </div>
                   </div>
                 </Card>
               ))}
