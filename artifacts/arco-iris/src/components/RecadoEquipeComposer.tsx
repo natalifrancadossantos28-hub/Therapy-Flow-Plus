@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MessageSquarePlus, Send, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
-import { createRecadoEquipe, listRecadosEquipeDoProfissional, type RecadoEquipe, type RecadoEquipeStatus } from "@/lib/arco-rpc";
+import { MessageSquarePlus, Send, ChevronDown, ChevronUp, RefreshCw, Trash2 } from "lucide-react";
+import { createRecadoEquipe, deleteRecadoEquipe, listRecadosEquipeDoProfissional, type RecadoEquipe, type RecadoEquipeStatus } from "@/lib/arco-rpc";
 import { RECADO_STATUS_META, recadoStatusOf } from "@/lib/recado-status";
 import { useToast } from "@/hooks/use-toast";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
@@ -23,6 +23,7 @@ export function RecadoEquipeComposer({ professionalId, professionalName, special
   const [mensagem, setMensagem] = useState("");
   const [sending, setSending] = useState(false);
   const [meus, setMeus] = useState<RecadoEquipe[]>([]);
+  const [excluindoId, setExcluindoId] = useState<number | null>(null);
 
   // O status é definido pela administração em "Recados da Equipe"; aqui o
   // profissional só acompanha. Falha silenciosa: o envio continua funcionando
@@ -40,6 +41,27 @@ export function RecadoEquipeComposer({ professionalId, professionalName, special
     for (const r of meus) c[recadoStatusOf(r)]++;
     return (Object.entries(c) as [RecadoEquipeStatus, number][]).filter(([, n]) => n > 0);
   }, [meus]);
+
+  // Só o que a administração ainda não resolveu; resolvido vira histórico.
+  const excluir = async (r: RecadoEquipe) => {
+    if (professionalId == null || excluindoId != null) return;
+    if (!confirm("Excluir este recado? A administração deixa de vê-lo.")) return;
+    setExcluindoId(r.id);
+    try {
+      await deleteRecadoEquipe(r.id, professionalId);
+      setMeus(prev => prev.filter(m => m.id !== r.id));
+      toast({ title: "Recado excluído" });
+    } catch (e) {
+      toast({
+        title: "Não foi possível excluir",
+        description: e instanceof Error ? e.message : "Tente novamente.",
+        variant: "destructive",
+      });
+      carregarMeus();
+    } finally {
+      setExcluindoId(null);
+    }
+  };
 
   const enviar = async () => {
     const texto = mensagem.trim();
@@ -134,14 +156,29 @@ export function RecadoEquipeComposer({ professionalId, professionalName, special
               </div>
               <ul className="space-y-2">
                 {meus.map(r => {
-                  const meta = RECADO_STATUS_META[recadoStatusOf(r)];
+                  const status = recadoStatusOf(r);
+                  const meta = RECADO_STATUS_META[status];
+                  const podeExcluir = status !== "resolvido";
                   return (
                     <li key={r.id} className="rounded-xl border border-border bg-muted/40 px-3 py-2">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm text-foreground whitespace-pre-wrap break-words">{r.mensagem}</p>
-                        <span className={cn("shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border", meta.badge)}>
-                          <span className={cn("w-1.5 h-1.5 rounded-full", meta.dot)} />
-                          {meta.label}
+                        <span className="shrink-0 inline-flex items-center gap-2">
+                          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border", meta.badge)}>
+                            <span className={cn("w-1.5 h-1.5 rounded-full", meta.dot)} />
+                            {meta.label}
+                          </span>
+                          {podeExcluir && (
+                            <button
+                              type="button"
+                              onClick={() => excluir(r)}
+                              disabled={excluindoId === r.id}
+                              title="Excluir recado"
+                              className="text-muted-foreground hover:text-red-400 disabled:opacity-50 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </span>
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-1">

@@ -2690,6 +2690,22 @@ export async function markRecadoEquipeLido(id: number, lido = true): Promise<voi
   if (error) throw error;
 }
 
+/**
+ * Exclui um recado. Informando `professionalId`, o banco só apaga se o recado
+ * for dele e ainda não estiver resolvido (exclusão pelo portal do profissional).
+ */
+export async function deleteRecadoEquipe(id: number, professionalId?: number | null): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("delete_recado_equipe", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_professional_id: professionalId ?? null,
+  });
+  if (error) throw error;
+}
+
 export async function setRecadoEquipeStatus(id: number, status: RecadoEquipeStatus): Promise<RecadoEquipe> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
