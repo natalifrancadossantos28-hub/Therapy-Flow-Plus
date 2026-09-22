@@ -2120,10 +2120,7 @@ export type Sala = {
   id: number;
   companyId: number;
   numero: string;
-  professionalId: number | null;
-  diasSemana: number[] | null;
-  horaInicio: string | null;
-  horaFim: string | null;
+  especialidade: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -2132,12 +2129,29 @@ type SalaRow = {
   id: number | string;
   company_id: number | string;
   numero: string;
-  professional_id: number | string | null;
-  dias_semana: number[] | null;
-  hora_inicio: string | null;
-  hora_fim: string | null;
+  especialidade: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** Período em que um profissional usa uma sala (vários por dia permitidos). */
+export type SalaHorario = {
+  id: number;
+  salaId: number;
+  professionalId: number;
+  /** ISO: 1=Seg … 7=Dom */
+  diaSemana: number;
+  horaInicio: string;
+  horaFim: string;
+};
+
+type SalaHorarioRow = {
+  id: number | string;
+  sala_id: number | string;
+  professional_id: number | string;
+  dia_semana: number | string;
+  hora_inicio: string;
+  hora_fim: string;
 };
 
 /** "07:00:00" → "07:00" (aceita null). */
@@ -2151,12 +2165,20 @@ function mapSala(r: SalaRow): Sala {
     id: Number(r.id),
     companyId: Number(r.company_id),
     numero: r.numero,
-    professionalId: r.professional_id == null ? null : Number(r.professional_id),
-    diasSemana: r.dias_semana == null ? null : r.dias_semana.map(Number),
-    horaInicio: shortTime(r.hora_inicio),
-    horaFim: shortTime(r.hora_fim),
+    especialidade: r.especialidade ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+  };
+}
+
+function mapSalaHorario(r: SalaHorarioRow): SalaHorario {
+  return {
+    id: Number(r.id),
+    salaId: Number(r.sala_id),
+    professionalId: Number(r.professional_id),
+    diaSemana: Number(r.dia_semana),
+    horaInicio: shortTime(r.hora_inicio) ?? "",
+    horaFim: shortTime(r.hora_fim) ?? "",
   };
 }
 
@@ -2174,10 +2196,7 @@ export async function listSalas(): Promise<Sala[]> {
 export async function upsertSala(
   id: number | null,
   numero: string,
-  professionalId: number | null,
-  diasSemana: number[] | null = null,
-  horaInicio: string | null = null,
-  horaFim: string | null = null
+  especialidade: string | null = null
 ): Promise<Sala> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
@@ -2186,10 +2205,7 @@ export async function upsertSala(
     p_password: password,
     p_id: id,
     p_numero: numero,
-    p_professional_id: professionalId,
-    p_dias: diasSemana && diasSemana.length > 0 ? diasSemana : null,
-    p_hora_inicio: horaInicio || null,
-    p_hora_fim: horaFim || null,
+    p_especialidade: especialidade || null,
   });
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
@@ -2208,11 +2224,79 @@ export async function deleteSala(id: number): Promise<void> {
   if (error) throw error;
 }
 
-export type SalaStatus = "Vermelho" | "Amarelo" | "Verde";
+export async function listSalaHorarios(): Promise<SalaHorario[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_sala_horarios", {
+    p_slug: slug,
+    p_password: password,
+  });
+  if (error) throw error;
+  return ((data ?? []) as SalaHorarioRow[]).map(mapSalaHorario);
+}
+
+export async function addSalaHorario(input: {
+  salaId: number;
+  professionalId: number;
+  diaSemana: number;
+  horaInicio: string;
+  horaFim: string;
+}): Promise<SalaHorario> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("add_sala_horario", {
+    p_slug: slug,
+    p_password: password,
+    p_sala_id: input.salaId,
+    p_professional_id: input.professionalId,
+    p_dia_semana: input.diaSemana,
+    p_hora_inicio: input.horaInicio,
+    p_hora_fim: input.horaFim,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("Falha ao salvar horário.");
+  return mapSalaHorario(row as SalaHorarioRow);
+}
+
+export async function deleteSalaHorario(id: number): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("delete_sala_horario", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Sala que o profissional usa em determinado dia/horário (calculado a partir
+ * dos períodos cadastrados). `date` = "yyyy-MM-dd", `time` = "HH:mm".
+ */
+export function salaDoProfissional(
+  horarios: SalaHorario[],
+  salas: Sala[],
+  professionalId: number,
+  date: string,
+  time: string
+): Sala | null {
+  const d = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const dow = d.getDay() === 0 ? 7 : d.getDay();
+  const h = horarios.find(
+    (x) => x.professionalId === professionalId && x.diaSemana === dow && x.horaInicio <= time && time < x.horaFim
+  );
+  if (!h) return null;
+  return salas.find((s) => s.id === h.salaId) ?? null;
+}
+
+export type SalaStatus = "Vermelho" | "Azul" | "Amarelo" | "Verde";
 
 export type StatusSala = {
   salaId: number;
   numeroDaSala: string;
+  especialidade: string | null;
   statusAtual: SalaStatus;
   detalheStatus: string;
   profissionais: string | null;
@@ -2220,12 +2304,15 @@ export type StatusSala = {
   profissionalEmAtendimento: string | null;
   pacienteAtual: string | null;
   horarioAtual: string | null;
+  checkinHorario: string | null;
   horarioProximoAgendamento: string | null;
+  proximoPaciente: string | null;
 };
 
 type StatusSalaRow = {
   sala_id: number | string;
   numero_da_sala: string;
+  especialidade: string | null;
   status_atual: string;
   detalhe_status: string;
   profissionais: string | null;
@@ -2233,7 +2320,9 @@ type StatusSalaRow = {
   profissional_em_atendimento: string | null;
   paciente_atual: string | null;
   horario_atual: string | null;
+  checkin_horario: string | null;
   horario_proximo_agendamento: string | null;
+  proximo_paciente: string | null;
 };
 
 export async function getStatusSalas(): Promise<StatusSala[]> {
@@ -2247,6 +2336,7 @@ export async function getStatusSalas(): Promise<StatusSala[]> {
   return ((data ?? []) as StatusSalaRow[]).map((r) => ({
     salaId: Number(r.sala_id),
     numeroDaSala: r.numero_da_sala,
+    especialidade: r.especialidade ?? null,
     statusAtual: (r.status_atual as SalaStatus) ?? "Verde",
     detalheStatus: r.detalhe_status,
     profissionais: r.profissionais,
@@ -2254,7 +2344,9 @@ export async function getStatusSalas(): Promise<StatusSala[]> {
     profissionalEmAtendimento: r.profissional_em_atendimento,
     pacienteAtual: r.paciente_atual,
     horarioAtual: r.horario_atual,
+    checkinHorario: r.checkin_horario ?? null,
     horarioProximoAgendamento: r.horario_proximo_agendamento,
+    proximoPaciente: r.proximo_paciente ?? null,
   }));
 }
 
