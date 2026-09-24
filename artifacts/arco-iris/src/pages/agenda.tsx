@@ -962,8 +962,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const handleCancelarFalta = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      // RPC própria: devolve o contador do paciente e impede que a marcação
-      // automática (24h) volte a lançar a falta no mesmo atendimento.
+      // RPC própria: devolve o contador do paciente.
       if (apt.id > 0) {
         await reverterFalta(apt.id);
         setAppointments(prev => prev.map(a => (a.id === apt.id ? { ...a, status: "agendado" } : a)));
