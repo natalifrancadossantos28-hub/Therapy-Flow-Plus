@@ -1279,7 +1279,7 @@ export default function Reception() {
           <div>
             <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              <strong>Presente</strong> com o check-in da recepção (botão ✓) ou pelo profissional na agenda. <strong>Agendado</strong> = paciente recém-puxado,
+              <strong>Presente</strong> com o check-in da recepção (botão ✓) ou pelo profissional na agenda. <strong>Avaliação</strong> = paciente recém-puxado,
               ainda sem a primeira avaliação; depois dela ele fica <strong>Em Atendimento</strong> até receber alta.
               Falta é registrada só pela recepção ou pelo profissional (use "Cancelar Falta" para desfazer).
             </p>

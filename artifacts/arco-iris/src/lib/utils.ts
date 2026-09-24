@@ -57,7 +57,7 @@ export const getStatusLabel = (status: string): string => {
   if (s === "desmarcado") return "Desmarcado";
   if (s === "remarcado") return "Remarcado";
   if (s === "remanejado") return "Remanejado";
-  if (s === "agendado") return "Agendado";
+  if (s === "agendado") return "Avaliação";
   if (s === "pausado") return "Pausado";
   return status;
 };
