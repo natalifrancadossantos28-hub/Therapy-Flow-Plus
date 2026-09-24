@@ -850,8 +850,7 @@ export async function getPatientAbsences(id: number): Promise<PatientAbsencesInf
 
 /**
  * Desfaz uma falta (justificada ou não) de qualquer data, ajustando os
- * contadores do paciente. O atendimento revertido não volta a ser marcado
- * pela falta automática do dia.
+ * contadores do paciente.
  */
 export async function reverterFalta(appointmentId: number): Promise<boolean> {
   const supabase = requireSupabase();
@@ -1723,24 +1722,6 @@ export async function countAbsencesBySpecialty(): Promise<AbsenceBySpecialty[]> 
   });
   if (error) throw error;
   return (data ?? []) as AbsenceBySpecialty[];
-}
-
-/**
- * Marca falta sem justificativa nos atendimentos de hoje que passaram da
- * tolerância (em minutos) sem marcação da recepção. Feriado, ausência do
- * profissional e transporte ficam de fora. Retorna quantos foram marcados.
- */
-export async function autoMarkAbsences(toleranceMinutes = 24 * 60): Promise<number> {
-  const supabase = requireSupabase();
-  const { slug, password } = requireCompanyCredentials();
-  const { data, error } = await supabase.rpc("auto_marcar_faltas", {
-    p_slug: slug,
-    p_password: password,
-    p_tolerancia: toleranceMinutes,
-  });
-  if (error) throw error;
-  const result = (data ?? {}) as { marcadas?: number };
-  return Number(result.marcadas ?? 0);
 }
 
 /**

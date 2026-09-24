@@ -8,7 +8,6 @@ import {
   updateAppointment,
   deletePatient,
   countAbsencesBySpecialty,
-  autoMarkAbsences,
   reverterFalta,
   listFirstEvaluationDone,
   listFeriados,
@@ -675,9 +674,6 @@ function isFaltaSemJustificativa(apt: { status?: string | null }): boolean {
 
 type SituacaoFilter = "pendentes" | "presente" | "justificada" | "falta" | "todos";
 
-// Minutos após o horário agendado em que a falta é registrada sozinha (24h).
-const AUTO_ABSENCE_MINUTES = 24 * 60;
-
 export default function Reception() {
   useDocumentTitle("Recepção");
   const [profIdFilter, setProfIdFilter] = useState<string>("");
@@ -717,9 +713,7 @@ export default function Reception() {
     // Busca o dia inteiro e filtra aqui: o aviso de transporte precisa dos
     // motoristas mesmo quando a tela está filtrada por um profissional.
     const filterId = profIdFilter ? parseInt(profIdFilter) : null;
-    return autoMarkAbsences(AUTO_ABSENCE_MINUTES)
-      .catch((e) => { console.error(e); return 0; })
-      .then(() => listAppointmentsToday())
+    return listAppointmentsToday()
       .then((data) => {
         // Oculta pacientes encerrados e atendimentos em feriado ou quando o
         // profissional está ausente (férias/folga/falta).
@@ -1013,8 +1007,7 @@ export default function Reception() {
       || apt?.status === "falta_justificada"
       || apt?.status === "justificado"
       || apt?.status === "abonado";
-    // Desfazer falta usa a RPC própria: além de devolver o contador, impede que a
-    // marcação automática de 1h volte a lançar a falta no mesmo atendimento.
+    // Desfazer falta usa a RPC própria, que também devolve o contador do paciente.
     const isCancelarFalta = status === "agendado" && wasFalta;
     setIsMutating(true);
     try {
@@ -1288,8 +1281,7 @@ export default function Reception() {
             <p className="text-xs text-muted-foreground mt-1">
               <strong>Presente</strong> com o check-in da recepção (botão ✓) ou pelo profissional na agenda. <strong>Agendado</strong> = paciente recém-puxado,
               ainda sem a primeira avaliação; depois dela ele fica <strong>Em Atendimento</strong> até receber alta.
-              Sem marcação até 24 horas depois do horário, o sistema registra <strong>Falta sem Justificativa</strong> automaticamente
-              (use "Cancelar Falta" para desfazer).
+              Falta é registrada só pela recepção ou pelo profissional (use "Cancelar Falta" para desfazer).
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
