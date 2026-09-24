@@ -39,7 +39,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 function statusLabel(status: string): string {
   const s = (status || "").toLowerCase();
   const map: Record<string, string> = {
-    agendado: "Agendado",
+    agendado: "Avaliação",
     ativo: "Em atendimento",
     atendimento: "Em atendimento",
     em_atendimento: "Em atendimento",
