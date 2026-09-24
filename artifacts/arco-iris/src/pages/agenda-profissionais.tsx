@@ -73,7 +73,7 @@ export default function AgendaProfissionais() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="bg-slate-800 text-white px-4 py-2 flex items-center">
         <a
           href={import.meta.env.BASE_URL || "/"}
