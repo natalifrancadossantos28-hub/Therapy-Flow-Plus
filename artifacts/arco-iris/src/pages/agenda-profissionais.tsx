@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Calendar as CalendarIcon, Lock, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { CelebrationBanner } from "@/components/CelebrationBanner";
 import { MensagensComemorativas } from "@/components/MensagensComemorativas";
 import { RecadoEquipeComposer } from "@/components/RecadoEquipeComposer";
 import { listProfessionals, verifyProfessionalPin } from "@/lib/arco-rpc";
@@ -167,11 +166,6 @@ export default function AgendaProfissionais() {
           </div>
         ) : (
           <>
-            <CelebrationBanner
-              name={selectedProf?.name}
-              specialty={selectedProf?.specialty}
-              birthDate={selectedProf?.birthDate}
-            />
             <MensagensComemorativas professionalId={selectedProf?.id ?? null} />
             {!isAdminViewing && selectedProf && (
               <RecadoEquipeComposer
