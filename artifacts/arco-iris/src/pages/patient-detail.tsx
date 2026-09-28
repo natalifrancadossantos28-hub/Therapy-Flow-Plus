@@ -46,6 +46,17 @@ import { TriagemMultiForm, TriagemMultiResultado } from "@/components/TriagemMul
 // Bônus de vulnerabilidade somam direto no score exibido (apenas desempate):
 //   +1 Escola Pública, +1 Trabalho na Roça/Informal. Máximo possível = 152.
 // Social NAO muda a cor da classificacao (regra: cor = clinica pura).
+
+// Janela que define vínculo ativo com o profissional (cobre semanal, quinzenal
+// e mensal). Fora dela o paciente não está na grade daquele profissional.
+const JANELA_VINCULO_ATRAS = 30;
+const JANELA_VINCULO_FRENTE = 45;
+const addDaysStr = (iso: string, days: number): string => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
 const SCORE_MAX_RAW = 360;
 const SCORE_MAX_DISPLAY = 150;
 const VULN_BONUS_EP = 1;
@@ -96,7 +107,13 @@ export default function PatientDetail() {
   const [revertingAbsenceId, setRevertingAbsenceId] = useState<number | null>(null);
 
   // Equipe de Atendimento
-  type TeamMember = { professionalId: number; professionalName: string; specialty: string; status: "Ativo" | "Alta" };
+  type TeamMember = {
+    professionalId: number;
+    professionalName: string;
+    specialty: string;
+    status: "Ativo" | "Alta" | "Sem agenda";
+    nextDate: string | null;
+  };
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [discharges, setDischarges] = useState<PatientDischarge[]>([]);
 
@@ -276,16 +293,24 @@ export default function PatientDetail() {
       setAbcHist(abcs);
       setAvfHist(avfs);
       if (p) listTriagensDoPaciente(p).then(setTriagensMulti).catch(() => setTriagensMulti([]));
-      // Derive team from appointments
-      const profMap = new Map<number, { name: string; hasActive: boolean }>();
+      // Derive team from appointments.
+      // "Ativo" exige vínculo real na agenda: atendimento ativo dentro da janela
+      // corrente (últimos 30 dias ou próximos 45). Um agendamento solto meses à
+      // frente não é vínculo ativo — o paciente não está na grade do profissional.
+      const janelaIni = addDaysStr(today, -JANELA_VINCULO_ATRAS);
+      const janelaFim = addDaysStr(today, JANELA_VINCULO_FRENTE);
+      const profMap = new Map<number, { name: string; hasActive: boolean; nextDate: string | null }>();
       for (const apt of allApts) {
-        const entry = profMap.get(apt.professionalId) || { name: apt.professionalName, hasActive: false };
-        if (["agendado", "atendimento", "presente"].includes(apt.status) && apt.date >= today) {
-          entry.hasActive = true;
-        }
+        const entry = profMap.get(apt.professionalId) || { name: apt.professionalName, hasActive: false, nextDate: null };
+        const ativo = ["agendado", "atendimento", "presente"].includes(apt.status);
+        if (ativo && apt.date >= janelaIni && apt.date <= janelaFim) entry.hasActive = true;
+        if (ativo && apt.date >= today && (!entry.nextDate || apt.date < entry.nextDate)) entry.nextDate = apt.date;
         entry.name = apt.professionalName;
         profMap.set(apt.professionalId, entry);
       }
+      const dischargedSpecialties = new Set(
+        alts.map(d => (d.specialty || "").trim().toLowerCase()).filter(Boolean),
+      );
       // Get specialties from professionals list
       const { listProfessionals } = await import("@/lib/arco-rpc");
       const profs = await listProfessionals().catch(() => []);
@@ -297,7 +322,12 @@ export default function PatientDetail() {
           professionalId: id,
           professionalName: info.name,
           specialty: (profSpecMap.get(id) as string) || "—",
-          status: info.hasActive ? "Ativo" : "Alta",
+          status: info.hasActive
+            ? "Ativo"
+            : dischargedSpecialties.has(((profSpecMap.get(id) as string) || "").trim().toLowerCase())
+              ? "Alta"
+              : "Sem agenda",
+          nextDate: info.nextDate,
         }));
       teamArr.sort((a, b) => (a.status === "Ativo" ? 0 : 1) - (b.status === "Ativo" ? 0 : 1) || a.specialty.localeCompare(b.specialty));
       setTeam(teamArr);
@@ -678,11 +708,14 @@ export default function PatientDetail() {
                         </div>
                         <div>
                           <p className="font-semibold text-sm text-foreground">{m.professionalName}</p>
-                          <p className="text-xs text-muted-foreground">{m.specialty}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {m.specialty}
+                            {m.status !== "Ativo" && m.nextDate && ` · próximo horário em ${formatDate(m.nextDate)}`}
+                          </p>
                         </div>
                       </div>
                       <Badge className={m.status === "Ativo" ? "bg-emerald-100 text-emerald-700 border-emerald-300" : "bg-secondary text-muted-foreground border-border"}>
-                        {m.status === "Ativo" ? "Ativo" : "Alta"}
+                        {m.status}
                       </Badge>
                     </div>
                   ))}
