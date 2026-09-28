@@ -182,7 +182,7 @@ export const SPECIALTIES = [
   "Nutrição",
   "Psicomotricidade",
   "Fisioterapia Pilates",
-  "Educação Física (Oficina)",
+  "Educação Física",
   "Oficina Mães e Responsáveis",
   "Oficina Pacientes",
 ] as const;

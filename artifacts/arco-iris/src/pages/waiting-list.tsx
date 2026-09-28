@@ -4,7 +4,7 @@ import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-
 import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate, calcIdade } from "@/lib/utils";
-import { specialtyTone, specialtyShortLabel, SPECIALTIES } from "@/lib/specialty-colors";
+import { specialtyTone, specialtyShortLabel, SPECIALTIES, isCaregiverSpecialty } from "@/lib/specialty-colors";
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { supabase } from "@/lib/supabase";
 import { AREA_MAX_UI, areaToUi } from "@/lib/score-scale";
@@ -388,6 +388,12 @@ export default function WaitingList() {
   const photoById = new Map<number, string | null>();
   for (const p of patients) photoById.set(p.id, p.photoUrl);
 
+  // Parental/Pilates: quem é atendido é o responsável, então é o nome dele que aparece.
+  const caregiverById = new Map<number, string | null>();
+  for (const p of patients) caregiverById.set(p.id, p.motherName || p.guardianName || null);
+  const caregiverNameOf = (entry: WaitingListEntry): string | null =>
+    isCaregiverSpecialty(entry.specialty) ? (caregiverById.get(entry.patientId) ?? null) : null;
+
   // Pacientes em busca ativa (congelados) saem da disputa por vaga prioritaria.
   const activeList = waitingList.filter(e => !e.paused);
   const pausedList = waitingList.filter(e => e.paused);
@@ -399,6 +405,10 @@ export default function WaitingList() {
   const specialtyOptions: string[] = [];
   {
     const seen = new Set<string>();
+    // Lista oficial primeiro: toda especialidade existe no filtro mesmo sem ninguém na fila.
+    for (const sp of SPECIALTIES) {
+      if (!seen.has(sp)) { seen.add(sp); specialtyOptions.push(sp); }
+    }
     for (const entry of waitingList) {
       const sp: string = entry.specialty ?? "__null__";
       if (!seen.has(sp)) { seen.add(sp); specialtyOptions.push(sp); }
@@ -557,6 +567,9 @@ export default function WaitingList() {
                             );
                           })()}
                         </div>
+                        {caregiverNameOf(entry) && (
+                          <div className="text-xs text-pink-400 font-semibold mt-0.5">Mãe/responsável: {caregiverNameOf(entry)}</div>
+                        )}
                         <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">
                           {entry.patientProntuario || `#${String(entry.patientId).padStart(4, "0")}`}
                         </div>
@@ -759,6 +772,9 @@ export default function WaitingList() {
                             );
                           })()}
                         </div>
+                        {caregiverNameOf(entry) && (
+                          <div className="text-xs text-pink-400 font-semibold mt-0.5">Mãe/responsável: {caregiverNameOf(entry)}</div>
+                        )}
                         <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">
                           {entry.patientProntuario || `#${String(entry.patientId).padStart(4, "0")}`}
                         </div>
