@@ -77,20 +77,18 @@ function dataExtenso(iso: string): string {
 
 function abrirPdf(opts: { titulo: string; corpo: string; dataIso: string; atendente: string; cargo: string }) {
   const { titulo, corpo, dataIso, atendente, cargo } = opts;
-  const logo = `${window.location.origin}/nfs-logo.png`;
+  const logo = `${window.location.origin}/images/cabecalho-prefeitura-ibiuna.png`;
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title>
 <style>
   @page{size:A4 portrait;margin:20mm;}
   *{box-sizing:border-box;}
   body{font-family:'Times New Roman',Georgia,serif;color:#111;margin:0;padding:24px;background:#fff;}
   .page{max-width:720px;margin:0 auto;}
-  .head{display:flex;align-items:center;gap:18px;border-bottom:3px double #0e7490;padding-bottom:14px;margin-bottom:40px;}
-  .head img{width:88px;height:88px;object-fit:contain;}
-  .head .id{flex:1;text-align:center;line-height:1.35;}
-  .head .id .l1{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#334155;}
-  .head .id .l2{font-size:17px;font-weight:700;color:#0e7490;margin-top:2px;}
+  .head{border-bottom:3px double #0e7490;padding-bottom:14px;margin-bottom:40px;text-align:center;}
+  .head img{width:100%;max-width:640px;height:auto;display:block;margin:0 auto 12px;}
+  .head .id{line-height:1.35;}
+  .head .id .l2{font-size:17px;font-weight:700;color:#0e7490;}
   .head .id .l3{font-size:12px;color:#475569;}
-  .head .sus{font-size:11px;font-weight:700;color:#1d4ed8;border:2px solid #1d4ed8;border-radius:6px;padding:4px 8px;text-align:center;line-height:1.1;}
   h1{text-align:center;font-size:20px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 42px;}
   .corpo{font-size:16px;line-height:2;text-align:justify;text-indent:3em;}
   .fim{font-size:15px;line-height:2;text-indent:3em;margin-top:10px;text-align:justify;}
@@ -110,13 +108,11 @@ function abrirPdf(opts: { titulo: string; corpo: string; dataIso: string; atende
 </div>
 <div class="page">
   <div class="head">
-    <img src="${logo}" alt="Logo" onerror="this.style.display='none'">
+    <img src="${logo}" alt="Prefeitura da Estância Turística de Ibiúna — Secretaria dos Direitos da Pessoa com Deficiência" onerror="this.style.display='none'">
     <div class="id">
-      <div class="l1">Prefeitura Municipal de Ibiúna · Secretaria Municipal de Saúde</div>
       <div class="l2">Núcleo Integrado Novo Arco-Íris</div>
-      <div class="l3">Núcleo de Fisioterapia e Saúde — Atendimento Multiprofissional · Ibiúna - SP</div>
+      <div class="l3">Atendimento Multiprofissional · Ibiúna - SP</div>
     </div>
-    <div class="sus">SUS<br><span style="font-weight:400;font-size:9px">Sistema Único<br>de Saúde</span></div>
   </div>
   <h1>${esc(titulo)}</h1>
   <p class="corpo">${esc(corpo)}</p>
