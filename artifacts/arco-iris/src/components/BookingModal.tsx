@@ -6,7 +6,7 @@ import { MotionCard, Button, Label } from "@/components/ui-custom";
 import { listWaitingList, listPatients, createAppointments, listAppointments, deleteWaitingListEntry, listProfessionals, createNotificacao, type Patient } from "@/lib/arco-rpc";
 import { supabase } from "@/lib/supabase";
 import { cn, todayBR, formatDate } from "@/lib/utils";
-import { specialtyKey, allowsDirectBooking } from "@/lib/specialty-colors";
+import { specialtyKey, allowsDirectBooking, hasMixedPilatesAgenda, isPilatesAppointment, PILATES_SPECIALTY, PILATES_TAG } from "@/lib/specialty-colors";
 import { allowsSameSlotAsPatient } from "@/lib/schedule";
 
 type WaitingEntry = {
@@ -91,9 +91,15 @@ const FREQUENCY_OPTIONS = [
 ];
 
 export default function BookingModal({
-  date, time, professionalId, professionalName, professionalSpecialty = "",
+  date, time, professionalId, professionalName, professionalSpecialty: baseSpecialty = "",
   adminMode = false, onClose, onSuccess,
 }: Props) {
+  // Agenda mista (Leonardo): a mesma agenda/fila atende crianças (Fisioterapia)
+  // e mães/responsáveis (Pilates). O alvo escolhido troca a especialidade efetiva.
+  const mixedPilates = hasMixedPilatesAgenda(professionalName, baseSpecialty);
+  const [target, setTarget] = useState<"crianca" | "mae">("crianca");
+  const isPilatesTarget = mixedPilates && target === "mae";
+  const professionalSpecialty = isPilatesTarget ? PILATES_SPECIALTY : baseSpecialty;
   const [waitingList, setWaitingList] = useState<WaitingEntry[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [alreadyScheduledIds, setAlreadyScheduledIds] = useState<Set<number>>(new Set());
@@ -101,7 +107,7 @@ export default function BookingModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"fila" | "direto">(
-    () => (allowsDirectBooking(professionalSpecialty) ? "direto" : "fila")
+    () => (allowsDirectBooking(baseSpecialty) ? "direto" : "fila")
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
@@ -165,6 +171,8 @@ export default function BookingModal({
       const activeStatuses = ["agendado", "atendimento", "em_atendimento", "em atendimento", "presente"];
       for (const a of apts) {
         if (!activeStatuses.includes(a.status.toLowerCase())) continue;
+        // Agenda mista: horário da criança não bloqueia a mãe (Pilates) e vice-versa.
+        if (mixedPilates && a.professionalId === professionalId && isPilatesAppointment(a.notes) !== isPilatesTarget) continue;
         const aptSpec = a.professionalId === professionalId
           ? professionalSpecialty
           : (specMap.get(a.professionalId) ?? "");
@@ -184,12 +192,12 @@ export default function BookingModal({
       for (const a of allAptsOnDate) {
         if (a.time !== time || a.professionalId === professionalId) continue;
         if (a.status !== "agendado" && a.status !== "atendimento") continue;
-        if (allowsSameSlotAsPatient(specMap.get(a.professionalId))) continue;
+        if (allowsSameSlotAsPatient(specMap.get(a.professionalId)) || isPilatesAppointment(a.notes)) continue;
         bookedIds.add(a.patientId);
       }
       setBookedAtSlotIds(bookedIds);
     } catch (err) { console.error(err); }
-  }, [adminMode, allowDirect, professionalId, professionalSpecialty, date, time]);
+  }, [adminMode, allowDirect, professionalId, professionalSpecialty, mixedPilates, isPilatesTarget, date, time]);
 
   useEffect(() => { void loadData(); }, [loadData]);
 
@@ -300,6 +308,7 @@ export default function BookingModal({
       // por um profissional da MESMA especialidade enquanto o modal estava aberto.
       const hasActiveSameSpec = freshGlobalApts.some(a => {
         if (!activeStatuses.includes(a.status.toLowerCase())) return false;
+        if (mixedPilates && a.professionalId === professionalId && isPilatesAppointment(a.notes) !== isPilatesTarget) return false;
         const aptSpec = a.professionalId === professionalId
           ? professionalSpecialty
           : (profSpecialtyMap.get(a.professionalId) ?? "");
@@ -323,7 +332,7 @@ export default function BookingModal({
       const slotConflicts = freshApts.filter(
         a => a.patientId === targetPatientId && a.time === time &&
              (a.status === "agendado" || a.status === "atendimento") &&
-             (a.professionalId === professionalId || !allowsSameSlotAsPatient(profSpecialtyMap.get(a.professionalId)))
+             (a.professionalId === professionalId || !(allowsSameSlotAsPatient(profSpecialtyMap.get(a.professionalId)) || isPilatesAppointment(a.notes)))
       );
       // Psicologia Parental: permite o mesmo horário com OUTRO profissional
       // (a criança em terapia + a mãe na orientação). Só bloqueia duplicata
@@ -347,6 +356,7 @@ export default function BookingModal({
         date,
         time,
         frequency,
+        notes: isPilatesTarget ? PILATES_TAG : null,
         fromWaitingList: !isDirect,
       });
 
@@ -440,6 +450,38 @@ export default function BookingModal({
                 Agendamentos só são permitidos a partir de amanhã. Esta data ({formatDate(date)})
                 é hoje ou já passou — escolha um dia futuro na agenda.
               </span>
+            </div>
+          )}
+          {mixedPilates && (
+            <div>
+              <Label className="mb-2 block font-semibold">Atendimento para</Label>
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-secondary/40 border border-border text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => { setTarget("crianca"); setSelectedPatientId(null); setError(""); }}
+                  className={cn(
+                    "flex items-center justify-center gap-2 py-2 rounded-lg transition-all",
+                    target === "crianca" ? "bg-emerald-500 text-white shadow" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  👶 Criança — {baseSpecialty}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTarget("mae"); setSelectedPatientId(null); setError(""); }}
+                  className={cn(
+                    "flex items-center justify-center gap-2 py-2 rounded-lg transition-all",
+                    target === "mae" ? "bg-pink-500 text-white shadow" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  👩 Mãe/Responsável — Pilates
+                </button>
+              </div>
+              {isPilatesTarget && (
+                <p className="mt-1.5 text-[11px] text-pink-500 font-semibold">
+                  Selecione o prontuário da criança: quem será atendida é a mãe/responsável. O horário fica marcado como Pilates e pode coincidir com a terapia do filho.
+                </p>
+              )}
             </div>
           )}
           {allowDirect && (

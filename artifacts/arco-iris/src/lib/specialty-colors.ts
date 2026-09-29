@@ -271,6 +271,26 @@ export function canHavePilates(professionalName: string | null | undefined): boo
   return normalize(professionalName).includes(normalize(PILATES_PROFESSIONAL));
 }
 
+export const PILATES_SPECIALTY = "Fisioterapia Pilates";
+
+/** Marca no campo notes do agendamento que o atendimento é da mãe/responsável (Pilates). */
+export const PILATES_TAG = "[PILATES — Mãe/Responsável]";
+
+/**
+ * Agenda mista do fisioterapeuta do Pilates: a mesma agenda e fila atendem
+ * crianças (Fisioterapia) e mães/responsáveis (Fisioterapia Pilates).
+ */
+export function hasMixedPilatesAgenda(
+  professionalName: string | null | undefined,
+  specialty: string | null | undefined,
+): boolean {
+  return canHavePilates(professionalName) && specialtyKey(specialty) === "fisioterapia";
+}
+
+export function isPilatesAppointment(notes: string | null | undefined): boolean {
+  return !!notes && notes.includes(PILATES_TAG);
+}
+
 function isLightTheme(): boolean {
   return typeof document !== "undefined" && document.documentElement.classList.contains("light");
 }

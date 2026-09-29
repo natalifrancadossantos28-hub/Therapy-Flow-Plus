@@ -566,6 +566,11 @@ export default function WaitingList() {
                               </span>
                             );
                           })()}
+                          {isCaregiverSpecialty(entry.specialty) && (
+                            <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-md leading-none bg-pink-500/20 text-pink-300 border border-pink-400/40">
+                              👩 Mãe/Responsável
+                            </span>
+                          )}
                         </div>
                         {caregiverNameOf(entry) && (
                           <div className="text-xs text-pink-400 font-semibold mt-0.5">Mãe/responsável: {caregiverNameOf(entry)}</div>
