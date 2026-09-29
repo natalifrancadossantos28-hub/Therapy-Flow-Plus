@@ -62,7 +62,7 @@ import {
 import { AvaliacaoFuncionalForm } from "@/components/AvaliacaoFuncionalForm";
 import { avfFaixa, AVF_MAX, isParentalSpecialty } from "@/lib/avaliacao-funcional";
 import { buildMultiGuestAppointments } from "@/lib/multi-agenda";
-import { isTransportSpecialty } from "@/lib/specialty-colors";
+import { isTransportSpecialty, isPilatesAppointment } from "@/lib/specialty-colors";
 import {
   activeCareDays,
   fetchClinicalAppointments,
@@ -1513,13 +1513,14 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       // profissionais diferentes, exceto Psicologia Parental/Oficina (mãe/responsável
       // no mesmo horário da terapia) e o parceiro do Atendimento Multi.
       const selfSpecialty = selectedProf?.specialty;
-      if (!allowsSameSlotAsPatient(selfSpecialty)) {
+      if (!allowsSameSlotAsPatient(selfSpecialty) && !isPilatesAppointment(remanejFlow.apt.notes)) {
         const sameDay = await listAppointments({ patientId: remanejFlow.apt.patientId, date: remanejFlow.newDate });
         const conflict = sameDay.find(a =>
           a.time === remanejFlow.newTime &&
           a.professionalId !== parseInt(selectedProfId) &&
           ["agendado", "atendimento", "presente"].includes(a.status.toLowerCase()) &&
           !(a.notes ?? "").startsWith("Atendimento Multi com ") &&
+          !isPilatesAppointment(a.notes) &&
           !allowsSameSlotAsPatient(professionals.find(p => p.id === a.professionalId)?.specialty),
         );
         if (conflict) {
@@ -2087,7 +2088,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       </span>
                                     )}
                                     {/* Parental/Pilates: show guardian/mother name */}
-                                    {apt.guardianName && isParentalSpecialty(selectedProf?.specialty) && (
+                                    {isPilatesAppointment(apt.notes) && (
+                                      <span className="text-[9px] font-black text-pink-300 bg-pink-500/20 border border-pink-400/40 rounded px-1 truncate" title="Atendimento da mãe/responsável (Pilates)">
+                                        👩 MÃE/RESPONSÁVEL — PILATES
+                                      </span>
+                                    )}
+                                    {apt.guardianName && (isParentalSpecialty(selectedProf?.specialty) || isPilatesAppointment(apt.notes)) && (
                                       <span className="text-[9px] text-pink-400/80 font-semibold truncate">
                                         Mãe: {apt.guardianName}
                                       </span>

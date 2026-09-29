@@ -4,7 +4,7 @@ import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-
 import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate, calcIdade } from "@/lib/utils";
-import { specialtyTone, specialtyShortLabel, SPECIALTIES } from "@/lib/specialty-colors";
+import { specialtyTone, specialtyShortLabel, SPECIALTIES, isCaregiverSpecialty } from "@/lib/specialty-colors";
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { supabase } from "@/lib/supabase";
 import { AREA_MAX_UI, areaToUi } from "@/lib/score-scale";
@@ -556,6 +556,11 @@ export default function WaitingList() {
                               </span>
                             );
                           })()}
+                          {isCaregiverSpecialty(entry.specialty) && (
+                            <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-md leading-none bg-pink-500/20 text-pink-300 border border-pink-400/40">
+                              👩 Mãe/Responsável
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-muted-foreground font-mono font-normal mt-0.5">
                           {entry.patientProntuario || `#${String(entry.patientId).padStart(4, "0")}`}
