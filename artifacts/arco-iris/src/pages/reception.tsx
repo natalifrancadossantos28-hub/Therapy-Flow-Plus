@@ -28,8 +28,9 @@ import {
   Check, X, CalendarClock, AlertCircle, UserMinus,
   ChevronRight, Printer, ShieldCheck, CheckCircle,
   UserPlus, PhoneOff, FileCheck, Bell, MessageSquare, Copy,
-  BellRing, Undo2, Bus, Search,
+  BellRing, Undo2, Bus, Search, FileText,
 } from "lucide-react";
+import { DeclaracaoModal, type DeclaracaoTarget } from "@/components/DeclaracaoModal";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "wouter";
@@ -407,7 +408,7 @@ function AbsenceBellModal({
 }
 
 function AppointmentRow({
-  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, photoUrl, drivers, emAcompanhamento,
+  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, onDeclaracao, photoUrl, drivers, emAcompanhamento,
 }: {
   apt: Appointment;
   emAcompanhamento: boolean;
@@ -422,6 +423,7 @@ function AppointmentRow({
   specialtyAbsences: Map<string, number>;
   onFirstApptMsg: (apt: Appointment) => void;
   onAbsenceBell: (apt: Appointment, absenceCount: number) => void;
+  onDeclaracao: (apt: Appointment) => void;
 }) {
   const handleAbsent = async () => {
     const newCount = await onStatusChange(apt.id, "falta_nao_justificada");
@@ -587,6 +589,19 @@ function AppointmentRow({
               title="Mensagem do 1º Agendamento"
             >
               <MessageSquare className="w-4 h-4" />
+            </button>
+
+            <button
+              className="h-9 w-9 rounded-lg flex items-center justify-center transition-colors"
+              style={{
+                background: "rgba(8,145,178,0.08)",
+                border: "1px solid rgba(8,145,178,0.35)",
+                color: "#0891b2",
+              }}
+              onClick={() => onDeclaracao(apt)}
+              title="Emitir Declaração (comparecimento / acompanhamento)"
+            >
+              <FileText className="w-4 h-4" />
             </button>
 
             {/* 🔔 Sininho de Faltas — marca ausente + abre WhatsApp */}
@@ -827,6 +842,7 @@ export default function Reception() {
   const [vacancyAlert, setVacancyAlert] = useState<VacancyAlert | null>(null);
   const [firstApptMsgApt, setFirstApptMsgApt] = useState<Appointment | null>(null);
   const [absenceBellData, setAbsenceBellData] = useState<{ apt: Appointment; absenceCount: number } | null>(null);
+  const [declaracaoTarget, setDeclaracaoTarget] = useState<DeclaracaoTarget | null>(null);
   const [vacancyProfId, setVacancyProfId] = useState<number>(0);
   const [atestados, setAtestados] = useState<Atestado[]>([]);
   const [desconhecidos, setDesconhecidos] = useState<ContatoDesconhecido[]>([]);
@@ -1382,6 +1398,7 @@ export default function Reception() {
                 specialtyAbsences={specialtyAbsences}
                 onFirstApptMsg={setFirstApptMsgApt}
                 onAbsenceBell={(a, count) => setAbsenceBellData({ apt: a, absenceCount: count })}
+                onDeclaracao={(a) => setDeclaracaoTarget({ patientId: a.patientId, patientName: a.patientName, prontuario: a.prontuario ?? prontuarioMap.get(a.patientId) ?? null, date: a.date, time: a.time })}
                 drivers={transportByPatient.get(apt.patientId) ?? []}
                 emAcompanhamento={firstEvalDone.has(firstEvalKey(apt.patientId, apt.professionalSpecialty))}
               />
@@ -1407,6 +1424,9 @@ export default function Reception() {
             absenceCount={absenceBellData.absenceCount}
             onClose={() => setAbsenceBellData(null)}
           />
+        )}
+        {declaracaoTarget && (
+          <DeclaracaoModal target={declaracaoTarget} onClose={() => setDeclaracaoTarget(null)} />
         )}
       </AnimatePresence>
 
