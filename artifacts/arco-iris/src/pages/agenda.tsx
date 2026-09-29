@@ -27,6 +27,8 @@ import {
   deleteAppointmentAlta,
   dischargePatientSpecialty,
   deleteRecurrenceForward,
+  leaveMultiAsGuest,
+  removeProfessionalFromPatientAgenda,
   createNotificacao,
   markNotificacoesLidoByAppointment,
   createAppointments,
@@ -274,6 +276,7 @@ type Appointment = {
   /** Card do Atendimento Multi projetado a partir da linha do outro profissional. */
   multiGuest?: boolean;
   multiHostName?: string | null;
+  multiHostProfessionalId?: number | null;
 };
 
 type AbsenceAlert = {
@@ -1078,7 +1081,17 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     if (!excluirConfirm) return;
     setExcluirSending(true);
     try {
-      if (excluirConfirm.recurrenceGroupId) {
+      if (excluirConfirm.multiGuest && excluirConfirm.multiHostProfessionalId) {
+        // Card projetado do Multi: a linha real é do anfitrião, que continua
+        // com o paciente; aqui só tiramos este profissional do Multi.
+        await leaveMultiAsGuest({
+          patientId: excluirConfirm.patientId,
+          hostProfessionalId: excluirConfirm.multiHostProfessionalId,
+          guestProfessionalName: selectedProf?.name ?? excluirConfirm.professionalName ?? "",
+          time: excluirConfirm.time,
+          fromDate: excluirConfirm.date,
+        });
+      } else if (excluirConfirm.recurrenceGroupId) {
         // "Daqui para frente": deletes from selected date onward, preserves past history
         await deleteRecurrenceForward(
           excluirConfirm.recurrenceGroupId,
@@ -1104,6 +1117,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       // Remove from local state: appointments in the same recurrence group from this date onward
       setAppointments(prev =>
         prev.filter(a => {
+          if (excluirConfirm.multiGuest) {
+            return !(a.multiGuest && a.patientId === excluirConfirm.patientId && a.time === excluirConfirm.time && a.date >= excluirConfirm.date);
+          }
           if (a.recurrenceGroupId && a.recurrenceGroupId === excluirConfirm.recurrenceGroupId) {
             return a.date < excluirConfirm.date;
           }
@@ -1113,7 +1129,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       // Re-adiciona o paciente à fila de espera da especialidade do profissional
       try {
         const prof = professionals.find(p => p.id === excluirConfirm.professionalId);
-        if (prof?.specialty) {
+        if (prof?.specialty && !excluirConfirm.multiGuest) {
           await addPatientToFila(excluirConfirm.patientId, prof.specialty, null, true);
         }
       } catch { /* se falhar a re-inserção na fila, não bloqueia */ }
@@ -1170,39 +1186,43 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     // tratamento (cancelou a avaliação) ou saiu por faltas não tem o que avaliar.
     if (saidaTipo === "Alta" && !altaAvf) return;
     const label = saidaTipo;
+    const todayStr = todayBR();
+    const profSpecialty = selectedProf?.specialty ?? null;
+    const profId = selectedProf ? Number(selectedProf.id) : altaConfirm.professionalId;
     try {
-      if (altaConfirm.id > 0) {
-        await deleteAppointmentAlta(altaConfirm.id);
-      } else if (altaConfirm.recurrenceGroupId) {
-        const realSibling = appointments.find(
-          a => a.recurrenceGroupId === altaConfirm.recurrenceGroupId && a.id > 0
-        );
-        if (realSibling) await deleteAppointmentAlta(realSibling.id);
+      // 1) Registro da saída por especialidade (fonte da verdade). A RPC apaga a
+      //    agenda futura da especialidade e grava o corte das recorrências; se
+      //    falhar, nada é apagado e o erro é mostrado.
+      const res = await dischargePatientSpecialty({
+        patientId: altaConfirm.patientId,
+        specialty: profSpecialty,
+        professionalId: profId,
+        tipo: label,
+        reason: altaMotivo.trim(),
+      });
+      const hasOtherActive = !res.altaGlobalAplicada;
+
+      // 2) Agenda deste profissional daqui em diante (inclusive cards de
+      //    Atendimento Multi projetados pela agenda de outro profissional).
+      //    Histórico e agendas de outras especialidades ficam intactos.
+      let cleanupError: string | null = null;
+      try {
+        await removeProfessionalFromPatientAgenda({
+          patientId: altaConfirm.patientId,
+          professionalId: profId,
+          professionalName: selectedProf?.name ?? null,
+          fromDate: todayStr,
+        });
+      } catch (e) {
+        cleanupError = e instanceof Error ? e.message : String(e);
       }
+
       const avfInfo = altaAvf
         ? ` — Avaliação Funcional de alta: ${altaAvf.scoreTotal}/${AVF_MAX} pts${altaAvfEntrada ? ` (entrada: ${altaAvfEntrada.scoreTotal})` : ""}`
         : "";
-      await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}${avfInfo}`);
-
-      const todayStr = todayBR();
-      const profSpecialty = selectedProf?.specialty ?? null;
-
-      // A saída é registrada por especialidade: o status global só vira "Alta"
-      // quando o paciente não tem mais nenhuma outra área ativa.
-      let hasOtherActive = false;
       try {
-        const res = await dischargePatientSpecialty({
-          patientId: altaConfirm.patientId,
-          specialty: profSpecialty,
-          professionalId: altaConfirm.professionalId,
-          tipo: label,
-          reason: altaMotivo.trim(),
-        });
-        hasOtherActive = !res.altaGlobalAplicada;
-      } catch {
-        toast({ title: "Aviso", description: "Não foi possível registrar a alta desta especialidade no prontuário.", variant: "destructive" });
-        hasOtherActive = true;
-      }
+        await logNotificacao(altaConfirm, `${label} — Motivo: ${altaMotivo.trim()}${avfInfo}`);
+      } catch { /* notificação é informativa */ }
 
       // Histórico no prontuário (o status é responsabilidade da RPC acima).
       try {
@@ -1215,28 +1235,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         toast({ title: "Aviso", description: "Motivo registrado na notificação, mas houve falha ao gravar no prontuário.", variant: "destructive" });
       }
 
-      // Cascata: remove TODOS os agendamentos futuros do paciente com este profissional
-      // (não só o grupo de recorrência clicado) — evita "fantasmas" na agenda após a alta.
-      try {
-        const futuros = await listAppointments({
-          patientId: altaConfirm.patientId,
-          professionalId: altaConfirm.professionalId,
-          dateFrom: todayStr,
-        });
-        const gruposRemovidos = new Set<string>();
-        for (const a of futuros) {
-          if (a.id <= 0) continue;
-          const gid = a.recurrenceGroupId || `single:${a.id}`;
-          if (gruposRemovidos.has(gid)) continue;
-          gruposRemovidos.add(gid);
-          try { await deleteAppointmentAlta(a.id); } catch { /* best-effort */ }
-        }
-      } catch { /* best-effort */ }
-
-      // Remove all appointments in the same recurrence group from local state
       setAppointments(prev => prev.filter(a =>
-        a.id !== altaConfirm.id &&
-        !(a.recurrenceGroupId && a.recurrenceGroupId === altaConfirm.recurrenceGroupId)
+        !(a.patientId === altaConfirm.patientId && a.professionalId === profId && a.date >= todayStr)
       ));
       setAltaConfirm(null);
       setAltaMotivo("");
@@ -1244,9 +1244,17 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         ? `${altaConfirm.patientName} — removido desta especialidade. Permanece ativo em outras.`
         : `${altaConfirm.patientName} — status alterado para ${label}.`;
       toast({ title: `${label} aplicada`, description: statusMsg });
+      if (cleanupError) {
+        toast({
+          title: "Agenda não removida por completo",
+          description: `${cleanupError}. Recarregue a agenda e use "Excluir" no horário que sobrou.`,
+          variant: "destructive",
+        });
+      }
       fetchAppointments();
-    } catch {
-      toast({ title: "Erro", description: `Não foi possível aplicar ${label.toLowerCase()}.`, variant: "destructive" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      toast({ title: "Erro", description: `Não foi possível aplicar ${label.toLowerCase()}.${msg ? ` ${msg}` : ""}`, variant: "destructive" });
     }
   };
 
@@ -1993,24 +2001,14 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     const multiPartnerSpec = isMulti ? (apt.notes!.match(/\(([^)]+)\)\s*$/) || [])[1] || null : null;
                                     const isMultiGuest = !!apt.multiGuest;
                                     const isMenuOpen = actionMenuId === apt.id && !isMultiGuest;
+                                    const isGuestMenuOpen = actionMenuId === apt.id && isMultiGuest;
                                     const isPastDate = date < today;
                                     const isGhost = !apt.patientName || apt.patientName.trim() === "";
                                     return (
-                                <div key={apt.id} className="relative" ref={isMenuOpen ? menuRef : null}>
+                                <div key={apt.id} className="relative" ref={isMenuOpen || isGuestMenuOpen ? menuRef : null}>
                                   {/* Appointment block */}
                                   <div
-                                    onClick={() => {
-                                      // Card projetado do Multi: a linha real é do outro
-                                      // profissional, então as ações ficam na agenda dele.
-                                      if (isMultiGuest) {
-                                        toast({
-                                          title: "Atendimento Multi",
-                                          description: `Este horário é um Multi com ${apt.multiHostName || "outro profissional"}. Gerencie o agendamento pela agenda de ${apt.multiHostName || "quem criou o Multi"}.`,
-                                        });
-                                        return;
-                                      }
-                                      setActionMenuId(isMenuOpen ? null : apt.id);
-                                    }}
+                                    onClick={() => setActionMenuId(actionMenuId === apt.id ? null : apt.id)}
                                     className={cn(
                                       "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
                                       isMultiGuest && "border-dashed",
@@ -2098,6 +2096,41 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       </span>
                                     )}
                                   </div>
+
+                                  {/* Card projetado do Multi: a linha real é do anfitrião.
+                                      Presença/falta/remanejo ficam na agenda dele; aqui só
+                                      as ações que tiram este profissional do horário. */}
+                                  {isGuestMenuOpen && (
+                                    <div
+                                      className="absolute z-50 top-full mt-1 left-0 w-60 rounded-2xl overflow-hidden shadow-2xl"
+                                      style={{
+                                        background: "rgba(2,4,8,0.97)",
+                                        border: "1px solid rgba(255,255,255,0.08)",
+                                        backdropFilter: "blur(20px)",
+                                        padding: "10px",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "6px",
+                                      }}
+                                    >
+                                      <p className="text-[10px] text-white/40 uppercase font-bold mb-1 px-1">Multi — {apt.patientName}</p>
+                                      <p className="text-[10px] text-white/50 px-1 leading-tight">
+                                        Horário criado por {apt.multiHostName || "outro profissional"}. Presença, falta e remanejo são feitos na agenda de quem criou.
+                                      </p>
+                                      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                      <button style={NEON.violet} onClick={() => handleExcluirAdmin(apt)}>
+                                        <UserX className="w-3.5 h-3.5" /> Sair deste Multi (daqui em diante)
+                                      </button>
+                                      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
+                                      <p className="text-[9px] text-white/40 uppercase font-bold px-1">Saída</p>
+                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Alta")}>
+                                        <LogOut className="w-3.5 h-3.5" /> Dar Alta
+                                      </button>
+                                      <button style={NEON.red} onClick={() => handleSaida(apt, "Desistência")}>
+                                        <UserX className="w-3.5 h-3.5" /> Desistência
+                                      </button>
+                                    </div>
+                                  )}
 
                                   {/* Action menu */}
                                   {isMenuOpen && (
@@ -2383,7 +2416,11 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
               <p className="text-xs text-white/60 mt-2">
                 O horário voltará a ficar disponível (+ Agendar). <strong className="text-white/80">Não</strong> gera alta, falta nem registro no prontuário.
               </p>
-              {excluirConfirm.recurrenceGroupId && (
+              {excluirConfirm.multiGuest ? (
+                <p className="text-xs text-violet-300/80 mt-2">
+                  ⚠ Atendimento Multi: {selectedProf?.name || "este profissional"} sai deste horário de {excluirConfirm.date} em diante. {excluirConfirm.multiHostName || "O profissional que criou"} continua atendendo o paciente normalmente.
+                </p>
+              ) : excluirConfirm.recurrenceGroupId && (
                 <p className="text-xs text-orange-400/80 mt-2">
                   ⚠ Todos os horários de {excluirConfirm.date} em diante serão excluídos. O histórico anterior será preservado.
                 </p>
