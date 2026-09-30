@@ -1876,6 +1876,76 @@ export async function undoMultiAppointment(params: {
   return { removedNames: [...removedNames], deletedCount: toDelete.length };
 }
 
+/**
+ * O profissional convidado sai de um Atendimento Multi daqui em diante: limpa
+ * a etiqueta "Atendimento Multi com <convidado>" das linhas do profissional
+ * anfitrião (que continua atendendo o paciente sozinho). O card projetado some
+ * da agenda do convidado; nenhuma linha é apagada.
+ */
+export async function leaveMultiAsGuest(params: {
+  patientId: number;
+  hostProfessionalId: number;
+  guestProfessionalName: string;
+  time: string;
+  fromDate: string;
+}): Promise<number> {
+  const rows = await listAppointments({
+    patientId: params.patientId,
+    professionalId: params.hostProfessionalId,
+    dateFrom: params.fromDate,
+  });
+  const alvo = rows.filter(a =>
+    a.id > 0 && a.time === params.time && isPartnerOf(a.notes, params.guestProfessionalName)
+  );
+  await Promise.all(alvo.map(a => updateAppointment(a.id, { notes: "" })));
+  return alvo.length;
+}
+
+/**
+ * Tira o paciente da agenda de UM profissional daqui em diante: apaga as
+ * ocorrências futuras dele com esse profissional (registrando o corte da
+ * recorrência para nada ser recriado), preserva o histórico e limpa a etiqueta
+ * "Atendimento Multi com <profissional>" das linhas dos outros profissionais —
+ * é ela que projeta o card na agenda de quem saiu. Nenhuma agenda de outro
+ * profissional é apagada.
+ */
+export async function removeProfessionalFromPatientAgenda(params: {
+  patientId: number;
+  professionalId: number;
+  professionalName?: string | null;
+  fromDate: string;
+}): Promise<{ deletedGroups: number; deletedSingles: number; clearedMultiTags: number }> {
+  const all = await listAppointments({ patientId: params.patientId, dateFrom: params.fromDate });
+  const name = params.professionalName?.trim() || null;
+
+  const mine = all.filter(a => a.id > 0 && a.professionalId === params.professionalId);
+  const groups = new Set(
+    mine.map(a => a.recurrenceGroupId).filter((g): g is string => !!g && g.trim() !== "")
+  );
+  const singles = mine.filter(a => !a.recurrenceGroupId || a.recurrenceGroupId.trim() === "");
+  const tagged = name
+    ? all.filter(a => a.id > 0 && a.professionalId !== params.professionalId && isPartnerOf(a.notes, name))
+    : [];
+
+  const failures: string[] = [];
+  const run = async (label: string, fn: () => Promise<unknown>) => {
+    try { await fn(); } catch (e) {
+      failures.push(`${label}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  for (const gid of groups) {
+    await run(`série ${gid.slice(0, 8)}`, () => deleteRecurrenceForward(gid, params.fromDate));
+  }
+  await Promise.all(singles.map(a => run(`${a.date} ${a.time}`, () => deleteAppointment(a.id))));
+  await Promise.all(tagged.map(a => run(`multi ${a.date} ${a.time}`, () => updateAppointment(a.id, { notes: "" }))));
+
+  if (failures.length > 0) {
+    throw new Error(`Parte da agenda não foi removida — ${failures.join("; ")}`);
+  }
+  return { deletedGroups: groups.size, deletedSingles: singles.length, clearedMultiTags: tagged.length };
+}
+
 // ── Notificacoes recepcao (Fase 4C) ─────────────────────────────────────────
 
 export type NotificacaoRecepcao = {
