@@ -348,3 +348,27 @@ export async function autolinkTriagem(triagemId: number): Promise<AutolinkResult
     return null;
   }
 }
+
+export type PacienteProntuario = { id: number; name: string; prontuario: string | null };
+
+/** Localiza o paciente da Gestão (NFS) pelo CPF ou nome para exibir o prontuário no relatório. */
+export async function findPatientProntuario(params: { cpf?: string | null; nome?: string | null }): Promise<PacienteProntuario | null> {
+  const digits = (params.cpf ?? "").replace(/\D/g, "");
+  const nome = (params.nome ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!digits && !nome) return null;
+  try {
+    const { slug, password } = requireCompanyCredentials();
+    const sb = requireSupabase();
+    const { data, error } = await sb.rpc("list_patients", { p_slug: slug, p_password: password });
+    if (error || !Array.isArray(data)) return null;
+    type Row = { id: number | string; name: string | null; cpf: string | null; prontuario: string | null };
+    const rows = data as Row[];
+    const match =
+      (digits ? rows.find(r => (r.cpf ?? "").replace(/\D/g, "") === digits) : undefined) ??
+      (nome ? rows.find(r => (r.name ?? "").trim().toLowerCase().replace(/\s+/g, " ") === nome) : undefined);
+    if (!match) return null;
+    return { id: Number(match.id), name: match.name ?? "", prontuario: match.prontuario ?? null };
+  } catch {
+    return null;
+  }
+}
