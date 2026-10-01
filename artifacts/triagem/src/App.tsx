@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { listTriagens, getTriagem, upsertTriagem, deleteTriagem, autolinkTriagem } from "@/lib/triagem-rpc";
+import { listTriagens, getTriagem, upsertTriagem, deleteTriagem, autolinkTriagem, findPatientProntuario } from "@/lib/triagem-rpc";
 import { useTheme } from "@/lib/theme";
 import { Sun, Moon } from "lucide-react";
 
@@ -1029,9 +1029,18 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
   const [salvo, setSalvo] = useState(false);
   const [erroSalvar, setErroSalvar] = useState("");
   const [autolinkMsg, setAutolinkMsg] = useState<string | null>(null);
+  const [prontuario, setProntuario] = useState<string | null>(null);
   const [, navigate] = useLocation();
   const data = new Date().toLocaleDateString("pt-BR");
   const isCenso = tipoRegistro === "Registro Censo Municipal";
+
+  useEffect(() => {
+    let ativo = true;
+    findPatientProntuario({ cpf, nome: nomePaciente }).then(p => {
+      if (ativo) setProntuario(p?.prontuario?.trim() || null);
+    });
+    return () => { ativo = false; };
+  }, [cpf, nomePaciente]);
 
   // ── Pesos por área (multiplicadores de prioridade) ──
   // Fisioterapia tem peso "mestre" maior (1.3x) sobre Psicomotricidade (0.85x).
@@ -1304,9 +1313,16 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
               <p className="text-sm text-muted-foreground">{CLINIC_CONFIG.subtitle}</p>
             </div>
           </div>
-          <div className="flex justify-between mt-3 text-sm">
-            <span><strong>Paciente:</strong> {nomePaciente}</span>
-            <span><strong>Data:</strong> {data}</span>
+          <div className="print-paciente mt-4 flex items-end justify-between gap-6 border-2 border-gray-800 rounded-xl px-5 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Paciente</p>
+              <p className="text-3xl font-black leading-tight uppercase break-words">{nomePaciente || "—"}</p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Prontuário</p>
+              <p className="text-3xl font-black leading-tight">{prontuario ?? "—"}</p>
+              <p className="text-xs text-gray-600 mt-1"><strong>Data:</strong> {data}</p>
+            </div>
           </div>
         </div>
 
@@ -1355,6 +1371,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div className="md:col-span-2"><p className="text-muted-foreground font-semibold">Nome</p><p className="font-bold">{nomePaciente || "—"}</p></div>
+            <div><p className="text-muted-foreground font-semibold">Prontuário</p><p className="font-bold">{prontuario ?? "—"}</p></div>
             <div><p className="text-muted-foreground font-semibold">Data da Triagem</p><p className="font-bold">{data}</p></div>
             {dataNascimento && <div><p className="text-muted-foreground font-semibold">Nascimento</p><p className="font-bold">{new Date(dataNascimento + "T12:00:00").toLocaleDateString("pt-BR")}</p></div>}
             {idade && <div><p className="text-muted-foreground font-semibold">Idade</p><p className="font-bold">{idade}</p></div>}
@@ -1485,7 +1502,7 @@ function Relatorio({ formData, onNova, editId, viewOnly }: {
                   </div>
                 </div>
                 <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: nivel.hex }} />
+                  <div className="h-full rounded-full print-color" style={{ width: `${pct}%`, backgroundColor: nivel.hex }} />
                 </div>
               </div>
             ))}

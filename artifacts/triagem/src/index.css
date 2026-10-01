@@ -218,35 +218,56 @@ input[type="checkbox"], input[type="radio"] {
   accent-color: hsl(196 100% 48%);
 }
 
-/* ── Print: fundo branco para PDF ── */
+/* ── Print: fundo branco, cores das áreas preservadas ── */
 @media print {
   .no-print { display: none !important; }
   .print-only { display: block !important; }
+  :root, :root.light, :root.dark {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 14%;
+    --border: 220 18% 80%;
+    --input: 220 22% 94%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 14%;
+    --primary: 196 80% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 22% 92%;
+    --secondary-foreground: 222 40% 22%;
+    --muted: 220 22% 95%;
+    --muted-foreground: 220 12% 38%;
+    --accent: 196 70% 92%;
+    --accent-foreground: 196 80% 28%;
+    --app-bg: #ffffff;
+    --app-bg-soft: #ffffff;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+  }
   html, body, #root {
     background: white !important;
     background-color: white !important;
-    color: black !important;
+    color: hsl(var(--foreground)) !important;
     font-size: 11px;
   }
-  * {
-    color: black !important;
-    border-color: #e5e7eb !important;
-    box-shadow: none !important;
-    background-color: white !important;
-  }
+  .print-color { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   .header-gradient, .glass {
     background: white !important;
     border-color: #e5e7eb !important;
-    box-shadow: none !important;
   }
   .glow-card, .glow-card-red, .glow-card-orange { box-shadow: 0 0 0 1px #e5e7eb !important; }
-  /* Recharts SVG — manter cores dos gráficos legíveis */
-  svg rect, svg path, svg circle { background-color: transparent !important; }
-  svg text { color: #374151 !important; fill: #374151 !important; }
-  .recharts-text { fill: #374151 !important; }
+  .bg-card { background-color: white !important; }
+  /* Chips/faixas das áreas e níveis: fundos escuros da tela ficam legíveis no papel */
+  [class*="-950/"] { background-color: color-mix(in srgb, currentColor 14%, white) !important; }
+  [class*="text-"][class*="-300"], [class*="text-"][class*="-400"] { filter: brightness(0.6) saturate(1.4); }
+  .print-paciente { border-color: #1f2937 !important; color: #111827 !important; }
+  .print-paciente * { color: inherit !important; }
+  svg text, .recharts-text { fill: #374151 !important; }
   .recharts-cartesian-grid line { stroke: #d1d5db !important; }
   .recharts-tooltip-wrapper { display: none !important; }
-  /* Evitar quebra de página dentro dos cards */
   .bg-card, .rounded-2xl { break-inside: avoid; page-break-inside: avoid; }
-  @page { margin: 1.5cm; size: A4; }
+  @page { margin: 1.2cm; size: A4; }
 }
