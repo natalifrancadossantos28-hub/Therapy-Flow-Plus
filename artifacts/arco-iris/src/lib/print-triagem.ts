@@ -16,6 +16,10 @@ export function printTriagemMulti(
     .join("\n");
   const content = el.cloneNode(true) as HTMLElement;
   content.querySelectorAll(".no-print").forEach((n) => n.remove());
+  // O CSS do app (copiado acima) esconde na impressão tudo que não contém
+  // [data-triagem-print] — inclusive o cabeçalho com nome e prontuário.
+  content.removeAttribute("data-triagem-print");
+  content.querySelectorAll("[data-triagem-print]").forEach((n) => n.removeAttribute("data-triagem-print"));
 
   const html = `<!DOCTYPE html><html lang="pt-BR" class="light"><head>
 <meta charset="utf-8">
