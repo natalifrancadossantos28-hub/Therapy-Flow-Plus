@@ -3,6 +3,7 @@ import { Button, Input, Label } from "@/components/ui-custom";
 import { Printer, X as XIcon } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { printTriagemMulti } from "@/lib/print-triagem";
+import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer } from "recharts";
 import {
   upsertTriagemMulti, autolinkTriagemMulti,
   type Patient, type TriagemMulti, type AutolinkTriagemResult,
@@ -29,6 +30,33 @@ const escalaCls = (v: number) =>
     : v === 1 ? "bg-blue-500 text-white border-blue-500"
     : v === 2 ? "bg-amber-500 text-white border-amber-500"
     : "bg-rose-500 text-white border-rose-500";
+
+function GraficoRadar({ porArea }: { porArea: { area: string; pct: number }[] }) {
+  const data = porArea.map(({ area, pct }) => ({ area: SHORT_NAMES[area] ?? area, pct, fullMark: 100 }));
+  const pctMedio = porArea.length ? Math.round(porArea.reduce((a, b) => a + b.pct, 0) / porArea.length) : 0;
+  const cor = corTotal(pctMedio);
+  const gradId = `radar-grad-${cor.replace("#", "")}`;
+  return (
+    <div style={{ width: "100%", height: 340 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart data={data} margin={{ top: 24, right: 48, bottom: 24, left: 48 }}>
+          <defs>
+            <radialGradient id={gradId} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor={cor} stopOpacity={0.55} />
+              <stop offset="70%" stopColor={cor} stopOpacity={0.18} />
+              <stop offset="100%" stopColor={cor} stopOpacity={0.02} />
+            </radialGradient>
+          </defs>
+          <PolarGrid gridType="circle" stroke="rgba(148,163,184,0.35)" />
+          <PolarAngleAxis dataKey="area" tick={{ fontSize: 11, fontWeight: 700, fill: "currentColor" }} />
+          <PolarRadiusAxis angle={90} domain={[0, 100]} tickCount={5} tick={{ fontSize: 8, fill: "rgba(148,163,184,0.8)" }} />
+          <Radar name="Índice (%)" dataKey="pct" stroke={cor} strokeWidth={2.5} fill={`url(#${gradId})`} fillOpacity={1} isAnimationActive={false}
+            dot={{ r: 5, fill: cor, stroke: "rgba(255,255,255,0.8)", strokeWidth: 1.5 }} />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 const idadeDe = (dataNascimento: string | null): string => {
   if (!dataNascimento) return "";
@@ -208,9 +236,10 @@ export function TriagemMultiResultado({ triagem, patient, compact }: { triagem: 
 
           {/* Perfil por área */}
           <div className="rounded-2xl border border-border/60 p-5 bg-card">
-            <h4 className="font-bold text-base mb-1">Perfil Multidisciplinar</h4>
+            <h4 className="font-bold text-base mb-1">Teia de Aranha – Perfil Multidisciplinar</h4>
             <p className="text-muted-foreground mb-3">Percentual de indicativo por área avaliada</p>
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+            {!compact && <GraficoRadar porArea={r.porArea} />}
+            <div className="grid grid-cols-3 md:grid-cols-5 gap-2 mt-3">
               {r.porArea.map(({ area, pct, nivel }) => (
                 <div key={area} className={cn("text-center p-2 rounded-xl border", nivel.bg)}>
                   <p className="text-xs font-semibold text-muted-foreground truncate">{SHORT_NAMES[area]}</p>

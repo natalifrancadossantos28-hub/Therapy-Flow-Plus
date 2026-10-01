@@ -19,6 +19,7 @@ export function printTriagemMulti(
 
   const html = `<!DOCTYPE html><html lang="pt-BR" class="light"><head>
 <meta charset="utf-8">
+<base href="${esc(window.location.origin)}/">
 <title>Triagem_${esc((info.nome || "Paciente").replace(/\s+/g, "_"))}${info.prontuario ? `_${esc(info.prontuario)}` : ""}</title>
 ${styles}
 <style>
@@ -28,10 +29,15 @@ ${styles}
   .print-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; border: 2px solid #1f2937; border-radius: 14px; padding: 14px 20px; margin-bottom: 16px; break-inside: avoid; }
   .print-top .lbl { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #6b7280; margin: 0 0 2px; }
   .print-top .nome { font-size: 30px; font-weight: 900; line-height: 1.1; text-transform: uppercase; margin: 0; color: #111827; }
-  .print-top .pront { font-size: 34px; font-weight: 900; line-height: 1; margin: 0; color: #0e7490; text-align: right; white-space: nowrap; }
+  .print-top .pront { font-size: 34px; font-weight: 900; line-height: 1; margin: 0; color: #111827; text-align: right; white-space: nowrap; }
   .print-top .data { font-size: 11px; color: #4b5563; margin: 4px 0 0; text-align: right; }
-  .print-title { font-size: 16px; font-weight: 800; color: #0e7490; margin: 0 0 12px; }
-  .footer { margin-top: 18px; font-size: 10px; color: #94a3b8; }
+  .print-head { display: flex; align-items: center; gap: 16px; border-bottom: 2px solid #1f2937; padding-bottom: 14px; margin-bottom: 16px; }
+  .print-head img { height: 64px; width: auto; }
+  .print-head h1 { font-size: 22px; font-weight: 800; margin: 0; color: #111827; }
+  .print-head p { font-size: 12px; color: #6b7280; margin: 2px 0 0; }
+  .footer { margin-top: 18px; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 10px; color: #6b7280; }
+  .recharts-text, svg text { fill: #374151 !important; }
+  .recharts-tooltip-wrapper { display: none !important; }
   .rounded-2xl, .rounded-xl { break-inside: avoid; page-break-inside: avoid; }
   @page { size: A4 portrait; margin: 12mm; }
   @media print { .no-print { display: none !important; } body { padding: 0; } }
@@ -40,13 +46,16 @@ ${styles}
     <button onclick="window.close()" style="padding:8px 18px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar</button>
     <button onclick="window.print()" style="padding:8px 18px;background:#0891b2;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">🖨 Imprimir / Salvar PDF</button>
   </div>
+  <div class="print-head">
+    <img src="/nfs-logo.png" alt="NFs systems" />
+    <div><h1>NFs – Triagem Multidisciplinar</h1><p>Avaliação multidisciplinar para crianças e adolescentes (0–18 anos)</p></div>
+  </div>
   <div class="print-top">
     <div><p class="lbl">Paciente</p><p class="nome">${esc(info.nome || "—")}</p></div>
     <div><p class="lbl">Prontuário</p><p class="pront">${esc(info.prontuario?.trim() || "—")}</p>${info.data ? `<p class="data"><strong>Data da triagem:</strong> ${esc(info.data)}</p>` : ""}</div>
   </div>
-  <p class="print-title">Triagem Multidisciplinar — Núcleo Integrado Novo Arco-Íris</p>
   ${content.outerHTML}
-  <div class="footer">NFS – Gestão Terapêutica</div>
+  <div class="footer">© ${new Date().getFullYear()} NFs – Triagem Multidisciplinar — Documento gerado em ${esc(new Date().toLocaleDateString("pt-BR"))}</div>
 </div></body></html>`;
 
   const w = window.open("", "_blank");
