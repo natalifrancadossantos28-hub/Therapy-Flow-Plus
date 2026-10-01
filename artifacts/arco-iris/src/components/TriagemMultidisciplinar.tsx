@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button, Input, Label } from "@/components/ui-custom";
 import { Printer, X as XIcon } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
+import { printTriagemMulti } from "@/lib/print-triagem";
 import {
   upsertTriagemMulti, autolinkTriagemMulti,
   type Patient, type TriagemMulti, type AutolinkTriagemResult,
@@ -387,6 +388,7 @@ export function TriagemMultiForm({ patient, base, professionalName, professional
     }
   };
 
+  const resultadoRef = useRef<HTMLDivElement>(null);
   const preview: TriagemMulti = { id: b?.id ?? 0, createdAt: b?.createdAt ?? new Date().toISOString(), ...payload() };
 
   const etapas: Array<{ key: typeof etapa; label: string }> = [
@@ -562,12 +564,12 @@ export function TriagemMultiForm({ patient, base, professionalName, professional
 
       {etapa === "resultado" && (
         <div className="space-y-4">
-          <TriagemMultiResultado triagem={preview} patient={patient} />
+          <div ref={resultadoRef}><TriagemMultiResultado triagem={preview} patient={patient} /></div>
           {error && <p className="text-sm text-red-500 font-semibold">{error}</p>}
           <div className="flex flex-wrap justify-end gap-2 no-print">
             <Button variant="ghost" onClick={onCancel} disabled={saving}><XIcon className="w-4 h-4 mr-1" />Cancelar</Button>
             <Button variant="outline" onClick={() => setEtapa("perguntas")} disabled={saving}>← Voltar ao questionário</Button>
-            <Button variant="outline" onClick={() => window.print()} disabled={saving} className="gap-2"><Printer className="w-4 h-4" />Imprimir</Button>
+            <Button variant="outline" onClick={() => printTriagemMulti(resultadoRef.current, { nome: preview.nome || patient?.name || "", prontuario: patient?.prontuario, data: preview.data })} disabled={saving} className="gap-2"><Printer className="w-4 h-4" />Imprimir</Button>
             <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : b ? "Atualizar Triagem" : "Salvar Triagem"}</Button>
           </div>
         </div>

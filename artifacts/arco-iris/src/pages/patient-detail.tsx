@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Card, Button, Badge, MotionCard, Input, Label, Select } from "@/components/ui-custom";
 import { generatePatientPdf } from "@/hooks/use-pdf";
@@ -39,6 +39,7 @@ import { AVF_MAX, AVF_PERGUNTAS, avfFaixa } from "@/lib/avaliacao-funcional";
 import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, printAbcChecklist, type AbcAreaKey } from "@/lib/abc-checklist";
 import { getProfessionalSession } from "@/lib/portal-session";
 import { TriagemMultiForm, TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
+import { printTriagemMulti } from "@/lib/print-triagem";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
@@ -126,6 +127,8 @@ export default function PatientDetail() {
   const [triagensMulti, setTriagensMulti] = useState<TriagemMulti[]>([]);
   const [triagemMultiForm, setTriagemMultiForm] = useState<{ base: TriagemMulti | null } | null>(null);
   const [triagemMultiView, setTriagemMultiView] = useState<TriagemMulti | null>(null);
+  const triagemViewRef = useRef<HTMLDivElement>(null);
+  const triagemCompactRef = useRef<HTMLDivElement>(null);
   const [sPsicologia, setSPsicologia] = useState("");
   const [sPsicomotricidade, setSPsicomotricidade] = useState("");
   const [sFisioterapia, setSFisioterapia] = useState("");
@@ -763,10 +766,13 @@ export default function PatientDetail() {
 
             {triagensMulti.length > 0 && (
               <div className="mb-5 space-y-3">
-                <TriagemMultiResultado triagem={triagensMulti[0]} patient={patient} compact />
+                <div ref={triagemCompactRef}><TriagemMultiResultado triagem={triagensMulti[0]} patient={patient} compact /></div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button variant="outline" size="sm" className="gap-2" onClick={() => setTriagemMultiView(triagensMulti[0])}>
-                    <FileText className="w-4 h-4" /> Ver completa / Imprimir
+                    <FileText className="w-4 h-4" /> Ver completa
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => printTriagemMulti(triagemCompactRef.current, { nome: patient.name, prontuario: patient.prontuario, data: triagensMulti[0].data || formatDate(triagensMulti[0].createdAt.slice(0, 10)) })}>
+                    <Printer className="w-4 h-4" /> Imprimir / PDF
                   </Button>
                   <Button variant="ghost" size="sm" className="gap-2" onClick={() => setTriagemMultiForm({ base: triagensMulti[0] })}>
                     <Pencil className="w-4 h-4" /> Editar respostas
@@ -1160,11 +1166,11 @@ export default function PatientDetail() {
                 <p className="text-sm text-muted-foreground">{patient.name} · {triagemMultiView.data || formatDate(triagemMultiView.createdAt.slice(0, 10))}</p>
               </div>
               <div className="flex gap-2 no-print">
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => window.print()}><Printer className="w-4 h-4" />Imprimir</Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => printTriagemMulti(triagemViewRef.current, { nome: patient.name, prontuario: patient.prontuario, data: triagemMultiView.data || formatDate(triagemMultiView.createdAt.slice(0, 10)) })}><Printer className="w-4 h-4" />Imprimir</Button>
                 <Button variant="ghost" size="sm" onClick={() => setTriagemMultiView(null)}><XIcon className="w-4 h-4" /></Button>
               </div>
             </div>
-            <TriagemMultiResultado triagem={triagemMultiView} patient={patient} />
+            <div ref={triagemViewRef}><TriagemMultiResultado triagem={triagemMultiView} patient={patient} /></div>
           </MotionCard>
         </div>
       )}
