@@ -478,6 +478,8 @@ export default function WaitingList() {
             Pais <strong>desempregados</strong> somam +10 pontos e trabalho <strong>informal/roça</strong> +5.
             Quem já atende no <strong>particular</strong> perde 10 pontos, o bônus de idade e a Prioridade Máxima por idade;
             quem atende no <strong>CAPS/Reabilitação</strong> perde só 5 pontos. Abrigo mantém Prioridade Máxima.
+            Pelo diagnóstico/CID, quem tem <strong>deficiência</strong> passa na frente na especialidade que mais precisa
+            (ex.: paralisia cerebral, física e visual na Fisio/T.O.; auditiva na Fono; intelectual e TEA na Psico/T.O.), logo depois da Prioridade Máxima.
           </span>
         </div>
         {specialtyOptions.length > 0 && (
@@ -601,6 +603,14 @@ export default function WaitingList() {
                         >
                           <AbcNivelBadge nivel={entry.abcNivel ?? null} total={entry.abcTotal ?? null} />
                         </div>
+                        {entry.demandaPrioritaria && (
+                          <div
+                            title={`Demanda prioritária pelo diagnóstico/CID: ${entry.demandaPrioritaria}. Fica logo depois da Prioridade Máxima nesta especialidade.`}
+                            className="mt-1 text-[11px] font-bold text-rose-500"
+                          >
+                            ★ {entry.demandaPrioritaria}
+                          </div>
+                        )}
                         {entry.atendeFora && (
                           <div
                             title={entry.atendeForaTipo === "particular"
