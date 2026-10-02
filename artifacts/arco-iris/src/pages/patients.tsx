@@ -166,6 +166,7 @@ export default function Patients() {
     abrigoCasaCrianca: false,
     tipoRegistro: "Paciente da Unidade",
     localAtendimento: "",
+    trabalhoPais: "",
     photoUrl: null as string | null,
   });
 
@@ -256,7 +257,7 @@ export default function Patients() {
       name: "", prontuario: next, cpf: "", cns: "", phone: "", dateOfBirth: "",
       motherName: "", fatherName: "", guardianName: "", guardianPhone: "", address: "", diagnosis: "",
       entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
-      tipoRegistro: "Paciente da Unidade", localAtendimento: "", photoUrl: null,
+      tipoRegistro: "Paciente da Unidade", localAtendimento: "", trabalhoPais: "", photoUrl: null,
     });
     setIsDialogOpen(true);
   };
@@ -268,7 +269,7 @@ export default function Patients() {
       name: "", prontuario: "", cpf: "", cns: "", phone: "", dateOfBirth: "",
       motherName: "", fatherName: "", guardianName: "", guardianPhone: "", address: "", diagnosis: "",
       entryDate: today(), escolaPublica: false, abrigoCasaCrianca: false,
-      tipoRegistro: "Paciente da Unidade", localAtendimento: "", photoUrl: null,
+      tipoRegistro: "Paciente da Unidade", localAtendimento: "", trabalhoPais: "", photoUrl: null,
     });
   };
 
@@ -896,11 +897,6 @@ export default function Patients() {
                 <div className="col-span-2">
                   <Label>Nome do Pai</Label>
                   <Input value={formData.fatherName} onChange={e => setFormData({ ...formData, fatherName: e.target.value })} placeholder="Nome completo do pai" />
-                  {formData.motherName.trim() !== "" && formData.fatherName.trim() !== "" && (
-                    <p className="text-xs text-amber-600 mt-1 font-semibold">
-                      Pai e mãe registrados: a fila de espera aplica uma penalidade no score (o paciente continua na disputa).
-                    </p>
-                  )}
                 </div>
                 <div className="col-span-2">
                   <Label>Endereço</Label>
@@ -952,10 +948,33 @@ export default function Patients() {
                     <option value="">Selecione...</option>
                     {["CAPS", "Reabilitação", "Particular", "Sem Atendimento"].map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
-                  {formData.localAtendimento !== "" && formData.localAtendimento !== "Sem Atendimento" && (
+                  {formData.localAtendimento === "Particular" && (
                     <p className="text-xs text-amber-600 mt-1 font-semibold">
-                      Já atende em outro lugar: na fila de espera não recebe prioridade (sem Prioridade Máxima e sem bônus de idade).
+                      Atendimento particular: na fila perde 10 pontos, o bônus de idade e a Prioridade Máxima por idade.
                     </p>
+                  )}
+                  {(formData.localAtendimento === "CAPS" || formData.localAtendimento === "Reabilitação") && (
+                    <p className="text-xs text-amber-600 mt-1 font-semibold">
+                      Já atende na rede pública: na fila perde 5 pontos e mantém a prioridade.
+                    </p>
+                  )}
+                </div>
+
+                <div className="col-span-2">
+                  <Label>Trabalho dos pais</Label>
+                  <select
+                    value={formData.trabalhoPais}
+                    onChange={e => setFormData({ ...formData, trabalhoPais: e.target.value })}
+                    className="mt-1 w-full border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-background"
+                  >
+                    <option value="">Selecione...</option>
+                    {["Formal (Carteira Assinada)", "Informal/Roça", "Desempregado", "Aposentado/Pensionista"].map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                  {formData.trabalhoPais === "Desempregado" && (
+                    <p className="text-xs text-emerald-600 mt-1 font-semibold">Pais desempregados: +10 pontos na fila.</p>
+                  )}
+                  {formData.trabalhoPais === "Informal/Roça" && (
+                    <p className="text-xs text-emerald-600 mt-1 font-semibold">Trabalho informal/roça: +5 pontos na fila.</p>
                   )}
                 </div>
 

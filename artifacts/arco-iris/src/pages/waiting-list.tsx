@@ -475,8 +475,9 @@ export default function WaitingList() {
             <strong> ordem de chegada</strong> (do mais antigo para o mais novo pela data de entrada).
           </span>
           <span className="w-full text-[11px] text-muted-foreground">
-            Quem <strong>já faz atendimento terapêutico em outro lugar</strong> não recebe prioridade (sem Prioridade Máxima e sem bônus de idade).
-            Quem tem <strong>pai e mãe registrados</strong> perde pontos no score, mas continua na disputa.
+            Pais <strong>desempregados</strong> somam +10 pontos e trabalho <strong>informal/roça</strong> +5.
+            Quem já atende no <strong>particular</strong> perde 10 pontos, o bônus de idade e a Prioridade Máxima por idade;
+            quem atende no <strong>CAPS/Reabilitação</strong> perde só 5 pontos. Abrigo mantém Prioridade Máxima.
           </span>
         </div>
         {specialtyOptions.length > 0 && (
@@ -602,10 +603,12 @@ export default function WaitingList() {
                         </div>
                         {entry.atendeFora && (
                           <div
-                            title={`Já faz atendimento terapêutico fora da unidade${entry.localAtendimento ? ` (${entry.localAtendimento})` : ""}: não recebe Prioridade Máxima nem bônus de idade.`}
+                            title={entry.atendeForaTipo === "particular"
+                              ? "Já faz atendimento particular: −10 pontos, sem bônus de idade e sem Prioridade Máxima por idade."
+                              : `Já atende na rede pública${entry.localAtendimento ? ` (${entry.localAtendimento})` : ""}: −5 pontos, mantém a prioridade.`}
                             className="mt-1 text-[11px] font-bold text-amber-500"
                           >
-                            ⚠ atende fora · sem prioridade
+                            {entry.atendeForaTipo === "particular" ? "⚠ particular · −10" : `⚠ atende fora · −${entry.penalidadeFora ?? 5}`}
                           </div>
                         )}
                         {entry.ordenacao === "chegada" && (
@@ -623,17 +626,17 @@ export default function WaitingList() {
                             <div className="flex items-baseline gap-1 font-mono">
                               <span className="font-bold text-foreground">{areaToUi(entry.scoreEspecialidade)}</span>
                               <span className="text-xs text-muted-foreground">/{AREA_MAX_UI}</span>
-                              {!!entry.penalidadePais && entry.penalidadePais > 0 && (
+                              {!!entry.bonusTrabalho && entry.bonusTrabalho > 0 && (
                                 <span
-                                  title="Pai e mãe registrados no cadastro: penalidade no score de ordenação (não vai para o fim da fila)"
-                                  className="ml-2 text-xs font-semibold text-rose-400"
+                                  title={`Trabalho dos pais: ${entry.trabalhoPais || "Informal/Roça"} (Desempregado +10, Informal/Roça +5)`}
+                                  className="ml-2 text-xs font-semibold text-emerald-500"
                                 >
-                                  −{entry.penalidadePais} pai e mãe
+                                  +{entry.bonusTrabalho} {entry.bonusTrabalho >= 10 ? "desempregado" : "informal"}
                                 </span>
                               )}
                               {!!entry.scoreSocialDesempate && entry.scoreSocialDesempate > 0 && (
                                 <span
-                                  title="Pontos de vulnerabilidade somados como desempate (+1 Escola Publica / +1 Trabalho na Roca)"
+                                  title="Ponto de vulnerabilidade somado como desempate (+1 Escola Pública)"
                                   className="ml-2 text-xs font-semibold text-amber-500"
                                 >
                                   +{entry.scoreSocialDesempate} desempate

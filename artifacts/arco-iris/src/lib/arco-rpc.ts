@@ -476,6 +476,8 @@ export type Patient = {
   abrigoCasaCrianca: boolean | null;
   tipoRegistro: string | null;
   localAtendimento: string | null;
+  /** Trabalho dos pais: Formal, Informal/Roça, Desempregado, Aposentado/Pensionista. */
+  trabalhoPais: string | null;
   /** Já faz atendimento terapêutico em outro local (fora da unidade). */
   outroAtendimento: boolean | null;
   photoUrl: string | null;
@@ -519,6 +521,7 @@ type PatientRow = {
   abrigo_casa_crianca: boolean | null;
   tipo_registro: string | null;
   local_atendimento: string | null;
+  trabalho_pais?: string | null;
   outro_atendimento: boolean | null;
   photo_url: string | null;
   created_at: string;
@@ -568,6 +571,7 @@ function mapPatient(r: PatientRow): Patient {
     abrigoCasaCrianca: r.abrigo_casa_crianca,
     tipoRegistro: r.tipo_registro,
     localAtendimento: r.local_atendimento,
+    trabalhoPais: r.trabalho_pais ?? null,
     outroAtendimento: r.outro_atendimento,
     photoUrl: r.photo_url,
     createdAt: r.created_at,
@@ -950,8 +954,15 @@ export type WaitingListEntry = {
   atendeFora?: boolean | null;
   /** Pai e mãe preenchidos no cadastro: penalidade no score. */
   paisRegistrados?: boolean | null;
-  /** Pontos descontados do score por pai e mãe registrados. */
+  /** Pontos descontados do score por pai e mãe registrados (regra extinta; sempre 0). */
   penalidadePais?: number | null;
+  trabalhoPais?: string | null;
+  /** Desempregado +10, Informal/Roça +5. */
+  bonusTrabalho?: number | null;
+  /** 'particular' | 'sus' (CAPS/Reabilitação) | null. */
+  atendeForaTipo?: string | null;
+  /** Particular -10, CAPS/Reabilitação -5. */
+  penalidadeFora?: number | null;
   /** Onde faz o atendimento fora da unidade. */
   localAtendimento?: string | null;
   /** Data de nascimento do paciente (ISO). */
