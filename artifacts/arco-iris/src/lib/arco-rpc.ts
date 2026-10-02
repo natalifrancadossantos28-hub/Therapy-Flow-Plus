@@ -959,6 +959,8 @@ export type WaitingListEntry = {
   trabalhoPais?: string | null;
   /** Desempregado +10, Informal/Roça +5. */
   bonusTrabalho?: number | null;
+  /** Demanda pelo diagnóstico/CID (ex.: Paralisia cerebral na Fisio, Deficiência auditiva na Fono). */
+  demandaPrioritaria?: string | null;
   /** 'particular' | 'sus' (CAPS/Reabilitação) | null. */
   atendeForaTipo?: string | null;
   /** Particular -10, CAPS/Reabilitação -5. */
