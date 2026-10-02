@@ -20,9 +20,12 @@ import {
   checkProntuario as checkProntuarioRpc,
   type Patient,
   type Professional,
+  type TriagemMulti,
+  type AutolinkTriagemResult,
 } from "@/lib/arco-rpc";
 import { hasAdminScope, getProfessionalSession } from "@/lib/portal-session";
 import { AbcNivelBadge, AbcChecklistForm } from "@/components/AbcChecklistForm";
+import { TriagemMultiForm } from "@/components/TriagemMultidisciplinar";
 import { ABC_NIVEL_INFO } from "@/lib/abc-checklist";
 
 const STATUS_OPTIONS = [
@@ -129,6 +132,8 @@ export default function Patients() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [abcByPatient, setAbcByPatient] = useState<Map<number, AbcResumo>>(new Map());
   const [abcTriagem, setAbcTriagem] = useState<Patient | null>(null);
+  const [wizardTriagem, setWizardTriagem] = useState<Patient | null>(null);
+  const [abcNoWizard, setAbcNoWizard] = useState(false);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [patientProfs, setPatientProfs] = useState<Map<number, { names: string[]; count: number }>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
@@ -462,10 +467,14 @@ export default function Patients() {
         status: "Aguardando Triagem",
       });
       setPatients(prev => [created, ...prev]);
-      toast({ title: "Paciente cadastrado!", description: `Prontuário ${formData.prontuario || "—"} • Agora faça a Triagem ABC.` });
       setIsDialogOpen(false);
       resetForm();
-      setAbcTriagem(created);
+      if (created.status === "Cadastro Geral") {
+        toast({ title: "Paciente cadastrado!", description: `Prontuário ${formData.prontuario || "—"} • Cadastro Geral (sem triagem).` });
+      } else {
+        toast({ title: "Dados salvos", description: `Prontuário ${formData.prontuario || "—"} • Etapa 2: Triagem Multidisciplinar.` });
+        setWizardTriagem(created);
+      }
     } catch (err: any) {
       toast({
         title: "Erro",
@@ -475,6 +484,27 @@ export default function Patients() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const avancarParaAbc = (pat: Patient) => {
+    setWizardTriagem(null);
+    setAbcNoWizard(true);
+    setAbcTriagem(pat);
+  };
+
+  const fecharAbc = () => {
+    setAbcTriagem(null);
+    setAbcNoWizard(false);
+  };
+
+  const handleTriagemWizardSaved = (pat: Patient, t: TriagemMulti, link: AutolinkTriagemResult | null) => {
+    if (link?.addedToQueue && link.addedSpecialties?.length) {
+      setPatients(prev => prev.map(p => p.id === pat.id && p.status !== "Atendimento" ? { ...p, status: "Fila de Espera" } : p));
+      toast({ title: "Triagem salva e paciente na fila!", description: `Fila: ${link.addedSpecialties.join(", ")}${link.priority ? ` · Prioridade: ${link.priority}` : ""}` });
+    } else {
+      toast({ title: "Triagem salva", description: `${t.nome ?? pat.name} • Etapa 3: Avaliação ABC.` });
+    }
+    avancarParaAbc(pat);
   };
 
   const handleAbcSaved = async (a: AbcAvaliacao) => {
@@ -492,7 +522,7 @@ export default function Patients() {
       });
       return next;
     });
-    setAbcTriagem(null);
+    fecharAbc();
     toast({ title: "Triagem ABC salva", description: `${a.scoreTotal} pontos — ${ABC_NIVEL_INFO[a.nivel].label}` });
     try {
       const r = await enqueueAfterAbcEntrada(pat, a);
@@ -722,9 +752,32 @@ export default function Patients() {
         )}
       </Card>
 
+      {wizardTriagem && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <MotionCard className="w-full max-w-4xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <CadastroEtapas atual={2} />
+            <h2 className="text-xl font-bold font-display mb-1">Triagem Multidisciplinar</h2>
+            <p className="text-sm text-muted-foreground mb-5">{wizardTriagem.prontuario ? `${wizardTriagem.prontuario} · ` : ""}{wizardTriagem.name}</p>
+            <TriagemMultiForm
+              key={`tm-${wizardTriagem.id}`}
+              patient={wizardTriagem}
+              base={null}
+              professionalName={getProfessionalSession()?.professionalName ?? null}
+              professionalSpecialty={getProfessionalSession()?.specialty ?? null}
+              onCancel={() => avancarParaAbc(wizardTriagem)}
+              onSaved={(t, link) => handleTriagemWizardSaved(wizardTriagem, t, link)}
+            />
+            <p className="text-xs text-muted-foreground mt-3">
+              Sem dados para a triagem agora? <strong>Cancelar</strong> pula para a Avaliação ABC; a triagem pode ser feita depois pela ficha do paciente.
+            </p>
+          </MotionCard>
+        </div>
+      )}
+
       {abcTriagem && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
           <MotionCard className="w-full max-w-3xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            {abcNoWizard && <CadastroEtapas atual={3} />}
             <p className="text-xs text-muted-foreground mb-4">
               Ao salvar, o paciente entra automaticamente na <strong>Fila de Espera</strong>, ordenado pelo grau de impacto.
             </p>
@@ -738,7 +791,7 @@ export default function Patients() {
               professionalId={getProfessionalSession()?.professionalId ?? null}
               professionalName={getProfessionalSession()?.professionalName ?? null}
               saveLabel="Salvar triagem e colocar na fila"
-              onCancel={() => setAbcTriagem(null)}
+              onCancel={fecharAbc}
               onSaved={(a) => { void handleAbcSaved(a); }}
             />
           </MotionCard>
@@ -762,9 +815,10 @@ export default function Patients() {
               </div>
             )}
 
+            <CadastroEtapas atual={1} />
             <h2 className="text-2xl font-bold font-display mb-1">Novo Paciente</h2>
             <p className="text-sm text-muted-foreground mb-6">
-              Será cadastrado com status <strong>Aguardando Triagem</strong>.
+              Depois dos dados, o cadastro segue para a <strong>Triagem Multidisciplinar</strong> e a <strong>Avaliação ABC</strong>; ao final o paciente entra sozinho na fila.
             </p>
 
             <form onSubmit={handleCreate} className="space-y-4">
@@ -962,5 +1016,31 @@ export default function Patients() {
         </div>
       )}
     </div>
+  );
+}
+
+const CADASTRO_ETAPAS = ["Dados do paciente", "Triagem Multidisciplinar", "Avaliação ABC"];
+
+function CadastroEtapas({ atual }: { atual: number }) {
+  return (
+    <ol className="flex items-center gap-2 mb-4 text-xs font-semibold flex-wrap">
+      {CADASTRO_ETAPAS.map((label, i) => {
+        const n = i + 1;
+        return (
+          <li
+            key={label}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1 rounded-full border",
+              n === atual ? "bg-primary text-primary-foreground border-primary"
+                : n < atual ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                : "bg-secondary text-muted-foreground border-border",
+            )}
+          >
+            <span>{n}</span>
+            <span>{label}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
