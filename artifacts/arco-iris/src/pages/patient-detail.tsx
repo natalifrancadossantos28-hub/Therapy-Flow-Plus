@@ -74,6 +74,9 @@ const toScoreDisplay = (
 
 // Cor da classificacao depende SO da demanda clinica (triagem_score 0-360).
 // Pesos sociais sao apenas desempate na fila (NAO mudam a cor).
+const TRABALHO_PAIS_OPCOES = ["Formal (Carteira Assinada)", "Informal/Roça", "Desempregado", "Aposentado/Pensionista"];
+const LOCAL_ATENDIMENTO_OPCOES = ["CAPS", "Reabilitação", "Particular", "Sem Atendimento"];
+
 function calcPriority(score: number, _escolaPublica: boolean, _trabalhoNaRoca: boolean, _semTerapia: boolean = false): "elevado" | "moderado" | "leve" | "baixo" {
   const levels: Array<"elevado" | "moderado" | "leve" | "baixo"> = ["baixo", "leve", "moderado", "elevado"];
   const baseIdx = score >= 270 ? 3 : score >= 180 ? 2 : score >= 90 ? 1 : 0;
@@ -156,6 +159,8 @@ export default function PatientDetail() {
   const [editEmail, setEditEmail] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editMotherName, setEditMotherName] = useState("");
+  const [editTrabalhoPais, setEditTrabalhoPais] = useState("");
+  const [editLocalAtendimento, setEditLocalAtendimento] = useState("");
   const [editFatherName, setEditFatherName] = useState("");
   const [editGuardianName, setEditGuardianName] = useState("");
   const [editGuardianPhone, setEditGuardianPhone] = useState("");
@@ -236,6 +241,8 @@ export default function PatientDetail() {
     setEditAddress(patient.address || "");
     setEditMotherName(patient.motherName || "");
     setEditFatherName(patient.fatherName || "");
+    setEditTrabalhoPais(patient.trabalhoPais || "");
+    setEditLocalAtendimento(patient.localAtendimento || "");
     setEditGuardianName(patient.guardianName || "");
     setEditGuardianPhone(patient.guardianPhone || "");
     setEditDiagnosis(patient.diagnosis || "");
@@ -260,6 +267,10 @@ export default function PatientDetail() {
         address: editAddress || null,
         motherName: editMotherName || null,
         fatherName: editFatherName || null,
+        trabalhoPais: editTrabalhoPais || null,
+        ...(editTrabalhoPais ? { trabalhoNaRoca: editTrabalhoPais === "Informal/Roça" } : {}),
+        localAtendimento: editLocalAtendimento || null,
+        outroAtendimento: editLocalAtendimento !== "" && editLocalAtendimento !== "Sem Atendimento",
         guardianName: editGuardianName || null,
         guardianPhone: editGuardianPhone || null,
         diagnosis: editDiagnosis || null,
@@ -660,7 +671,7 @@ export default function PatientDetail() {
               </div>
             </div>
 
-            {(patient.tipoRegistro || patient.localAtendimento) && (
+            {(patient.tipoRegistro || patient.localAtendimento || patient.trabalhoPais) && (
               <div className="mt-6 pt-4 border-t border-border grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-12">
                 {patient.tipoRegistro && (
                   <div>
@@ -672,6 +683,12 @@ export default function PatientDetail() {
                   <div>
                     <p className="text-sm font-semibold text-muted-foreground">Atendimento Atual</p>
                     <p className="text-base font-semibold mt-1">{patient.localAtendimento}</p>
+                  </div>
+                )}
+                {patient.trabalhoPais && (
+                  <div>
+                    <p className="text-sm font-semibold text-muted-foreground">Trabalho dos pais</p>
+                    <p className="text-base font-semibold mt-1">{patient.trabalhoPais}</p>
                   </div>
                 )}
               </div>
@@ -1440,6 +1457,33 @@ export default function PatientDetail() {
                   <Label className="text-sm font-semibold">Nome do Pai</Label>
                   <Input value={editFatherName} onChange={e => setEditFatherName(e.target.value)} placeholder="Nome completo do pai" className="mt-1" />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-semibold">Trabalho dos pais</Label>
+                    <select
+                      value={editTrabalhoPais}
+                      onChange={e => setEditTrabalhoPais(e.target.value)}
+                      className="mt-1 w-full border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-background"
+                    >
+                      <option value="">Não informado</option>
+                      {TRABALHO_PAIS_OPCOES.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold">Onde realiza atendimento</Label>
+                    <select
+                      value={editLocalAtendimento}
+                      onChange={e => setEditLocalAtendimento(e.target.value)}
+                      className="mt-1 w-full border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-background"
+                    >
+                      <option value="">Não informado</option>
+                      {LOCAL_ATENDIMENTO_OPCOES.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Mudou a situação depois da triagem? Atualize aqui: a posição na fila é recalculada automaticamente.
+                </p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-semibold">Telefone</Label>
