@@ -201,6 +201,10 @@ function expandRecurrence<T extends { date: string; time: string; patientId: num
     // projetada de volta para o presente/futuro. Recorrências ativas mantêm ~1 ano de
     // linhas reais à frente, então isto só afeta séries encerradas/cortadas.
     if (target >= todayStr && !gApts.some(a => a.date >= todayStr)) continue;
+    // Semana passada só recebe projeção se a série tem linha real depois dela
+    // (lacuna no meio da série). Série que terminou (alta, pausa, remoção) não
+    // reaparece nas semanas entre a última linha real e hoje.
+    if (target < todayStr && !gApts.some(a => a.date > target)) continue;
 
     // Projeta até 6 meses além da última linha real da série. O limite antigo
     // (4 semanas) fazia o paciente sumir da grade quando as linhas gravadas
