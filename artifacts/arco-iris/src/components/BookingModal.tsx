@@ -103,6 +103,9 @@ export default function BookingModal({
   const [waitingList, setWaitingList] = useState<WaitingEntry[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [alreadyScheduledIds, setAlreadyScheduledIds] = useState<Set<number>>(new Set());
+  // Sem a trava carregada não dá para saber quem já está agendado: a fila fica
+  // bloqueada em vez de oferecer um paciente que talvez já tenha horário.
+  const [scheduleCheckFailed, setScheduleCheckFailed] = useState(false);
   const [frequency, setFrequency] = useState<"semanal" | "quinzenal" | "mensal">("semanal");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -164,12 +167,25 @@ export default function BookingModal({
     // na fila desta especialidade (evita que dois profissionais da mesma
     // especialidade puxem o mesmo paciente). Ter agendamento em OUTRA especialidade
     // NÃO bloqueia: puxar é independente por especialidade.
+    // A busca é por profissional e limitada a 45 dias (toda série ativa, até a
+    // mensal, tem ocorrência nessa janela): a consulta global sem data final
+    // estourava o tempo no banco e a trava ficava vazia em silêncio.
     const today = new Date().toISOString().slice(0, 10);
+    const horizon = new Date(); horizon.setDate(horizon.getDate() + 45);
+    const dateTo = horizon.toISOString().slice(0, 10);
     try {
-      const apts = await listAppointments({ dateFrom: today });
+      const sameSpecProfIds = new Set<number>([professionalId]);
+      if (professionalSpecialty) {
+        for (const [pid, spec] of specMap) {
+          if (isSameSpecialty(professionalSpecialty, spec)) sameSpecProfIds.add(pid);
+        }
+      }
+      const perProf = await Promise.all(
+        [...sameSpecProfIds].map(pid => listAppointments({ dateFrom: today, dateTo, professionalId: pid }))
+      );
       const ids = new Set<number>();
       const activeStatuses = ["agendado", "atendimento", "em_atendimento", "em atendimento", "presente"];
-      for (const a of apts) {
+      for (const a of perProf.flat()) {
         if (!activeStatuses.includes(a.status.toLowerCase())) continue;
         // Agenda mista: horário da criança não bloqueia a mãe (Pilates) e vice-versa.
         if (mixedPilates && a.professionalId === professionalId && isPilatesAppointment(a.notes) !== isPilatesTarget) continue;
@@ -182,7 +198,11 @@ export default function BookingModal({
         if (sameSpec) ids.add(a.patientId);
       }
       setAlreadyScheduledIds(ids);
-    } catch (err) { console.error(err); }
+      setScheduleCheckFailed(false);
+    } catch (err) {
+      console.error(err);
+      setScheduleCheckFailed(true);
+    }
 
     // Filtro de Disponibilidade: busca TODOS os agendamentos no mesmo dia
     // para identificar pacientes já agendados neste horário com qualquer profissional.
@@ -245,7 +265,7 @@ export default function BookingModal({
     if (alreadyScheduledIds.has(e.patientId)) return false;
     return true;
   });
-  const nextPatient = filteredList[0] ?? null;
+  const nextPatient = scheduleCheckFailed ? null : (filteredList[0] ?? null);
   const queueBlockedCount = matchedBySpec.length - filteredList.length;
 
   const directMatches = useMemo(() => {
@@ -524,14 +544,18 @@ export default function BookingModal({
                 <div className="text-center py-8 bg-secondary/30 rounded-xl border border-border flex flex-col items-center gap-2">
                   <AlertCircle className="w-8 h-8 text-muted-foreground" />
                   <p className="text-muted-foreground font-semibold">
-                    {waitingList.length === 0
+                    {scheduleCheckFailed
+                      ? "Não foi possível conferir a agenda"
+                      : waitingList.length === 0
                       ? "Fila de espera vazia"
                       : queueBlockedCount > 0
                         ? `Todos os pacientes na fila já possuem agendamento ativo nesta especialidade`
                         : `Nenhum paciente de ${professionalSpecialty} na fila`}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {waitingList.length === 0
+                    {scheduleCheckFailed
+                      ? "A fila ficou bloqueada para não oferecer paciente que já tem horário. Feche e abra o horário de novo."
+                      : waitingList.length === 0
                       ? "Não há pacientes aguardando vaga."
                       : queueBlockedCount > 0
                         ? `${queueBlockedCount} paciente(s) oculto(s) pois já possuem agendamento ativo nesta especialidade.`
