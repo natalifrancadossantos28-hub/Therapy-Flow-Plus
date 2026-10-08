@@ -471,8 +471,10 @@ export default function WaitingList() {
           <span className="text-muted-foreground">→</span>
           <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">VERDE – Baixo</span>
           <span className="w-full text-[11px] text-muted-foreground">
-            Vale só para <strong>Fonoaudiologia</strong> e <strong>Fisioterapia</strong>. Nas demais especialidades a fila segue a
-            <strong> ordem de chegada</strong> (do mais antigo para o mais novo pela data de entrada).
+            Em toda especialidade a ordem é: <strong>Prioridade Máxima</strong> (abrigo / idade na Fono e Fisio) →
+            <strong>demanda prioritária</strong> pelo diagnóstico/CID → <strong>Checklist ABC</strong> (maior pontuação) → o resto.
+            No "resto", <strong>Fonoaudiologia</strong> e <strong>Fisioterapia</strong> usam a pontuação da triagem (as cores acima);
+            as demais especialidades seguem a <strong>ordem de chegada</strong>. Quem está sem triagem fica como "Baixo" e entra pela data.
           </span>
           <span className="w-full text-[11px] text-muted-foreground">
             Pais <strong>desempregados</strong> somam +10 pontos e trabalho <strong>informal/roça</strong> +5.
@@ -603,6 +605,14 @@ export default function WaitingList() {
                         >
                           <AbcNivelBadge nivel={entry.abcNivel ?? null} total={entry.abcTotal ?? null} />
                         </div>
+                        {entry.ordenacao === "prioridade" && entry.scoreEspecialidade == null && !entry.triagemScore && (
+                          <div
+                            title="Sem nota de triagem nesta especialidade: a prioridade fica como Baixo e a posição é só pela data de entrada. Faça a triagem para a criança disputar a vaga pela gravidade."
+                            className="mt-1 inline-block text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/40"
+                          >
+                            ⚠ sem triagem
+                          </div>
+                        )}
                         {entry.demandaPrioritaria && (
                           <div
                             title={`Demanda prioritária pelo diagnóstico/CID: ${entry.demandaPrioritaria}. Fica logo depois da Prioridade Máxima nesta especialidade.`}
