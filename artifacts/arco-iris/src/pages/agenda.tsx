@@ -60,6 +60,7 @@ import {
   listSalaHorarios,
   type Sala,
   type SalaHorario,
+  pausePatientFromAgenda,
 } from "@/lib/arco-rpc";
 import { AvaliacaoFuncionalForm } from "@/components/AvaliacaoFuncionalForm";
 import { avfFaixa, AVF_MAX, isParentalSpecialty } from "@/lib/avaliacao-funcional";
@@ -996,36 +997,16 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     if (!pauseModal) return;
     setPauseSending(true);
     try {
-      const today = new Date().toISOString().slice(0, 10);
       const reason = pauseReason || "Pausa temporária";
       const returnDate = pauseReturnDate || null;
 
-      // 1. Busca TODOS os appointments futuros desse paciente+profissional
-      const futureApts = await listAppointments({
-        professionalId: pauseModal.professionalId,
-        dateFrom: today,
-      });
-      const toUpdate = futureApts.filter(
-        a => a.patientId === pauseModal.patientId &&
-             !["cancelado", "desmarcado", "alta", "desistencia", "obito"].includes((a.status || "").toLowerCase())
-      );
-
-      // 2. Marca cada um como "pausado"
-      for (const a of toUpdate) {
-        await updateAppointment(a.id, { status: "pausado" });
-      }
-
-      // 3. Adiciona paciente na fila de espera com motivo e data de retorno
-      const profSpec = professionals.find(p => p.id === pauseModal.professionalId)?.specialty || null;
-      const notaFila = `Pausa: ${reason}${returnDate ? `. Retorno previsto: ${returnDate}` : ""}`;
-      try {
-        await addPatientToFila(pauseModal.patientId, profSpec, notaFila, true);
-      } catch { /* Se já está na fila, ignora */ }
+      // Sai da agenda do profissional (horário fica livre) e vai para "Pausados / Busca Ativa".
+      await pausePatientFromAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
 
       await logNotificacao(pauseModal, "Pausa Temporária");
       // Refresh para refletir as mudanças
       fetchAppointments();
-      toast({ title: "⏸ Pausado", description: `${pauseModal.patientName} foi pausado e movido para a fila de espera.` });
+      toast({ title: "⏸ Pausado", description: `${pauseModal.patientName} saiu da agenda (horário livre) e está em Pausados / Busca Ativa.` });
       setPauseModal(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

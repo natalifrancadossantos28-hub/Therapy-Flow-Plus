@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { Card, MotionCard, Button, Badge, Label, Select } from "@/components/ui-custom";
-import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search, LogOut } from "lucide-react";
+import { Card, MotionCard, Button, Badge, Label, Select, Input } from "@/components/ui-custom";
+import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search, LogOut, History, Clock, X } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate, calcIdade } from "@/lib/utils";
 import { specialtyTone, specialtyShortLabel, SPECIALTIES, isCaregiverSpecialty } from "@/lib/specialty-colors";
@@ -13,6 +14,8 @@ import {
   listWaitingList,
   deleteWaitingListEntry,
   setWaitingListPaused,
+  listWaitingListHistory,
+  type WaitingListHistoryEntry,
   addPatientToFila,
   listPatients,
   syncWaitingListWithAgenda,
@@ -60,6 +63,38 @@ const SCORE_SPECIALTY_MAP: Array<{ field: keyof Patient; specialty: string }> = 
   { field: "scoreEdFisica",         specialty: "Educação Física"    },
 ];
 
+const PAUSE_REASONS = [
+  "Sem contato (telefone não atende)",
+  "Recusou a vaga no momento",
+  "Mudou-se / sem transporte",
+  "Aguardando documento / laudo",
+  "Problema de saúde / internação",
+  "Pedido da família",
+  "Outro",
+] as const;
+
+const HIST_LABEL: Record<string, { label: string; cls: string }> = {
+  entrada:            { label: "Entrou na fila",      cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/40" },
+  agendado:           { label: "Agendado",            cls: "bg-cyan-500/15 text-cyan-400 border-cyan-500/40" },
+  alta:               { label: "Alta",                cls: "bg-violet-500/15 text-violet-400 border-violet-500/40" },
+  desistencia:        { label: "Desistência",         cls: "bg-orange-500/15 text-orange-400 border-orange-500/40" },
+  obito:              { label: "Óbito",               cls: "bg-zinc-500/15 text-zinc-300 border-zinc-500/40" },
+  removido:           { label: "Removido da fila",    cls: "bg-red-500/15 text-red-400 border-red-500/40" },
+  pausa:              { label: "Pausa / busca ativa", cls: "bg-sky-500/15 text-sky-400 border-sky-500/40" },
+  retorno:            { label: "Voltou à fila",       cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/40" },
+  retorno_automatico: { label: "Voltou (prazo venceu)", cls: "bg-yellow-500/15 text-yellow-400 border-yellow-500/40" },
+};
+
+const waitDaysOf = (e: WaitingListEntry): number => {
+  if (typeof e.waitDays === "number") return e.waitDays;
+  const d = new Date(e.entryDate + "T12:00:00").getTime();
+  return Number.isFinite(d) ? Math.max(0, Math.round((Date.now() - d) / 86_400_000)) : 0;
+};
+const waitTone = (days: number) =>
+  days >= 180 ? "text-red-400 bg-red-500/10 border-red-500/40"
+  : days >= 90 ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/40"
+  : "text-muted-foreground bg-secondary/40 border-border";
+
 export default function WaitingList() {
   useDocumentTitle("Fila de Espera");
   const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
@@ -80,6 +115,16 @@ export default function WaitingList() {
   const [saidaTipo, setSaidaTipo] = useState<"Alta" | "Desistência" | "Óbito">("Alta");
   const [saidaMotivo, setSaidaMotivo] = useState("");
   const [saidaLoading, setSaidaLoading] = useState(false);
+  const [pauseTarget, setPauseTarget] = useState<WaitingListEntry | null>(null);
+  const [pauseReason, setPauseReason] = useState<string>(PAUSE_REASONS[0]);
+  const [pauseOther, setPauseOther] = useState("");
+  const [pauseReturn, setPauseReturn] = useState("");
+  const [pauseLoading, setPauseLoading] = useState(false);
+  const [histOpen, setHistOpen] = useState(false);
+  const [histItems, setHistItems] = useState<WaitingListHistoryEntry[]>([]);
+  const [histLoading, setHistLoading] = useState(false);
+  const [histSearch, setHistSearch] = useState("");
+  const [histEvento, setHistEvento] = useState("");
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -353,30 +398,52 @@ export default function WaitingList() {
     }
   };
 
-  const handlePause = async (entry: WaitingListEntry) => {
-    const reason = prompt(
-      `Pausar atendimento de ${entry.patientName} (busca ativa)?\n\nMotivo (opcional):`,
-      "Busca ativa"
-    );
-    if (reason === null) return; // cancelou
+  const handlePause = (entry: WaitingListEntry) => {
+    setPauseReason(PAUSE_REASONS[0]);
+    setPauseOther("");
+    const d = new Date(); d.setDate(d.getDate() + 30);
+    setPauseReturn(d.toISOString().slice(0, 10));
+    setPauseTarget(entry);
+  };
+
+  const confirmPause = async () => {
+    if (!pauseTarget) return;
+    const reason = pauseReason === "Outro" ? (pauseOther.trim() || "Outro") : pauseReason;
+    setPauseLoading(true);
     try {
-      await setWaitingListPaused(entry.id, true, reason.trim() || "Busca ativa");
+      const res = await setWaitingListPaused(pauseTarget.id, true, reason, pauseReturn || null);
       setWaitingList(prev => prev.map(e =>
-        e.id === entry.id
-          ? { ...e, paused: true, pausedAt: new Date().toISOString(), pausedReason: reason.trim() || "Busca ativa" }
+        e.id === pauseTarget.id
+          ? { ...e, paused: true, pausedAt: new Date().toISOString(), pausedReason: reason, pausedReturnDate: res.pausedReturnDate, pausedOrigin: "Fila de Espera" }
           : e
       ));
-      toast({ title: "🔵 Em busca ativa", description: `${entry.patientName} saiu da disputa por vaga prioritária.` });
+      toast({ title: "🔵 Em busca ativa", description: `${pauseTarget.patientName} saiu da disputa por vaga${pauseReturn ? ` até ${formatDate(pauseReturn)}` : ""}.` });
+      setPauseTarget(null);
     } catch (err: any) {
-      toast({ title: "Erro", description: err?.message || "Falha ao congelar.", variant: "destructive" });
+      toast({ title: "Erro", description: err?.message || "Falha ao pausar.", variant: "destructive" });
+    } finally {
+      setPauseLoading(false);
     }
   };
+
+  const loadHistory = useCallback(async () => {
+    setHistLoading(true);
+    try {
+      setHistItems(await listWaitingListHistory({ limit: 500 }));
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message || "Falha ao carregar histórico.", variant: "destructive" });
+    } finally {
+      setHistLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { if (histOpen) loadHistory(); }, [histOpen, loadHistory]);
 
   const handleUnpause = async (entry: WaitingListEntry) => {
     try {
       await setWaitingListPaused(entry.id, false);
       setWaitingList(prev => prev.map(e =>
-        e.id === entry.id ? { ...e, paused: false, pausedAt: null, pausedReason: null } : e
+        e.id === entry.id ? { ...e, paused: false, pausedAt: null, pausedReason: null, pausedReturnDate: null, pausedOrigin: null } : e
       ));
       toast({ title: "Descongelado", description: `${entry.patientName} voltou à fila na posição original.` });
     } catch (err: any) {
@@ -396,6 +463,21 @@ export default function WaitingList() {
 
   // Pacientes em busca ativa (congelados) saem da disputa por vaga prioritaria.
   const activeList = waitingList.filter(e => !e.paused);
+
+  // Resumo gerencial por especialidade: quantos esperam, média e maior espera, alertas.
+  const resumo = useMemo(() => {
+    const m = new Map<string, { n: number; soma: number; max: number; a90: number; a180: number; semTriagem: number }>();
+    for (const e of activeList) {
+      const k = e.specialty || "Qualquer especialidade";
+      const r = m.get(k) ?? { n: 0, soma: 0, max: 0, a90: 0, a180: 0, semTriagem: 0 };
+      const d = waitDaysOf(e);
+      r.n++; r.soma += d; r.max = Math.max(r.max, d);
+      if (d >= 180) r.a180++; else if (d >= 90) r.a90++;
+      if (e.ordenacao === "prioridade" && e.scoreEspecialidade == null && !e.triagemScore) r.semTriagem++;
+      m.set(k, r);
+    }
+    return Array.from(m.entries()).sort((a, b) => b[1].n - a[1].n);
+  }, [activeList]);
   const pausedList = waitingList.filter(e => e.paused);
 
   // Server ja retorna ORDER BY (score_clinico_100 + score_social) DESC (Fase 5C).
@@ -511,6 +593,100 @@ export default function WaitingList() {
         )}
       </div>
 
+      {resumo.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {resumo.map(([sp, r]) => {
+            const tone = specialtyTone(sp);
+            const media = Math.round(r.soma / r.n);
+            return (
+              <button key={sp} type="button" onClick={() => setFilterSpecialty(filterSpecialty === sp ? "__all__" : sp)}
+                className={`text-left rounded-xl border p-3 transition hover:scale-[1.02] ${filterSpecialty === sp ? "ring-2 ring-primary" : ""}`}
+                style={{ background: tone.bg, borderColor: tone.border }}>
+                <div className="text-[11px] font-bold uppercase tracking-wide" style={{ color: tone.fg }}>{specialtyShortLabel(sp)}</div>
+                <div className="text-2xl font-bold text-foreground leading-tight">{r.n}</div>
+                <div className="text-[11px] text-muted-foreground">média {media}d · maior {r.max}d</div>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {r.a180 > 0 && <span className="text-[10px] font-bold px-1.5 rounded bg-red-500/20 text-red-400">{r.a180} &gt;180d</span>}
+                  {r.a90 > 0 && <span className="text-[10px] font-bold px-1.5 rounded bg-yellow-500/20 text-yellow-400">{r.a90} &gt;90d</span>}
+                  {r.semTriagem > 0 && <span className="text-[10px] font-bold px-1.5 rounded bg-amber-500/20 text-amber-400">{r.semTriagem} sem triagem</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <Clock className="w-3.5 h-3.5" />
+        <span>Tempo de espera: </span>
+        <span className="px-1.5 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-400 font-semibold">amarelo ≥ 90 dias</span>
+        <span className="px-1.5 rounded border border-red-500/40 bg-red-500/10 text-red-400 font-semibold">vermelho ≥ 180 dias</span>
+        <span className="ml-auto flex gap-2">
+          <Link href="/pausados"><Button variant="outline" size="sm" className="gap-1.5"><Snowflake className="w-3.5 h-3.5" /> Pausados / Busca Ativa</Button></Link>
+          <Button variant={histOpen ? "default" : "outline"} size="sm" className="gap-1.5" onClick={() => setHistOpen(v => !v)}>
+            <History className="w-3.5 h-3.5" /> Histórico da fila
+          </Button>
+        </span>
+      </div>
+
+      {histOpen && (
+        <Card className="p-0 overflow-hidden border-primary/30">
+          <div className="flex flex-wrap items-center gap-2 px-6 py-3 bg-primary/5 border-b border-border">
+            <History className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-bold uppercase tracking-wide">Histórico da fila</h2>
+            <span className="text-xs text-muted-foreground">quem entrou, saiu, pausou, voltou ou foi agendado — e por quê</span>
+            <div className="ml-auto flex gap-2 items-center">
+              <Input className="h-8 w-56 text-xs" placeholder="Paciente ou prontuário…" value={histSearch} onChange={e => setHistSearch(e.target.value)} />
+              <Select className="h-8 w-44 text-xs py-0" value={histEvento} onChange={e => setHistEvento(e.target.value)}>
+                <option value="">Todos os eventos</option>
+                {Object.entries(HIST_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </Select>
+              <Button variant="ghost" size="sm" onClick={loadHistory} disabled={histLoading}>{histLoading ? "…" : "Atualizar"}</Button>
+            </div>
+          </div>
+          <div className="max-h-[420px] overflow-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 sticky top-0">
+                <tr>
+                  <th className="px-6 py-2">Quando</th>
+                  <th className="px-6 py-2">Paciente</th>
+                  <th className="px-6 py-2">Especialidade</th>
+                  <th className="px-6 py-2">Evento</th>
+                  <th className="px-6 py-2">Motivo / detalhe</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(() => {
+                  const q = histSearch.trim().toLowerCase();
+                  const rows = histItems.filter(h =>
+                    (!histEvento || h.evento === histEvento) &&
+                    (!q || (h.patientName || "").toLowerCase().includes(q) || (h.prontuario || "").toLowerCase().includes(q))
+                  );
+                  if (histLoading && histItems.length === 0) return <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Carregando…</td></tr>;
+                  if (rows.length === 0) return <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Nenhum evento.</td></tr>;
+                  return rows.map(h => {
+                    const lb = HIST_LABEL[h.evento] ?? { label: h.evento, cls: "bg-secondary text-foreground border-border" };
+                    const ret = h.detalhe && typeof h.detalhe.retorno === "string" ? h.detalhe.retorno : null;
+                    return (
+                      <tr key={h.id} className="hover:bg-secondary/20">
+                        <td className="px-6 py-2 whitespace-nowrap text-muted-foreground">{new Date(h.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
+                        <td className="px-6 py-2 font-medium">
+                          <Link href={`/patients/${h.patientId}`} className="hover:underline">{h.patientName || `#${h.patientId}`}</Link>
+                          {h.prontuario && <span className="text-xs text-muted-foreground ml-1">[{h.prontuario}]</span>}
+                        </td>
+                        <td className="px-6 py-2">{h.specialty || "Qualquer"}</td>
+                        <td className="px-6 py-2"><span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border ${lb.cls}`}>{lb.label}</span></td>
+                        <td className="px-6 py-2 text-muted-foreground">{h.motivo || "—"}{ret ? ` · retorno previsto ${formatDate(ret)}` : ""}</td>
+                      </tr>
+                    );
+                  });
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
       <Card className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -522,15 +698,16 @@ export default function WaitingList() {
                 <th className="px-6 py-4">Prioridade</th>
                 <th className="px-6 py-4">Score</th>
                 <th className="px-6 py-4">Entrada</th>
+                <th className="px-6 py-4">Espera</th>
                 <th className="px-6 py-4 text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="text-center py-12 animate-pulse">Carregando fila...</td></tr>
+                <tr><td colSpan={8} className="text-center py-12 animate-pulse">Carregando fila...</td></tr>
               ) : activeList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-16">
+                  <td colSpan={8} className="text-center py-16">
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                       <ListTodo className="w-8 h-8 text-muted-foreground" />
                     </div>
@@ -540,7 +717,7 @@ export default function WaitingList() {
                 </tr>
               ) : displayList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={8} className="text-center py-12 text-muted-foreground">
                     {normalizedQuery ? "Nenhum paciente encontrado" : "Nenhum paciente nesta especialidade."}
                   </td>
                 </tr>
@@ -698,6 +875,14 @@ export default function WaitingList() {
                         )}
                       </td>
                       <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
+                      <td className="px-6 py-4">
+                        {(() => { const d = waitDaysOf(entry); return (
+                          <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-md border ${waitTone(d)}`}
+                            title={d >= 180 ? "Mais de 180 dias esperando — prioridade de contato/encaixe" : d >= 90 ? "Mais de 90 dias esperando" : "Dias na fila"}>
+                            <Clock className="w-3 h-3" /> {d}d
+                          </span>
+                        ); })()}
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1 flex-wrap">
                           <Button
@@ -759,7 +944,7 @@ export default function WaitingList() {
               Em Busca Ativa ({pausedList.length})
             </h2>
             <span className="text-xs text-muted-foreground">
-              Congelados — fora da disputa por vaga prioritária. Descongele para voltar à posição original.
+              Fora da disputa por vaga. Vencido o prazo de retorno, volta sozinho à fila. Veja todos em "Pausados / Busca Ativa".
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -769,14 +954,16 @@ export default function WaitingList() {
                   <th className="px-6 py-4">Paciente</th>
                   <th className="px-6 py-4">Especialidade</th>
                   <th className="px-6 py-4">Motivo</th>
+                  <th className="px-6 py-4">Veio de</th>
                   <th className="px-6 py-4">Congelado em</th>
+                  <th className="px-6 py-4">Retorno previsto</th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {displayPausedList.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
                       Nenhum paciente em busca ativa nesta especialidade.
                     </td>
                   </tr>
@@ -816,9 +1003,11 @@ export default function WaitingList() {
                       <td className="px-6 py-4 text-muted-foreground italic">
                         {entry.pausedReason || "Busca ativa"}
                       </td>
+                      <td className="px-6 py-4 text-xs"><span className={`font-bold uppercase px-1.5 py-0.5 rounded border ${(entry.pausedOrigin || "").startsWith("Agenda") ? "bg-violet-500/15 text-violet-400 border-violet-500/40" : "bg-sky-500/15 text-sky-400 border-sky-500/40"}`}>{entry.pausedOrigin || "Fila de Espera"}</span></td>
                       <td className="px-6 py-4 font-medium">
                         {entry.pausedAt ? formatDate(entry.pausedAt) : "—"}
                       </td>
+                      <td className="px-6 py-4 text-xs whitespace-nowrap">{entry.pausedReturnDate ? (() => { const d = Math.round((new Date(entry.pausedReturnDate + "T12:00:00").getTime() - Date.now()) / 86_400_000); return <span className={d < 0 ? "text-red-400 font-bold" : d <= 7 ? "text-yellow-400 font-bold" : "text-foreground"}>{formatDate(entry.pausedReturnDate)}{d < 0 ? " · vencido" : d <= 7 ? (d <= 0 ? " · hoje" : ` · em ${d}d`) : ""}</span>; })() : <span className="text-muted-foreground">sem prazo</span>}</td>
                       <td className="px-6 py-4 text-right">
                         <Button
                           variant="outline"
@@ -835,6 +1024,40 @@ export default function WaitingList() {
             </table>
           </div>
         </Card>
+      )}
+
+      {pauseTarget && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <MotionCard className="w-full max-w-md p-6 overflow-visible border-sky-500/40" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold font-display flex items-center gap-2"><Snowflake className="w-5 h-5 text-sky-400" /> Busca ativa / pausa</h2>
+                <p className="text-sm text-muted-foreground mt-1">{pauseTarget.patientName}{pauseTarget.specialty ? ` — ${pauseTarget.specialty}` : ""}. Sai da disputa por vaga, sem perder a data de entrada.</p>
+              </div>
+              <button type="button" onClick={() => setPauseTarget(null)} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label>Motivo</Label>
+                <Select value={pauseReason} onChange={e => setPauseReason(e.target.value)}>
+                  {PAUSE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                </Select>
+                {pauseReason === "Outro" && (
+                  <Input className="mt-2" placeholder="Descreva o motivo" value={pauseOther} onChange={e => setPauseOther(e.target.value)} autoFocus />
+                )}
+              </div>
+              <div>
+                <Label>Retorno previsto</Label>
+                <Input type="date" value={pauseReturn} onChange={e => setPauseReturn(e.target.value)} />
+                <p className="text-xs text-muted-foreground mt-1">Nessa data o paciente volta sozinho para a fila. Deixe em branco para sem prazo.</p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setPauseTarget(null)} disabled={pauseLoading}>Cancelar</Button>
+                <Button onClick={confirmPause} disabled={pauseLoading} className="gap-1.5"><Snowflake className="w-4 h-4" /> {pauseLoading ? "Salvando…" : "Pausar"}</Button>
+              </div>
+            </div>
+          </MotionCard>
+        </div>
       )}
 
       {isDialogOpen && (

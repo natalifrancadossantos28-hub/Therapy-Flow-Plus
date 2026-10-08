@@ -950,6 +950,12 @@ export type WaitingListEntry = {
   ageBonus?: number | null;
   /** 'prioridade' (Fono/Fisio) | 'chegada' (FIFO nas demais especialidades). */
   ordenacao?: string | null;
+  /** Data (YYYY-MM-DD) em que a busca ativa vence e o paciente volta sozinho à fila. */
+  pausedReturnDate?: string | null;
+  /** Dias corridos desde a entrada na fila. */
+  waitDays?: number | null;
+  /** De onde veio a pausa: 'Fila de Espera' ou 'Agenda — Nome (Especialidade)'. */
+  pausedOrigin?: string | null;
   /** Já faz atendimento terapêutico fora da unidade: sem Prioridade Máxima e sem bônus de idade. */
   atendeFora?: boolean | null;
   /** Pai e mãe preenchidos no cadastro: penalidade no score. */
@@ -1038,8 +1044,9 @@ export async function deleteWaitingListEntry(id: number): Promise<void> {
 export async function setWaitingListPaused(
   id: number,
   paused: boolean,
-  reason?: string | null
-): Promise<{ id: number; paused: boolean; pausedAt: string | null; pausedReason: string | null }> {
+  reason?: string | null,
+  returnDate?: string | null
+): Promise<{ id: number; paused: boolean; pausedAt: string | null; pausedReason: string | null; pausedReturnDate: string | null }> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();
   const { data, error } = await supabase.rpc("set_waiting_list_paused", {
@@ -1048,9 +1055,39 @@ export async function setWaitingListPaused(
     p_id: id,
     p_paused: paused,
     p_reason: reason ?? null,
+    p_return_date: returnDate ?? null,
   });
   if (error) throw error;
-  return data as { id: number; paused: boolean; pausedAt: string | null; pausedReason: string | null };
+  return data as { id: number; paused: boolean; pausedAt: string | null; pausedReason: string | null; pausedReturnDate: string | null };
+}
+
+export type WaitingListHistoryEvento =
+  | "entrada" | "agendado" | "alta" | "desistencia" | "obito" | "removido" | "pausa" | "retorno" | "retorno_automatico";
+
+export interface WaitingListHistoryEntry {
+  id: number;
+  patientId: number;
+  patientName: string | null;
+  prontuario: string | null;
+  specialty: string | null;
+  evento: WaitingListHistoryEvento;
+  motivo: string | null;
+  detalhe: Record<string, unknown> | null;
+  entryDate: string | null;
+  createdAt: string;
+}
+
+export async function listWaitingListHistory(opts?: { patientId?: number | null; limit?: number }): Promise<WaitingListHistoryEntry[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_waiting_list_history", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: opts?.patientId ?? null,
+    p_limit: opts?.limit ?? 300,
+  });
+  if (error) throw error;
+  return (data ?? []) as WaitingListHistoryEntry[];
 }
 
 export async function syncWaitingListWithAgenda(): Promise<{
@@ -2153,11 +2190,41 @@ export async function setAppointmentPaused(
   return data as { id: number; paused: boolean; pausedAt: string | null; pausedReason: string | null; pausedReturnDate: string | null };
 }
 
+/**
+ * Pausa pela agenda: remove os horários futuros do paciente com esse profissional
+ * (a grade fica livre) e coloca o paciente em "Pausados / Busca Ativa" na
+ * especialidade do profissional, com motivo e previsão de retorno.
+ */
+export async function pausePatientFromAgenda(
+  patientId: number,
+  professionalId: number,
+  reason?: string | null,
+  returnDate?: string | null
+): Promise<{ ok: boolean; appointmentsRemoved: number; waitingListId: number; origin: string }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("pause_patient_from_agenda", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId,
+    p_professional_id: professionalId,
+    p_reason: reason ?? null,
+    p_return_date: returnDate ?? null,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; appointmentsRemoved: number; waitingListId: number; origin: string };
+}
+
 export type PausedOverviewItem = {
   source: 'fila' | 'agenda';
   id: number;
   patientId: number;
   patientName: string;
+  prontuario?: string | null;
+  patientPhone?: string | null;
+  origin?: string | null;
+  entryDate?: string | null;
+  waitDays?: number | null;
   specialty: string;
   professionalName: string;
   pausedReason: string;
