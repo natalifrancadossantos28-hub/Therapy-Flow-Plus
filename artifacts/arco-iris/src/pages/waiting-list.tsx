@@ -472,8 +472,8 @@ export default function WaitingList() {
           <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">VERDE – Baixo</span>
           <span className="w-full text-[11px] text-muted-foreground">
             Em toda especialidade a ordem é: <strong>Prioridade Máxima</strong> (abrigo / idade na Fono e Fisio) →
-            <strong>demanda prioritária</strong> pelo diagnóstico/CID → <strong>Checklist ABC</strong> (maior pontuação) → o resto.
-            No "resto", <strong>Fonoaudiologia</strong> e <strong>Fisioterapia</strong> usam a pontuação da triagem (as cores acima);
+            <strong>demanda prioritária</strong> pelo diagnóstico/CID → o resto.
+            No "resto", <strong>Fonoaudiologia</strong> e <strong>Fisioterapia</strong> usam a pontuação (nota da triagem + Checklist ABC, as cores acima);
             as demais especialidades seguem a <strong>ordem de chegada</strong>. Quem está sem triagem fica como "Baixo" e entra pela data.
           </span>
           <span className="w-full text-[11px] text-muted-foreground">
@@ -600,8 +600,8 @@ export default function WaitingList() {
                         <div
                           className="mt-1"
                           title={entry.abcNivel
-                            ? `Checklist ABC (avaliação de entrada): ${entry.abcTotal} pontos. A fila é ordenada pela pontuação ABC — maior urgência primeiro.`
-                            : "Sem avaliação ABC: entra na fila depois dos pacientes já avaliados."}
+                            ? `Checklist ABC (avaliação de entrada): ${entry.abcTotal} pontos. O ABC não pula a fila: soma junto com a nota da triagem na pontuação da especialidade.`
+                            : "Sem avaliação ABC: a pontuação fica só com a nota da triagem."}
                         >
                           <AbcNivelBadge nivel={entry.abcNivel ?? null} total={entry.abcTotal ?? null} />
                         </div>
