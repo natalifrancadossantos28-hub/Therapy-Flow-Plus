@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
+  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
@@ -20,6 +21,7 @@ const navItems: NavItem[] = [
   { href: "/patients", label: "Pacientes", icon: Users, scopes: ["admin"] },
   { href: "/reception", label: "Recepção", icon: ClipboardList, scopes: ["admin", "reception"] },
   { href: "/waiting-list", label: "Fila de Espera", icon: ListTodo, scopes: ["admin", "reception"] },
+  { href: "/pausados", label: "Pausados / Busca Ativa", icon: Snowflake, scopes: ["admin", "reception"] },
   { href: "/agenda", label: "Agenda Geral", icon: Calendar, scopes: ["admin", "reception"] },
   { href: "/agenda-mensal", label: "Agenda Mensal", icon: CalendarDays, scopes: ["admin"] },
   { href: "/salas", label: "Gestão de Salas", icon: DoorOpen, scopes: ["admin"] },
