@@ -689,7 +689,7 @@ export default function BookingModal({
                   Atenção: {selectedDirect.name} já tem horário ativo com {professionalName}.{" "}
                   {isParentalBooking
                     ? "Na Psicologia Parental/Pilates/Oficina é permitido agendar mesmo assim."
-                    : "Só o administrador pode adicionar um segundo horário."}
+                    : "Ao confirmar, o horário antigo com este profissional sai da agenda daqui pra frente (sem duplicidade)."}
                 </p>
               )}
             </div>
