@@ -2215,6 +2215,66 @@ export async function pausePatientFromAgenda(
   return data as { ok: boolean; appointmentsRemoved: number; waitingListId: number; origin: string };
 }
 
+/** Pausa pela agenda mantendo o paciente na agenda (horários continuam reservados). */
+export async function pausePatientKeepAgenda(
+  patientId: number,
+  professionalId: number,
+  reason?: string | null,
+  returnDate?: string | null
+): Promise<{ ok: boolean; appointmentsPaused: number }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("pause_patient_keep_agenda", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId,
+    p_professional_id: professionalId,
+    p_reason: reason ?? null,
+    p_return_date: returnDate ?? null,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; appointmentsPaused: number };
+}
+
+/** Retoma a pausa que ficou na agenda (horários voltam a "Agendado"). */
+export async function resumePatientAgendaPause(
+  patientId: number,
+  professionalId: number
+): Promise<{ ok: boolean; appointmentsResumed: number }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("resume_patient_agenda_pause", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId,
+    p_professional_id: professionalId,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; appointmentsResumed: number };
+}
+
+export type BuscaAtivaStatus = 'pendente' | 'em_andamento' | 'resolvido' | 'nao_resolvido';
+
+export async function setBuscaAtivaStatus(
+  source: 'fila' | 'agenda',
+  id: number,
+  status: BuscaAtivaStatus,
+  obs?: string | null
+): Promise<{ ok: boolean; buscaStatus: BuscaAtivaStatus; buscaObs: string | null }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("set_busca_ativa_status", {
+    p_slug: slug,
+    p_password: password,
+    p_source: source,
+    p_id: id,
+    p_status: status,
+    p_obs: obs ?? null,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; buscaStatus: BuscaAtivaStatus; buscaObs: string | null };
+}
+
 export type PausedOverviewItem = {
   source: 'fila' | 'agenda';
   id: number;
@@ -2226,11 +2286,16 @@ export type PausedOverviewItem = {
   entryDate?: string | null;
   waitDays?: number | null;
   specialty: string;
+  professionalId?: number | null;
   professionalName: string;
+  keepsAgenda?: boolean;
   pausedReason: string;
   pausedAt: string | null;
   pausedReturnDate: string | null;
   returnOverdue: boolean;
+  buscaStatus?: BuscaAtivaStatus;
+  buscaObs?: string | null;
+  buscaUpdatedAt?: string | null;
 };
 
 export async function listPausedOverview(): Promise<{ fila: PausedOverviewItem[]; agenda: PausedOverviewItem[] }> {

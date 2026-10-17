@@ -61,6 +61,8 @@ import {
   type Sala,
   type SalaHorario,
   pausePatientFromAgenda,
+  pausePatientKeepAgenda,
+  resumePatientAgendaPause,
 } from "@/lib/arco-rpc";
 import { AvaliacaoFuncionalForm } from "@/components/AvaliacaoFuncionalForm";
 import { avfFaixa, AVF_MAX, isParentalSpecialty } from "@/lib/avaliacao-funcional";
@@ -545,6 +547,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [pauseModal, setPauseModal] = useState<Appointment | null>(null);
   const [pauseReason, setPauseReason] = useState("");
   const [pauseReturnDate, setPauseReturnDate] = useState("");
+  const [pauseKeepAgenda, setPauseKeepAgenda] = useState<boolean | null>(null);
   const [pauseSending, setPauseSending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
@@ -990,23 +993,38 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     setActionMenuId(null);
     setPauseReason("");
     setPauseReturnDate("");
+    setPauseKeepAgenda(null);
     setPauseModal(apt);
   };
 
   const confirmPause = async () => {
     if (!pauseModal) return;
+    if (pauseKeepAgenda === null) {
+      toast({ title: "Responda a pergunta", description: "O paciente fica ou sai da agenda?", variant: "destructive" });
+      return;
+    }
     setPauseSending(true);
     try {
       const reason = pauseReason || "Pausa temporária";
       const returnDate = pauseReturnDate || null;
 
-      // Sai da agenda do profissional (horário fica livre) e vai para "Pausados / Busca Ativa".
-      await pausePatientFromAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
+      if (pauseKeepAgenda) {
+        // Fica na agenda: horários continuam reservados, só marcados como pausados.
+        await pausePatientKeepAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
+      } else {
+        // Sai da agenda do profissional (horário fica livre) e vai para "Pausados / Busca Ativa".
+        await pausePatientFromAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
+      }
 
       await logNotificacao(pauseModal, "Pausa Temporária");
       // Refresh para refletir as mudanças
       fetchAppointments();
-      toast({ title: "⏸ Pausado", description: `${pauseModal.patientName} saiu da agenda (horário livre) e está em Pausados / Busca Ativa.` });
+      toast({
+        title: "⏸ Pausado",
+        description: pauseKeepAgenda
+          ? `${pauseModal.patientName} continua na agenda (horário reservado) e aparece em Pausados / Busca Ativa.`
+          : `${pauseModal.patientName} saiu da agenda (horário livre) e está em Pausados / Busca Ativa.`,
+      });
       setPauseModal(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1019,35 +1037,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const handleUnpause = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      const today = new Date().toISOString().slice(0, 10);
-
-      // 1. Busca appointments pausados desse paciente+profissional
-      const allApts = await listAppointments({
-        professionalId: apt.professionalId,
-        dateFrom: today,
-      });
-      const pausedApts = allApts.filter(
-        a => a.patientId === apt.patientId && (a.status || "").toLowerCase() === "pausado"
-      );
-
-      // 2. Volta cada um para "agendado"
-      for (const a of pausedApts) {
-        await updateAppointment(a.id, { status: "agendado" });
-      }
-
-      // 3. Remove da fila de espera
-      const profSpec = professionals.find(p => p.id === apt.professionalId)?.specialty || null;
-      try {
-        const fila = await listWaitingList();
-        const entries = fila.filter(e =>
-          e.patientId === apt.patientId &&
-          (!profSpec || (e.specialty || "").toLowerCase().includes((profSpec || "").toLowerCase().slice(0, 5)))
-        );
-        for (const e of entries) {
-          try { await deleteWaitingListEntry(e.id); } catch { /* silencioso */ }
-        }
-      } catch { /* silencioso */ }
-
+      await resumePatientAgendaPause(apt.patientId, apt.professionalId);
       await logNotificacao(apt, "Retorno de Pausa");
       fetchAppointments();
       toast({ title: "▶ Retomado", description: `${apt.patientName} voltou para a agenda com status "Agendado".` });
@@ -2439,7 +2429,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 </div>
                 <div>
                   <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar Atendimento</p>
-                  <p className="text-xs text-white/50">Suspender temporariamente sem cancelar</p>
+                  <p className="text-xs text-white/50">Vai para a lista Pausados / Busca Ativa</p>
                 </div>
               </div>
               <p className="text-sm text-white/80 mb-3">
@@ -2447,6 +2437,32 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
               </p>
 
               <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">O paciente fica ou sai da agenda?</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { v: false, t: "Sai da agenda", d: "Libera o horário — Busca Ativa" },
+                      { v: true, t: "Fica na agenda", d: "Horário continua reservado" },
+                    ] as const).map(o => {
+                      const sel = pauseKeepAgenda === o.v;
+                      return (
+                        <button
+                          key={String(o.v)}
+                          type="button"
+                          onClick={() => setPauseKeepAgenda(o.v)}
+                          className="rounded-lg px-2 py-2 text-left transition-colors"
+                          style={{
+                            background: sel ? (o.v ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)") : "rgba(255,255,255,0.04)",
+                            border: `1px solid ${sel ? (o.v ? "#10b981" : "#ef4444") : "rgba(255,255,255,0.12)"}`,
+                          }}
+                        >
+                          <span className="block text-sm font-bold" style={{ color: sel ? (o.v ? "#6ee7b7" : "#fca5a5") : "#fff" }}>{o.t}</span>
+                          <span className="block text-[10px] text-white/50">{o.d}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div>
                   <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Motivo da Pausa</label>
                   <input
@@ -2473,8 +2489,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
               <div className="flex gap-3 mt-4">
                 <button
                   onClick={confirmPause}
-                  disabled={pauseSending}
-                  style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: pauseSending ? 0.4 : 1, cursor: pauseSending ? "not-allowed" : "pointer" }}
+                  disabled={pauseSending || pauseKeepAgenda === null}
+                  style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: pauseSending || pauseKeepAgenda === null ? 0.4 : 1, cursor: pauseSending || pauseKeepAgenda === null ? "not-allowed" : "pointer" }}
                 >
                   <Snowflake className="w-4 h-4" />
                   {pauseSending ? "Pausando..." : "Confirmar Pausa"}
