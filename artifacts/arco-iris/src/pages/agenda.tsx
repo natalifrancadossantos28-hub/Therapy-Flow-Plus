@@ -61,6 +61,8 @@ import {
   type Sala,
   type SalaHorario,
   pausePatientFromAgenda,
+  pausePatientKeepAgenda,
+  resumePatientAgendaPause,
 } from "@/lib/arco-rpc";
 import { AvaliacaoFuncionalForm } from "@/components/AvaliacaoFuncionalForm";
 import { avfFaixa, AVF_MAX, isParentalSpecialty } from "@/lib/avaliacao-funcional";
@@ -545,6 +547,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [pauseModal, setPauseModal] = useState<Appointment | null>(null);
   const [pauseReason, setPauseReason] = useState("");
   const [pauseReturnDate, setPauseReturnDate] = useState("");
+  const [pauseKeepAgenda, setPauseKeepAgenda] = useState<boolean | null>(null);
   const [pauseSending, setPauseSending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
@@ -990,23 +993,38 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     setActionMenuId(null);
     setPauseReason("");
     setPauseReturnDate("");
+    setPauseKeepAgenda(null);
     setPauseModal(apt);
   };
 
   const confirmPause = async () => {
     if (!pauseModal) return;
+    if (pauseKeepAgenda === null) {
+      toast({ title: "Responda a pergunta", description: "O paciente fica ou sai da agenda?", variant: "destructive" });
+      return;
+    }
     setPauseSending(true);
     try {
       const reason = pauseReason || "Pausa temporária";
       const returnDate = pauseReturnDate || null;
 
-      // Sai da agenda do profissional (horário fica livre) e vai para "Pausados / Busca Ativa".
-      await pausePatientFromAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
+      if (pauseKeepAgenda) {
+        // Fica na agenda: horários continuam reservados, só marcados como pausados.
+        await pausePatientKeepAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
+      } else {
+        // Sai da agenda do profissional (horário fica livre) e vai para "Pausados / Busca Ativa".
+        await pausePatientFromAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
+      }
 
       await logNotificacao(pauseModal, "Pausa Temporária");
       // Refresh para refletir as mudanças
       fetchAppointments();
-      toast({ title: "⏸ Pausado", description: `${pauseModal.patientName} saiu da agenda (horário livre) e está em Pausados / Busca Ativa.` });
+      toast({
+        title: "⏸ Pausado",
+        description: pauseKeepAgenda
+          ? `${pauseModal.patientName} continua na agenda (horário reservado) e aparece em Pausados / Busca Ativa.`
+          : `${pauseModal.patientName} saiu da agenda (horário livre) e está em Pausados / Busca Ativa.`,
+      });
       setPauseModal(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1019,35 +1037,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const handleUnpause = async (apt: Appointment) => {
     setActionMenuId(null);
     try {
-      const today = new Date().toISOString().slice(0, 10);
-
-      // 1. Busca appointments pausados desse paciente+profissional
-      const allApts = await listAppointments({
-        professionalId: apt.professionalId,
-        dateFrom: today,
-      });
-      const pausedApts = allApts.filter(
-        a => a.patientId === apt.patientId && (a.status || "").toLowerCase() === "pausado"
-      );
-
-      // 2. Volta cada um para "agendado"
-      for (const a of pausedApts) {
-        await updateAppointment(a.id, { status: "agendado" });
-      }
-
-      // 3. Remove da fila de espera
-      const profSpec = professionals.find(p => p.id === apt.professionalId)?.specialty || null;
-      try {
-        const fila = await listWaitingList();
-        const entries = fila.filter(e =>
-          e.patientId === apt.patientId &&
-          (!profSpec || (e.specialty || "").toLowerCase().includes((profSpec || "").toLowerCase().slice(0, 5)))
-        );
-        for (const e of entries) {
-          try { await deleteWaitingListEntry(e.id); } catch { /* silencioso */ }
-        }
-      } catch { /* silencioso */ }
-
+      await resumePatientAgendaPause(apt.patientId, apt.professionalId);
       await logNotificacao(apt, "Retorno de Pausa");
       fetchAppointments();
       toast({ title: "▶ Retomado", description: `${apt.patientName} voltou para a agenda com status "Agendado".` });
@@ -2248,7 +2238,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </button>
                                       ) : (
                                         <button style={NEON.cyan} onClick={() => handleOpenPauseModal(apt)}>
-                                          <Snowflake className="w-3.5 h-3.5" /> Pausar Atendimento
+                                          <Snowflake className="w-3.5 h-3.5" /> Pausar / Busca Ativa
                                         </button>
                                       )}
 
@@ -2438,51 +2428,97 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   <Snowflake className="w-5 h-5" style={{ color: "#7dd3fc" }} />
                 </div>
                 <div>
-                  <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar Atendimento</p>
-                  <p className="text-xs text-white/50">Suspender temporariamente sem cancelar</p>
+                  <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar / Busca Ativa</p>
+                  <p className="text-xs text-white/50">Vai para a lista Pausados / Busca Ativa</p>
                 </div>
               </div>
               <p className="text-sm text-white/80 mb-3">
                 <strong className="text-white">{pauseModal.patientName}</strong> — {pauseModal.date} às {pauseModal.time}.
               </p>
 
-              <div className="space-y-3">
-                <div>
-                  <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Motivo da Pausa</label>
-                  <input
-                    type="text"
-                    value={pauseReason}
-                    onChange={e => setPauseReason(e.target.value)}
-                    placeholder="Ex: Licença, Viagem, Transição de profissional..."
-                    className="w-full px-3 py-2 rounded-lg text-sm"
-                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Data de Retorno Prevista (opcional)</label>
-                  <input
-                    type="date"
-                    value={pauseReturnDate}
-                    onChange={e => setPauseReturnDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm"
-                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
-                  />
-                </div>
-              </div>
+              {pauseKeepAgenda === null ? (
+                <>
+                  <p className="text-base font-bold text-white text-center my-4">O paciente fica ou sai da agenda?</p>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setPauseKeepAgenda(false)}
+                      className="w-full rounded-xl px-4 py-3 text-left transition-colors hover:brightness-125"
+                      style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #ef4444" }}
+                    >
+                      <span className="block text-sm font-bold" style={{ color: "#fca5a5" }}>Sai da agenda</span>
+                      <span className="block text-[11px] text-white/60">Libera o horário e vai para a Busca Ativa</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPauseKeepAgenda(true)}
+                      className="w-full rounded-xl px-4 py-3 text-left transition-colors hover:brightness-125"
+                      style={{ background: "rgba(16,185,129,0.12)", border: "1px solid #10b981" }}
+                    >
+                      <span className="block text-sm font-bold" style={{ color: "#6ee7b7" }}>Fica na agenda</span>
+                      <span className="block text-[11px] text-white/60">O horário continua reservado (só fica pausado)</span>
+                    </button>
+                  </div>
+                  <Button variant="outline" className="w-full mt-4 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setPauseModal(null)}>
+                    Cancelar
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div
+                    className="flex items-center justify-between rounded-lg px-3 py-2 mb-3"
+                    style={{
+                      background: pauseKeepAgenda ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                      border: `1px solid ${pauseKeepAgenda ? "#10b981" : "#ef4444"}`,
+                    }}
+                  >
+                    <span className="text-sm font-bold" style={{ color: pauseKeepAgenda ? "#6ee7b7" : "#fca5a5" }}>
+                      {pauseKeepAgenda ? "Fica na agenda (horário reservado)" : "Sai da agenda → Busca Ativa"}
+                    </span>
+                    <button type="button" className="text-[11px] text-white/60 underline hover:text-white" onClick={() => setPauseKeepAgenda(null)}>
+                      trocar
+                    </button>
+                  </div>
 
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={confirmPause}
-                  disabled={pauseSending}
-                  style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: pauseSending ? 0.4 : 1, cursor: pauseSending ? "not-allowed" : "pointer" }}
-                >
-                  <Snowflake className="w-4 h-4" />
-                  {pauseSending ? "Pausando..." : "Confirmar Pausa"}
-                </button>
-                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setPauseModal(null)}>
-                  Cancelar
-                </Button>
-              </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Motivo da Pausa</label>
+                      <input
+                        type="text"
+                        value={pauseReason}
+                        onChange={e => setPauseReason(e.target.value)}
+                        placeholder="Ex: Sumiu dos atendimentos, Viagem, Problema de saúde..."
+                        className="w-full px-3 py-2 rounded-lg text-sm"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Data de Retorno Prevista (opcional)</label>
+                      <input
+                        type="date"
+                        value={pauseReturnDate}
+                        onChange={e => setPauseReturnDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-sm"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={confirmPause}
+                      disabled={pauseSending}
+                      style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: pauseSending ? 0.4 : 1, cursor: pauseSending ? "not-allowed" : "pointer" }}
+                    >
+                      <Snowflake className="w-4 h-4" />
+                      {pauseSending ? "Pausando..." : "Confirmar Pausa"}
+                    </button>
+                    <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setPauseModal(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -1,14 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { Snowflake, Clock, Play, Search, RefreshCw, Phone } from "lucide-react";
+import { Snowflake, Clock, Play, Search, RefreshCw, Phone, CircleDot, Loader2, CheckCircle2, XCircle, MessageSquare } from "lucide-react";
 import { Card, Button, Badge, Input } from "@/components/ui-custom";
 import { useToast } from "@/hooks/use-toast";
 import { cn, formatDate } from "@/lib/utils";
 import {
   listPausedOverview,
   setWaitingListPaused,
+  resumePatientAgendaPause,
+  setBuscaAtivaStatus,
+  type BuscaAtivaStatus,
   type PausedOverviewItem,
 } from "@/lib/arco-rpc";
+
+const BUSCA_STATUS: { v: BuscaAtivaStatus; label: string; icon: typeof CircleDot; on: string }[] = [
+  { v: "pendente", label: "Pendente", icon: CircleDot, on: "bg-slate-500/25 text-slate-200" },
+  { v: "em_andamento", label: "Em andamento", icon: Loader2, on: "bg-sky-500/25 text-sky-200" },
+  { v: "resolvido", label: "Resolvido", icon: CheckCircle2, on: "bg-emerald-500/25 text-emerald-200" },
+  { v: "nao_resolvido", label: "Não resolvido", icon: XCircle, on: "bg-red-500/25 text-red-200" },
+];
+
+const buscaOf = (i: PausedOverviewItem): BuscaAtivaStatus => i.buscaStatus || "pendente";
+const keyOf = (i: PausedOverviewItem) => `${i.source}-${i.id}`;
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -24,6 +37,8 @@ export default function PausadosPage() {
   const [search, setSearch] = useState("");
   const [specFilter, setSpecFilter] = useState<string>("");
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [buscaFilter, setBuscaFilter] = useState<BuscaAtivaStatus | "">("");
+  const [savingKey, setSavingKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,6 +63,7 @@ export default function PausadosPage() {
     const q = search.trim().toLowerCase();
     return items
       .filter(i => !specFilter || i.specialty === specFilter)
+      .filter(i => !buscaFilter || buscaOf(i) === buscaFilter)
       .filter(i => !q || i.patientName.toLowerCase().includes(q) || (i.prontuario || "").toLowerCase().includes(q))
       .sort((a, b) => {
         // vencidos primeiro, depois quem vence antes, depois sem prazo
@@ -57,14 +73,47 @@ export default function PausadosPage() {
         if (db === null) return -1;
         return da - db;
       });
-  }, [items, search, specFilter]);
+  }, [items, search, specFilter, buscaFilter]);
 
   const overdueCount = items.filter(i => i.returnOverdue).length;
   const nearCount = items.filter(i => { const d = daysUntil(i.pausedReturnDate); return d !== null && d >= 0 && d <= 7; }).length;
 
+  const updateBusca = async (item: PausedOverviewItem, status: BuscaAtivaStatus, obs: string | null) => {
+    const k = keyOf(item);
+    setSavingKey(k);
+    try {
+      await setBuscaAtivaStatus(item.source, item.id, status, obs);
+      setItems(prev => prev.map(i => keyOf(i) === k ? { ...i, buscaStatus: status, buscaObs: obs, buscaUpdatedAt: new Date().toISOString() } : i));
+    } catch (err: unknown) {
+      toast({ title: "Erro ao salvar busca ativa", description: err instanceof Error ? err.message : String(err), variant: "destructive" });
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const editObs = (item: PausedOverviewItem) => {
+    const obs = prompt(`Observação da busca ativa — ${item.patientName}\n(ex.: visita feita, família informou que...)`, item.buscaObs || "");
+    if (obs === null) return;
+    updateBusca(item, buscaOf(item), obs.trim() || null);
+  };
+
   const handleResume = async (item: PausedOverviewItem) => {
     if (item.source !== "fila") {
-      toast({ title: "Pausa antiga da agenda", description: "Essa pausa foi feita no modelo antigo. Retome pelo card do paciente na agenda do profissional." });
+      if (!item.professionalId) {
+        toast({ title: "Retome pela agenda", description: "Abra o card do paciente na agenda do profissional e clique em Retomar Atendimento." });
+        return;
+      }
+      if (!confirm(`Retomar ${item.patientName} na agenda de ${item.professionalName}?\n\nOs horários dele voltam para "Agendado".`)) return;
+      setBusyId(item.id);
+      try {
+        await resumePatientAgendaPause(item.patientId, item.professionalId);
+        setItems(prev => prev.filter(i => keyOf(i) !== keyOf(item)));
+        toast({ title: "▶ Retomado", description: `${item.patientName} voltou para a agenda de ${item.professionalName}.` });
+      } catch (err: unknown) {
+        toast({ title: "Erro", description: err instanceof Error ? err.message : String(err), variant: "destructive" });
+      } finally {
+        setBusyId(null);
+      }
       return;
     }
     if (!confirm(`Retomar ${item.patientName} em ${item.specialty}?\n\nEle volta a disputar vaga na Fila de Espera (o horário anterior pode já ter sido ocupado).`)) return;
@@ -88,7 +137,7 @@ export default function PausadosPage() {
             <Snowflake className="w-7 h-7 text-sky-400" /> Pausados / Busca Ativa
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Pacientes que saíram da agenda ou da disputa da fila temporariamente. Aqui fica o motivo, de onde vieram e a previsão de retorno.
+            Pacientes pausados pela fila ou pela agenda. Aqui fica o motivo, se saiu ou ficou na agenda, a previsão de retorno e o acompanhamento da busca ativa (Pendente, Em andamento, Resolvido, Não resolvido).
             Vencido o prazo, o paciente volta sozinho para a Fila de Espera da especialidade.
           </p>
         </div>
@@ -101,6 +150,16 @@ export default function PausadosPage() {
         <Card className="p-4"><p className="text-xs uppercase text-muted-foreground">Total pausados</p><p className="text-3xl font-bold text-sky-400">{items.length}</p></Card>
         <Card className="p-4 border-yellow-500/30"><p className="text-xs uppercase text-muted-foreground">Retorno nos próximos 7 dias</p><p className="text-3xl font-bold text-yellow-400">{nearCount}</p></Card>
         <Card className="p-4 border-red-500/30"><p className="text-xs uppercase text-muted-foreground">Prazo vencido</p><p className="text-3xl font-bold text-red-400">{overdueCount}</p></Card>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        <span className="text-xs uppercase text-muted-foreground font-bold self-center mr-1">Busca ativa:</span>
+        <Button size="sm" variant={buscaFilter ? "outline" : "default"} onClick={() => setBuscaFilter("")}>Todos ({items.length})</Button>
+        {BUSCA_STATUS.map(b => (
+          <Button key={b.v} size="sm" variant={buscaFilter === b.v ? "default" : "outline"} onClick={() => setBuscaFilter(b.v)}>
+            {b.label} ({items.filter(i => buscaOf(i) === b.v).length})
+          </Button>
+        ))}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -126,17 +185,19 @@ export default function PausadosPage() {
                 <th className="px-5 py-3">Paciente</th>
                 <th className="px-5 py-3">Especialidade</th>
                 <th className="px-5 py-3">Veio de</th>
+                <th className="px-5 py-3">Agenda</th>
                 <th className="px-5 py-3">Motivo</th>
                 <th className="px-5 py-3">Pausado em</th>
                 <th className="px-5 py-3">Retorno previsto</th>
+                <th className="px-5 py-3">Busca ativa</th>
                 <th className="px-5 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading && items.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">Carregando…</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-muted-foreground">Carregando…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">Nenhum paciente pausado{search || specFilter ? " com esse filtro" : ""}.</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-muted-foreground">Nenhum paciente pausado{search || specFilter ? " com esse filtro" : ""}.</td></tr>
               ) : filtered.map(item => {
                 const d = daysUntil(item.pausedReturnDate);
                 const overdue = item.returnOverdue || (d !== null && d < 0);
@@ -157,6 +218,13 @@ export default function PausadosPage() {
                         {item.origin || (item.source === "fila" ? "Fila de Espera" : "Agenda")}
                       </Badge>
                     </td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      {item.keepsAgenda ? (
+                        <Badge className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Ficou na agenda</Badge>
+                      ) : (
+                        <Badge className="text-[10px] uppercase font-bold bg-red-500/20 text-red-300 border border-red-500/30">Saiu da agenda</Badge>
+                      )}
+                    </td>
                     <td className="px-5 py-3 max-w-[260px]"><span className="text-foreground">{item.pausedReason || "—"}</span></td>
                     <td className="px-5 py-3 whitespace-nowrap text-muted-foreground">{item.pausedAt ? formatDate(item.pausedAt) : "—"}</td>
                     <td className="px-5 py-3 whitespace-nowrap">
@@ -167,6 +235,29 @@ export default function PausadosPage() {
                           {near && <span className="text-[10px] uppercase ml-1">{d === 0 ? "hoje" : `em ${d}d`}</span>}
                         </span>
                       ) : <span className="text-muted-foreground">sem prazo</span>}
+                    </td>
+                    <td className="px-5 py-3 min-w-[260px]">
+                      <div className="inline-flex flex-wrap rounded-lg border border-border overflow-hidden text-xs">
+                        {BUSCA_STATUS.map((b, idx) => {
+                          const Icon = b.icon;
+                          const active = buscaOf(item) === b.v;
+                          return (
+                            <button key={b.v} type="button" title={`Marcar como ${b.label.toLowerCase()}`}
+                              disabled={savingKey === keyOf(item)}
+                              onClick={() => !active && updateBusca(item, b.v, item.buscaObs ?? null)}
+                              className={cn("inline-flex items-center gap-1 px-2 py-1.5 font-semibold transition-colors", idx > 0 && "border-l border-border", active ? b.on : "hover:bg-secondary/70 text-muted-foreground")}>
+                              <Icon className="w-3.5 h-3.5" /> {b.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button type="button" onClick={() => editObs(item)} className="mt-1.5 flex items-start gap-1 text-xs text-left text-muted-foreground hover:text-foreground">
+                        <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>{item.buscaObs || "Adicionar observação"}</span>
+                      </button>
+                      {item.buscaUpdatedAt && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Atualizado em {formatDate(item.buscaUpdatedAt)}</p>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-right">
                       <Button size="sm" variant="outline" className="gap-1 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
