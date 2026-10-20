@@ -2238,7 +2238,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </button>
                                       ) : (
                                         <button style={NEON.cyan} onClick={() => handleOpenPauseModal(apt)}>
-                                          <Snowflake className="w-3.5 h-3.5" /> Pausar Atendimento
+                                          <Snowflake className="w-3.5 h-3.5" /> Pausar / Busca Ativa
                                         </button>
                                       )}
 
@@ -2428,7 +2428,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   <Snowflake className="w-5 h-5" style={{ color: "#7dd3fc" }} />
                 </div>
                 <div>
-                  <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar Atendimento</p>
+                  <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar / Busca Ativa</p>
                   <p className="text-xs text-white/50">Vai para a lista Pausados / Busca Ativa</p>
                 </div>
               </div>
@@ -2436,69 +2436,89 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 <strong className="text-white">{pauseModal.patientName}</strong> — {pauseModal.date} às {pauseModal.time}.
               </p>
 
-              <div className="space-y-3">
-                <div>
-                  <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">O paciente fica ou sai da agenda?</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {([
-                      { v: false, t: "Sai da agenda", d: "Libera o horário — Busca Ativa" },
-                      { v: true, t: "Fica na agenda", d: "Horário continua reservado" },
-                    ] as const).map(o => {
-                      const sel = pauseKeepAgenda === o.v;
-                      return (
-                        <button
-                          key={String(o.v)}
-                          type="button"
-                          onClick={() => setPauseKeepAgenda(o.v)}
-                          className="rounded-lg px-2 py-2 text-left transition-colors"
-                          style={{
-                            background: sel ? (o.v ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)") : "rgba(255,255,255,0.04)",
-                            border: `1px solid ${sel ? (o.v ? "#10b981" : "#ef4444") : "rgba(255,255,255,0.12)"}`,
-                          }}
-                        >
-                          <span className="block text-sm font-bold" style={{ color: sel ? (o.v ? "#6ee7b7" : "#fca5a5") : "#fff" }}>{o.t}</span>
-                          <span className="block text-[10px] text-white/50">{o.d}</span>
-                        </button>
-                      );
-                    })}
+              {pauseKeepAgenda === null ? (
+                <>
+                  <p className="text-base font-bold text-white text-center my-4">O paciente fica ou sai da agenda?</p>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setPauseKeepAgenda(false)}
+                      className="w-full rounded-xl px-4 py-3 text-left transition-colors hover:brightness-125"
+                      style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #ef4444" }}
+                    >
+                      <span className="block text-sm font-bold" style={{ color: "#fca5a5" }}>Sai da agenda</span>
+                      <span className="block text-[11px] text-white/60">Libera o horário e vai para a Busca Ativa</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPauseKeepAgenda(true)}
+                      className="w-full rounded-xl px-4 py-3 text-left transition-colors hover:brightness-125"
+                      style={{ background: "rgba(16,185,129,0.12)", border: "1px solid #10b981" }}
+                    >
+                      <span className="block text-sm font-bold" style={{ color: "#6ee7b7" }}>Fica na agenda</span>
+                      <span className="block text-[11px] text-white/60">O horário continua reservado (só fica pausado)</span>
+                    </button>
                   </div>
-                </div>
-                <div>
-                  <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Motivo da Pausa</label>
-                  <input
-                    type="text"
-                    value={pauseReason}
-                    onChange={e => setPauseReason(e.target.value)}
-                    placeholder="Ex: Licença, Viagem, Transição de profissional..."
-                    className="w-full px-3 py-2 rounded-lg text-sm"
-                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Data de Retorno Prevista (opcional)</label>
-                  <input
-                    type="date"
-                    value={pauseReturnDate}
-                    onChange={e => setPauseReturnDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm"
-                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
-                  />
-                </div>
-              </div>
+                  <Button variant="outline" className="w-full mt-4 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setPauseModal(null)}>
+                    Cancelar
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div
+                    className="flex items-center justify-between rounded-lg px-3 py-2 mb-3"
+                    style={{
+                      background: pauseKeepAgenda ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                      border: `1px solid ${pauseKeepAgenda ? "#10b981" : "#ef4444"}`,
+                    }}
+                  >
+                    <span className="text-sm font-bold" style={{ color: pauseKeepAgenda ? "#6ee7b7" : "#fca5a5" }}>
+                      {pauseKeepAgenda ? "Fica na agenda (horário reservado)" : "Sai da agenda → Busca Ativa"}
+                    </span>
+                    <button type="button" className="text-[11px] text-white/60 underline hover:text-white" onClick={() => setPauseKeepAgenda(null)}>
+                      trocar
+                    </button>
+                  </div>
 
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={confirmPause}
-                  disabled={pauseSending || pauseKeepAgenda === null}
-                  style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: pauseSending || pauseKeepAgenda === null ? 0.4 : 1, cursor: pauseSending || pauseKeepAgenda === null ? "not-allowed" : "pointer" }}
-                >
-                  <Snowflake className="w-4 h-4" />
-                  {pauseSending ? "Pausando..." : "Confirmar Pausa"}
-                </button>
-                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setPauseModal(null)}>
-                  Cancelar
-                </Button>
-              </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Motivo da Pausa</label>
+                      <input
+                        type="text"
+                        value={pauseReason}
+                        onChange={e => setPauseReason(e.target.value)}
+                        placeholder="Ex: Sumiu dos atendimentos, Viagem, Problema de saúde..."
+                        className="w-full px-3 py-2 rounded-lg text-sm"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-white/50 uppercase font-bold mb-1 block">Data de Retorno Prevista (opcional)</label>
+                      <input
+                        type="date"
+                        value={pauseReturnDate}
+                        onChange={e => setPauseReturnDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-sm"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={confirmPause}
+                      disabled={pauseSending}
+                      style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: pauseSending ? 0.4 : 1, cursor: pauseSending ? "not-allowed" : "pointer" }}
+                    >
+                      <Snowflake className="w-4 h-4" />
+                      {pauseSending ? "Pausando..." : "Confirmar Pausa"}
+                    </button>
+                    <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setPauseModal(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
