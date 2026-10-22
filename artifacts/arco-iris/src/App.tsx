@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import { Layout } from "@/components/Layout";
 import AdminGuard from "@/components/AdminGuard";
+import { useSessionEpochGuard } from "@/lib/session-epoch";
 
 // ── Lazy-loaded pages (code-splitting) ──────────────────────────────────────
 const Portal = lazy(() => import("@/pages/portal"));
@@ -55,6 +56,7 @@ function PageLoader() {
 }
 
 function Router() {
+  useSessionEpochGuard();
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>

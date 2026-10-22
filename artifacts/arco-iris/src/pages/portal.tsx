@@ -11,6 +11,7 @@ import {
   clearAllSessions,
   restoreCompanyFromDevice,
 } from "@/lib/portal-session";
+import { stampSessionEpoch } from "@/lib/session-epoch";
 import { listProfessionalsPublic, verifyProfessionalPinWithSlug } from "@/lib/arco-rpc";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
 
@@ -128,6 +129,7 @@ export default function Portal() {
         modulePonto: Boolean(company.module_ponto),
       };
       setCompanySession(session);
+      await stampSessionEpoch();
       if (scope === "reception") setLocation("/reception");
       else setLocation("/");
     } catch (err: any) {
@@ -181,6 +183,7 @@ export default function Portal() {
           modulePonto: Boolean(company.module_ponto),
         });
       }
+      await stampSessionEpoch();
       setProfessionalSession({
         professionalId: prof.id,
         professionalName: prof.name,
