@@ -27,6 +27,7 @@ export type CompanySession = {
   moduleArcoIris?: boolean;
   moduleTriagem?: boolean;
   modulePonto?: boolean;
+  epoch?: number;
 };
 
 export type ProfessionalSession = {
@@ -43,6 +44,7 @@ type DeviceCompany = {
   moduleArcoIris?: boolean;
   moduleTriagem?: boolean;
   modulePonto?: boolean;
+  epoch?: number;
 };
 
 function readDeviceCompany(): DeviceCompany | null {
@@ -64,6 +66,7 @@ function writeDeviceCompany(session: CompanySession) {
     moduleArcoIris: session.moduleArcoIris,
     moduleTriagem: session.moduleTriagem,
     modulePonto: session.modulePonto,
+    epoch: session.epoch,
   };
   try {
     localStorage.setItem(DEVICE_KEY, JSON.stringify(payload));
@@ -119,6 +122,7 @@ export function restoreCompanyFromDevice(): boolean {
     moduleArcoIris: dev.moduleArcoIris,
     moduleTriagem: dev.moduleTriagem,
     modulePonto: dev.modulePonto,
+    epoch: dev.epoch,
   };
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
   sessionStorage.setItem(LEGACY_KEY, "true");

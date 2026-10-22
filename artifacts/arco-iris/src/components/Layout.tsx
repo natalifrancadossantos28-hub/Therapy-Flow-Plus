@@ -1,10 +1,11 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
-  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
+import { logoutAllDevices } from "@/lib/session-epoch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useThemeTick } from "@/lib/theme";
 
@@ -48,6 +49,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setLocation("/portal");
   };
 
+  const handleLogoutOthers = async () => {
+    if (!window.confirm("Desconectar todos os outros computadores e celulares? Eles vão precisar entrar de novo com a senha.")) return;
+    try {
+      await logoutAllDevices();
+      window.alert("Pronto! Os outros computadores foram desconectados.");
+    } catch (err: any) {
+      window.alert(err?.message || "Não foi possível desconectar os outros computadores.");
+    }
+  };
+
   const NavLinks = ({ collapsed = false }: { collapsed?: boolean }) => (
     <>
       {visibleItems.map((item) => {
@@ -68,6 +79,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
         );
       })}
+      {scope === "admin" && (
+        <button
+          onClick={handleLogoutOthers}
+          className={cn(
+            "flex items-center rounded-xl font-medium transition-all duration-200 text-foreground/60 hover:bg-destructive/10 hover:text-destructive mt-2",
+            collapsed ? "justify-center px-2 py-3" : "gap-3 px-4 py-3"
+          )}
+          title={collapsed ? "Desconectar outros computadores" : undefined}
+        >
+          <MonitorX className="w-5 h-5 shrink-0" />
+          {!collapsed && "Desconectar outros computadores"}
+        </button>
+      )}
       <button
         onClick={handleLogout}
         className={cn(

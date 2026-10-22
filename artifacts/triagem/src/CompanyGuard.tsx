@@ -48,7 +48,17 @@ type Session = {
   moduleTriagem?: boolean;
   moduleArcoIris?: boolean;
   modulePonto?: boolean;
+  epoch?: number;
 };
+
+async function fetchSessionEpoch(slug: string): Promise<number | null> {
+  try {
+    const { data, error } = await requireSupabase().rpc("get_session_epoch", { p_slug: slug });
+    return error || typeof data !== "number" ? null : data;
+  } catch {
+    return null;
+  }
+}
 
 function getSession(): Session | null {
   try {
@@ -95,6 +105,21 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
     return () => window.removeEventListener("online", handleOnline);
   }, []);
 
+  // Desconecta quando a Administração usa "Desconectar outros computadores".
+  useEffect(() => {
+    const check = async () => {
+      const s = getSession();
+      if (!s || s.type !== "company" || !s.companySlug) return;
+      const epoch = await fetchSessionEpoch(s.companySlug);
+      if (epoch === null || s.epoch === epoch) return;
+      sessionStorage.removeItem(SESSION_KEY);
+      setSession(null);
+    };
+    void check();
+    const id = window.setInterval(() => void check(), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const handleLogin = useCallback(async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -128,6 +153,7 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
         moduleTriagem: company.module_triagem,
         moduleArcoIris: company.module_arco_iris,
         modulePonto: company.module_ponto,
+        epoch: (await fetchSessionEpoch(company.slug)) ?? undefined,
       };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
       setSession(s);
