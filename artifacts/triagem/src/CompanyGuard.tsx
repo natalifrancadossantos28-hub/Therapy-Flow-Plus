@@ -10,7 +10,7 @@ const DEFAULT_SLUG = (import.meta.env.VITE_DEFAULT_COMPANY_SLUG as string | unde
 // empresa no banco, então trocar aqui não afeta outros módulos (ex.: Ponto).
 // Pode ser sobrescrita por env (VITE_PORTAL_PASSWORD).
 const PORTAL_PASSWORD =
-  (import.meta.env.VITE_PORTAL_PASSWORD as string | undefined) || "NTL28";
+  (import.meta.env.VITE_PORTAL_PASSWORD as string | undefined) || "Ntl102030";
 
 // Compara ignorando case, espaços e zero-width chars que o auto-complete costuma colar.
 function normalizePassword(value: string): string {
