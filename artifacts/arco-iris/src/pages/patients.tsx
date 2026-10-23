@@ -27,6 +27,7 @@ import { hasAdminScope, getProfessionalSession } from "@/lib/portal-session";
 import { AbcNivelBadge, AbcChecklistForm } from "@/components/AbcChecklistForm";
 import { TriagemMultiForm } from "@/components/TriagemMultidisciplinar";
 import { ABC_NIVEL_INFO } from "@/lib/abc-checklist";
+import { listBuscaAtivaAtual } from "@/lib/busca-ativa";
 
 const STATUS_OPTIONS = [
   { value: "Aguardando Triagem", label: "Aguardando Triagem" },
@@ -174,6 +175,7 @@ export default function Patients() {
   const [prontuarioAlerta, setProntuarioAlerta] = useState<string | null>(null);
   const [prontuarioChecking, setProntuarioChecking] = useState(false);
   const [fromWhatsapp, setFromWhatsapp] = useState(false);
+  const [buscaIds, setBuscaIds] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -194,6 +196,7 @@ export default function Patients() {
         ppMap.set(pid, { names, count: names.length });
       }
       setPatientProfs(ppMap);
+      listBuscaAtivaAtual().then(l => setBuscaIds(new Set(l.map(i => i.patientId)))).catch(() => { /* sem acesso */ });
     } catch (err: any) {
       toast({
         title: "Erro ao carregar pacientes",
@@ -650,6 +653,9 @@ export default function Patients() {
                           <span className="font-semibold text-foreground">{patient.name}</span>
                           {isRede && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">🏫 Mun.</span>
+                          )}
+                          {buscaIds.has(patient.id) && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 font-bold uppercase whitespace-nowrap">❄ Busca Ativa</span>
                           )}
                         </div>
                       </td>

@@ -2296,7 +2296,39 @@ export type PausedOverviewItem = {
   buscaStatus?: BuscaAtivaStatus;
   buscaObs?: string | null;
   buscaUpdatedAt?: string | null;
+  address?: string | null;
+  guardianName?: string | null;
 };
+
+export type BuscaAtivaHistoricoItem = {
+  id: number;
+  patientId: number;
+  patientName: string | null;
+  prontuario: string | null;
+  specialty: string | null;
+  professionalName: string | null;
+  origin: string | null;
+  keepsAgenda: boolean;
+  motivo: string | null;
+  pausedAt: string | null;
+  returnDate: string | null;
+  buscaStatus: string | null;
+  buscaObs: string | null;
+  returnedAt: string;
+  retornoMotivo: string | null;
+};
+
+export async function listBuscaAtivaHistorico(patientId?: number | null): Promise<BuscaAtivaHistoricoItem[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_busca_ativa_historico", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as BuscaAtivaHistoricoItem[];
+}
 
 export async function listPausedOverview(): Promise<{ fila: PausedOverviewItem[]; agenda: PausedOverviewItem[] }> {
   const supabase = requireSupabase();
