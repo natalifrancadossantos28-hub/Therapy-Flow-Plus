@@ -619,7 +619,7 @@ function Formulario({ onSubmit, initialData, noHeader }: { onSubmit: (f: FormDat
   const [outroAtendimento, setOutroAtendimento] = useState(b?.outroAtendimento ?? false);
   const [abrigoCasaCrianca, setAbrigoCasaCrianca] = useState(b?.abrigoCasaCrianca ?? false);
   const [cognitivoNaoPreservado, setCognitivoNaoPreservado] = useState(b?.cognitivoNaoPreservado ?? false);
-  const [localAtendimento, setLocalAtendimento] = useState(b?.localAtendimento ?? "");
+  const [localAtendimento, setLocalAtendimento] = useState(b?.localAtendimento || (b?.outroAtendimento === true ? "" : "Sem Atendimento"));
   const [tipoRegistro, setTipoRegistro] = useState(b?.tipoRegistro ?? "Paciente da Unidade");
   const [profissional, setProfissional] = useState(b?.profissional ?? "");
   const questionario = questionarioDe(respostas.length);
