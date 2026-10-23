@@ -426,7 +426,7 @@ function triSalvaToFormData(t: TriagemSalva): FormData {
     medicacaoContinua: t.medicacaoContinua || "",
     alergias: t.alergias || "", problemasSaude: t.problemasSaude || "",
     tipoEscola: t.tipoEscola || "", trabalhoPais: t.trabalhoPais || "",
-    outroAtendimento: t.outroAtendimento !== false,
+    outroAtendimento: t.outroAtendimento === true,
     abrigoCasaCrianca: !!t.abrigoCasaCrianca,
     cognitivoNaoPreservado: false,
     localAtendimento: t.localAtendimento || "",
@@ -616,7 +616,7 @@ function Formulario({ onSubmit, initialData, noHeader }: { onSubmit: (f: FormDat
   const [problemasSaude, setProblemasSaude] = useState(b?.problemasSaude ?? "");
   const [tipoEscola, setTipoEscola] = useState(b?.tipoEscola ?? "");
   const [trabalhoPais, setTrabalhoPais] = useState(b?.trabalhoPais ?? "");
-  const [outroAtendimento, setOutroAtendimento] = useState(b?.outroAtendimento ?? true);
+  const [outroAtendimento, setOutroAtendimento] = useState(b?.outroAtendimento ?? false);
   const [abrigoCasaCrianca, setAbrigoCasaCrianca] = useState(b?.abrigoCasaCrianca ?? false);
   const [cognitivoNaoPreservado, setCognitivoNaoPreservado] = useState(b?.cognitivoNaoPreservado ?? false);
   const [localAtendimento, setLocalAtendimento] = useState(b?.localAtendimento ?? "");
@@ -795,18 +795,18 @@ function Formulario({ onSubmit, initialData, noHeader }: { onSubmit: (f: FormDat
                 <label className="block text-sm font-semibold text-muted-foreground mb-2">Já realiza terapias em outro local atualmente?</label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" checked={outroAtendimento === true} onChange={() => setOutroAtendimento(true)} className="accent-primary w-4 h-4" />
+                    <input type="radio" checked={outroAtendimento === true} onChange={() => { setOutroAtendimento(true); if (localAtendimento === "Sem Atendimento") setLocalAtendimento(""); }} className="accent-primary w-4 h-4" />
                     <span className="text-sm font-semibold text-muted-foreground">Sim</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" checked={outroAtendimento === false} onChange={() => setOutroAtendimento(false)} className="accent-primary w-4 h-4" />
+                    <input type="radio" checked={outroAtendimento === false} onChange={() => { setOutroAtendimento(false); setLocalAtendimento("Sem Atendimento"); }} className="accent-primary w-4 h-4" />
                     <span className="text-sm font-semibold text-muted-foreground">Não — atendimento exclusivo aqui (+5 pts prioridade)</span>
                   </label>
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-muted-foreground mb-1">Onde realiza atendimento atualmente?</label>
-                <select value={localAtendimento} onChange={e => setLocalAtendimento(e.target.value)} className={fc}>
+                <select value={localAtendimento} required={outroAtendimento} onChange={e => { const v = e.target.value; setLocalAtendimento(v); if (v) setOutroAtendimento(v !== "Sem Atendimento"); }} className={fc}>
                   <option value="">Selecione...</option>
                   {["CAPS", "Reabilitação", "Particular", "Sem Atendimento"].map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
