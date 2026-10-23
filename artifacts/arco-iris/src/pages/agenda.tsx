@@ -572,6 +572,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [specialtyAbsences, setSpecialtyAbsences] = useState<Map<string, number>>(new Map());
   const [photoById, setPhotoById] = useState<Map<number, string | null>>(new Map());
   const [docsById, setDocsById] = useState<Map<number, { cpf: string | null; cns: string | null }>>(new Map());
+  const [phoneById, setPhoneById] = useState<Map<number, string>>(new Map());
   const { toast } = useToast();
 
   // Transporte (Motorista)
@@ -605,12 +606,15 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     listPatients().then((ps) => {
       const m = new Map<number, string | null>();
       const d = new Map<number, { cpf: string | null; cns: string | null }>();
+      const ph = new Map<number, string>();
       for (const p of ps) {
+        if (p.phone) ph.set(p.id, p.phone);
         if (p.photoUrl) m.set(p.id, p.photoUrl);
         if (p.cpf || p.cns) d.set(p.id, { cpf: p.cpf, cns: p.cns });
       }
       setPhotoById(m);
       setDocsById(d);
+      setPhoneById(ph);
     }).catch(console.error);
     listFeriados().then(setFeriados).catch(console.error);
     listAusencias().then(setAusencias).catch(console.error);
@@ -1747,7 +1751,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         prontuario: a.prontuario ?? null,
         status: apptStatus(a),
         guardianName: a.guardianName ?? null,
-        guardianPhone: a.guardianPhone ?? null,
+        guardianPhone: a.guardianPhone || phoneById.get(a.patientId) || null,
       }));
   };
 

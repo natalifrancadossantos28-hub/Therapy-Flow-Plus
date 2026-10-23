@@ -81,10 +81,10 @@ function patientCell(apts: PrintAppointment[]): string {
 const COLS = 7;
 const THEAD = `<thead><tr><th>Nº</th><th>Horário</th><th>Paciente</th><th>Responsável</th><th>Telefone</th><th>Status</th><th>Anotações</th></tr></thead>`;
 
-function aptRow(n: number, a: PrintAppointment): string {
+function aptRow(n: number, a: PrintAppointment, dateLabel?: string): string {
   return `<tr>
     <td class="n">${n}º</td>
-    <td class="time">${esc(a.time)}</td>
+    <td class="time">${esc(a.time)}${dateLabel ? `<div class="s">${esc(dateLabel)}</div>` : ""}</td>
     <td>${patientNameHtml(a.patientName || `Paciente #${a.patientId}`, a.prontuario)}</td>
     <td>${esc(a.guardianName || "—")}</td>
     <td class="nw">${esc(a.guardianPhone || "—")}</td>
@@ -161,11 +161,12 @@ function buildMes(o: AgendaPrintOptions): { html: string; count: number } {
         .filter((a) => a.date === dateStr)
         .sort((a, b) => a.time.localeCompare(b.time));
       const header = `<tr class="day-head"><td colspan="${COLS}">${esc(cap(format(d, "EEEE, dd 'de' MMMM", { locale: ptBR })))}</td></tr>`;
-      if (dayApts.length === 0) return `${header}<tr><td colspan="${COLS}" class="livre">Sem atendimentos</td></tr>`;
-      return header + dayApts.map((a) => aptRow(++n, a)).join("");
+      if (dayApts.length === 0) return `<tbody class="day">${header}<tr><td colspan="${COLS}" class="livre">Sem atendimentos</td></tr></tbody>`;
+      const dateLabel = cap(format(d, "EEE dd/MM", { locale: ptBR }));
+      return `<tbody class="day">${header}${dayApts.map((a) => aptRow(++n, a, dateLabel)).join("")}</tbody>`;
     })
     .join("");
-  return { html: `<table>${THEAD}<tbody>${rows}</tbody></table>`, count: n };
+  return { html: `<table>${THEAD}${rows}</table>`, count: n };
 }
 
 // -----------------------------------------------------------------------------
