@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useLocation } from "wouter";
-import { Building2, UserRound, ShieldCheck, Shield, Lock, ArrowLeft } from "lucide-react";
+import { Users, Stethoscope, Settings, Building2, ShieldCheck, Shield, Lock, ArrowLeft, ArrowRight } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { BackgroundPicker } from "@/components/BackgroundPicker";
+import { useBackground } from "@/lib/background";
 import { requireSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   CompanySession,
@@ -56,6 +59,7 @@ export default function Portal() {
   const [selectedProfId, setSelectedProfId] = useState("");
   const [pinInput, setPinInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
+  const portalBg = useBackground("portal");
 
   useEffect(() => {
     // Se ja tem sessao ativa, redireciona direto pra area correspondente.
@@ -209,89 +213,92 @@ export default function Portal() {
 
   const CARD_STYLE = neonCard("rgba(0,240,255,0.5)", "rgba(0,240,255,0.15)");
 
+  const backdropStyle: React.CSSProperties = portalBg
+    ? {
+        backgroundImage: `linear-gradient(180deg, rgba(5,14,50,0.30), rgba(4,12,40,0.45) 55%, rgba(3,8,30,0.78)), linear-gradient(90deg, rgba(20,50,160,0.22), rgba(20,40,140,0.10)), url("${portalBg}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : { background: "radial-gradient(1200px 600px at 15% -10%, rgba(34,211,238,0.14), transparent 60%), radial-gradient(900px 500px at 100% 110%, rgba(168,85,247,0.14), transparent 60%), #050b1f" };
+
+  const accessCards: Array<{ key: CardKey; color: string; title: string; text: string; Icon: typeof Users }> = [
+    { key: "reception", color: "#22c55e", title: "Recepção", text: "Agendamentos, presenças e acolhimento de pacientes.", Icon: Users },
+    { key: "professional", color: "#22d3ee", title: "Profissional de Saúde", text: "Agenda pessoal e atendimentos.", Icon: Stethoscope },
+    { key: "admin", color: "#a855f7", title: "Administração", text: "Gestão total, dashboards e configurações do sistema.", Icon: Settings },
+  ];
+
   // Tela dos 3 cards.
   if (!active) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-[#020612] via-[#040a18] to-[#010408]">
-        <div className="text-center mb-10">
+      <div className="min-h-screen relative flex flex-col items-center justify-center px-5 pt-28 pb-24 md:py-24 text-white overflow-hidden" style={backdropStyle}>
+        <div className="absolute top-5 left-5 right-5 md:left-8 md:right-8 flex items-center justify-between">
           <img
             src={`${import.meta.env.BASE_URL}images/logo.png`}
             alt="NFs"
-            className="w-20 h-20 rounded-2xl mx-auto mb-4"
-            style={{ boxShadow: "0 0 30px rgba(0,200,255,0.35), 0 0 60px rgba(0,200,255,0.15)" }}
+            className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white p-0.5"
+            style={{ boxShadow: "0 0 24px rgba(34,211,238,0.35)" }}
           />
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2" style={{ textShadow: "0 0 25px rgba(0,200,255,0.6), 0 0 50px rgba(0,200,255,0.3)" }}>
-            NFs Gestão Terapêutica
-          </h1>
-          <p className="text-sm text-white/50">Selecione o tipo de acesso</p>
+          <div className="flex items-center gap-1 text-white [&_button]:text-white/80">
+            <ThemeToggle compact />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full max-w-5xl">
-          {/* Card 1 - Recepcao */}
-          <button
-            onClick={() => setActive("reception")}
-            className="group rounded-2xl p-6 text-left transition-all hover:scale-[1.03] active:scale-[0.98]"
-            style={neonCard("#22c55e", "rgba(34,197,94,0.25)")}
-          >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.6)", boxShadow: "0 0 20px rgba(34,197,94,0.35)" }}>
-              <Building2 className="w-7 h-7" style={{ color: "#86efac" }} />
-            </div>
-            <h2 className="text-xl font-bold text-white mb-2" style={{ textShadow: "0 0 12px rgba(34,197,94,0.5)" }}>Recepção</h2>
-            <p className="text-sm text-white/55 leading-relaxed">
-              Agendamentos, presenças e recepção de pacientes.
-            </p>
-            <p className="text-[11px] mt-4 font-bold uppercase tracking-wider" style={{ color: "#86efac", textShadow: "0 0 8px rgba(34,197,94,0.6)" }}>
-              Acesso direto
-            </p>
-          </button>
+        <div
+          className="hidden xl:block absolute right-12 top-28 text-[34px] leading-[1.12] text-[#eaf2ff] -rotate-[4deg] pointer-events-none select-none"
+          style={{ fontFamily: "Caveat, cursive", textShadow: "0 2px 14px rgba(0,0,0,0.7)" }}
+          aria-hidden
+        >
+          Inclusão<br />Desenvolvimento<br />Acolhimento<br />Qualidade de vida
+        </div>
 
-          {/* Card 2 - Profissional de Saude */}
-          <button
-            onClick={() => setActive("professional")}
-            className="group rounded-2xl p-6 text-left transition-all hover:scale-[1.03] active:scale-[0.98]"
-            style={neonCard("#06b6d4", "rgba(6,182,212,0.25)")}
+        <div className="text-center mb-9 relative">
+          <h1
+            className="font-display font-extrabold text-[32px] md:text-5xl text-white"
+            style={{ textShadow: "0 2px 24px rgba(0,0,0,0.55), 0 0 30px rgba(34,211,238,0.25)" }}
           >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(6,182,212,0.12)", border: "1px solid rgba(6,182,212,0.6)", boxShadow: "0 0 20px rgba(6,182,212,0.35)" }}>
-              <UserRound className="w-7 h-7" style={{ color: "#67e8f9" }} />
-            </div>
-            <h2 className="text-xl font-bold text-white mb-2" style={{ textShadow: "0 0 12px rgba(6,182,212,0.5)" }}>Profissional de Saúde</h2>
-            <p className="text-sm text-white/55 leading-relaxed">
-              Agenda pessoal e atendimentos.
-            </p>
-            <p className="text-[11px] mt-4 font-bold uppercase tracking-wider" style={{ color: "#67e8f9", textShadow: "0 0 8px rgba(6,182,212,0.6)" }}>
-              Acesso: seu nome + PIN
-            </p>
-          </button>
+            NFs Gestão Terapêutica
+          </h1>
+          <p className="mt-3 text-base md:text-lg text-[#dbe7ff]" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.6)" }}>
+            Cuidado, inclusão e desenvolvimento em um só lugar.
+          </p>
+        </div>
 
-          {/* Card 3 - Administracao */}
-          <button
-            onClick={() => setActive("admin")}
-            className="group rounded-2xl p-6 text-left transition-all hover:scale-[1.03] active:scale-[0.98]"
-            style={neonCard("#a855f7", "rgba(168,85,247,0.25)")}
-          >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(168,85,247,0.12)", border: "1px solid rgba(168,85,247,0.6)", boxShadow: "0 0 20px rgba(168,85,247,0.35)" }}>
-              <ShieldCheck className="w-7 h-7" style={{ color: "#d8b4fe" }} />
-            </div>
-            <h2 className="text-xl font-bold text-white mb-2" style={{ textShadow: "0 0 12px rgba(168,85,247,0.5)" }}>Administração</h2>
-            <p className="text-sm text-white/55 leading-relaxed">
-              Gestão total, dashboards e configurações do sistema.
-            </p>
-            <p className="text-[11px] mt-4 font-bold uppercase tracking-wider" style={{ color: "#d8b4fe", textShadow: "0 0 8px rgba(168,85,247,0.6)" }}>
-              Acesso direto
-            </p>
-          </button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-7 w-full max-w-md md:max-w-5xl relative">
+          {accessCards.map(({ key, color, title, text, Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActive(key)}
+              className="portal-access-card rounded-3xl px-6 pt-8 pb-6 text-center flex flex-col items-center"
+              style={{ ["--c" as string]: color } as React.CSSProperties}
+            >
+              <Icon className="w-11 h-11 mb-3" style={{ color, filter: `drop-shadow(0 0 10px ${color})` }} />
+              <h2 className="font-display text-2xl font-extrabold text-white">{title}</h2>
+              <p className="text-[15px] text-[#e3ecff] mt-2.5 mb-6 min-h-[46px] leading-relaxed">{text}</p>
+              <span className="portal-access-btn mt-auto w-full rounded-full py-3.5 font-bold text-[15px] text-[#04111f] flex items-center justify-center gap-2">
+                Acessar <ArrowRight className="w-4 h-4" />
+              </span>
+            </button>
+          ))}
         </div>
 
         {/* Link para Painel Master */}
         <button
           onClick={() => setLocation("/master")}
-          className="mt-6 text-xs text-white/30 hover:text-amber-400/80 transition-colors flex items-center gap-1.5"
+          className="mt-8 text-xs text-white/60 hover:text-amber-300 transition-colors flex items-center gap-1.5 relative"
         >
           <Shield className="w-3.5 h-3.5" />
           Painel Master (Multi-Empresa)
         </button>
 
-        <p className="text-xs text-white/30 mt-6">&copy; 2026 NFs Systems &middot; Gestão Terapêutica</p>
+        <p className="text-xs text-white/55 mt-4 relative">&copy; 2026 NFs Systems &middot; Gestão Terapêutica</p>
+
+        <BackgroundPicker
+          bgKey="portal"
+          subtitle="Portal (tela de entrada)"
+          variant="pill"
+          placement="up-left"
+          className="absolute left-5 bottom-5 md:left-8 md:bottom-6"
+        />
       </div>
     );
   }
@@ -302,7 +309,7 @@ export default function Portal() {
     const accent = isRecep ? "#67e8f9" : "#f0abfc";
     const accentBg = isRecep ? "rgba(0,240,255,0.12)" : "rgba(217,70,239,0.12)";
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-[#020612] via-[#040a18] to-[#010408]">
+      <div className="min-h-screen flex items-center justify-center p-6" style={backdropStyle}>
         <div className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl" style={neonCard(isRecep ? "rgba(34,197,94,0.5)" : "rgba(168,85,247,0.5)", isRecep ? "rgba(34,197,94,0.15)" : "rgba(168,85,247,0.15)")}>
           <div className="p-6 text-center" style={{ borderBottom: `1px solid ${accent}33` }}>
             <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3" style={{ background: accentBg, border: `1px solid ${accent}`, boxShadow: `0 0 20px ${accent}40` }}>
@@ -365,7 +372,7 @@ export default function Portal() {
 
   // Formulario de PIN para Profissional.
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-[#020612] via-[#040a18] to-[#010408]">
+    <div className="min-h-screen flex items-center justify-center p-6" style={backdropStyle}>
       <div className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl" style={{ ...CARD_STYLE, border: "1px solid rgba(16,185,129,0.35)" }}>
         <div className="p-6 text-center" style={{ borderBottom: "1px solid rgba(16,185,129,0.25)" }}>
           <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid #10b981", boxShadow: "0 0 20px rgba(16,185,129,0.35)" }}>

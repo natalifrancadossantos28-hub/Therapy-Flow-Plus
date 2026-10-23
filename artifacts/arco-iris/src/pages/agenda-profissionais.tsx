@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Calendar as CalendarIcon, Lock, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { BackgroundPicker } from "@/components/BackgroundPicker";
+import { appBackgroundStyle, useBackground } from "@/lib/background";
 import { MensagensComemorativas } from "@/components/MensagensComemorativas";
 import { RecadoEquipeComposer } from "@/components/RecadoEquipeComposer";
 import { listProfessionals, verifyProfessionalPin } from "@/lib/arco-rpc";
@@ -21,6 +23,8 @@ export default function AgendaProfissionais() {
   const portalProf = getProfessionalSession();
   const isAdminViewing = portalScope === "admin";
   const isProfessionalSession = portalScope === "professional" && !!portalProf;
+  const bgKey = portalProf ? `prof_${portalProf.professionalId}` : "prof_admin";
+  const bgUrl = useBackground(bgKey);
   const profFromQuery =
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("prof") || ""
@@ -72,7 +76,7 @@ export default function AgendaProfissionais() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className={`min-h-screen bg-background text-foreground${bgUrl ? " has-app-bg" : ""}`} style={appBackgroundStyle(bgUrl)}>
       <div className="bg-slate-800 text-white px-4 py-2 flex items-center">
         <a
           href={import.meta.env.BASE_URL || "/"}
@@ -95,6 +99,7 @@ export default function AgendaProfissionais() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <BackgroundPicker bgKey={bgKey} subtitle={portalProf ? `Minha agenda · ${portalProf.professionalName}` : "Agenda do profissional"} placement="down-right" />
             <ThemeToggle compact />
             {pinVerified && (
               <button
