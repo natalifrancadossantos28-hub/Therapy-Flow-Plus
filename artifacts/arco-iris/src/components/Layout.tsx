@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
-  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX } from "lucide-react";
+  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
@@ -34,6 +34,7 @@ const navItems: NavItem[] = [
   { href: "/recados-equipe", label: "Recados da Equipe", icon: Inbox, scopes: ["admin"] },
   { href: "/gestao-contratos", label: "Gestão de Contratos", icon: Building2, scopes: ["admin"] },
   { href: "/ai-brain", label: "Cérebro IA", icon: Brain, scopes: ["admin"] },
+  { href: "/personalizacao-visual", label: "Configurações · Visual", icon: Palette, scopes: ["admin"] },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

@@ -3,8 +3,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useLocation } from "wouter";
 import { Users, Stethoscope, Settings, Building2, ShieldCheck, Shield, Lock, ArrowLeft, ArrowRight } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BackgroundPicker } from "@/components/BackgroundPicker";
-import { useBackground } from "@/lib/background";
+import { portalVeilGradient, usePortalBackground } from "@/lib/visual-settings";
 import { requireSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   CompanySession,
@@ -59,7 +58,7 @@ export default function Portal() {
   const [selectedProfId, setSelectedProfId] = useState("");
   const [pinInput, setPinInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
-  const portalBg = useBackground("portal");
+  const { url: portalBg, veil: portalVeil } = usePortalBackground(DEFAULT_SLUG);
 
   useEffect(() => {
     // Se ja tem sessao ativa, redireciona direto pra area correspondente.
@@ -215,7 +214,7 @@ export default function Portal() {
 
   const backdropStyle: React.CSSProperties = portalBg
     ? {
-        backgroundImage: `linear-gradient(180deg, rgba(5,14,50,0.30), rgba(4,12,40,0.45) 55%, rgba(3,8,30,0.78)), linear-gradient(90deg, rgba(20,50,160,0.22), rgba(20,40,140,0.10)), url("${portalBg}")`,
+        backgroundImage: `${portalVeilGradient(portalVeil)}, url("${portalBg}")`,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }
@@ -291,14 +290,6 @@ export default function Portal() {
         </button>
 
         <p className="text-xs text-white/55 mt-4 relative">&copy; 2026 NFs Systems &middot; Gestão Terapêutica</p>
-
-        <BackgroundPicker
-          bgKey="portal"
-          subtitle="Portal (tela de entrada)"
-          variant="pill"
-          placement="up-left"
-          className="absolute left-5 bottom-5 md:left-8 md:bottom-6"
-        />
       </div>
     );
   }
