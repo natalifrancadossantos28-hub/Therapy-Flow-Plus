@@ -1,3 +1,4 @@
+import { escHtml, openReportWindow, patientNameHtml } from "@/lib/print-report-shell";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
@@ -918,43 +919,35 @@ export default function Reception() {
     const morningSlots = [...baseMorning, ...extras.filter(t => t < "12:10")].sort(sortT);
     const afternoonSlots = [...baseAfternoon, ...extras.filter(t => t > "12:10")].sort(sortT);
 
-    const w = window.open("", "_blank");
-    if (!w) return;
-
+    let n = 0;
     const rowHtml = (time: string, isLunch = false) => {
       const apts = aptMap[time] || [];
-      if (isLunch && apts.length === 0) return `<tr><td colspan="4" style="background:#f8fafc;color:#94a3b8;font-style:italic;padding:8px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;">🍽 12:10 — Intervalo de Almoço</td></tr>`;
+      if (isLunch && apts.length === 0) return `<tr class="lunch-row"><td colspan="7">🍽 12:10 — Intervalo de Almoço</td></tr>`;
       if (apts.length === 0)
-        return `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td colspan="3" style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#cbd5e1;font-style:italic;">Livre</td></tr>`;
-      return apts.map(a => { const pront = a.prontuario || prontuarioMap.get(a.patientId) || ""; return `<tr><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;">${time}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;font-weight:600;">${pront ? `${pront} - ` : ""}${a.patientName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.professionalName}</td><td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">${a.status}</td></tr>`; }).join("");
+        return `<tr><td class="n"></td><td class="time">${time}</td><td colspan="5" class="livre">Livre</td></tr>`;
+      return apts.map(a => {
+        const pront = a.prontuario || prontuarioMap.get(a.patientId) || "";
+        return `<tr><td class="n">${++n}º</td><td class="time">${time}</td><td>${patientNameHtml(a.patientName, pront)}</td><td class="nw">${escHtml(a.patientPhone || "—")}</td><td>${escHtml(a.professionalName || "—")}</td><td class="nw">${escHtml(a.status)}</td><td class="anot"></td></tr>`;
+      }).join("");
     };
+    const rowsM = morningSlots.map(t => rowHtml(t)).join("");
+    const rowL = rowHtml("12:10", true);
+    const rowsT = afternoonSlots.map(t => rowHtml(t)).join("");
 
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Agenda do Dia</title>
-    <style>body{font-family:Arial,sans-serif;padding:32px;color:#0f172a;}h1{font-size:20px;margin-bottom:4px;}
-    .sub{color:#64748b;font-size:13px;margin-bottom:24px;text-transform:capitalize;}
-    table{width:100%;border-collapse:collapse;font-size:13px;}
-    th{text-align:left;padding:10px 14px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
-    .section{background:#fefce8;color:#92400e;font-size:11px;font-weight:700;padding:8px 14px;border-bottom:1px solid #e2e8f0;text-transform:uppercase;letter-spacing:.05em;}
-    @media print{button{display:none}html,body{height:auto!important;overflow:visible!important;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
-    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
-      <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
-      <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
-    </div>
-    <h1>Atendimentos Terapêuticos – Hoje</h1>
-    <p class="sub">${todayStr} · ${list.length} atendimento(s)</p>
-    <table>
-      <thead><tr><th>Horário</th><th>Paciente</th><th>Profissional</th><th>Status</th></tr></thead>
-      <tbody>
-        <tr><td colspan="4" class="section">Período da Manhã</td></tr>
-        ${morningSlots.map(t => rowHtml(t)).join("")}
-        ${rowHtml("12:10", true)}
-        <tr><td colspan="4" class="section">Período da Tarde</td></tr>
-        ${afternoonSlots.map(t => rowHtml(t)).join("")}
-      </tbody>
-    </table>
-    <p style="margin-top:24px;font-size:11px;color:#94a3b8;">Encerramento: 17:20 | NFS – Gestão Terapêutica</p>
-    </body></html>`);
-    w.document.close();
+    openReportWindow({
+      title: "Atendimentos Terapêuticos – Hoje",
+      subParts: [todayStr, `${list.length} atendimento(s)`],
+      body: `<table>
+        <thead><tr><th>Nº</th><th>Horário</th><th>Paciente</th><th>Telefone</th><th>Profissional</th><th>Status</th><th>Anotações</th></tr></thead>
+        <tbody>
+          <tr class="section"><td colspan="7">Período da Manhã</td></tr>
+          ${rowsM}${rowL}
+          <tr class="section"><td colspan="7">Período da Tarde</td></tr>
+          ${rowsT}
+        </tbody>
+      </table>`,
+      footer: "Encerramento: 17:20",
+    });
   };
 
   // Lista por paciente ÚNICO: cada criança aparece 1 vez (mesmo com fono+psico+TO),
@@ -978,40 +971,26 @@ export default function Reception() {
 
     const rows = [...byPatient.values()].sort((x, y) => x.name.localeCompare(y.name, "pt-BR"));
 
-    const w = window.open("", "_blank");
-    if (!w) return;
-
     const rowHtml = rows.map((r, i) => {
       const horarios = [...r.horarios].sort((a, b) => a.localeCompare(b)).join(", ");
       const profs = [...r.profs].sort((a, b) => a.localeCompare(b, "pt-BR")).join(", ");
       return `<tr>
-        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:16px;">☐</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;text-align:center;">${i + 1}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:600;">${r.pront ? `${r.pront} - ` : ""}${r.name}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;">${profs}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;">${horarios}</td>
+        <td style="text-align:center;font-size:16px;width:34px;">☐</td>
+        <td class="n">${i + 1}º</td>
+        <td>${patientNameHtml(r.name, r.pront)}</td>
+        <td>${escHtml(profs)}</td>
+        <td class="nw">${escHtml(horarios)}</td>
       </tr>`;
     }).join("");
 
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lista por Paciente</title>
-    <style>body{font-family:Arial,sans-serif;padding:32px;color:#0f172a;}h1{font-size:20px;margin-bottom:4px;}
-    .sub{color:#64748b;font-size:13px;margin-bottom:24px;text-transform:capitalize;}
-    table{width:100%;border-collapse:collapse;font-size:13px;}
-    th{text-align:left;padding:10px 12px;background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
-    @media print{button{display:none}html,body{height:auto!important;overflow:visible!important;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}table{break-inside:auto;}}</style></head><body>
-    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
-      <button onclick="window.close()" style="padding:8px 20px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar ao Sistema</button>
-      <button onclick="window.print()" style="padding:8px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">🖨 Imprimir</button>
-    </div>
-    <h1>Lista por Paciente (Único) – Hoje</h1>
-    <p class="sub">${todayStr} · ${rows.length} criança(s) — marque ☐ ao entregar lembrança/lanche</p>
-    <table>
-      <thead><tr><th style="text-align:center;">✓</th><th style="text-align:center;">#</th><th>Paciente</th><th>Profissional(is)</th><th>Horários</th></tr></thead>
-      <tbody>${rowHtml || `<tr><td colspan="5" style="padding:16px;color:#cbd5e1;font-style:italic;text-align:center;">Nenhum atendimento hoje.</td></tr>`}</tbody>
-    </table>
-    <p style="margin-top:24px;font-size:11px;color:#94a3b8;">NFS – Gestão Terapêutica</p>
-    </body></html>`);
-    w.document.close();
+    openReportWindow({
+      title: "Lista por Paciente (Único) – Hoje",
+      subParts: [todayStr, `${rows.length} criança(s) — marque ☐ ao entregar lembrança/lanche`],
+      body: `<table>
+        <thead><tr><th style="text-align:center;">✓</th><th>Nº</th><th>Paciente</th><th>Profissional(is)</th><th>Horários</th></tr></thead>
+        <tbody>${rowHtml || `<tr><td colspan="5" class="livre" style="text-align:center;">Nenhum atendimento hoje.</td></tr>`}</tbody>
+      </table>`,
+    });
   };
 
   const handleStatusChange = async (id: number, status: string): Promise<number> => {

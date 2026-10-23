@@ -7,6 +7,7 @@
 // =============================================================================
 import { format, startOfWeek, addDays, endOfMonth, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { escHtml as esc, openReportWindow, patientNameHtml } from "@/lib/print-report-shell";
 
 export type AgendaPrintMode = "dia" | "semana" | "mes" | "rascunho";
 
@@ -17,6 +18,8 @@ export type PrintAppointment = {
   patientName?: string | null;
   prontuario?: string | null;
   status: string;
+  guardianName?: string | null;
+  guardianPhone?: string | null;
 };
 
 export interface AgendaPrintOptions {
@@ -29,10 +32,6 @@ export interface AgendaPrintOptions {
   lunchSlot?: string;        // padrão "12:10"
   includeLunch?: boolean;    // se mostra a linha de almoço (padrão true)
 }
-
-const esc = (v: unknown): string =>
-  String(v ?? "").replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -57,25 +56,6 @@ function statusLabel(status: string): string {
   return map[s] ?? (status ? cap(status) : "");
 }
 
-function patientLine(apt: PrintAppointment): string {
-  const pront = apt.prontuario
-    ? `<strong style="color:#0891b2">[${esc(apt.prontuario)}]</strong> `
-    : "";
-  return `${pront}${esc(apt.patientName || `Paciente #${apt.patientId}`)}`;
-}
-
-/** Um mesmo horário pode ter vários pacientes (grupo, Multi, Parental). */
-function patientCell(apts: PrintAppointment[], emptyLabel = ""): string {
-  if (apts.length === 0) {
-    return emptyLabel ? `<span style="color:#9ca3af;font-style:italic">${esc(emptyLabel)}</span>` : "";
-  }
-  return apts.map((a) => `<div class="pat">${patientLine(a)}</div>`).join("");
-}
-
-function statusCell(apts: PrintAppointment[]): string {
-  return apts.map((a) => `<div class="pat">${esc(statusLabel(a.status))}</div>`).join("");
-}
-
 const aptsAt = (list: PrintAppointment[], date: string, time: string): PrintAppointment[] =>
   list.filter((a) => a.date === date && a.time === time);
 
@@ -93,32 +73,46 @@ function printableSlots(o: AgendaPrintOptions, dates: string[]): string[] {
   return Array.from(new Set([...base, ...extras])).sort((a, b) => a.localeCompare(b));
 }
 
+
+function patientCell(apts: PrintAppointment[]): string {
+  return apts.map((a) => `<div class="pat">${patientNameHtml(a.patientName || `Paciente #${a.patientId}`, a.prontuario)}</div>`).join("");
+}
+
+const COLS = 7;
+const THEAD = `<thead><tr><th>Nº</th><th>Horário</th><th>Paciente</th><th>Responsável</th><th>Telefone</th><th>Status</th><th>Anotações</th></tr></thead>`;
+
+function aptRow(n: number, a: PrintAppointment): string {
+  return `<tr>
+    <td class="n">${n}º</td>
+    <td class="time">${esc(a.time)}</td>
+    <td>${patientNameHtml(a.patientName || `Paciente #${a.patientId}`, a.prontuario)}</td>
+    <td>${esc(a.guardianName || "—")}</td>
+    <td class="nw">${esc(a.guardianPhone || "—")}</td>
+    <td class="nw">${esc(statusLabel(a.status))}</td>
+    <td class="anot"></td>
+  </tr>`;
+}
+
 // -----------------------------------------------------------------------------
 // Blocos de HTML por modo
 // -----------------------------------------------------------------------------
-function buildDia(o: AgendaPrintOptions, dateStr: string): string {
+function buildDia(o: AgendaPrintOptions, dateStr: string): { html: string; count: number } {
   const lunch = o.lunchSlot ?? "12:10";
   const includeLunch = o.includeLunch ?? true;
   const dayApts = o.appointments.filter((a) => a.date === dateStr);
   const slots = printableSlots(o, [dateStr]);
-
-  const rowFor = (time: string): string => {
+  let n = 0;
+  const rows = slots.map((time) => {
     const apts = dayApts.filter((a) => a.time === time);
     if (time === lunch && includeLunch && apts.length === 0) {
-      return `<tr class="lunch-row"><td colspan="3">🍽 ${esc(time)} — Intervalo de Almoço</td></tr>`;
+      return `<tr class="lunch-row"><td colspan="${COLS}">🍽 ${esc(time)} — Intervalo de Almoço</td></tr>`;
     }
-    return `<tr>
-      <td class="time">${esc(time)}</td>
-      <td>${patientCell(apts, "Livre")}</td>
-      <td>${statusCell(apts)}</td>
-    </tr>`;
-  };
-
-  return `
-    <table>
-      <thead><tr><th style="width:90px">Horário</th><th>Paciente</th><th style="width:150px">Status</th></tr></thead>
-      <tbody>${slots.map(rowFor).join("")}</tbody>
-    </table>`;
+    if (apts.length === 0) {
+      return `<tr><td class="n"></td><td class="time">${esc(time)}</td><td colspan="${COLS - 2}" class="livre">Livre</td></tr>`;
+    }
+    return apts.map((a) => aptRow(++n, a)).join("");
+  }).join("");
+  return { html: `<table>${THEAD}<tbody>${rows}</tbody></table>`, count: n };
 }
 
 function buildSemanaTable(o: AgendaPrintOptions, weekDates: string[], blank: boolean): string {
@@ -142,10 +136,7 @@ function buildSemanaTable(o: AgendaPrintOptions, weekDates: string[], blank: boo
         return `<tr class="lunch-row"><td class="time">${esc(time)}</td><td colspan="${weekDates.length}">🍽 Intervalo de Almoço</td></tr>`;
       }
       const cells = weekDates
-        .map((date) => {
-          if (blank) return `<td class="blank-cell"></td>`;
-          return `<td>${patientCell(aptsAt(o.appointments, date, time))}</td>`;
-        })
+        .map((date) => (blank ? `<td class="blank-cell"></td>` : `<td>${patientCell(aptsAt(o.appointments, date, time))}</td>`))
         .join("");
       return `<tr><td class="time">${esc(time)}</td>${cells}</tr>`;
     })
@@ -154,7 +145,7 @@ function buildSemanaTable(o: AgendaPrintOptions, weekDates: string[], blank: boo
   return `<table class="grid"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
-function buildMes(o: AgendaPrintOptions): string {
+function buildMes(o: AgendaPrintOptions): { html: string; count: number } {
   const first = startOfMonth(o.refDate);
   const last = endOfMonth(o.refDate);
   const days: Date[] = [];
@@ -162,26 +153,19 @@ function buildMes(o: AgendaPrintOptions): string {
     const dow = d.getDay();
     if (dow >= 1 && dow <= 5) days.push(new Date(d)); // seg..sex
   }
-
-  return days
+  let n = 0;
+  const rows = days
     .map((d) => {
       const dateStr = format(d, "yyyy-MM-dd");
       const dayApts = o.appointments
         .filter((a) => a.date === dateStr)
         .sort((a, b) => a.time.localeCompare(b.time));
-      const header = `<div class="mes-day-head">${cap(format(d, "EEEE, dd 'de' MMMM", { locale: ptBR }))}</div>`;
-      if (dayApts.length === 0) {
-        return `<div class="mes-day">${header}<div class="mes-empty">Sem atendimentos</div></div>`;
-      }
-      const rows = dayApts
-        .map(
-          (apt) =>
-            `<div class="mes-row"><span class="mes-time">${esc(apt.time)}</span><span class="mes-pat">${patientLine(apt)}</span><span class="mes-status">${esc(statusLabel(apt.status))}</span></div>`,
-        )
-        .join("");
-      return `<div class="mes-day">${header}${rows}</div>`;
+      const header = `<tr class="day-head"><td colspan="${COLS}">${esc(cap(format(d, "EEEE, dd 'de' MMMM", { locale: ptBR })))}</td></tr>`;
+      if (dayApts.length === 0) return `${header}<tr><td colspan="${COLS}" class="livre">Sem atendimentos</td></tr>`;
+      return header + dayApts.map((a) => aptRow(++n, a)).join("");
     })
     .join("");
+  return { html: `<table>${THEAD}<tbody>${rows}</tbody></table>`, count: n };
 }
 
 // -----------------------------------------------------------------------------
@@ -195,20 +179,23 @@ export function openAgendaPrint(o: AgendaPrintOptions): void {
   let title = "";
   let subtitle = "";
   let content = "";
+  let count: number | null = null;
 
   if (o.mode === "dia") {
-    const dateStr = format(o.refDate, "yyyy-MM-dd");
     title = "Agenda do Dia";
     subtitle = cap(format(o.refDate, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR }));
-    content = buildDia(o, dateStr);
+    const r = buildDia(o, format(o.refDate, "yyyy-MM-dd"));
+    content = r.html; count = r.count;
   } else if (o.mode === "semana") {
     title = "Agenda da Semana";
     subtitle = `${format(weekDays[0], "dd/MM")} a ${format(weekDays[4], "dd/MM/yyyy")}`;
     content = buildSemanaTable(o, weekDates, false);
+    count = o.appointments.filter((a) => weekDates.includes(a.date)).length;
   } else if (o.mode === "mes") {
     title = "Agenda do Mês";
     subtitle = cap(format(o.refDate, "MMMM 'de' yyyy", { locale: ptBR }));
-    content = buildMes(o);
+    const r = buildMes(o);
+    content = r.html; count = r.count;
   } else {
     // rascunho — grade semanal em branco pra preencher à mão
     title = "Agenda (rascunho)";
@@ -217,57 +204,10 @@ export function openAgendaPrint(o: AgendaPrintOptions): void {
   }
 
   const profLine = [o.professionalName, o.specialty].filter(Boolean).map(esc).join(" — ");
-
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head>
-<meta charset="utf-8"><title>${esc(title)}</title>
-<style>
-  *{box-sizing:border-box;}
-  body{font-family:Arial,Helvetica,sans-serif;padding:28px;color:#111827;margin:0;}
-  h1{font-size:22px;margin:0 0 2px;}
-  .prof{font-size:15px;font-weight:700;color:#0e7490;margin:6px 0 0;}
-  .sub{color:#6b7280;font-size:13px;margin:2px 0 20px;}
-  table{width:100%;border-collapse:collapse;font-size:13px;}
-  th{text-align:left;padding:9px 10px;background:#ecfeff;color:#0e7490;border-bottom:2px solid #0891b2;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
-  td{padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top;}
-  td.time{font-weight:700;color:#0e7490;white-space:nowrap;}
-  .lunch-row td{background:#f1f5f9;color:#64748b;font-style:italic;font-size:12px;}
-  table.grid{table-layout:fixed;}
-  table.grid th{text-align:center;}
-  table.grid th .th-sub{font-weight:400;font-size:10px;text-transform:none;}
-  table.grid td{font-size:12px;}
-  td.blank-cell{height:34px;}
-  .mes-day{margin-bottom:14px;break-inside:avoid;}
-  .mes-day-head{background:#ecfeff;color:#0e7490;font-weight:700;font-size:13px;padding:6px 10px;border-left:3px solid #0891b2;}
-  .mes-row{display:flex;gap:12px;padding:5px 10px;border-bottom:1px solid #eef2f7;font-size:12px;}
-  .mes-time{font-weight:700;color:#0e7490;width:52px;flex:0 0 52px;}
-  .mes-pat{flex:1;}
-  .mes-status{color:#6b7280;width:130px;flex:0 0 130px;text-align:right;}
-  .mes-empty{padding:5px 10px;color:#9ca3af;font-style:italic;font-size:12px;}
-  .footer{margin-top:22px;font-size:11px;color:#94a3b8;}
-  .pat + .pat{margin-top:3px;padding-top:3px;border-top:1px dotted #cbd5e1;}
-  @media print{
-    .no-print{display:none!important;}
-    body{padding:0;}
-    /* Nada de altura fixa/rolagem: a folha tem que sair com a lista inteira. */
-    html,body{height:auto!important;overflow:visible!important;}
-    thead{display:table-header-group;}
-    tr,.mes-day,.mes-row{break-inside:avoid;page-break-inside:avoid;}
-    table{break-inside:auto;}
-  }
-</style></head><body>
-  <div class="no-print" style="display:flex;gap:10px;margin-bottom:18px;align-items:center;">
-    <button onclick="window.close()" style="padding:8px 18px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar</button>
-    <button onclick="window.print()" style="padding:8px 18px;background:#0891b2;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">🖨 Imprimir</button>
-  </div>
-  <h1>${esc(title)}</h1>
-  ${profLine ? `<div class="prof">${profLine}</div>` : ""}
-  <div class="sub">${esc(subtitle)}</div>
-  ${content}
-  <div class="footer">NFS – Gestão Terapêutica</div>
-</body></html>`;
-
-  const w = window.open("", "_blank");
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
+  openReportWindow({
+    title,
+    heading: profLine ? `<div class="prof">${profLine}</div>` : "",
+    subParts: [subtitle, count === null ? "" : `${count} atendimento(s)`],
+    body: content,
+  });
 }
