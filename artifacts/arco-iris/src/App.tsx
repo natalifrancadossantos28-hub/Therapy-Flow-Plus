@@ -70,8 +70,8 @@ function Router() {
                 <Route path="/">{() => <AdminGuard><Dashboard /></AdminGuard>}</Route>
                 <Route path="/professionals">{() => <AdminGuard><Professionals /></AdminGuard>}</Route>
                 <Route path="/professionals/:id">{(params) => <AdminGuard><ProfessionalDetail /></AdminGuard>}</Route>
-                <Route path="/patients">{() => <AdminGuard><Patients /></AdminGuard>}</Route>
-                <Route path="/patients/:id">{(params) => <AdminGuard><PatientDetail /></AdminGuard>}</Route>
+                <Route path="/patients">{() => <AdminGuard requiredScope="reception"><Patients /></AdminGuard>}</Route>
+                <Route path="/patients/:id">{(params) => <AdminGuard requiredScope="reception"><PatientDetail /></AdminGuard>}</Route>
                 <Route path="/reception">{() => <AdminGuard requiredScope="reception"><Reception /></AdminGuard>}</Route>
                 <Route path="/waiting-list">{() => <AdminGuard requiredScope="reception"><WaitingList /></AdminGuard>}</Route>
                 <Route path="/pausados">{() => <AdminGuard requiredScope="reception"><Pausados /></AdminGuard>}</Route>
