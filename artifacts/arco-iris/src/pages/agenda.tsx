@@ -1746,6 +1746,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         patientName: a.patientName ?? null,
         prontuario: a.prontuario ?? null,
         status: apptStatus(a),
+        guardianName: a.guardianName ?? null,
+        guardianPhone: a.guardianPhone ?? null,
       }));
   };
 
