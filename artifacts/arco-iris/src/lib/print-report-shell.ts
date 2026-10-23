@@ -28,7 +28,7 @@ export const REPORT_CSS = `
   @media print{
     .no-print{display:none!important;} body{padding:0;}
     html,body{height:auto!important;overflow:visible!important;}
-    thead{display:table-header-group;} tr{break-inside:avoid;page-break-inside:avoid;} table{break-inside:auto;}
+    thead{display:table-header-group;} tr{break-inside:avoid;page-break-inside:avoid;} table{break-inside:auto;} tbody.day{break-inside:avoid;page-break-inside:avoid;} .day-head{break-after:avoid;page-break-after:avoid;}
   }`;
 
 /** Nome em negrito/maiúsculo com "Pront." embaixo, como no relatório da Busca Ativa. */
