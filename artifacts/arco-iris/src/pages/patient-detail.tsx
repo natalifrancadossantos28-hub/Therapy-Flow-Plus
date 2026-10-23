@@ -21,6 +21,8 @@ import {
   listAbcAvaliacoes,
   listAvaliacoesFuncionais,
   type AvaliacaoFuncional,
+  listAvaliacoesSociofamiliares,
+  type AvaliacaoSociofamiliar,
   type AvaliacaoFuncionalTipo,
   listTriagensDoPaciente,
   type TriagemMulti,
@@ -40,6 +42,7 @@ import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, printAbcCheckli
 import { getProfessionalSession } from "@/lib/portal-session";
 import { useBuscaAtivaPaciente } from "@/lib/busca-ativa";
 import { BuscaAtivaPacienteCard } from "@/components/BuscaAtivaPacienteCard";
+import { AvaliacaoSociofamiliarCard, AvaliacaoSociofamiliarForm } from "@/components/AvaliacaoSociofamiliar";
 import { TriagemMultiForm, TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
 import { printTriagemMulti } from "@/lib/print-triagem";
 
@@ -127,6 +130,8 @@ export default function PatientDetail() {
   const [abcHist, setAbcHist] = useState<AbcAvaliacao[]>([]);
   const [abcForm, setAbcForm] = useState<{ tipo: AbcTipo; base?: number[] } | null>(null);
   const [avfHist, setAvfHist] = useState<AvaliacaoFuncional[]>([]);
+  const [avsfHist, setAvsfHist] = useState<AvaliacaoSociofamiliar[]>([]);
+  const [avsfFormOpen, setAvsfFormOpen] = useState(false);
   const [avfForm, setAvfForm] = useState<{ tipo: AvaliacaoFuncionalTipo; specialty: string; entradaRef: AvaliacaoFuncional | null } | null>(null);
   const [avfNovaEspecialidade, setAvfNovaEspecialidade] = useState("");
   const [triagensMulti, setTriagensMulti] = useState<TriagemMulti[]>([]);
@@ -295,7 +300,7 @@ export default function PatientDetail() {
     setIsLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const [p, pdf, abs, allApts, alts, abcs, avfs] = await Promise.all([
+      const [p, pdf, abs, allApts, alts, abcs, avfs, avsfs] = await Promise.all([
         getPatient(patientId),
         getPatientPdf(patientId).catch(() => null),
         getPatientAbsences(patientId).catch(() => null),
@@ -303,6 +308,7 @@ export default function PatientDetail() {
         listPatientDischarges(patientId).catch(() => [] as PatientDischarge[]),
         listAbcAvaliacoes(patientId).catch(() => [] as AbcAvaliacao[]),
         listAvaliacoesFuncionais(patientId).catch(() => [] as AvaliacaoFuncional[]),
+        listAvaliacoesSociofamiliares(patientId).catch(() => [] as AvaliacaoSociofamiliar[]),
       ]);
       setPatient(p);
       setPdfData(pdf);
@@ -310,6 +316,7 @@ export default function PatientDetail() {
       setDischarges(alts);
       setAbcHist(abcs);
       setAvfHist(avfs);
+      setAvsfHist(avsfs);
       if (p) listTriagensDoPaciente(p).then(setTriagensMulti).catch(() => setTriagensMulti([]));
       // Derive team from appointments.
       // "Ativo" exige vínculo real na agenda: atendimento ativo dentro da janela
@@ -973,6 +980,8 @@ export default function PatientDetail() {
             );
           })()}
 
+          <AvaliacaoSociofamiliarCard historico={avsfHist} onNova={() => setAvsfFormOpen(true)} />
+
           {(() => {
             const entrada = abcHist.find(a => a.tipo === "entrada") ?? null;
             const alta = abcHist.find(a => a.tipo === "alta") ?? null;
@@ -1196,6 +1205,25 @@ export default function PatientDetail() {
               </div>
             </div>
             <div ref={triagemViewRef}><TriagemMultiResultado triagem={triagemMultiView} patient={patient} /></div>
+          </MotionCard>
+        </div>
+      )}
+
+      {avsfFormOpen && patient && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <MotionCard className="w-full max-w-2xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <AvaliacaoSociofamiliarForm
+              patientId={patient.id}
+              patientName={patient.name}
+              professionalId={getProfessionalSession()?.professionalId ?? null}
+              professionalName={getProfessionalSession()?.professionalName ?? null}
+              onCancel={() => setAvsfFormOpen(false)}
+              onSaved={(a) => {
+                setAvsfHist(prev => [a, ...prev]);
+                setAvsfFormOpen(false);
+                toast({ title: "Avaliação sociofamiliar salva", description: a.alertas.length ? `${a.alertas.length} alerta(s) para avaliar com urgência` : undefined });
+              }}
+            />
           </MotionCard>
         </div>
       )}

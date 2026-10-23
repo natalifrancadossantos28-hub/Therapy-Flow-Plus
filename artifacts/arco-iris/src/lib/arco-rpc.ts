@@ -3266,3 +3266,61 @@ export async function autolinkTriagemMulti(triagemId: number): Promise<AutolinkT
     return null;
   }
 }
+
+// ── Avaliação Sociofamiliar ────────────────────────────────────────────────
+
+export type AvaliacaoSociofamiliar = {
+  id: number;
+  patientId: number;
+  professionalId: number | null;
+  professionalName: string | null;
+  respostas: Record<string, string | string[]>;
+  score: number;
+  scoreMax: number;
+  alertas: string[];
+  justificativa: string;
+  observacoes: string | null;
+  createdAt: string;
+};
+
+export async function createAvaliacaoSociofamiliar(input: {
+  patientId: number;
+  respostas: Record<string, string | string[]>;
+  score: number;
+  scoreMax: number;
+  alertas: string[];
+  justificativa: string;
+  professionalId?: number | null;
+  professionalName?: string | null;
+  observacoes?: string | null;
+}): Promise<AvaliacaoSociofamiliar> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("create_avaliacao_sociofamiliar", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: input.patientId,
+    p_respostas: input.respostas,
+    p_score: input.score,
+    p_score_max: input.scoreMax,
+    p_alertas: input.alertas,
+    p_justificativa: input.justificativa,
+    p_professional_id: input.professionalId ?? null,
+    p_professional_name: input.professionalName ?? null,
+    p_observacoes: input.observacoes ?? null,
+  });
+  if (error) throw error;
+  return data as AvaliacaoSociofamiliar;
+}
+
+export async function listAvaliacoesSociofamiliares(patientId: number): Promise<AvaliacaoSociofamiliar[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_avaliacoes_sociofamiliares", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId,
+  });
+  if (error) throw error;
+  return (data ?? []) as AvaliacaoSociofamiliar[];
+}
