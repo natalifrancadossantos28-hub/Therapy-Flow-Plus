@@ -31,6 +31,7 @@ const CentralMensagens = lazy(() => import("@/pages/central-mensagens"));
 const RecadosEquipe = lazy(() => import("@/pages/recados-equipe"));
 const PainelMaster = lazy(() => import("@/pages/painel-master"));
 const AIBrain = lazy(() => import("@/pages/ai-brain"));
+const PersonalizacaoVisual = lazy(() => import("@/pages/personalizacao-visual"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,6 +85,7 @@ function Router() {
                 <Route path="/central-mensagens">{() => <AdminGuard><CentralMensagens /></AdminGuard>}</Route>
                 <Route path="/recados-equipe">{() => <AdminGuard><RecadosEquipe /></AdminGuard>}</Route>
                 <Route path="/ai-brain">{() => <AdminGuard><AIBrain /></AdminGuard>}</Route>
+                <Route path="/personalizacao-visual">{() => <AdminGuard><PersonalizacaoVisual /></AdminGuard>}</Route>
                 <Route component={NotFound} />
               </Switch>
             </Suspense>
