@@ -8,6 +8,8 @@ import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
 import { logoutAllDevices } from "@/lib/session-epoch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useThemeTick } from "@/lib/theme";
+import { BackgroundPicker } from "@/components/BackgroundPicker";
+import { appBackgroundStyle, useBackground } from "@/lib/background";
 
 type NavItem = {
   href: string;
@@ -43,6 +45,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   // Recepcao/admin compartilham o mesmo Layout; profissional tem tela propria.
   const effectiveScope: "admin" | "reception" = scope === "reception" ? "reception" : "admin";
   const visibleItems = navItems.filter((i) => i.scopes.includes(effectiveScope));
+  const bgKey = effectiveScope;
+  const bgSubtitle = effectiveScope === "reception" ? "Telas da Recepção" : "Telas da Administração";
+  const bgUrl = useBackground(bgKey);
 
   const handleLogout = () => {
     clearAllSessions();
@@ -107,7 +112,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="h-screen bg-background flex flex-col md:flex-row overflow-hidden">
+    <div className={cn("h-screen bg-background flex flex-col md:flex-row overflow-hidden", bgUrl && "has-app-bg")} style={appBackgroundStyle(bgUrl)}>
       {/* Skip-to-content — acessibilidade para navegação por teclado */}
       <a
         href="#main-content"
@@ -122,6 +127,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <span className="font-display font-bold text-lg text-primary">NFS</span>
         </div>
         <div className="flex items-center gap-1">
+          <BackgroundPicker bgKey={bgKey} subtitle={bgSubtitle} placement="down-right" />
           <ThemeToggle compact />
           <button aria-label={isMobileOpen ? "Fechar menu" : "Abrir menu"} onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-foreground/70 hover:bg-secondary rounded-lg">
             {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -165,7 +171,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLinks collapsed={isSidebarCollapsed} />
         </nav>
         {!isSidebarCollapsed && (
-          <div className="mt-2 mb-3 px-1">
+          <div className="mt-2 mb-3 px-1 flex flex-col gap-2">
+            <BackgroundPicker bgKey={bgKey} subtitle={bgSubtitle} variant="button" placement="side" />
             <ThemeToggle />
           </div>
         )}

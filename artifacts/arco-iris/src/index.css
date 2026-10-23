@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Caveat:wght@500;600&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -94,6 +94,10 @@
   --sidebar-ring: 183 100% 52%;
 
   --radius: 0.75rem;
+
+  /* véu por cima do fundo personalizado (lib/background.ts) */
+  --app-bg-veil-top: rgba(5, 11, 32, 0.70);
+  --app-bg-veil-bottom: rgba(5, 11, 32, 0.84);
 }
 
 /* ═══════════════════════════════════════════
@@ -138,6 +142,9 @@
   --sidebar-accent: 220 30% 94%;
   --sidebar-accent-foreground: 183 80% 28%;
   --sidebar-ring: 183 80% 38%;
+
+  --app-bg-veil-top: rgba(238, 243, 249, 0.82);
+  --app-bg-veil-bottom: rgba(238, 243, 249, 0.92);
 }
 
 @layer base {
@@ -233,10 +240,10 @@
   text-shadow: none;
 }
 :root.light .nav-active-neon {
-  background: rgba(6, 182, 212, 0.08);
-  color: #0e7490;
-  box-shadow: none;
-  border-color: rgba(6, 182, 212, 0.30);
+  background: linear-gradient(90deg, #0891b2, #2563eb);
+  color: #ffffff;
+  box-shadow: 0 4px 14px -4px rgba(37, 99, 235, 0.45);
+  border-color: transparent;
 }
 :root.light .card-neon:hover {
   box-shadow: 0 0 20px rgba(6, 182, 212, 0.05), 0 4px 12px rgba(15, 23, 42, 0.06);
@@ -364,10 +371,45 @@
    SIDEBAR ACTIVE NEON GLOW
    ═══════════════════════════════════════════ */
 .nav-active-neon {
-  background: rgba(0, 240, 255, 0.12);
-  color: #00f0ff;
-  box-shadow: 0 0 12px rgba(0, 240, 255, 0.2), inset 0 0 12px rgba(0, 240, 255, 0.05);
-  border: 1px solid rgba(0, 240, 255, 0.25);
+  background: linear-gradient(90deg, #0ea5e9, #2563eb);
+  color: #ffffff;
+  box-shadow: 0 0 18px -4px rgba(14, 165, 233, 0.8);
+  border: 1px solid rgba(125, 211, 252, 0.45);
+}
+
+/* ═══════════════════════════════════════════
+   FUNDO PERSONALIZADO — cartões levemente translúcidos sobre a foto
+   ═══════════════════════════════════════════ */
+.has-app-bg .bg-card {
+  background-color: hsl(var(--card) / 0.86);
+}
+.has-app-bg .bg-background {
+  background-color: hsl(var(--background) / 0.6);
+}
+
+/* Portal: cartões de acesso com borda neon (cor via --c) */
+.portal-access-card {
+  border: 2px solid var(--c);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 22%, rgba(6, 14, 40, 0.82)), rgba(6, 14, 40, 0.80));
+  backdrop-filter: blur(6px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent),
+    0 0 22px color-mix(in srgb, var(--c) 70%, transparent),
+    0 0 60px -6px color-mix(in srgb, var(--c) 55%, transparent),
+    inset 0 0 30px color-mix(in srgb, var(--c) 18%, transparent);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.portal-access-card:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 0 0 1px var(--c),
+    0 0 30px var(--c),
+    0 0 90px -6px var(--c),
+    inset 0 0 40px color-mix(in srgb, var(--c) 25%, transparent);
+}
+.portal-access-btn {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 85%, #fff), var(--c));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--c) 55%, transparent);
 }
 
 /* ═══════════════════════════════════════════
