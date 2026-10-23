@@ -63,7 +63,9 @@ import {
   pausePatientFromAgenda,
   pausePatientKeepAgenda,
   resumePatientAgendaPause,
+  type PausedOverviewItem,
 } from "@/lib/arco-rpc";
+import { listBuscaAtivaAtual, groupBuscaByPatient, retornarDaBuscaAtiva } from "@/lib/busca-ativa";
 import { AvaliacaoFuncionalForm } from "@/components/AvaliacaoFuncionalForm";
 import { avfFaixa, AVF_MAX, isParentalSpecialty } from "@/lib/avaliacao-funcional";
 import { buildMultiGuestAppointments } from "@/lib/multi-agenda";
@@ -549,6 +551,13 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [pauseReturnDate, setPauseReturnDate] = useState("");
   const [pauseKeepAgenda, setPauseKeepAgenda] = useState<boolean | null>(null);
   const [pauseSending, setPauseSending] = useState(false);
+  const [buscaByPatient, setBuscaByPatient] = useState<Map<number, PausedOverviewItem[]>>(new Map());
+  const refreshBusca = () => {
+    listBuscaAtivaAtual().then(l => setBuscaByPatient(groupBuscaByPatient(l))).catch(() => { /* sem acesso */ });
+  };
+  useEffect(() => { refreshBusca(); }, []);
+  const buscaTitle = (patientId: number) =>
+    (buscaByPatient.get(patientId) ?? []).map(i => `Busca Ativa (${i.specialty || i.professionalName}): ${i.pausedReason}`).join("\n") || "Busca Ativa";
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
@@ -1025,6 +1034,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           ? `${pauseModal.patientName} continua na agenda (horário reservado) e aparece em Pausados / Busca Ativa.`
           : `${pauseModal.patientName} saiu da agenda (horário livre) e está em Pausados / Busca Ativa.`,
       });
+      refreshBusca();
       setPauseModal(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1040,9 +1050,26 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       await resumePatientAgendaPause(apt.patientId, apt.professionalId);
       await logNotificacao(apt, "Retorno de Pausa");
       fetchAppointments();
-      toast({ title: "▶ Retomado", description: `${apt.patientName} voltou para a agenda com status "Agendado".` });
+      refreshBusca();
+      toast({ title: "▶ Retornou aos atendimentos", description: `${apt.patientName} saiu da Busca Ativa e voltou para a agenda com status "Agendado".` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível retomar.", variant: "destructive" });
+    }
+  };
+
+  const handleReturnBusca = async (apt: Appointment) => {
+    setActionMenuId(null);
+    const items = buscaByPatient.get(apt.patientId) ?? [];
+    if (!items.length) return;
+    const lista = items.map(i => `• ${i.specialty || i.professionalName}: ${i.pausedReason}`).join("\n");
+    if (!confirm(`${apt.patientName} está em Busca Ativa:\n${lista}\n\nRetornar aos atendimentos? Ele sai da Busca Ativa (fica registrado no histórico).`)) return;
+    try {
+      for (const i of items) await retornarDaBuscaAtiva(i);
+      fetchAppointments();
+      refreshBusca();
+      toast({ title: "▶ Retornou aos atendimentos", description: `${apt.patientName} saiu da Busca Ativa.` });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message || "Não foi possível retornar.", variant: "destructive" });
     }
   };
 
@@ -2029,9 +2056,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
                                       {getStatusLabel(apptStatus(apt))}
                                     </span>
-                                    {apt.paused && (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
-                                        <Snowflake className="w-2.5 h-2.5" /> Pausado
+                                    {(apt.paused || buscaByPatient.has(apt.patientId)) && (
+                                      <span title={buscaTitle(apt.patientId)} className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5 w-max">
+                                        <Snowflake className="w-2.5 h-2.5" /> Busca Ativa
                                       </span>
                                     )}
                                     {isDesmarcado && (
@@ -2234,12 +2261,19 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
                                       {(apt.paused || (apt.status || "").toLowerCase() === "pausado") ? (
                                         <button style={NEON.green} onClick={() => handleUnpause(apt)}>
-                                          <Play className="w-3.5 h-3.5" /> Retomar Atendimento
+                                          <Play className="w-3.5 h-3.5" /> Retornar aos atendimentos
                                         </button>
                                       ) : (
-                                        <button style={NEON.cyan} onClick={() => handleOpenPauseModal(apt)}>
-                                          <Snowflake className="w-3.5 h-3.5" /> Pausar / Busca Ativa
-                                        </button>
+                                        <>
+                                          {buscaByPatient.has(apt.patientId) && (
+                                            <button style={NEON.green} onClick={() => handleReturnBusca(apt)}>
+                                              <Play className="w-3.5 h-3.5" /> Retornar aos atendimentos
+                                            </button>
+                                          )}
+                                          <button style={NEON.cyan} onClick={() => handleOpenPauseModal(apt)}>
+                                            <Snowflake className="w-3.5 h-3.5" /> Pausar / Busca Ativa
+                                          </button>
+                                        </>
                                       )}
 
                                       <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />

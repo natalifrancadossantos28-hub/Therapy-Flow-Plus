@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { Snowflake, Clock, Play, Search, RefreshCw, Phone, CircleDot, Loader2, CheckCircle2, XCircle, MessageSquare } from "lucide-react";
+import { Snowflake, Clock, Play, Search, RefreshCw, Phone, CircleDot, Loader2, CheckCircle2, XCircle, MessageSquare, Printer, History } from "lucide-react";
+import { printBuscaAtivaReport } from "@/lib/print-busca-ativa";
+import { buscaStatusLabel } from "@/lib/busca-ativa";
 import { Card, Button, Badge, Input } from "@/components/ui-custom";
 import { useToast } from "@/hooks/use-toast";
 import { cn, formatDate } from "@/lib/utils";
@@ -11,6 +13,8 @@ import {
   setBuscaAtivaStatus,
   type BuscaAtivaStatus,
   type PausedOverviewItem,
+  type BuscaAtivaHistoricoItem,
+  listBuscaAtivaHistorico,
 } from "@/lib/arco-rpc";
 
 const BUSCA_STATUS: { v: BuscaAtivaStatus; label: string; icon: typeof CircleDot; on: string }[] = [
@@ -39,12 +43,15 @@ export default function PausadosPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [buscaFilter, setBuscaFilter] = useState<BuscaAtivaStatus | "">("");
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [hist, setHist] = useState<BuscaAtivaHistoricoItem[]>([]);
+  const [showHist, setShowHist] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const r = await listPausedOverview();
       setItems([...r.fila, ...r.agenda]);
+      listBuscaAtivaHistorico().then(setHist).catch(() => setHist([]));
     } catch (err: unknown) {
       toast({ title: "Erro ao carregar pausados", description: err instanceof Error ? err.message : String(err), variant: "destructive" });
     } finally {
@@ -65,14 +72,8 @@ export default function PausadosPage() {
       .filter(i => !specFilter || i.specialty === specFilter)
       .filter(i => !buscaFilter || buscaOf(i) === buscaFilter)
       .filter(i => !q || i.patientName.toLowerCase().includes(q) || (i.prontuario || "").toLowerCase().includes(q))
-      .sort((a, b) => {
-        // vencidos primeiro, depois quem vence antes, depois sem prazo
-        const da = daysUntil(a.pausedReturnDate), db = daysUntil(b.pausedReturnDate);
-        if (da === null && db === null) return (b.pausedAt || "").localeCompare(a.pausedAt || "");
-        if (da === null) return 1;
-        if (db === null) return -1;
-        return da - db;
-      });
+      // Igual à fila de espera: 1º é quem entrou primeiro na busca ativa.
+      .sort((a, b) => (a.pausedAt || "").localeCompare(b.pausedAt || ""));
   }, [items, search, specFilter, buscaFilter]);
 
   const overdueCount = items.filter(i => i.returnOverdue).length;
@@ -141,9 +142,17 @@ export default function PausadosPage() {
             Vencido o prazo, o paciente volta sozinho para a Fila de Espera da especialidade.
           </p>
         </div>
-        <Button variant="outline" onClick={load} disabled={loading} className="gap-2">
-          <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} /> Atualizar
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => printBuscaAtivaReport(filtered, [specFilter, buscaFilter && buscaStatusLabel(buscaFilter)].filter(Boolean).join(" · "))} className="gap-2">
+            <Printer className="w-4 h-4" /> Imprimir relatório
+          </Button>
+          <Button variant="outline" onClick={() => setShowHist(v => !v)} className="gap-2">
+            <History className="w-4 h-4" /> Já passaram ({hist.length})
+          </Button>
+          <Button variant="outline" onClick={load} disabled={loading} className="gap-2">
+            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} /> Atualizar
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -182,6 +191,7 @@ export default function PausadosPage() {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
               <tr>
+                <th className="px-5 py-3">Nº</th>
                 <th className="px-5 py-3">Paciente</th>
                 <th className="px-5 py-3">Especialidade</th>
                 <th className="px-5 py-3">Veio de</th>
@@ -195,15 +205,16 @@ export default function PausadosPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {loading && items.length === 0 ? (
-                <tr><td colSpan={9} className="px-5 py-10 text-center text-muted-foreground">Carregando…</td></tr>
+                <tr><td colSpan={10} className="px-5 py-10 text-center text-muted-foreground">Carregando…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={9} className="px-5 py-10 text-center text-muted-foreground">Nenhum paciente pausado{search || specFilter ? " com esse filtro" : ""}.</td></tr>
-              ) : filtered.map(item => {
+                <tr><td colSpan={10} className="px-5 py-10 text-center text-muted-foreground">Nenhum paciente pausado{search || specFilter ? " com esse filtro" : ""}.</td></tr>
+              ) : filtered.map((item, idx) => {
                 const d = daysUntil(item.pausedReturnDate);
                 const overdue = item.returnOverdue || (d !== null && d < 0);
                 const near = !overdue && d !== null && d <= 7;
                 return (
                   <tr key={`${item.source}-${item.id}`} className={cn("hover:bg-secondary/30", overdue && "bg-red-500/5", near && "bg-yellow-500/5")}>
+                    <td className="px-5 py-3 font-bold text-sky-400 whitespace-nowrap">{idx + 1}º</td>
                     <td className="px-5 py-3">
                       <Link href={`/patients/${item.patientId}`} className="font-semibold hover:underline">{item.patientName}</Link>
                       <div className="text-xs text-muted-foreground flex items-center gap-2">
@@ -262,7 +273,7 @@ export default function PausadosPage() {
                     <td className="px-5 py-3 text-right">
                       <Button size="sm" variant="outline" className="gap-1 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
                         disabled={busyId === item.id} onClick={() => handleResume(item)}>
-                        <Play className="w-3.5 h-3.5" /> Retomar
+                        <Play className="w-3.5 h-3.5" /> Retornar aos atendimentos
                       </Button>
                     </td>
                   </tr>
@@ -272,6 +283,46 @@ export default function PausadosPage() {
           </table>
         </div>
       </Card>
+
+      {showHist && (
+        <Card className="overflow-hidden">
+          <div className="px-5 py-3 border-b border-border">
+            <h2 className="font-bold flex items-center gap-2"><History className="w-4 h-4" /> Já passaram pela Busca Ativa</h2>
+            <p className="text-xs text-muted-foreground">Pacientes que retornaram ou saíram, com o motivo da busca ativa.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
+                <tr>
+                  <th className="px-5 py-3">Paciente</th>
+                  <th className="px-5 py-3">Especialidade</th>
+                  <th className="px-5 py-3">Motivo da busca ativa</th>
+                  <th className="px-5 py-3">Período</th>
+                  <th className="px-5 py-3">Situação</th>
+                  <th className="px-5 py-3">Como saiu</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {hist.length === 0 ? (
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">Ninguém retornou ainda.</td></tr>
+                ) : hist.map(h => (
+                  <tr key={h.id} className="hover:bg-secondary/30">
+                    <td className="px-5 py-3">
+                      <Link href={`/patients/${h.patientId}`} className="font-semibold hover:underline">{h.patientName || `#${h.patientId}`}</Link>
+                      {h.prontuario && <div className="text-xs text-muted-foreground">Pront. {h.prontuario}</div>}
+                    </td>
+                    <td className="px-5 py-3">{h.specialty || "—"}{h.professionalName && <div className="text-xs text-muted-foreground">{h.professionalName}</div>}</td>
+                    <td className="px-5 py-3 max-w-[280px]">{h.motivo || "—"}{h.buscaObs && <div className="text-xs text-muted-foreground mt-0.5">Obs.: {h.buscaObs}</div>}</td>
+                    <td className="px-5 py-3 whitespace-nowrap text-muted-foreground">{h.pausedAt ? formatDate(h.pausedAt) : "—"} até {formatDate(h.returnedAt)}</td>
+                    <td className="px-5 py-3 whitespace-nowrap">{h.buscaStatus ? buscaStatusLabel(h.buscaStatus) : "—"}</td>
+                    <td className="px-5 py-3 text-xs">{h.retornoMotivo || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

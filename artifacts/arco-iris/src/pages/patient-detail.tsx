@@ -38,6 +38,8 @@ import { AvaliacaoFuncionalForm, AvfScoreBadge, AvfEvolucaoBadge } from "@/compo
 import { AVF_MAX, AVF_PERGUNTAS, avfFaixa } from "@/lib/avaliacao-funcional";
 import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, printAbcChecklist, type AbcAreaKey } from "@/lib/abc-checklist";
 import { getProfessionalSession } from "@/lib/portal-session";
+import { useBuscaAtivaPaciente } from "@/lib/busca-ativa";
+import { BuscaAtivaPacienteCard } from "@/components/BuscaAtivaPacienteCard";
 import { TriagemMultiForm, TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
 import { printTriagemMulti } from "@/lib/print-triagem";
 
@@ -286,6 +288,8 @@ export default function PatientDetail() {
       setSavingEdit(false);
     }
   };
+
+  const busca = useBuscaAtivaPaciente(patientId);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -587,6 +591,9 @@ export default function PatientDetail() {
               {patient.name}
             </h1>
             <Badge className={getStatusColor(patient.status)}>{patient.status}</Badge>
+            {busca.current.length > 0 && (
+              <Badge className="bg-sky-500/20 text-sky-400 border border-sky-500/40">❄ Em Busca Ativa</Badge>
+            )}
             {isCensoMunicipal && (
               <Badge className="bg-violet-100 text-violet-800 border-violet-300">🏛️ Censo Municipal PCD</Badge>
             )}
@@ -1072,6 +1079,7 @@ export default function PatientDetail() {
         </div>
 
         <div className="space-y-6">
+          <BuscaAtivaPacienteCard current={busca.current} history={busca.history} />
           <Card className={cn("p-6 border-2 transition-colors", hasWarning ? "border-rose-400 bg-rose-50/10" : "border-transparent")}>
             <div className="flex items-center gap-3 mb-6">
               <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", hasWarning ? "bg-rose-200 text-rose-600" : "bg-secondary text-foreground")}>
