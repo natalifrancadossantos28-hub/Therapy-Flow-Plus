@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
-  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette, ChevronDown, BarChart3 } from "lucide-react";
+  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette, ChevronDown, BarChart3, FileText } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
@@ -23,7 +23,9 @@ type NavGroup = "Gestão" | "Atendimento" | "Organização" | "Administração";
 const NAV_GROUPS: NavGroup[] = ["Gestão", "Atendimento", "Organização", "Administração"];
 
 const navItems: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, scopes: ["admin"], group: "Gestão" },
+  { href: "/", label: "Painel de Gestão", icon: LayoutDashboard, scopes: ["admin"], group: "Gestão" },
+  { href: "/prestacao-contas", label: "Prestação de Contas", icon: FileText, scopes: ["admin"], group: "Gestão" },
+  { href: "/dashboard-detalhes", label: "Painel detalhado", icon: BarChart3, scopes: ["admin"], group: "Gestão" },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3, scopes: ["admin"], group: "Gestão" },
   { href: "/simulacao-fila", label: "Simulação da fila", icon: BarChart3, scopes: ["admin"], group: "Gestão" },
   { href: "/professionals", label: "Profissionais", icon: UserRound, scopes: ["admin"], group: "Administração" },
