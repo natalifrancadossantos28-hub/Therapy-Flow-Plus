@@ -299,7 +299,10 @@ export default function Dashboard() {
     }
     return ids.size;
   })();
-  const waitingCount = waitingList?.length || 0;
+  // Mesma regra da página da Fila: congelados não contam como "aguardando vaga".
+  const activeWaitingList = useMemo(() => (waitingList || []).filter(w => !w.paused), [waitingList]);
+  const waitingCount = activeWaitingList.length;
+  const pausedWaitingCount = (waitingList?.length || 0) - waitingCount;
 
   // Agrupar alertas por paciente (pode ter múltiplos profissionais com >= 3 faltas)
   const absentByPatient = useMemo(() => {
@@ -426,7 +429,7 @@ export default function Dashboard() {
   // ── Status da fila (cor por prioridade clínica) ──────────────────────────
   const filaPorCor = useMemo(() => {
     const buckets = { maxima: 0, vermelho: 0, laranja: 0, azul: 0, verde: 0, sem: 0 };
-    for (const w of waitingList || []) {
+    for (const w of activeWaitingList) {
       const p = (w.priority || "").toLowerCase();
       if (p === "maxima" || p === "máxima") buckets.maxima++;
       else if (p === "elevado" || p === "alto") buckets.vermelho++;
@@ -436,12 +439,22 @@ export default function Dashboard() {
       else buckets.sem++;
     }
     return buckets;
-  }, [waitingList]);
+  }, [activeWaitingList]);
 
   // ── Fila por especialidade (contagem por área) ───────────────────────────
   const filaPorEspecialidade = useMemo(() => {
     const map: Record<string, number> = {};
+    for (const w of activeWaitingList) {
+      const k = (w.specialty || "").trim() || "Sem especialidade";
+      map[k] = (map[k] || 0) + 1;
+    }
+    return map;
+  }, [activeWaitingList]);
+
+  const filaCongeladosPorEspecialidade = useMemo(() => {
+    const map: Record<string, number> = {};
     for (const w of waitingList || []) {
+      if (!w.paused) continue;
       const k = (w.specialty || "").trim() || "Sem especialidade";
       map[k] = (map[k] || 0) + 1;
     }
@@ -665,7 +678,9 @@ export default function Dashboard() {
         totalAno={atendimentosAno.total}
         filaPorCor={filaPorCor}
         filaPorEspecialidade={filaPorEspecialidade}
+        filaCongeladosPorEspecialidade={filaCongeladosPorEspecialidade}
         waitingCount={waitingCount}
+        pausedWaitingCount={pausedWaitingCount}
       />
 
       {/* Top Stats */}
@@ -1672,7 +1687,9 @@ type HeartbeatProps = {
   totalAno: number;
   filaPorCor: { maxima: number; vermelho: number; laranja: number; azul: number; verde: number; sem: number };
   filaPorEspecialidade: Record<string, number>;
+  filaCongeladosPorEspecialidade: Record<string, number>;
   waitingCount: number;
+  pausedWaitingCount: number;
 };
 
 function Heartbeat({
@@ -1688,11 +1705,14 @@ function Heartbeat({
   totalAno,
   filaPorCor,
   filaPorEspecialidade,
+  filaCongeladosPorEspecialidade,
   waitingCount,
+  pausedWaitingCount,
 }: HeartbeatProps) {
   const especialidades = Object.entries(porEspecialidadeAno)
     .sort((a, b) => b[1] - a[1]);
-  const filaEspecialidades = Object.entries(filaPorEspecialidade)
+  const filaEspecialidades = Array.from(new Set([...Object.keys(filaPorEspecialidade), ...Object.keys(filaCongeladosPorEspecialidade)]))
+    .map((k) => [k, filaPorEspecialidade[k] || 0] as [string, number])
     .sort((a, b) => b[1] - a[1]);
 
   return (
@@ -1825,7 +1845,7 @@ function Heartbeat({
               <ListTodo className="w-5 h-5 text-[#ff9f20]" style={{ filter: "drop-shadow(0 0 6px rgba(255,159,32,0.7))" }} />
               <h2 className="text-base font-display font-bold text-foreground">Fila de espera por especialidade</h2>
             </div>
-            <span className="text-xs text-muted-foreground">{waitingCount} na fila · cor neon de cada área</span>
+            <span className="text-xs text-muted-foreground">{waitingCount} na fila{pausedWaitingCount > 0 ? ` · ${pausedWaitingCount} congelados à parte` : ""} · cor neon de cada área</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {filaEspecialidades.map(([k, n]) => {
@@ -1847,6 +1867,11 @@ function Heartbeat({
                   <span className="text-xs font-bold px-2 py-0.5 rounded-md" style={{ background: "rgba(0,0,0,0.3)", color: tone.fg }}>
                     {n}
                   </span>
+                  {(filaCongeladosPorEspecialidade[k] || 0) > 0 && (
+                    <span className="text-[10px] text-muted-foreground" title="Congelados (pausados) — não entram na contagem da fila">
+                      +{filaCongeladosPorEspecialidade[k]} congelados
+                    </span>
+                  )}
                 </div>
               );
             })}
