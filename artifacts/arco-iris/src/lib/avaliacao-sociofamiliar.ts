@@ -97,6 +97,68 @@ export const AVSF_PERGUNTAS: readonly AvsfPergunta[] = [
       { valor: "uma_vez", label: "Uma vez", pontos: 1 },
       { valor: "varias", label: "Várias vezes / desligado por faltas", pontos: 2 },
     ],
+  },  {
+    key: "composicao",
+    titulo: "Composição familiar (informativo)",
+    texto: "Quantas pessoas moram na casa?",
+    opcoes: [
+      { valor: "ate_3", label: "Até 3 pessoas", pontos: 0 },
+      { valor: "4_5", label: "4 ou 5 pessoas", pontos: 0 },
+      { valor: "6_mais", label: "6 pessoas ou mais", pontos: 0 },
+    ],
+  },
+  {
+    key: "renda_per_capita",
+    titulo: "Renda por pessoa (informativo)",
+    texto: "Somando a renda da casa e dividindo pelo número de moradores, quanto fica por pessoa?",
+    opcoes: [
+      { valor: "acima_1", label: "Mais de 1 salário mínimo", pontos: 0 },
+      { valor: "meio_1", label: "Entre ½ e 1 salário mínimo", pontos: 0 },
+      { valor: "quarto_meio", label: "Entre ¼ e ½ salário mínimo", pontos: 0 },
+      { valor: "abaixo_quarto", label: "Menos de ¼ do salário mínimo", pontos: 0, alerta: "Renda por pessoa muito baixa: avaliar encaminhamento ao CRAS" },
+    ],
+  },
+  {
+    key: "beneficios",
+    titulo: "Benefícios sociais (informativo)",
+    texto: "A família recebe algum benefício?",
+    opcoes: [
+      { valor: "nenhum", label: "Nenhum", pontos: 0 },
+      { valor: "bpc", label: "BPC/LOAS", pontos: 0 },
+      { valor: "bolsa", label: "Bolsa Família / outro programa", pontos: 0 },
+      { valor: "varios", label: "Mais de um benefício", pontos: 0 },
+    ],
+  },
+  {
+    key: "desemprego",
+    titulo: "Situação de trabalho (informativo)",
+    texto: "Os responsáveis estão trabalhando?",
+    opcoes: [
+      { valor: "empregados", label: "Sim, com trabalho fixo", pontos: 0 },
+      { valor: "informal", label: "Trabalho informal / bicos", pontos: 0 },
+      { valor: "desempregados", label: "Desempregados", pontos: 0, alerta: "Responsáveis desempregados" },
+    ],
+  },
+  {
+    key: "gastos_deficiencia",
+    titulo: "Gastos com a deficiência (informativo)",
+    texto: "A família tem gastos com remédios, fraldas, equipamentos ou terapias particulares?",
+    opcoes: [
+      { valor: "nao", label: "Não ou poucos", pontos: 0 },
+      { valor: "moderados", label: "Sim, pesam no orçamento", pontos: 0 },
+      { valor: "altos", label: "Sim, comprometem o básico da casa", pontos: 0, alerta: "Gastos com a deficiência comprometem o básico" },
+    ],
+  },
+  {
+    key: "tempo_sem_atendimento",
+    titulo: "Tempo sem atendimento (informativo)",
+    texto: "Há quanto tempo a criança está sem nenhum atendimento terapêutico?",
+    opcoes: [
+      { valor: "em_atendimento", label: "Está em atendimento", pontos: 0 },
+      { valor: "ate_6m", label: "Até 6 meses", pontos: 0 },
+      { valor: "6_12m", label: "De 6 meses a 1 ano", pontos: 0 },
+      { valor: "mais_1a", label: "Mais de 1 ano", pontos: 0, alerta: "Mais de 1 ano sem atendimento terapêutico" },
+    ],
   },
 ];
 
