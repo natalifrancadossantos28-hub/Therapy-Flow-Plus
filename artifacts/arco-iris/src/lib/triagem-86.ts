@@ -99,38 +99,39 @@ export const ITENS_86: Item86[] = [
   { code: "PR10", tipo: "prioridade", grupo: "Prioridades", titulo: "Prejuízo funcional significativo", tecnica: "A criança apresenta comprometimento funcional relevante que prejudica sua participação nas atividades essenciais?", simples: "As dificuldades do seu filho estão impedindo que ele realize atividades importantes, como se alimentar, se movimentar, se comunicar ou participar da rotina?" },
 ];
 
-export type Opcao = { valor: string; label: string; pontos?: number };
+/** `num` = número mostrado no botão (estilo ABC); NS/NA/PNI não têm número e não somam. */
+export type Opcao = { valor: string; label: string; pontos?: number; num?: string };
 
 // Escala de frequência dos itens clínicos. "Não sei" e "Não se aplica" não
 // contam como ausência de necessidade: ficam fora da soma e são sinalizados.
 export const OPCOES_CLINICA: Opcao[] = [
-  { valor: "0", label: "0 · Nunca", pontos: 0 },
-  { valor: "1", label: "1 · Raramente", pontos: 1 },
-  { valor: "2", label: "2 · Frequentemente", pontos: 2 },
-  { valor: "3", label: "3 · Sempre", pontos: 3 },
-  { valor: "ns", label: "Não sei informar" },
-  { valor: "na", label: "Não se aplica" },
+  { valor: "0", label: "Nunca", pontos: 0, num: "0" },
+  { valor: "1", label: "Raramente", pontos: 1, num: "1" },
+  { valor: "2", label: "Frequentemente", pontos: 2, num: "2" },
+  { valor: "3", label: "Sempre", pontos: 3, num: "3" },
+  { valor: "ns", label: "Não sei informar", num: "NS" },
+  { valor: "na", label: "Não se aplica", num: "NA" },
 ];
 
 export const OPCOES_PRIORIDADE: Opcao[] = [
-  { valor: "nao", label: "Não" },
-  { valor: "sim", label: "Sim" },
-  { valor: "ns", label: "Não sei informar" },
+  { valor: "nao", label: "Não", num: "0" },
+  { valor: "sim", label: "Sim", num: "1" },
+  { valor: "ns", label: "Não sei informar", num: "NS" },
 ];
 
 export const OPCOES_SOCIAL: Opcao[] = [
-  { valor: "nao", label: "Não" },
-  { valor: "as_vezes", label: "Às vezes / em parte" },
-  { valor: "sim", label: "Sim" },
-  { valor: "pni", label: "Prefere não informar" },
+  { valor: "nao", label: "Não", num: "0" },
+  { valor: "as_vezes", label: "Às vezes / em parte", num: "1" },
+  { valor: "sim", label: "Sim", num: "2" },
+  { valor: "pni", label: "Prefere não informar", num: "PNI" },
 ];
 
 // S05 é invertida: "tem com quem contar" = sem barreira.
 export const OPCOES_S05: Opcao[] = [
-  { valor: "sim_sempre", label: "Sim, sempre" },
-  { valor: "as_vezes", label: "Às vezes" },
-  { valor: "ninguem", label: "Não tenho com quem contar" },
-  { valor: "pni", label: "Prefere não informar" },
+  { valor: "sim_sempre", label: "Sim, sempre", num: "0" },
+  { valor: "as_vezes", label: "Às vezes", num: "1" },
+  { valor: "ninguem", label: "Não tenho com quem contar", num: "2" },
+  { valor: "pni", label: "Prefere não informar", num: "PNI" },
 ];
 
 export const FAIXAS_RENDA: Opcao[] = [
@@ -226,4 +227,22 @@ export function sugestoes86(r: Resultado86): string[] {
   if (r.social.length) out.push(`Orientar serviço social / CRAS: ${r.social.map((s) => s.titulo.toLowerCase()).join("; ")}.`);
   if (!out.length) out.push("Sem sinalização relevante nesta triagem: seguir fluxo regular.");
   return out;
+}
+
+/** Mínimo de pontos (0–30) para a especialidade ser encaminhada à fila. */
+export const ENCAMINHAR_MIN = 9;
+export const ENCAMINHAR_MAX = 3;
+
+/**
+ * Prévia das especialidades que vão para a fila: as 3 maiores pontuações com
+ * ≥ 9 pontos. Empate: maior % das respostas válidas e, depois, a ordem das
+ * áreas. Mesma regra do servidor (migração 0129, `_t86_encaminhar`).
+ */
+export function previaEncaminhamento86(r: Resultado86): string[] {
+  return r.areas
+    .map((a, i) => ({ a, i, pct: a.respondidas ? a.pontos / (a.respondidas * 3) : 0 }))
+    .filter((x) => x.a.pontos >= ENCAMINHAR_MIN)
+    .sort((x, y) => y.a.pontos - x.a.pontos || y.pct - x.pct || x.i - y.i)
+    .slice(0, ENCAMINHAR_MAX)
+    .map((x) => x.a.area);
 }

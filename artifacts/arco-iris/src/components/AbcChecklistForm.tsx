@@ -52,6 +52,8 @@ type Props = {
   patientName?: string | null;
   patientProntuario?: string | null;
   patientDateOfBirth?: string | null;
+  /** Só para o termo de ciência impresso. */
+  patientGuardianName?: string | null;
   professionalId?: number | null;
   professionalName?: string | null;
   /** Respostas iniciais (ex.: para reavaliar a partir da entrada). */
@@ -68,7 +70,7 @@ const REF_ROWS: { nivel: AbcNivel; faixa: string; desc: string }[] = [
 ];
 
 export function AbcChecklistForm({
-  patientId, tipo, patientName, patientProntuario, patientDateOfBirth,
+  patientId, tipo, patientName, patientProntuario, patientDateOfBirth, patientGuardianName,
   professionalId, professionalName, initialRespostas, onSaved, onCancel, saveLabel,
 }: Props) {
   const [marcados, setMarcados] = useState<Set<number>>(() => new Set(initialRespostas ?? []));
@@ -99,6 +101,7 @@ export function AbcChecklistForm({
       marcados,
       observacoes: observacoes.trim() || null,
       profissional: professionalName,
+      responsavel: patientGuardianName,
     });
   };
 

@@ -1,4 +1,6 @@
-import { calcularResultado86, AVISO_TRIAGEM, ALERTA_RISCO, RISCO_CODES, nivelArea86, sugestoes86 } from "@/lib/triagem-86";
+import { calcularResultado86, AVISO_TRIAGEM, ALERTA_RISCO, RISCO_CODES, nivelArea86, sugestoes86, previaEncaminhamento86, ENCAMINHAR_MIN } from "@/lib/triagem-86";
+import { termoCienciaHtml } from "@/lib/termo-ciencia";
+import { abcChecklistDoc, type AbcPrintInput } from "@/lib/abc-checklist";
 import type { Triagem86 } from "@/lib/triagem-86-rpc";
 
 const esc = (s: string) =>
@@ -73,13 +75,21 @@ function grafico(areas: { area: string; pontos: number; respondidas: number }[])
  * Relatório impresso da Triagem em 2 folhas A4: folha 1 = dados do paciente e
  * da triagem; folha 2 = resultados e encaminhamentos.
  */
-export function printTriagem86(t: Triagem86, p: PacienteInfo, opts?: { tipo?: string }) {
+function triagem86Doc(t: Triagem86, p: PacienteInfo, opts?: { tipo?: string }): { titulo: string; css: string; paginas: string } {
   const r = calcularResultado86(t.respostas ?? {}, t.social ?? {});
   const criado = new Date(t.createdAt);
   const totalPts = r.areas.reduce((s, a) => s + a.pontos, 0);
   const pctTotal = Math.round((totalPts / 210) * 100);
   const riscos = r.prioridades.filter((x) => RISCO_CODES.includes(x.code));
-  const sugest = sugestoes86(r).filter((x) => x !== ALERTA_RISCO);
+  const sugTodas = sugestoes86(r).filter((x) => x !== ALERTA_RISCO);
+  const sugAreas = sugTodas.filter((x) => x.startsWith("Avaliação em "));
+  const sugest = [
+    ...(sugAreas.length ? [`Avaliação em: ${sugAreas.map((x) => x.replace(/^Avaliação em /, "").replace(/\.$/, "")).join("; ")}.`] : []),
+    ...sugTodas.filter((x) => !x.startsWith("Avaliação em ")),
+  ];
+  const enc = t.encaminhamento?.encaminhadas ?? previaEncaminhamento86(r);
+  const encPrevia = !t.encaminhamento;
+  const demais = r.areas.filter((a) => !enc.includes(a.area)).map((a) => a.area);
 
   const cab = (sub: string) => `<div class="cab">
     <div class="logo"><span class="nfs">NFS</span><span class="gt">Gestão<br>Terapêutica</span></div>
@@ -95,7 +105,8 @@ export function printTriagem86(t: Triagem86, p: PacienteInfo, opts?: { tipo?: st
     const pill = n ? PILL[n.label] : null;
     return `<tr><td class="esp"><span class="ai" style="background:${AREA_COR[a.area] ?? "#94a3b8"}"></span>${esc(a.area)}</td>
       <td class="c">${a.respondidas ? a.pontos : "–"}</td><td class="c">${a.respondidas ? `${a.pct}%` : "–"}</td>
-      <td class="c">${pill ? `<span class="pill" style="background:${pill[1]};color:${pill[2]}">${pill[0]}</span>` : `<span class="pill na">não avaliado</span>`}</td></tr>`;
+      <td class="c">${pill ? `<span class="pill" style="background:${pill[1]};color:${pill[2]}">${pill[0]}</span>` : `<span class="pill na">não avaliado</span>`}</td>
+      <td class="c">${enc.includes(a.area) ? `<span class="pill fila">✓ Fila</span>` : `<span class="av">Avaliada</span>`}</td></tr>`;
   }).join("");
 
   const folha1 = `<section class="page">${cab("RELATÓRIO DE TRIAGEM")}
@@ -114,6 +125,10 @@ export function printTriagem86(t: Triagem86, p: PacienteInfo, opts?: { tipo?: st
       ${campo(ic("user"), "Aplicador", t.responsavel)}${campo(ic("file"), "Tipo de triagem", opts?.tipo || "Triagem inicial")}
     </div>`)}
     ${secao(icH("msg"), "OBSERVAÇÕES", `<div class="branco"></div>`, "obs")}
+    <div class="ass">
+      <div><span></span><p>Assinatura da mãe / responsável</p><p class="n">${esc(p.guardianName || "")}</p></div>
+      <div><span></span><p>Assinatura do aplicador</p><p class="n">${esc(t.responsavel || "")}</p></div>
+    </div>
     <div class="rod"><span>${esc(AVISO_TRIAGEM)}</span><span>Página 1 de 2</span></div>
   </section>`;
 
@@ -126,7 +141,8 @@ export function printTriagem86(t: Triagem86, p: PacienteInfo, opts?: { tipo?: st
     </div>
     ${riscos.length ? `<div class="alerta">Atenção: ${esc(ALERTA_RISCO)}</div>` : ""}
     <div class="duas">
-      ${secao(icH("search"), "RESULTADO POR ÁREA", `<table><thead><tr><th>ESPECIALIDADE</th><th class="c">PONTOS<br>(0–30)</th><th class="c">%</th><th class="c">NÍVEL</th></tr></thead><tbody>${linhas}</tbody></table>`, "res")}
+      ${secao(icH("search"), "RESULTADO POR ÁREA", `<table><thead><tr><th>ESPECIALIDADE</th><th class="c">PONTOS<br>(0–30)</th><th class="c">%</th><th class="c">NÍVEL</th><th class="c">FILA</th></tr></thead><tbody>${linhas}</tbody></table>
+        <p class="encl"><b>Encaminhadas à fila${encPrevia ? " (previstas)" : ""}:</b> ${esc(enc.join(", ") || `nenhuma (sem área com ${ENCAMINHAR_MIN} pontos ou mais)`)}<br><b>Demais avaliadas:</b> ${esc(demais.join(", ") || "—")}</p>`, "res")}
       ${secao(icH("trend"), "GRÁFICO COMPARATIVO", `${grafico(r.areas)}
         <div class="faixa"><p class="fh">FAIXA DE CLASSIFICAÇÃO <span>(por especialidade)</span></p>
           <p><i style="background:#22c55e"></i><b>0 – 8</b> Baixa sinalização</p>
@@ -143,16 +159,13 @@ export function printTriagem86(t: Triagem86, p: PacienteInfo, opts?: { tipo?: st
         : `<p class="vazio">Nenhuma barreira marcada</p>`)}
     </div>
     ${secao(icH("file"), "CONSIDERAÇÕES FINAIS", `<p class="sg">Sugestões de encaminhamento (orientativas; a equipe técnica valida):</p><ul class="sug">${sugest.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><div class="branco curto"></div>`, "cons")}
-    <div class="ass">
-      <div><span></span><p>Assinatura da mãe / responsável</p><p class="n">${esc(p.guardianName || "")}</p></div>
-      <div><span></span><p>Assinatura do aplicador</p><p class="n">${esc(t.responsavel || "")}</p></div>
-    </div>
+    ${termoCienciaHtml({ triagem: "Triagem Multidisciplinar", paciente: p.name, prontuario: p.prontuario,
+      responsavel: p.guardianName, aplicador: t.responsavel, data: criado.toLocaleDateString("pt-BR") })}
     <div class="rod"><span>NFS – Gestão Terapêutica · gerado em ${esc(new Date().toLocaleDateString("pt-BR"))}</span><span>Página 2 de 2</span></div>
   </section>`;
 
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
-<title>Triagem_${esc((p.name || "Paciente").replace(/\s+/g, "_"))}${p.prontuario ? `_${esc(p.prontuario)}` : ""}</title>
-<style>
+  const titulo = `Triagem_${esc((p.name || "Paciente").replace(/\s+/g, "_"))}${p.prontuario ? `_${esc(p.prontuario)}` : ""}`;
+  const css = `
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 0; background: #e2e8f0; font-size: 12px; }
   .bar { display: flex; gap: 10px; padding: 14px; justify-content: center; }
@@ -178,7 +191,7 @@ export function printTriagem86(t: Triagem86, p: PacienteInfo, opts?: { tipo?: st
   .campo { display: flex; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid #f1f5f9; }
   .campo .l { margin: 0; font-size: 10.5px; font-weight: 700; color: #334155; } .campo .v { margin: 1px 0 0; font-size: 14px; } .campo .v.b { font-weight: 800; font-size: 16px; }
   .obs { flex: 1; display: flex; flex-direction: column; } .obs .sec-b { flex: 1; } .branco { height: 100%; min-height: 30mm; }
-  .branco.curto { min-height: 16mm; }
+  .branco.curto { min-height: 4mm; }
   .rod { display: flex; justify-content: space-between; gap: 10px; font-size: 9.5px; color: #64748b; margin-top: auto; }
   .total { display: flex; align-items: center; gap: 12px; background: #eef2f7; border-radius: 10px; padding: 10px 14px; }
   .tt { flex: 1; } .tt .h { margin: 0; font-weight: 800; font-size: 13px; color: #0b1f4d; } .tt .s { margin: 2px 0 6px; font-size: 10px; color: #475569; }
@@ -186,35 +199,71 @@ export function printTriagem86(t: Triagem86, p: PacienteInfo, opts?: { tipo?: st
   .num { text-align: right; } .num b { display: block; font-size: 24px; color: #0b1f4d; } .num span { font-size: 15px; font-weight: 800; color: #0b1f4d; }
   .alerta { border: 2px solid #dc2626; background: #fef2f2; color: #991b1b; font-weight: 700; border-radius: 8px; padding: 6px 10px; font-size: 11px; }
   .duas { display: grid; grid-template-columns: 1.15fr 1fr; gap: 4mm; } .duas.iguais { grid-template-columns: 1fr 1fr; }
-  table { width: 100%; border-collapse: collapse; }
-  th { font-size: 9.5px; text-align: left; color: #0b1f4d; padding: 5px 4px; border-bottom: 1px solid #dbe4ef; }
-  td { padding: 5px 4px; border-bottom: 1px solid #f1f5f9; font-size: 11.5px; } .c { text-align: center; }
+  .page table { width: 100%; border-collapse: collapse; }
+  .page th { font-size: 9.5px; text-align: left; color: #0b1f4d; padding: 5px 4px; border-bottom: 1px solid #dbe4ef; }
+  .page td { padding: 5px 4px; border-bottom: 1px solid #f1f5f9; font-size: 11.5px; } .c { text-align: center; }
   .esp { white-space: nowrap; } .ai { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
   .pill { display: inline-block; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 10.5px; min-width: 64px; } .pill.na { background: #f1f5f9; color: #64748b; font-style: italic; }
   .faixa { background: #f8fafc; border-radius: 8px; padding: 6px 8px; margin-top: 4px; }
   .faixa p { margin: 2px 0; font-size: 10.5px; display: flex; align-items: center; gap: 6px; } .faixa i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; } .faixa b { width: 42px; }
   .faixa .fh { font-weight: 800; color: #0b1f4d; display: block; } .faixa .fh span { font-weight: 400; } .faixa .nt { color: #64748b; font-size: 9.5px; display: block; }
   .prio { border-color: #fecdd3; } .prio .sec-h { background: #fff1f2; color: #9f1239; } .prio .ic.sm { background: #be123c; } .prio .sec-b { background: #fff7f8; }
-  ul { margin: 2px 0; padding-left: 16px; } li { margin: 3px 0; font-size: 11.5px; } ul.red li::marker { color: #dc2626; }
+  .page ul { margin: 2px 0; padding-left: 16px; } .page li { margin: 3px 0; font-size: 11.5px; }
+  .pill.fila { background: #0b1f4d; color: #fff; min-width: 0; white-space: nowrap; } .av { font-size: 10px; color: #64748b; }
+  .encl { margin: 6px 0 0; font-size: 10.5px; line-height: 1.5; } ul.red li::marker { color: #dc2626; }
   .vazio { color: #64748b; margin: 4px 0; }
   .cons { flex: 1; display: flex; flex-direction: column; } .cons .sec-b { flex: 1; }
   .sg { margin: 2px 0; font-size: 10.5px; font-weight: 700; color: #334155; } ul.sug li { font-size: 10.5px; margin: 2px 0; }
   .ass { display: grid; grid-template-columns: 1fr 1fr; gap: 12mm; padding: 6mm 4mm 0; break-inside: avoid; }
   .ass span { display: block; border-bottom: 1px solid #0f172a; height: 10mm; }
   .ass p { margin: 3px 0 0; text-align: center; font-size: 10.5px; font-weight: 700; color: #334155; } .ass p.n { font-weight: 400; color: #64748b; min-height: 12px; }
-  @page { size: A4 portrait; margin: 0; }
+  @page { size: A4 portrait; margin: 15mm; } @page t86 { margin: 0; } .page { page: t86; }
   @media print { body { background: #fff; } .bar { display: none !important; } .page { margin: 0; break-after: page; } .page:last-child { break-after: auto; } }
-</style></head><body>
-  <div class="bar">
+`;
+  return { titulo, css, paginas: folha1 + folha2 };
+}
+
+const BARRA = `<div class="bar">
     <button onclick="window.close()" style="padding:8px 18px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">← Voltar</button>
     <button onclick="window.print()" style="padding:8px 18px;background:#0b1f4d;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">Imprimir / Salvar PDF</button>
-  </div>
-  ${folha1}${folha2}
-</body></html>`;
+  </div>`;
 
+/** Isola o CSS de outra folha (ex.: ABC) dentro de `scope`, para juntar no mesmo arquivo. */
+function scopeCss(css: string, scope: string): string {
+  return css
+    .replace(/@page[^{]*\{[^}]*\}/g, "")
+    .replace(/@media print\s*\{(?:[^{}]*\{[^}]*\})*\s*\}/g, "")
+    .replace(/([^{}]+)\{([^}]*)\}/g, (_m, sel: string, body: string) =>
+      `${sel.split(",").map((s) => (s.trim() === "body" ? scope : `${scope} ${s.trim()}`)).join(", ")} {${body}}`);
+}
+
+function abrir(titulo: string, css: string, corpo: string) {
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${titulo}</title>
+<style>${css}</style></head><body>
+  ${BARRA}
+  ${corpo}
+</body></html>`;
   const w = window.open("", "_blank");
   if (!w) return;
   w.document.write(html);
   w.document.close();
   w.addEventListener("load", () => setTimeout(() => w.print(), 300));
+}
+
+/** PDF 1 — Triagem Multidisciplinar (2 folhas A4, termo de ciência no fim). */
+export function printTriagem86(t: Triagem86, p: PacienteInfo, opts?: { tipo?: string }) {
+  const d = triagem86Doc(t, p, opts);
+  abrir(d.titulo, d.css, d.paginas);
+}
+
+/** Arquivo único: Triagem Multidisciplinar + Triagem ABC, cada uma com o seu termo de ciência. */
+export function printTriagemCompleta(t: Triagem86, p: PacienteInfo, abc: AbcPrintInput, opts?: { tipo?: string }) {
+  const d = triagem86Doc(t, p, opts);
+  const a = abcChecklistDoc(abc);
+  const css = `${d.css}
+  ${scopeCss(a.css, ".abc-doc")}
+  .abc-doc { page: abc; width: 210mm; margin: 0 auto 14px; background: #fff; padding: 15mm; break-before: page; }
+  @page abc { size: A4 portrait; margin: 15mm; }
+  @media print { .abc-doc { width: auto; margin: 0; padding: 0; } }`;
+  abrir(d.titulo.replace(/^Triagem_/, "Triagens_"), css, `${d.paginas}<section class="abc-doc">${a.corpo}</section>`);
 }

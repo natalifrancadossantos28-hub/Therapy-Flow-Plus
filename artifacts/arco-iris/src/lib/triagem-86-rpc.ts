@@ -14,16 +14,33 @@ function creds() {
 export type Triagem86 = {
   id: number; patientId: number; respostas: Respostas86; social: Social86;
   resultado: { somas?: Record<string, number> }; responsavel: string | null; createdAt: string;
+  encaminhamento?: Encaminhamento86 | null;
+};
+
+/** Registro do encaminhamento à fila (migração 0129): 3 maiores pontuações com ≥ 9 pontos. */
+export type Encaminhamento86 = {
+  em: string; origem: string; criterio: string;
+  areas: { especialidade: string; pontos: number; respondidas: number; encaminhada: boolean }[];
+  encaminhadas: string[]; adicionadas: string[]; jaNaFila: string[];
+  prioridade?: string | null; reason?: string | null;
 };
 export type SaveTriagem86Result = {
-  triagem: Triagem86; addedToQueue: boolean; linkedOnly: boolean; reason?: string | null;
+  triagem: Triagem86; encaminhamento?: Encaminhamento86 | null; addedToQueue: boolean; linkedOnly: boolean; reason?: string | null;
   priority?: string | null; specialties?: string[]; addedSpecialties?: string[]; existingSpecialties?: string[];
 };
 
-export async function saveTriagem86(patientId: number, respostas: Respostas86, social: Social86, responsavel: string): Promise<SaveTriagem86Result> {
+/** `enfileirar = false`: só salva; o encaminhamento à fila fica para `encaminharTriagem86` (fim do fluxo Triagem → ABC). */
+export async function saveTriagem86(patientId: number, respostas: Respostas86, social: Social86, responsavel: string, enfileirar = true): Promise<SaveTriagem86Result> {
   const { data, error } = await requireSupabase().rpc("save_triagem_86", {
     ...creds(), p_patient_id: patientId, p_respostas: respostas, p_social: social, p_responsavel: responsavel || null,
+    p_enfileirar: enfileirar,
   });
+  if (error) throw error;
+  return data as SaveTriagem86Result;
+}
+
+export async function encaminharTriagem86(triagemId: number): Promise<SaveTriagem86Result> {
+  const { data, error } = await requireSupabase().rpc("encaminhar_triagem_86", { ...creds(), p_triagem_id: triagemId });
   if (error) throw error;
   return data as SaveTriagem86Result;
 }
