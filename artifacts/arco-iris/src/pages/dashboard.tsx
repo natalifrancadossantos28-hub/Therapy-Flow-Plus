@@ -34,6 +34,7 @@ import { specialtyTone, specialtyShortLabel, isTransportSpecialty } from "@/lib/
 import { listDrivers } from "@/lib/transporte";
 import { upcomingAwareness, dateLabel, CATEGORY_COLOR } from "@/lib/awareness-dates";
 import { printDashboardReport } from "@/lib/print-dashboard";
+import { DashboardKpis } from "@/components/DashboardKpis";
 import { AREA_MAX_DB, AREA_MAX_UI, areaToUi } from "@/lib/score-scale";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -85,6 +86,8 @@ export default function Dashboard() {
   const [aptStats, setAptStats] = useState<Stats | null>(null);
   const [ocupacao, setOcupacao] = useState<Ocupacao[]>([]);
   const [longAttendance, setLongAttendance] = useState<LongAttendancePatient[]>([]);
+  const [showCharts, setShowCharts] = useState(() => { try { return localStorage.getItem("nfs_dash_charts") !== "0"; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem("nfs_dash_charts", showCharts ? "1" : "0"); } catch { /* ignore */ } }, [showCharts]);
   const [perfFilter, setPerfFilter] = useState<"mes" | "total">("mes");
   const [histFilter, setHistFilter] = useState<"ano" | "acumulado">("ano");
   const [dashMonth, setDashMonth] = useState<Date>(new Date());
@@ -644,13 +647,23 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">Visão Geral</h1>
-          <p className="text-muted-foreground mt-1">Bem-vindo ao NFS – Gestão Terapêutica.</p>
+          <p className="text-muted-foreground mt-1">Indicadores da unidade com dados reais do sistema.</p>
         </div>
         <Button onClick={handlePrintReport} className="gap-2 whitespace-nowrap self-start sm:self-auto">
           <Printer className="w-4 h-4" /> Imprimir Relatório
         </Button>
       </div>
 
+      <DashboardKpis patients={patients} professionals={professionals} waitingList={waitingList}
+        today={todayAppointments} week={weekAppointments} month={currentMonthAppointments} year={yearAppointments} ocupacao={ocupacao} />
+
+      <button type="button" onClick={() => setShowCharts((v) => !v)}
+        className="w-full flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-3 text-sm font-bold hover:border-primary/50 transition-colors">
+        <span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" /> Gráficos e análises detalhadas</span>
+        <ChevronRight className={cn("w-4 h-4 transition-transform", showCharts && "rotate-90")} />
+      </button>
+
+      <div className={cn("space-y-8", !showCharts && "hidden")}>
       {/* Batimento Cardíaco da Clínica — resumo do dia em 5s de leitura. */}
       <Heartbeat
         total={todayCount}
@@ -1166,6 +1179,7 @@ export default function Dashboard() {
           </div>
         </Card>
       )}
+      </div>
     </div>
   );
 }

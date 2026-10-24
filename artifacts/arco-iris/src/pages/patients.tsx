@@ -25,7 +25,7 @@ import {
 } from "@/lib/arco-rpc";
 import { hasAdminScope, getProfessionalSession } from "@/lib/portal-session";
 import { AbcNivelBadge, AbcChecklistForm } from "@/components/AbcChecklistForm";
-import { TriagemMultiForm } from "@/components/TriagemMultidisciplinar";
+import { Triagem86Form } from "@/components/Triagem86";
 import { ABC_NIVEL_INFO } from "@/lib/abc-checklist";
 import { listBuscaAtivaAtual } from "@/lib/busca-ativa";
 
@@ -763,16 +763,19 @@ export default function Patients() {
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
           <MotionCard className="w-full max-w-4xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <CadastroEtapas atual={2} />
-            <h2 className="text-xl font-bold font-display mb-1">Triagem Multidisciplinar</h2>
+            <h2 className="text-xl font-bold font-display mb-1">Triagem multidisciplinar · 86 perguntas</h2>
             <p className="text-sm text-muted-foreground mb-5">{wizardTriagem.prontuario ? `${wizardTriagem.prontuario} · ` : ""}{wizardTriagem.name}</p>
-            <TriagemMultiForm
-              key={`tm-${wizardTriagem.id}`}
-              patient={wizardTriagem}
-              base={null}
-              professionalName={getProfessionalSession()?.professionalName ?? null}
-              professionalSpecialty={getProfessionalSession()?.specialty ?? null}
+            <Triagem86Form
+              key={`t86-${wizardTriagem.id}`}
+              patientId={wizardTriagem.id}
               onCancel={() => avancarParaAbc(wizardTriagem)}
-              onSaved={(t, link) => handleTriagemWizardSaved(wizardTriagem, t, link)}
+              onSaved={(res) => {
+                if (res.addedToQueue && res.addedSpecialties?.length) {
+                  setPatients(prev => prev.map(p => p.id === wizardTriagem.id && p.status !== "Atendimento" ? { ...p, status: "Fila de Espera" } : p));
+                }
+                toast({ title: res.addedToQueue ? "Triagem salva e paciente na fila!" : "Triagem salva", description: res.addedSpecialties?.length ? `Fila: ${res.addedSpecialties.join(", ")} · Etapa 3: Avaliação ABC.` : "Etapa 3: Avaliação ABC." });
+                avancarParaAbc(wizardTriagem);
+              }}
             />
             <p className="text-xs text-muted-foreground mt-3">
               Sem dados para a triagem agora? <strong>Cancelar</strong> pula para a Avaliação ABC; a triagem pode ser feita depois pela ficha do paciente.

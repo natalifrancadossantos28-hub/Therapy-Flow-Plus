@@ -43,7 +43,13 @@ import { getProfessionalSession } from "@/lib/portal-session";
 import { useBuscaAtivaPaciente } from "@/lib/busca-ativa";
 import { BuscaAtivaPacienteCard } from "@/components/BuscaAtivaPacienteCard";
 import { AvaliacaoSociofamiliarCard, AvaliacaoSociofamiliarForm } from "@/components/AvaliacaoSociofamiliar";
+import { PrioridadeClinicaCard, PrioridadeClinicaForm } from "@/components/PrioridadeClinica";
+import { TriagemValidacaoPanel } from "@/components/TriagemValidacao";
+import { listPrioridadesClinicas, listTriagemValidacoes, type PrioridadeClinica, type TriagemValidacao } from "@/lib/fila-indicadores";
+import { calcularResultado as calcTriagem, parseRespostas as parseTriagem } from "@/lib/triagem-multi";
 import { TriagemMultiForm, TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
+import { Triagem86Form, Triagem86Card } from "@/components/Triagem86";
+import { listTriagens86, type Triagem86 } from "@/lib/triagem-86-rpc";
 import { printTriagemMulti } from "@/lib/print-triagem";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
@@ -131,12 +137,23 @@ export default function PatientDetail() {
   const [abcForm, setAbcForm] = useState<{ tipo: AbcTipo; base?: number[] } | null>(null);
   const [avfHist, setAvfHist] = useState<AvaliacaoFuncional[]>([]);
   const [avsfHist, setAvsfHist] = useState<AvaliacaoSociofamiliar[]>([]);
+  const [prioHist, setPrioHist] = useState<PrioridadeClinica[]>([]);
+  const [prioFormOpen, setPrioFormOpen] = useState(false);
+  const [validacoes, setValidacoes] = useState<TriagemValidacao[]>([]);
+  useEffect(() => {
+    if (!patientId) return;
+    listPrioridadesClinicas(patientId).then(setPrioHist).catch(() => setPrioHist([]));
+    listTriagemValidacoes(patientId).then(setValidacoes).catch(() => setValidacoes([]));
+  }, [patientId]);
   const [avsfFormOpen, setAvsfFormOpen] = useState(false);
   const [avfForm, setAvfForm] = useState<{ tipo: AvaliacaoFuncionalTipo; specialty: string; entradaRef: AvaliacaoFuncional | null } | null>(null);
   const [avfNovaEspecialidade, setAvfNovaEspecialidade] = useState("");
   const [triagensMulti, setTriagensMulti] = useState<TriagemMulti[]>([]);
   const [triagemMultiForm, setTriagemMultiForm] = useState<{ base: TriagemMulti | null } | null>(null);
   const [triagemMultiView, setTriagemMultiView] = useState<TriagemMulti | null>(null);
+  const [t86List, setT86List] = useState<Triagem86[]>([]);
+  const [t86Open, setT86Open] = useState(false);
+  useEffect(() => { listTriagens86(patientId).then(setT86List).catch(() => setT86List([])); }, [patientId]);
   const triagemViewRef = useRef<HTMLDivElement>(null);
   const triagemCompactRef = useRef<HTMLDivElement>(null);
   const [sPsicologia, setSPsicologia] = useState("");
@@ -788,6 +805,9 @@ export default function PatientDetail() {
                   <ClipboardCheck className="w-4 h-4" />
                   {triagensMulti.length > 0 ? "Nova Triagem" : "Fazer Triagem"}
                 </Button>
+                <Button size="sm" variant="secondary" onClick={() => setT86Open(true)} className="gap-2">
+                  <ClipboardCheck className="w-4 h-4" /> Triagem 86 perguntas
+                </Button>
                 <Button variant="outline" size="sm" onClick={openTriagemEdit} className="gap-2">
                   <Pencil className="w-4 h-4" />
                   Notas por área
@@ -795,6 +815,7 @@ export default function PatientDetail() {
               </div>
             </div>
 
+            {t86List[0] && <div className="mb-4"><Triagem86Card t={t86List[0]} /></div>}
             {triagensMulti.length > 0 && (
               <div className="mb-5 space-y-3">
                 <div ref={triagemCompactRef}><TriagemMultiResultado triagem={triagensMulti[0]} patient={patient} compact /></div>
@@ -982,6 +1003,26 @@ export default function PatientDetail() {
 
           <AvaliacaoSociofamiliarCard historico={avsfHist} onNova={() => setAvsfFormOpen(true)} />
 
+          {prioFormOpen ? (
+            <Card className="p-6">
+              <h3 className="font-bold font-display text-lg mb-3">Classificação de Prioridade Clínica</h3>
+              <PrioridadeClinicaForm patientId={patientId} onCancel={() => setPrioFormOpen(false)}
+                onSaved={(pc) => { setPrioHist((h) => [pc, ...h]); setPrioFormOpen(false); }} />
+            </Card>
+          ) : (
+            <PrioridadeClinicaCard historico={prioHist} onNova={() => setPrioFormOpen(true)} />
+          )}
+
+          {triagensMulti.length > 0 && (() => {
+            const t0 = triagensMulti[0];
+            const r = parseTriagem(t0.respostas);
+            if (!r) return null;
+            const res = calcTriagem(r, { tipoEscola: t0.tipoEscola, trabalhoPais: t0.trabalhoPais });
+            const areas = res.ranking.map((a) => ({ area: a.area, pontos: a.pontos, nivelLabel: a.nivel.label, sinalizada: a.pontos > 8 }));
+            return <TriagemValidacaoPanel patientId={patientId} areas={areas} historico={validacoes}
+              onSaved={(v) => setValidacoes((h) => [v, ...h])} />;
+          })()}
+
           {(() => {
             const entrada = abcHist.find(a => a.tipo === "entrada") ?? null;
             const alta = abcHist.find(a => a.tipo === "alta") ?? null;
@@ -1162,6 +1203,22 @@ export default function PatientDetail() {
           </Card>
         </div>
       </div>
+
+      {t86Open && patient && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <MotionCard className="w-full max-w-4xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <h2 className="text-2xl font-bold font-display mb-1">Triagem multidisciplinar · 86 perguntas</h2>
+            <p className="text-sm text-muted-foreground mb-4">{patient.name}</p>
+            <Triagem86Form patientId={patient.id} onCancel={() => setT86Open(false)} onSaved={async (res) => {
+              setT86Open(false);
+              setT86List((prev) => [res.triagem, ...prev]);
+              try { const fresh = await getPatient(patientId); if (fresh) setPatient(fresh); } catch { /* mantém */ }
+              toast({ title: res.addedToQueue ? "Triagem salva e incluída na fila" : "Triagem salva",
+                description: res.addedSpecialties?.length ? `Fila: ${res.addedSpecialties.join(", ")}` : res.reason === "all_already_queued" ? "Já estava nas filas cabíveis; notas atualizadas." : "Notas por área atualizadas." });
+            }} />
+          </MotionCard>
+        </div>
+      )}
 
       {triagemMultiForm && patient && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto print:static print:p-0 print:bg-white">

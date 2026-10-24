@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
-  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette } from "lucide-react";
+  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette, ChevronDown, BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
@@ -16,32 +16,48 @@ type NavItem = {
   label: string;
   icon: typeof LayoutDashboard;
   scopes: Array<"admin" | "reception">;
+  group: NavGroup;
 };
 
+type NavGroup = "Gestão" | "Atendimento" | "Organização" | "Administração";
+const NAV_GROUPS: NavGroup[] = ["Gestão", "Atendimento", "Organização", "Administração"];
+
 const navItems: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, scopes: ["admin"] },
-  { href: "/professionals", label: "Profissionais", icon: UserRound, scopes: ["admin"] },
-  { href: "/patients", label: "Pacientes", icon: Users, scopes: ["admin", "reception"] },
-  { href: "/reception", label: "Recepção", icon: ClipboardList, scopes: ["admin", "reception"] },
-  { href: "/waiting-list", label: "Fila de Espera", icon: ListTodo, scopes: ["admin"] },
-  { href: "/pausados", label: "Pausados / Busca Ativa", icon: Snowflake, scopes: ["admin", "reception"] },
-  { href: "/agenda", label: "Agenda Geral", icon: Calendar, scopes: ["admin"] },
-  { href: "/agenda-mensal", label: "Agenda Mensal", icon: CalendarDays, scopes: ["admin"] },
-  { href: "/salas", label: "Gestão de Salas", icon: DoorOpen, scopes: ["admin"] },
-  { href: "/feriados", label: "Feriados & Ausências", icon: CalendarOff, scopes: ["admin", "reception"] },
-  { href: "/datas-conscientizacao", label: "Datas de Conscientização", icon: HeartHandshake, scopes: ["admin", "reception"] },
-  { href: "/central-mensagens", label: "Central de Mensagens", icon: MessageSquareHeart, scopes: ["admin"] },
-  { href: "/recados-equipe", label: "Recados da Equipe", icon: Inbox, scopes: ["admin"] },
-  { href: "/gestao-contratos", label: "Gestão de Contratos", icon: Building2, scopes: ["admin"] },
-  { href: "/ai-brain", label: "Cérebro IA", icon: Brain, scopes: ["admin"] },
-  { href: "/personalizacao-visual", label: "Configurações · Visual", icon: Palette, scopes: ["admin"] },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, scopes: ["admin"], group: "Gestão" },
+  { href: "/relatorios", label: "Relatórios", icon: BarChart3, scopes: ["admin"], group: "Gestão" },
+  { href: "/simulacao-fila", label: "Simulação da fila", icon: BarChart3, scopes: ["admin"], group: "Gestão" },
+  { href: "/professionals", label: "Profissionais", icon: UserRound, scopes: ["admin"], group: "Administração" },
+  { href: "/patients", label: "Pacientes", icon: Users, scopes: ["admin", "reception"], group: "Atendimento" },
+  { href: "/reception", label: "Recepção", icon: ClipboardList, scopes: ["admin", "reception"], group: "Atendimento" },
+  { href: "/waiting-list", label: "Fila de Espera", icon: ListTodo, scopes: ["admin"], group: "Organização" },
+  { href: "/pausados", label: "Pausados / Busca Ativa", icon: Snowflake, scopes: ["admin", "reception"], group: "Atendimento" },
+  { href: "/agenda", label: "Agenda Geral", icon: Calendar, scopes: ["admin"], group: "Organização" },
+  { href: "/agenda-mensal", label: "Agenda Mensal", icon: CalendarDays, scopes: ["admin"], group: "Organização" },
+  { href: "/salas", label: "Gestão de Salas", icon: DoorOpen, scopes: ["admin"], group: "Organização" },
+  { href: "/feriados", label: "Feriados & Ausências", icon: CalendarOff, scopes: ["admin", "reception"], group: "Organização" },
+  { href: "/datas-conscientizacao", label: "Datas de Conscientização", icon: HeartHandshake, scopes: ["admin", "reception"], group: "Administração" },
+  { href: "/central-mensagens", label: "Central de Mensagens", icon: MessageSquareHeart, scopes: ["admin"], group: "Administração" },
+  { href: "/recados-equipe", label: "Recados da Equipe", icon: Inbox, scopes: ["admin"], group: "Administração" },
+  { href: "/gestao-contratos", label: "Gestão de Contratos", icon: Building2, scopes: ["admin"], group: "Administração" },
+  { href: "/ai-brain", label: "Cérebro IA", icon: Brain, scopes: ["admin"], group: "Administração" },
+  { href: "/personalizacao-visual", label: "Configurações · Visual", icon: Palette, scopes: ["admin"], group: "Administração" },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   useThemeTick(); // re-renderiza as páginas quando o tema muda (cores via JS)
   const [location, setLocation] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem("nfs_sidebar_collapsed") === "1"; } catch { return false; }
+  });
+  const [closedGroups, setClosedGroups] = useState<NavGroup[]>(() => {
+    try { return JSON.parse(localStorage.getItem("nfs_nav_closed") || "[]"); } catch { return []; }
+  });
+  const toggleGroup = (g: NavGroup) => setClosedGroups((c) => {
+    const n = c.includes(g) ? c.filter((x) => x !== g) : [...c, g];
+    try { localStorage.setItem("nfs_nav_closed", JSON.stringify(n)); } catch { /* ignore */ }
+    return n;
+  });
   const scope = getCurrentScope();
   // Recepcao/admin compartilham o mesmo Layout; profissional tem tela propria.
   const effectiveScope: "admin" | "reception" = scope === "reception" ? "reception" : "admin";
@@ -67,13 +83,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const NavLinks = ({ collapsed = false }: { collapsed?: boolean }) => (
     <>
-      {visibleItems.map((item) => {
+      {NAV_GROUPS.map((group) => {
+        const items = visibleItems.filter((i) => i.group === group);
+        if (items.length === 0) return null;
+        const closed = closedGroups.includes(group) && !collapsed;
+        return (
+          <div key={group} className="flex flex-col gap-1">
+            {collapsed ? <div className="h-px bg-border/60 mx-2 my-1" /> : (
+              <button type="button" onClick={() => toggleGroup(group)}
+                className="flex items-center justify-between px-3 pt-3 pb-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground/80 hover:text-foreground">
+                {group}<ChevronDown className={cn("w-3.5 h-3.5 transition-transform", closed && "-rotate-90")} />
+              </button>
+            )}
+            {!closed && items.map((item) => {
         const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
         return (
           <Link key={item.href} href={item.href} onClick={() => setIsMobileOpen(false)}
             className={cn(
               "flex items-center rounded-xl font-medium transition-all duration-200 group",
-              collapsed ? "justify-center px-2 py-3" : "gap-3 px-4 py-3",
+              collapsed ? "justify-center px-2 py-3" : "gap-3 px-4 py-2.5",
               isActive
                 ? "nav-active-neon font-semibold"
                 : "text-foreground/60 hover:bg-secondary/80 hover:text-foreground"
@@ -83,6 +111,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <item.icon className={cn("w-5 h-5 shrink-0 transition-transform duration-200", isActive ? "scale-110" : "group-hover:scale-110")} />
             {!collapsed && item.label}
           </Link>
+        );
+      })}
+          </div>
         );
       })}
       {scope === "admin" && (
@@ -168,7 +199,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
         </div>
-        <nav aria-label="Navegação principal" className="flex flex-col gap-2 flex-1">
+        <nav aria-label="Navegação principal" className="flex flex-col gap-1 flex-1">
           <NavLinks collapsed={isSidebarCollapsed} />
         </nav>
         {!isSidebarCollapsed && (
@@ -178,7 +209,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <button
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onClick={() => { const v = !isSidebarCollapsed; setIsSidebarCollapsed(v); try { localStorage.setItem("nfs_sidebar_collapsed", v ? "1" : "0"); } catch { /* ignore */ } }}
           className="flex items-center justify-center p-2 rounded-xl text-foreground/50 hover:bg-secondary/80 hover:text-foreground transition-all duration-200 mt-2"
           title={isSidebarCollapsed ? "Expandir menu" : "Recolher menu"}
           aria-label={isSidebarCollapsed ? "Expandir menu" : "Recolher menu"}
