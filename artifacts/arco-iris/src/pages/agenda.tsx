@@ -15,6 +15,7 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
+import { ProximosElegiveis } from "@/components/ProximosElegiveis";
 import { AbsenceBadge } from "@/components/AbsenceBadge";
 import { DocCopyRow } from "@/components/PatientDocs";
 import {
@@ -1881,6 +1882,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           )}
         </div>
       </div>
+
+      {selectedProf && !isTransportSpecialty(selectedProf.specialty) && (
+        <ProximosElegiveis specialty={selectedProf.specialty} showProntuario={!isProfessionalProfile} />
+      )}
 
       <Card className="p-5 flex flex-col sm:flex-row items-start sm:items-end gap-4">
         <div className="flex-1">

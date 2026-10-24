@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
-  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette, ChevronDown } from "lucide-react";
+  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette, ChevronDown, BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
@@ -24,6 +24,7 @@ const NAV_GROUPS: NavGroup[] = ["Gestão", "Atendimento", "Organização", "Admi
 
 const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, scopes: ["admin"], group: "Gestão" },
+  { href: "/relatorios", label: "Relatórios", icon: BarChart3, scopes: ["admin"], group: "Gestão" },
   { href: "/professionals", label: "Profissionais", icon: UserRound, scopes: ["admin"], group: "Administração" },
   { href: "/patients", label: "Pacientes", icon: Users, scopes: ["admin", "reception"], group: "Atendimento" },
   { href: "/reception", label: "Recepção", icon: ClipboardList, scopes: ["admin", "reception"], group: "Atendimento" },

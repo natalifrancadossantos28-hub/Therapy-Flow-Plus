@@ -32,6 +32,7 @@ const RecadosEquipe = lazy(() => import("@/pages/recados-equipe"));
 const PainelMaster = lazy(() => import("@/pages/painel-master"));
 const AIBrain = lazy(() => import("@/pages/ai-brain"));
 const PersonalizacaoVisual = lazy(() => import("@/pages/personalizacao-visual"));
+const Relatorios = lazy(() => import("@/pages/relatorios"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -86,6 +87,7 @@ function Router() {
                 <Route path="/recados-equipe">{() => <AdminGuard><RecadosEquipe /></AdminGuard>}</Route>
                 <Route path="/ai-brain">{() => <AdminGuard><AIBrain /></AdminGuard>}</Route>
                 <Route path="/personalizacao-visual">{() => <AdminGuard><PersonalizacaoVisual /></AdminGuard>}</Route>
+                <Route path="/relatorios">{() => <AdminGuard><Relatorios /></AdminGuard>}</Route>
                 <Route component={NotFound} />
               </Switch>
             </Suspense>
