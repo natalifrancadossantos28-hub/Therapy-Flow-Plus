@@ -814,12 +814,12 @@ export default function PatientDetail() {
 
             {t86List[0] && (
               <div className="mb-4 space-y-2">
-                <Triagem86Card t={t86List[0]} onPrint={() => printTriagem86(t86List[0], patient)} />
+                <Triagem86Card t={t86List[0]} onPrint={() => printTriagem86(t86List[0], patient, { tipo: t86List.length > 1 ? "Reavaliação" : "Triagem inicial" })} />
                 {t86List.length > 1 && (
                   <p className="text-xs text-muted-foreground">
                     Anteriores (imprimir):{" "}
-                    {t86List.slice(1).map((t) => (
-                      <button key={t.id} type="button" className="underline mr-2 hover:text-primary" onClick={() => printTriagem86(t, patient)}>
+                    {t86List.slice(1).map((t, i) => (
+                      <button key={t.id} type="button" className="underline mr-2 hover:text-primary" onClick={() => printTriagem86(t, patient, { tipo: i + 2 === t86List.length ? "Triagem inicial" : "Reavaliação" })}>
                         {new Date(t.createdAt).toLocaleDateString("pt-BR")}
                       </button>
                     ))}
@@ -1202,7 +1202,7 @@ export default function PatientDetail() {
           <MotionCard className="w-full max-w-4xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <h2 className="text-2xl font-bold font-display mb-1">Nova Triagem</h2>
             <p className="text-sm text-muted-foreground mb-4">{patient.name}</p>
-            <Triagem86Form patientId={patient.id} patient={patient} onPatientUpdated={setPatient} onCancel={() => setT86Open(false)} onSaved={async (res) => {
+            <Triagem86Form patientId={patient.id} patient={patient} tipoTriagem={t86List.length > 0 ? "Reavaliação" : "Triagem inicial"} onPatientUpdated={setPatient} onCancel={() => setT86Open(false)} onSaved={async (res) => {
               setT86Open(false);
               setT86List((prev) => [res.triagem, ...prev]);
               try { const fresh = await getPatient(patientId); if (fresh) setPatient(fresh); } catch { /* mantém */ }

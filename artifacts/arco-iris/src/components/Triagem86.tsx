@@ -109,8 +109,8 @@ const DADOS_CAMPOS: { k: keyof Dados; l: string; type?: string }[] = [
  * prioridades → resultado/sugestões → Finalizar → Imprimir. Usa a Triagem 86
  * (save_triagem_86). A avaliação ABC continua separada.
  */
-export function Triagem86Form({ patientId, patient, editarDados = true, onPatientUpdated, onSaved, onCancel }: {
-  patientId: number; patient?: Patient | null; editarDados?: boolean; onPatientUpdated?: (p: Patient) => void;
+export function Triagem86Form({ patientId, patient, editarDados = true, tipoTriagem, onPatientUpdated, onSaved, onCancel }: {
+  patientId: number; patient?: Patient | null; editarDados?: boolean; tipoTriagem?: string; onPatientUpdated?: (p: Patient) => void;
   onSaved: (r: SaveTriagem86Result) => void; onCancel: () => void;
 }) {
   const comDados = !!patient && editarDados;
@@ -164,7 +164,7 @@ export function Triagem86Form({ patientId, patient, editarDados = true, onPatien
         <Resultado86View r={r} />
         <Sugestoes r={r} />
         <div className="flex flex-wrap gap-2">
-          {paciente && <Button className="gap-2" onClick={() => printTriagem86(res.triagem, paciente)}><Printer className="w-4 h-4" /> Imprimir relatório</Button>}
+          {paciente && <Button className="gap-2" onClick={() => printTriagem86(res.triagem, paciente, { tipo: tipoTriagem })}><Printer className="w-4 h-4" /> Imprimir relatório</Button>}
           <Button variant="outline" onClick={() => onSaved(res)}>Concluir</Button>
         </div>
       </div>
