@@ -43,6 +43,10 @@ import { getProfessionalSession } from "@/lib/portal-session";
 import { useBuscaAtivaPaciente } from "@/lib/busca-ativa";
 import { BuscaAtivaPacienteCard } from "@/components/BuscaAtivaPacienteCard";
 import { AvaliacaoSociofamiliarCard, AvaliacaoSociofamiliarForm } from "@/components/AvaliacaoSociofamiliar";
+import { PrioridadeClinicaCard, PrioridadeClinicaForm } from "@/components/PrioridadeClinica";
+import { TriagemValidacaoPanel } from "@/components/TriagemValidacao";
+import { listPrioridadesClinicas, listTriagemValidacoes, type PrioridadeClinica, type TriagemValidacao } from "@/lib/fila-indicadores";
+import { calcularResultado as calcTriagem, parseRespostas as parseTriagem } from "@/lib/triagem-multi";
 import { TriagemMultiForm, TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
 import { printTriagemMulti } from "@/lib/print-triagem";
 
@@ -131,6 +135,14 @@ export default function PatientDetail() {
   const [abcForm, setAbcForm] = useState<{ tipo: AbcTipo; base?: number[] } | null>(null);
   const [avfHist, setAvfHist] = useState<AvaliacaoFuncional[]>([]);
   const [avsfHist, setAvsfHist] = useState<AvaliacaoSociofamiliar[]>([]);
+  const [prioHist, setPrioHist] = useState<PrioridadeClinica[]>([]);
+  const [prioFormOpen, setPrioFormOpen] = useState(false);
+  const [validacoes, setValidacoes] = useState<TriagemValidacao[]>([]);
+  useEffect(() => {
+    if (!patientId) return;
+    listPrioridadesClinicas(patientId).then(setPrioHist).catch(() => setPrioHist([]));
+    listTriagemValidacoes(patientId).then(setValidacoes).catch(() => setValidacoes([]));
+  }, [patientId]);
   const [avsfFormOpen, setAvsfFormOpen] = useState(false);
   const [avfForm, setAvfForm] = useState<{ tipo: AvaliacaoFuncionalTipo; specialty: string; entradaRef: AvaliacaoFuncional | null } | null>(null);
   const [avfNovaEspecialidade, setAvfNovaEspecialidade] = useState("");
@@ -981,6 +993,26 @@ export default function PatientDetail() {
           })()}
 
           <AvaliacaoSociofamiliarCard historico={avsfHist} onNova={() => setAvsfFormOpen(true)} />
+
+          {prioFormOpen ? (
+            <Card className="p-6">
+              <h3 className="font-bold font-display text-lg mb-3">Classificação de Prioridade Clínica</h3>
+              <PrioridadeClinicaForm patientId={patientId} onCancel={() => setPrioFormOpen(false)}
+                onSaved={(pc) => { setPrioHist((h) => [pc, ...h]); setPrioFormOpen(false); }} />
+            </Card>
+          ) : (
+            <PrioridadeClinicaCard historico={prioHist} onNova={() => setPrioFormOpen(true)} />
+          )}
+
+          {triagensMulti.length > 0 && (() => {
+            const t0 = triagensMulti[0];
+            const r = parseTriagem(t0.respostas);
+            if (!r) return null;
+            const res = calcTriagem(r, { tipoEscola: t0.tipoEscola, trabalhoPais: t0.trabalhoPais });
+            const areas = res.ranking.map((a) => ({ area: a.area, pontos: a.pontos, nivelLabel: a.nivel.label, sinalizada: a.pontos > 8 }));
+            return <TriagemValidacaoPanel patientId={patientId} areas={areas} historico={validacoes}
+              onSaved={(v) => setValidacoes((h) => [v, ...h])} />;
+          })()}
 
           {(() => {
             const entrada = abcHist.find(a => a.tipo === "entrada") ?? null;
