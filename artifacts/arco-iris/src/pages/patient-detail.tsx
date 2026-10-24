@@ -52,7 +52,7 @@ import { Triagem86Form, Triagem86Card } from "@/components/Triagem86";
 import { listTriagens86, type Triagem86 } from "@/lib/triagem-86-rpc";
 import { calcularResultado86, nivelArea86 } from "@/lib/triagem-86";
 import { printTriagemMulti } from "@/lib/print-triagem";
-import { printTriagem86 } from "@/lib/print-triagem-86";
+import { printTriagem86, printTriagemCompleta } from "@/lib/print-triagem-86";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
@@ -815,6 +815,20 @@ export default function PatientDetail() {
             {t86List[0] && (
               <div className="mb-4 space-y-2">
                 <Triagem86Card t={t86List[0]} onPrint={() => printTriagem86(t86List[0], patient, { tipo: t86List.length > 1 ? "Reavaliação" : "Triagem inicial" })} />
+                {(() => {
+                  const abcEntrada = abcHist.find(x => x.tipo === "entrada");
+                  if (!abcEntrada) return null;
+                  return (
+                    <Button variant="outline" size="sm" className="gap-2 mt-2" onClick={() => printTriagemCompleta(t86List[0], patient, {
+                      nome: patient.name, prontuario: patient.prontuario, dataNascimento: patient.dateOfBirth,
+                      dataAplicacao: abcEntrada.createdAt, tipo: abcEntrada.tipo, marcados: abcEntrada.respostas,
+                      observacoes: abcEntrada.observacoes, profissional: abcEntrada.professionalName || t86List[0].responsavel,
+                      responsavel: patient.guardianName,
+                    }, { tipo: t86List.length > 1 ? "Reavaliação" : "Triagem inicial" })}>
+                      <Printer className="w-4 h-4" /> Arquivo único (Triagem + ABC)
+                    </Button>
+                  );
+                })()}
                 {t86List.length > 1 && (
                   <p className="text-xs text-muted-foreground">
                     Anteriores (imprimir):{" "}
@@ -1073,7 +1087,7 @@ export default function PatientDetail() {
                                 onClick={() => patient && printAbcChecklist({
                                   nome: patient.name, prontuario: patient.prontuario, dataNascimento: patient.dateOfBirth,
                                   dataAplicacao: a.createdAt, tipo: a.tipo, marcados: a.respostas,
-                                  observacoes: a.observacoes, profissional: a.professionalName,
+                                  observacoes: a.observacoes, profissional: a.professionalName, responsavel: patient.guardianName,
                                 })}
                               >
                                 <Printer className="w-3.5 h-3.5" /> Imprimir checklist
@@ -1286,6 +1300,7 @@ export default function PatientDetail() {
               patientName={patient.name}
               patientProntuario={patient.prontuario}
               patientDateOfBirth={patient.dateOfBirth}
+              patientGuardianName={patient.guardianName}
               initialRespostas={abcForm.base}
               professionalId={getProfessionalSession()?.professionalId ?? null}
               professionalName={getProfessionalSession()?.professionalName ?? null}

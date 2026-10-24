@@ -26,7 +26,9 @@ import {
 import { hasAdminScope, getProfessionalSession } from "@/lib/portal-session";
 import { AbcNivelBadge, AbcChecklistForm } from "@/components/AbcChecklistForm";
 import { Triagem86Form } from "@/components/Triagem86";
-import { ABC_NIVEL_INFO } from "@/lib/abc-checklist";
+import { ABC_NIVEL_INFO, printAbcChecklist, type AbcPrintInput } from "@/lib/abc-checklist";
+import { encaminharTriagem86, type SaveTriagem86Result, type Triagem86 } from "@/lib/triagem-86-rpc";
+import { printTriagem86, printTriagemCompleta } from "@/lib/print-triagem-86";
 import { listBuscaAtivaAtual } from "@/lib/busca-ativa";
 
 const STATUS_OPTIONS = [
@@ -135,6 +137,8 @@ export default function Patients() {
   const [abcTriagem, setAbcTriagem] = useState<Patient | null>(null);
   const [wizardTriagem, setWizardTriagem] = useState<Patient | null>(null);
   const [abcNoWizard, setAbcNoWizard] = useState(false);
+  const [wizardT86, setWizardT86] = useState<Triagem86 | null>(null);
+  const [finalizacao, setFinalizacao] = useState<{ pat: Patient; t86: Triagem86; res: SaveTriagem86Result | null; abc: AbcAvaliacao | null } | null>(null);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [patientProfs, setPatientProfs] = useState<Map<number, { names: string[]; count: number }>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
@@ -511,9 +515,31 @@ export default function Patients() {
     avancarParaAbc(pat);
   };
 
+  // Fim do fluxo do cadastro (Triagem → ABC): encaminha às 3 especialidades com maior pontuação.
+  const concluirFluxo = async (pat: Patient, t86: Triagem86, abc: AbcAvaliacao | null) => {
+    setWizardT86(null);
+    try {
+      const res = await encaminharTriagem86(t86.id);
+      if (res.addedToQueue) {
+        setPatients(prev => prev.map(p => p.id === pat.id && p.status !== "Atendimento" ? { ...p, status: "Fila de Espera" } : p));
+      }
+      setFinalizacao({ pat, t86: res.triagem, res, abc });
+    } catch (err: any) {
+      toast({ title: "Não foi possível encaminhar à fila", description: err?.message || "Tente novamente.", variant: "destructive" });
+      setFinalizacao({ pat, t86, res: null, abc });
+    }
+  };
+
+  const abcPrintInput = (pat: Patient, a: AbcAvaliacao, aplicador?: string | null): AbcPrintInput => ({
+    nome: pat.name, prontuario: pat.prontuario, dataNascimento: pat.dateOfBirth, dataAplicacao: a.createdAt,
+    tipo: a.tipo, marcados: a.respostas, observacoes: a.observacoes,
+    profissional: a.professionalName || aplicador || null, responsavel: pat.guardianName,
+  });
+
   const handleAbcSaved = async (a: AbcAvaliacao) => {
     const pat = abcTriagem;
     if (!pat) return;
+    const t86 = abcNoWizard ? wizardT86 : null;
     setAbcByPatient(prev => {
       const next = new Map(prev);
       const cur = next.get(pat.id);
@@ -528,6 +554,7 @@ export default function Patients() {
     });
     fecharAbc();
     toast({ title: "Triagem ABC salva", description: `${a.scoreTotal} pontos — ${ABC_NIVEL_INFO[a.nivel].label}` });
+    if (t86) { await concluirFluxo(pat, t86, a); return; }
     try {
       const r = await enqueueAfterAbcEntrada(pat, a);
       if (r.status === "adicionado") {
@@ -770,12 +797,12 @@ export default function Patients() {
               patientId={wizardTriagem.id}
               patient={wizardTriagem}
               editarDados={false}
-              onCancel={() => avancarParaAbc(wizardTriagem)}
+              enfileirar={false}
+              resumoAoSalvar={false}
+              onCancel={() => { setWizardT86(null); avancarParaAbc(wizardTriagem); }}
               onSaved={(res) => {
-                if (res.addedToQueue && res.addedSpecialties?.length) {
-                  setPatients(prev => prev.map(p => p.id === wizardTriagem.id && p.status !== "Atendimento" ? { ...p, status: "Fila de Espera" } : p));
-                }
-                toast({ title: res.addedToQueue ? "Triagem salva e paciente na fila!" : "Triagem salva", description: res.addedSpecialties?.length ? `Fila: ${res.addedSpecialties.join(", ")} · Etapa 3: Avaliação ABC.` : "Etapa 3: Avaliação ABC." });
+                setWizardT86(res.triagem);
+                toast({ title: "Triagem Multidisciplinar salva", description: "Etapa 3: Avaliação ABC." });
                 avancarParaAbc(wizardTriagem);
               }}
             />
@@ -791,7 +818,9 @@ export default function Patients() {
           <MotionCard className="w-full max-w-3xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             {abcNoWizard && <CadastroEtapas atual={3} />}
             <p className="text-xs text-muted-foreground mb-4">
-              Ao salvar, o paciente entra automaticamente na <strong>Fila de Espera</strong>, ordenado pelo grau de impacto.
+              {abcNoWizard && wizardT86
+                ? <>Ao salvar, as triagens são concluídas e o paciente entra na <strong>Fila de Espera</strong> das 3 especialidades com maior pontuação da Triagem Multidisciplinar.</>
+                : <>Ao salvar, o paciente entra automaticamente na <strong>Fila de Espera</strong>, ordenado pelo grau de impacto.</>}
             </p>
             <AbcChecklistForm
               key={`abc-${abcTriagem.id}`}
@@ -800,15 +829,74 @@ export default function Patients() {
               patientName={abcTriagem.name}
               patientProntuario={abcTriagem.prontuario}
               patientDateOfBirth={abcTriagem.dateOfBirth}
+              patientGuardianName={abcTriagem.guardianName}
               professionalId={getProfessionalSession()?.professionalId ?? null}
               professionalName={getProfessionalSession()?.professionalName ?? null}
-              saveLabel="Salvar triagem e colocar na fila"
-              onCancel={fecharAbc}
+              saveLabel={abcNoWizard && wizardT86 ? "Salvar ABC e concluir" : "Salvar triagem e colocar na fila"}
+              onCancel={() => {
+                const pat = abcTriagem, t86 = abcNoWizard ? wizardT86 : null;
+                fecharAbc();
+                if (t86) void concluirFluxo(pat, t86, null);
+              }}
               onSaved={(a) => { void handleAbcSaved(a); }}
             />
           </MotionCard>
         </div>
       )}
+
+      {finalizacao && (() => {
+        const { pat, t86, res, abc } = finalizacao;
+        const areas = res?.encaminhamento?.areas ?? [];
+        const abcIn = abc ? abcPrintInput(pat, abc, t86.responsavel) : null;
+        return (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+            <MotionCard className="w-full max-w-2xl p-6 my-4 space-y-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+              <div>
+                <CadastroEtapas atual={4} />
+                <h2 className="text-xl font-bold font-display mb-1">Finalização</h2>
+                <p className="text-sm text-muted-foreground">{pat.prontuario ? `${pat.prontuario} · ` : ""}{pat.name}</p>
+              </div>
+              {res ? (
+                <div className="rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-4 space-y-1">
+                  <p className="font-bold text-emerald-600 dark:text-emerald-400">
+                    {res.addedSpecialties?.length ? "Triagens concluídas e paciente encaminhado à fila" : "Triagens concluídas"}
+                  </p>
+                  <p className="text-sm">
+                    {res.addedSpecialties?.length ? `Entrou na fila de: ${res.addedSpecialties.join(", ")}.` : ""}
+                    {res.existingSpecialties?.length ? ` Já estava na fila de: ${res.existingSpecialties.join(", ")} (data de entrada mantida).` : ""}
+                    {res.reason === "no_eligible_specialties" ? "Nenhuma especialidade com 9 pontos ou mais: não entrou na fila. A Administração pode incluir pela Fila de Espera." : ""}
+                    {res.reason === "blocked_status" ? "Situação do cadastro não permite entrar na fila (censo, alta, óbito ou desistência)." : ""}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-4 space-y-2">
+                  <p className="font-bold text-red-500">Não foi possível encaminhar à fila.</p>
+                  <Button size="sm" onClick={() => void concluirFluxo(pat, t86, abc)}>Tentar de novo</Button>
+                </div>
+              )}
+              {areas.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {areas.map(a => (
+                    <div key={a.especialidade} className={cn("rounded-lg border p-2", a.encaminhada ? "border-primary bg-primary/10" : "border-border")}>
+                      <p className="text-xs font-semibold">{a.especialidade}</p>
+                      <p className="text-lg font-bold">{a.pontos}<span className="text-xs text-muted-foreground">/30</span></p>
+                      <p className={cn("text-[10px] font-bold uppercase", a.encaminhada ? "text-primary" : "text-muted-foreground")}>{a.encaminhada ? "Encaminhada à fila" : "Avaliada"}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-sm">{abc ? `Triagem ABC: ${abc.scoreTotal} pontos — ${ABC_NIVEL_INFO[abc.nivel].label}.` : "Triagem ABC não aplicada: pode ser feita depois pelo prontuário."}</p>
+              <p className="text-xs text-muted-foreground">Imprima e colete, no termo de ciência de cada triagem, a assinatura da mãe/responsável e do aplicador.</p>
+              <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+                <Button className="gap-2" onClick={() => printTriagem86(t86, pat, { tipo: "Triagem inicial" })}><Printer className="w-4 h-4" /> PDF Triagem Multidisciplinar</Button>
+                {abcIn && <Button variant="outline" className="gap-2" onClick={() => printAbcChecklist(abcIn)}><Printer className="w-4 h-4" /> PDF Triagem ABC</Button>}
+                {abcIn && <Button variant="outline" className="gap-2" onClick={() => printTriagemCompleta(t86, pat, abcIn, { tipo: "Triagem inicial" })}><Printer className="w-4 h-4" /> Arquivo único (as duas)</Button>}
+                <Button variant="ghost" onClick={() => setFinalizacao(null)}>Concluir</Button>
+              </div>
+            </MotionCard>
+          </div>
+        );
+      })()}
 
       {isDialogOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1049,7 +1137,7 @@ export default function Patients() {
   );
 }
 
-const CADASTRO_ETAPAS = ["Dados do paciente", "Triagem Multidisciplinar", "Avaliação ABC"];
+const CADASTRO_ETAPAS = ["Dados do paciente", "Triagem Multidisciplinar", "Avaliação ABC", "Finalização"];
 
 function CadastroEtapas({ atual }: { atual: number }) {
   return (

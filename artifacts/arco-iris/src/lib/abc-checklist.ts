@@ -1,3 +1,5 @@
+import { termoCienciaHtml } from "./termo-ciencia";
+
 /**
  * ABC — Autism Behavior Checklist, versão brasileira. Mesmo protocolo do app
  * NFs – Triagem (artifacts/triagem): 57 itens com peso 1–4 e explicação
@@ -158,6 +160,8 @@ export type AbcPrintInput = {
   marcados: Iterable<number>;
   observacoes?: string | null;
   profissional?: string | null;
+  /** Mãe / responsável (termo de ciência). */
+  responsavel?: string | null;
 };
 
 function escHtml(s: string): string {
@@ -171,8 +175,8 @@ function fmtData(d?: string | null): string {
   return isNaN(dt.getTime()) ? d : dt.toLocaleDateString("pt-BR");
 }
 
-/** Abre a folha de impressão do Checklist ABC (mesmo layout do app NFs – Triagem). */
-export function printAbcChecklist(input: AbcPrintInput): void {
+/** Folha do Checklist ABC: título, CSS e corpo (sem a barra de botões). */
+export function abcChecklistDoc(input: AbcPrintInput): { titulo: string; css: string; corpo: string } {
   const set = new Set(input.marcados);
   const scores = calcAbcScores(set);
   const nivel = ABC_NIVEL_INFO[scores.nivel];
@@ -204,8 +208,8 @@ export function printAbcChecklist(input: AbcPrintInput): void {
       <th style="width:50px;text-align:center">✔</th>
     </tr></thead><tbody>${lista.map(i => itemRow(i, on)).join("")}</tbody></table>`;
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ABC - ${escHtml(input.nome || "Paciente")}</title>
-  <style>
+  const titulo = `ABC - ${escHtml(input.nome || "Paciente")}`;
+  const css = `
     @page { size: A4; margin: 15mm; }
     body { font-family: 'Segoe UI', Tahoma, sans-serif; color: #1f2937; margin: 0; padding: 20px; }
     .header { text-align: center; border-bottom: 3px solid #1e40af; padding-bottom: 16px; margin-bottom: 20px; }
@@ -225,11 +229,8 @@ export function printAbcChecklist(input: AbcPrintInput): void {
     .toolbar button { padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; border: 1px solid #cbd5e1; background: #f1f5f9; color: #334155; }
     .toolbar button.primary { background: #1e40af; color: #fff; border-color: #1e40af; }
     @media print { body { padding: 0; } .toolbar { display: none; } }
-  </style></head><body>
-  <div class="toolbar">
-    <button onclick="window.close()">← Voltar ao Sistema</button>
-    <button class="primary" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
-  </div>
+  `;
+  const corpo = `
   <div class="header">
     <h1>NFS – Gestão Terapêutica</h1>
     <p>Avaliação multidisciplinar para crianças e adolescentes</p>
@@ -266,15 +267,29 @@ export function printAbcChecklist(input: AbcPrintInput): void {
   ${tabela("✔ Itens Marcados", marcados, true)}
   ${tabela("Itens Não Marcados", naoMarcados, false, "#9ca3af")}
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:48px;page-break-inside:avoid;break-inside:avoid">
-    <div style="text-align:center"><div style="border-bottom:1px solid #111827;height:36px"></div><p style="margin:4px 0 0;font-size:11px;font-weight:700;color:#374151">Assinatura da mãe / responsável</p></div>
-    <div style="text-align:center"><div style="border-bottom:1px solid #111827;height:36px"></div><p style="margin:4px 0 0;font-size:11px;font-weight:700;color:#374151">Assinatura do profissional${input.profissional ? ` · ${escHtml(input.profissional)}` : ""}</p></div>
-  </div>
+  <div style="margin-top:28px">${termoCienciaHtml({
+    triagem: "Triagem ABC", paciente: input.nome, prontuario: input.prontuario,
+    responsavel: input.responsavel, aplicador: input.profissional, data: fmtData(input.dataAplicacao ?? new Date().toISOString()),
+  })}</div>
 
   <div class="footer">
     <p>${ABC_DISCLAIMER}</p>
     <p style="margin-top:6px">© ${new Date().getFullYear()} NFS – Gestão Terapêutica · Gerado em ${new Date().toLocaleString("pt-BR")}</p>
   </div>
+  `;
+  return { titulo, css, corpo };
+}
+
+/** Abre a folha de impressão do Checklist ABC (mesmo layout do app NFs – Triagem). */
+export function printAbcChecklist(input: AbcPrintInput): void {
+  const { titulo, css, corpo } = abcChecklistDoc(input);
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo}</title>
+  <style>${css}</style></head><body>
+  <div class="toolbar">
+    <button onclick="window.close()">← Voltar ao Sistema</button>
+    <button class="primary" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
+  </div>
+${corpo}
   </body></html>`;
 
   const w = window.open("", "_blank");
