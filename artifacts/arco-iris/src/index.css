@@ -380,9 +380,26 @@
 /* ═══════════════════════════════════════════
    FUNDO PERSONALIZADO — cartões levemente translúcidos sobre a foto
    ═══════════════════════════════════════════ */
+/* Vidro fosco: a foto aparece suavemente atrás dos cartões */
 .has-app-bg .bg-card {
-  background-color: hsl(var(--card) / 0.86);
+  background-color: hsl(var(--card) / 0.72);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  border-color: hsl(var(--card-border) / 0.7);
+  box-shadow: 0 8px 32px -12px rgba(2, 8, 30, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
+:root.light .has-app-bg .bg-card {
+  background-color: hsl(var(--card) / 0.80);
+  box-shadow: 0 8px 28px -14px rgba(15, 30, 80, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+:root.light .has-app-bg {
+  background-blend-mode: normal;
+}
+.kpi-card {
+  border-radius: 1rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.kpi-card:hover { transform: translateY(-2px); }
 .has-app-bg .bg-background {
   background-color: hsl(var(--background) / 0.6);
 }
