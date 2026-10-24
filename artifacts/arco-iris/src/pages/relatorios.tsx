@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { capacidadeMax } from "@/lib/indicadores";
 import { format, startOfMonth, subMonths } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { BarChart3, Printer } from "lucide-react";
@@ -54,7 +55,7 @@ export default function Relatorios() {
     const filaC = fila.filter((w) => esp === "__all__" || w.specialty === esp);
     const filaAtiva = filaC.filter((w) => !w.paused);
     const capC = cap.filter((c) => !isTransportSpecialty(c.specialty) && (esp === "__all__" || c.specialty === esp));
-    const capMax = capC.reduce((s, c) => s + (c.maxPatients || (c.cargaHoraria?.startsWith("20") ? 25 : 35)), 0);
+    const capMax = capC.reduce((s, c) => s + capacidadeMax(c), 0);
     const capCur = capC.reduce((s, c) => s + c.currentPatients, 0);
     const porEsp: Record<string, { atendidas: Set<number>; fila: number; espera: number[] }> = {};
     for (const a of aptsC) {
@@ -79,7 +80,7 @@ export default function Relatorios() {
       cancelados: aptsC.filter((a) => CANCELADO.has(st(a))).length,
       reagendados: aptsC.filter((a) => REAGENDADO.has(st(a))).length,
       ocupacao: capMax > 0 ? Math.round((capCur / capMax) * 100) : 0,
-      vagas: capC.reduce((s, c) => s + Math.max(0, (c.maxPatients || (c.cargaHoraria?.startsWith("20") ? 25 : 35)) - c.currentPatients), 0),
+      vagas: capC.reduce((s, c) => s + Math.max(0, capacidadeMax(c) - c.currentPatients), 0),
       prioritarios: filaAtiva.filter((w) => w.prioridadeMaxima).length,
       aguardando: filaAtiva.length,
       esperaMedia: esperas.length ? Math.round(esperas.reduce((s, d) => s + d, 0) / esperas.length) : 0,

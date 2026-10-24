@@ -12,7 +12,7 @@ import {
 } from "@/lib/arco-rpc";
 import { isTransportSpecialty, SPECIALTIES } from "@/lib/specialty-colors";
 import {
-  type PeriodKind, periodRange, shiftPeriod, resumoAgenda, dedupeApts, statusOf, capacidadeMax, hojeISO, fmtPct, NAO_AVALIADO,
+  type PeriodKind, periodRange, shiftPeriod, resumoAgenda, dedupeApts, statusOf, capacidadeMax, abaixoDaMeta, CAPACIDADE_META, hojeISO, fmtPct, NAO_AVALIADO,
   ST_REALIZADO, ST_FALTA, ST_AGENDA_ATIVA, ST_PACIENTE_ENCERRADO, ST_PACIENTE_VINCULO,
 } from "@/lib/indicadores";
 
@@ -154,7 +154,7 @@ export default function PainelGestao() {
       origem: "Faltas não justificadas (Ausente) até hoje. Justificadas/abonadas não entram e aparecem embaixo." },
     { icon: ListTodo, label: "Fila de espera", value: v(fila ? filaAtiva.length : null, false), sub: filaCongelados > 0 ? `+${filaCongelados} congelados à parte` : "aguardando vaga", tone: "#fb923c",
       origem: "Pacientes ativos na fila (mesmo número da página Fila de Espera). Congelados não entram. Filtro por especialidade." },
-    { icon: DoorOpen, label: "Vagas", value: v(cap ? vagas : null, false), sub: `ocupação ${fmtPct(ocupacao)}`, tone: "#a78bfa",
+    { icon: DoorOpen, label: "Vagas", value: v(cap ? vagas : null, false), sub: `ocupação ${fmtPct(ocupacao)}${cap ? ` · ${abaixoDaMeta(capF)} abaixo de ${CAPACIDADE_META}` : ""}`, tone: "#a78bfa",
       origem: "Soma, por profissional, de capacidade − pacientes com agenda ativa (capacidade padrão 25 p/ 20h e 35 p/ 30/40h). Ocupação = pacientes ÷ capacidade." },
     { icon: Snowflake, label: "Pacientes pausados", value: v(pausedItems ? pausedItems.length : null, false), sub: pausedItems ? `${pausedItems.filter((i) => i.source === "fila").length} fila · ${pausedItems.filter((i) => i.source === "agenda").length} agenda` : "", tone: "#67e8f9",
       origem: "Pausas ativas na fila (congelados) e na agenda, da mesma lista da página Pausados / Busca Ativa." },

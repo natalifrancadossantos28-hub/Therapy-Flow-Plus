@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { capacidadeMax } from "@/lib/indicadores";
 import {
   listPatients,
   listProfessionals,
@@ -234,7 +235,7 @@ export default function Dashboard() {
     listProfessionalsCapacity()
       .then((rows) => {
         const mapped: Ocupacao[] = rows.filter((r) => !isTransportSpecialty(r.specialty)).map((r) => {
-          const max = r.maxPatients || (r.cargaHoraria.startsWith("20") ? 25 : 35);
+          const max = capacidadeMax(r);
           const cur = r.currentPatients;
           const pct = max > 0 ? Math.round((cur / max) * 100) : 0;
           let status: CapacityStatus = "poucos";

@@ -10,7 +10,7 @@ import {
 } from "@/lib/arco-rpc";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
 import { openReportWindow, escHtml } from "@/lib/print-report-shell";
-import { resumoAgenda, capacidadeMax, hojeISO, fmtPct, fmtDias, diasDesde, media, NAO_AVALIADO, type ResumoAgenda } from "@/lib/indicadores";
+import { resumoAgenda, capacidadeMax, abaixoDaMeta, CAPACIDADE_META, CAPACIDADE_MAX, hojeISO, fmtPct, fmtDias, diasDesde, media, NAO_AVALIADO, type ResumoAgenda } from "@/lib/indicadores";
 
 // Prestação de contas: só números agregados — nenhum nome, prontuário ou telefone.
 export default function PrestacaoContas() {
@@ -86,7 +86,8 @@ export default function PrestacaoContas() {
     ["Aguardando na fila (hoje)", n(filaAtiva.length)],
     ["Espera média na fila", fmtDias(esperaGeral)],
     ["Casos prioritários na fila", n(prioritarios)],
-    ["Vagas disponíveis (hoje)", n(capTotal ? vagas : null)],
+    [`Vagas disponíveis (hoje · até ${CAPACIDADE_MAX} por profissional)`, n(capTotal ? vagas : null)],
+    [`Profissionais abaixo de ${CAPACIDADE_META} pacientes`, n(capTotal ? abaixoDaMeta(capC) : null)],
     ["Ocupação da equipe (hoje)", fmtPct(capTotal ? Math.round((capUsada / capTotal) * 100) : null)],
     ["Pausas ativas (hoje)", n(pausados)],
   ];
