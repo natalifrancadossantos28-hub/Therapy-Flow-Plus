@@ -12,6 +12,8 @@ import { AREA_MAX_UI, areaToUi } from "@/lib/score-scale";
 import { AbcNivelBadge } from "@/components/AbcChecklistForm";
 import { NivelBadge } from "@/components/PrioridadeClinica";
 import { listFilaIndicadores, DECISAO_INFO, NIVEL_INFO, type FilaIndicador, type NivelPrioridade } from "@/lib/fila-indicadores";
+import { listFilaSituacoes, type FilaSituacao } from "@/lib/triagem-86-rpc";
+import { SituacaoFila } from "@/components/SituacaoFila";
 import { avsfFaixa } from "@/lib/avaliacao-sociofamiliar";
 import {
   listWaitingList,
@@ -136,6 +138,7 @@ export default function WaitingList() {
   const [filterSpecialty, setFilterSpecialty] = useState<string>("__all__");
   const [searchQuery, setSearchQuery] = useState("");
   const [indicadores, setIndicadores] = useState<Record<string, FilaIndicador>>({});
+  const [situacoes, setSituacoes] = useState<FilaSituacao[]>([]);
   const [filterNivel, setFilterNivel] = useState<"__all__" | NivelPrioridade | "sem">("__all__");
   // Saída do paciente (Alta / Desistência / Óbito) direto pela fila.
   const [saidaTarget, setSaidaTarget] = useState<WaitingListEntry | null>(null);
@@ -162,6 +165,7 @@ export default function WaitingList() {
 
       const [wl, ps] = await Promise.all([listWaitingList(), listPatients()]);
       listFilaIndicadores().then(setIndicadores).catch(() => {});
+      listFilaSituacoes().then(setSituacoes).catch(() => {});
 
       // Regra de faixa etária: remove automaticamente da fila os pacientes acima
       // de 11 anos (continuam cadastrados normalmente). Best-effort: se a exclusão
@@ -876,9 +880,14 @@ export default function WaitingList() {
                               {faixa
                                 ? <span className="text-[11px] font-semibold" style={{ color: faixa.color }} title="Indicador social experimental: não muda a fila">Social: {faixa.short}</span>
                                 : <span className="text-[11px] text-muted-foreground">Social: —</span>}
-                              <span className="text-[11px] font-semibold" style={{ color: val ? DECISAO_INFO[val].color : "#f59e0b" }}>
-                                {val ? DECISAO_INFO[val].label : "Demanda não validada"}
-                              </span>
+                              {val && (
+                                <span className="text-[11px] font-semibold" style={{ color: DECISAO_INFO[val].color }}>{DECISAO_INFO[val].label}</span>
+                              )}
+                              <SituacaoFila
+                                waitingListId={entry.id}
+                                historico={situacoes.filter((s) => s.waitingListId === entry.id || (s.patientId === entry.patientId && s.specialty === entry.specialty))}
+                                onSaved={(s) => setSituacoes((prev) => [s, ...prev])}
+                              />
                               <details className="text-[11px] text-muted-foreground">
                                 <summary className="cursor-pointer text-primary font-semibold">Por que nesta posição?</summary>
                                 <ol className="list-decimal pl-4 mt-1 space-y-0.5 max-w-[240px]">

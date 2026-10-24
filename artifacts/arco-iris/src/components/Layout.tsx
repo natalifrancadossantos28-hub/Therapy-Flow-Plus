@@ -25,6 +25,7 @@ const NAV_GROUPS: NavGroup[] = ["Gestão", "Atendimento", "Organização", "Admi
 const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, scopes: ["admin"], group: "Gestão" },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3, scopes: ["admin"], group: "Gestão" },
+  { href: "/simulacao-fila", label: "Simulação da fila", icon: BarChart3, scopes: ["admin"], group: "Gestão" },
   { href: "/professionals", label: "Profissionais", icon: UserRound, scopes: ["admin"], group: "Administração" },
   { href: "/patients", label: "Pacientes", icon: Users, scopes: ["admin", "reception"], group: "Atendimento" },
   { href: "/reception", label: "Recepção", icon: ClipboardList, scopes: ["admin", "reception"], group: "Atendimento" },

@@ -71,7 +71,7 @@ export function TriagemValidacaoPanel({ patientId, areas, historico, origem = "t
           );
         })}
       </div>
-      <p className="text-[11px] text-muted-foreground mt-3">Por enquanto, a inclusão automática na fila continua como hoje. A validação fica registrada e aparece na Fila de Espera.</p>
+      <p className="text-[11px] text-muted-foreground mt-3">A criança entra na fila automaticamente pela triagem. Este registro é feito pelo profissional na avaliação, depois da convocação, e fica no histórico.</p>
     </div>
   );
 }
