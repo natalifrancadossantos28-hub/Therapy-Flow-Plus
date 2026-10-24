@@ -196,7 +196,7 @@ export function AvaliacaoSociofamiliarCard({
   historico, onNova,
 }: {
   historico: AvaliacaoSociofamiliar[];
-  onNova: () => void;
+  onNova?: () => void;
 }) {
   const ultima = historico[0] ?? null;
   return (
@@ -213,7 +213,7 @@ export function AvaliacaoSociofamiliarCard({
             </p>
           </div>
         </div>
-        <Button size="sm" onClick={onNova}>{ultima ? "Nova avaliação" : "Fazer avaliação"}</Button>
+        {onNova && <Button size="sm" onClick={onNova}>{ultima ? "Nova avaliação" : "Fazer avaliação"}</Button>}
       </div>
 
       {ultima ? (

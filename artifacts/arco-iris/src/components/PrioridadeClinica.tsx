@@ -17,7 +17,7 @@ export function NivelBadge({ nivel, emergencia }: { nivel: NivelPrioridade; emer
   );
 }
 
-export function PrioridadeClinicaCard({ historico, onNova }: { historico: PrioridadeClinica[]; onNova: () => void }) {
+export function PrioridadeClinicaCard({ historico, onNova }: { historico: PrioridadeClinica[]; onNova?: () => void }) {
   const atual = historico[0];
   return (
     <div className="rounded-2xl border border-border bg-card p-6">
@@ -29,7 +29,7 @@ export function PrioridadeClinicaCard({ historico, onNova }: { historico: Priori
             <p className="text-xs text-muted-foreground">Considera gravidade, riscos e limitações funcionais, não só o diagnóstico.</p>
           </div>
         </div>
-        <Button size="sm" onClick={onNova}>{atual ? "Nova classificação" : "Classificar"}</Button>
+        {onNova && <Button size="sm" onClick={onNova}>{atual ? "Nova classificação" : "Classificar"}</Button>}
       </div>
       {atual ? (
         <div className="space-y-2">

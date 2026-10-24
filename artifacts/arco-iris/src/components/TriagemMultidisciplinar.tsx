@@ -236,9 +236,9 @@ export function TriagemMultiResultado({ triagem, patient, compact }: { triagem: 
 
           {/* Perfil por área */}
           <div className="rounded-2xl border border-border/60 p-5 bg-card">
-            <h4 className="font-bold text-base mb-1">Teia de Aranha – Perfil Multidisciplinar</h4>
+            <h4 className="font-bold text-base mb-1">Perfil Multidisciplinar</h4>
             <p className="text-muted-foreground mb-3">Percentual de indicativo por área avaliada</p>
-            {!compact && <GraficoRadar porArea={r.porArea} />}
+            {!compact && <div className="no-print"><GraficoRadar porArea={r.porArea} /></div>}
             <div className="grid grid-cols-3 md:grid-cols-5 gap-2 mt-3">
               {r.porArea.map(({ area, pct, nivel }) => (
                 <div key={area} className={cn("text-center p-2 rounded-xl border", nivel.bg)}>

@@ -266,6 +266,11 @@ export function printAbcChecklist(input: AbcPrintInput): void {
   ${tabela("✔ Itens Marcados", marcados, true)}
   ${tabela("Itens Não Marcados", naoMarcados, false, "#9ca3af")}
 
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:48px;page-break-inside:avoid;break-inside:avoid">
+    <div style="text-align:center"><div style="border-bottom:1px solid #111827;height:36px"></div><p style="margin:4px 0 0;font-size:11px;font-weight:700;color:#374151">Assinatura da mãe / responsável</p></div>
+    <div style="text-align:center"><div style="border-bottom:1px solid #111827;height:36px"></div><p style="margin:4px 0 0;font-size:11px;font-weight:700;color:#374151">Assinatura do profissional${input.profissional ? ` · ${escHtml(input.profissional)}` : ""}</p></div>
+  </div>
+
   <div class="footer">
     <p>${ABC_DISCLAIMER}</p>
     <p style="margin-top:6px">© ${new Date().getFullYear()} NFS – Gestão Terapêutica · Gerado em ${new Date().toLocaleString("pt-BR")}</p>
