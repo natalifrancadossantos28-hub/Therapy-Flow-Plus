@@ -10,6 +10,9 @@ import { PatientAvatar } from "@/components/PatientAvatar";
 import { supabase } from "@/lib/supabase";
 import { AREA_MAX_UI, areaToUi } from "@/lib/score-scale";
 import { AbcNivelBadge } from "@/components/AbcChecklistForm";
+import { NivelBadge } from "@/components/PrioridadeClinica";
+import { listFilaIndicadores, DECISAO_INFO, NIVEL_INFO, type FilaIndicador, type NivelPrioridade } from "@/lib/fila-indicadores";
+import { avsfFaixa } from "@/lib/avaliacao-sociofamiliar";
 import {
   listWaitingList,
   deleteWaitingListEntry,
@@ -95,6 +98,28 @@ const waitTone = (days: number) =>
   : days >= 90 ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/40"
   : "text-muted-foreground bg-secondary/40 border-border";
 
+// Explica a posição com as mesmas regras da ordenação do servidor (0119).
+function motivoPosicao(e: WaitingListEntry): string[] {
+  const m: string[] = [];
+  if (e.prioridadeMaxima) m.push(`Prioridade Máxima${e.prioridadeMaximaRazao ? `: ${e.prioridadeMaximaRazao}` : ""} — fica no topo.`);
+  if (e.demandaPrioritaria) m.push(`Demanda prioritária pelo diagnóstico/CID (${e.demandaPrioritaria}) — logo após a Prioridade Máxima.`);
+  if (e.ordenacao === "chegada") {
+    m.push("Nesta especialidade a fila segue a ordem de chegada (a pontuação não muda a posição).");
+  } else {
+    const base = e.scoreEspecialidade != null ? `${areaToUi(e.scoreEspecialidade)}/${AREA_MAX_UI} na especialidade` : `${e.scoreTotal150 ?? 0}/150 (score geral)`;
+    const extras = [
+      e.ageBonus ? `+${e.ageBonus} idade` : "",
+      e.bonusTrabalho ? `+${e.bonusTrabalho} trabalho dos pais` : "",
+      e.scoreSocialDesempate ? `+${e.scoreSocialDesempate} escola pública` : "",
+      e.atendeFora ? `−${e.penalidadeFora ?? 5} já atende fora` : "",
+      e.abcTotal ? `ABC ${e.abcTotal} pts somado` : "",
+    ].filter(Boolean).join(", ");
+    m.push(`Pontuação: ${base}${extras ? ` (${extras})` : ""}. Maior pontuação fica na frente.`);
+  }
+  m.push(`Empate: quem entrou primeiro (${formatDate(e.entryDate)}).`);
+  return m;
+}
+
 export default function WaitingList() {
   useDocumentTitle("Fila de Espera");
   const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
@@ -110,6 +135,8 @@ export default function WaitingList() {
   const [manualSearch, setManualSearch] = useState("");
   const [filterSpecialty, setFilterSpecialty] = useState<string>("__all__");
   const [searchQuery, setSearchQuery] = useState("");
+  const [indicadores, setIndicadores] = useState<Record<string, FilaIndicador>>({});
+  const [filterNivel, setFilterNivel] = useState<"__all__" | NivelPrioridade | "sem">("__all__");
   // Saída do paciente (Alta / Desistência / Óbito) direto pela fila.
   const [saidaTarget, setSaidaTarget] = useState<WaitingListEntry | null>(null);
   const [saidaTipo, setSaidaTipo] = useState<"Alta" | "Desistência" | "Óbito">("Alta");
@@ -134,6 +161,7 @@ export default function WaitingList() {
       try { await syncWaitingListWithAgenda(); } catch { /* silencioso */ }
 
       const [wl, ps] = await Promise.all([listWaitingList(), listPatients()]);
+      listFilaIndicadores().then(setIndicadores).catch(() => {});
 
       // Regra de faixa etária: remove automaticamente da fila os pacientes acima
       // de 11 anos (continuam cadastrados normalmente). Best-effort: se a exclusão
@@ -511,6 +539,10 @@ export default function WaitingList() {
       const prontuario = (entry.patientProntuario ?? "").toLowerCase();
       if (!name.includes(normalizedQuery) && !prontuario.includes(normalizedQuery)) return false;
     }
+    if (filterNivel !== "__all__") {
+      const nv = indicadores[String(entry.patientId)]?.prioridade?.nivel;
+      if (filterNivel === "sem" ? !!nv : nv !== filterNivel) return false;
+    }
     if (filterSpecialty === "__all__") return true;
     const sp: string = entry.specialty ?? "__null__";
     return sp === filterSpecialty;
@@ -566,6 +598,18 @@ export default function WaitingList() {
             (ex.: paralisia cerebral, física e visual na Fisio/T.O.; auditiva na Fono; intelectual e TEA na Psico/T.O.), logo depois da Prioridade Máxima.
           </span>
         </div>
+        <select
+          value={filterNivel}
+          onChange={e => setFilterNivel(e.target.value as typeof filterNivel)}
+          aria-label="Filtrar por prioridade clínica"
+          className="cursor-pointer font-bold text-xs rounded-full px-4 py-2 border-2 border-rose-400/50 bg-rose-500/5 text-rose-300 outline-none"
+        >
+          <option value="__all__" style={{ background: "#0f172a", color: "#e2e8f0" }}>Prioridade clínica: todas</option>
+          {(Object.keys(NIVEL_INFO) as NivelPrioridade[]).map(n => (
+            <option key={n} value={n} style={{ background: "#0f172a", color: "#e2e8f0" }}>{NIVEL_INFO[n].label}</option>
+          ))}
+          <option value="sem" style={{ background: "#0f172a", color: "#e2e8f0" }}>Sem classificação</option>
+        </select>
         {specialtyOptions.length > 0 && (
           <div className="relative">
             <select
@@ -696,6 +740,7 @@ export default function WaitingList() {
                 <th className="px-6 py-4">Paciente</th>
                 <th className="px-6 py-4">Especialidade</th>
                 <th className="px-6 py-4">Prioridade</th>
+                <th className="px-6 py-4">Indicadores</th>
                 <th className="px-6 py-4">Score</th>
                 <th className="px-6 py-4">Entrada</th>
                 <th className="px-6 py-4">Espera</th>
@@ -704,10 +749,10 @@ export default function WaitingList() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={8} className="text-center py-12 animate-pulse">Carregando fila...</td></tr>
+                <tr><td colSpan={9} className="text-center py-12 animate-pulse">Carregando fila...</td></tr>
               ) : activeList.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-16">
+                  <td colSpan={9} className="text-center py-16">
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                       <ListTodo className="w-8 h-8 text-muted-foreground" />
                     </div>
@@ -717,7 +762,7 @@ export default function WaitingList() {
                 </tr>
               ) : displayList.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={9} className="text-center py-12 text-muted-foreground">
                     {normalizedQuery ? "Nenhum paciente encontrado" : "Nenhum paciente nesta especialidade."}
                   </td>
                 </tr>
@@ -816,6 +861,33 @@ export default function WaitingList() {
                             ⏱ ordem de chegada
                           </div>
                         )}
+                      </td>
+                      <td className="px-6 py-4 align-top">
+                        {(() => {
+                          const ind = indicadores[String(entry.patientId)];
+                          const val = entry.specialty ? ind?.validacoes?.[entry.specialty] : undefined;
+                          const faixa = ind?.social ? avsfFaixa(ind.social.score, ind.social.scoreMax) : null;
+                          const motivos = motivoPosicao(entry);
+                          return (
+                            <div className="flex flex-col gap-1 items-start min-w-[150px]">
+                              {ind?.prioridade
+                                ? <NivelBadge nivel={ind.prioridade.nivel} emergencia={ind.prioridade.emergencia} />
+                                : <span className="text-[11px] text-muted-foreground">Prioridade clínica: —</span>}
+                              {faixa
+                                ? <span className="text-[11px] font-semibold" style={{ color: faixa.color }} title="Indicador social experimental: não muda a fila">Social: {faixa.short}</span>
+                                : <span className="text-[11px] text-muted-foreground">Social: —</span>}
+                              <span className="text-[11px] font-semibold" style={{ color: val ? DECISAO_INFO[val].color : "#f59e0b" }}>
+                                {val ? DECISAO_INFO[val].label : "Demanda não validada"}
+                              </span>
+                              <details className="text-[11px] text-muted-foreground">
+                                <summary className="cursor-pointer text-primary font-semibold">Por que nesta posição?</summary>
+                                <ol className="list-decimal pl-4 mt-1 space-y-0.5 max-w-[240px]">
+                                  {motivos.map((m) => <li key={m}>{m}</li>)}
+                                </ol>
+                              </details>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4">
                         {entry.scoreEspecialidade != null ? (
