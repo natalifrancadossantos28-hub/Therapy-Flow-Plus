@@ -50,6 +50,7 @@ import { calcularResultado as calcTriagem, parseRespostas as parseTriagem } from
 import { TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
 import { Triagem86Form, Triagem86Card } from "@/components/Triagem86";
 import { listTriagens86, type Triagem86 } from "@/lib/triagem-86-rpc";
+import { calcularResultado86, nivelArea86 } from "@/lib/triagem-86";
 import { printTriagemMulti } from "@/lib/print-triagem";
 import { printTriagem86 } from "@/lib/print-triagem-86";
 
@@ -995,24 +996,22 @@ export default function PatientDetail() {
             );
           })()}
 
-          <AvaliacaoSociofamiliarCard historico={avsfHist} onNova={() => setAvsfFormOpen(true)} />
+          {avsfHist.length > 0 && <AvaliacaoSociofamiliarCard historico={avsfHist} />}
 
-          {prioFormOpen ? (
-            <Card className="p-6">
-              <h3 className="font-bold font-display text-lg mb-3">Classificação de Prioridade Clínica</h3>
-              <PrioridadeClinicaForm patientId={patientId} onCancel={() => setPrioFormOpen(false)}
-                onSaved={(pc) => { setPrioHist((h) => [pc, ...h]); setPrioFormOpen(false); }} />
-            </Card>
-          ) : (
-            <PrioridadeClinicaCard historico={prioHist} onNova={() => setPrioFormOpen(true)} />
-          )}
+          {prioHist.length > 0 && <PrioridadeClinicaCard historico={prioHist} />}
 
-          {triagensMulti.length > 0 && (() => {
-            const t0 = triagensMulti[0];
-            const r = parseTriagem(t0.respostas);
-            if (!r) return null;
-            const res = calcTriagem(r, { tipoEscola: t0.tipoEscola, trabalhoPais: t0.trabalhoPais });
-            const areas = res.ranking.map((a) => ({ area: a.area, pontos: a.pontos, nivelLabel: a.nivel.label, sinalizada: a.pontos > 8 }));
+          {(t86List.length > 0 || triagensMulti.length > 0) && (() => {
+            let areas: { area: string; pontos: number; nivelLabel: string; sinalizada: boolean }[];
+            if (t86List[0]) {
+              const r86 = calcularResultado86(t86List[0].respostas ?? {}, t86List[0].social ?? {});
+              areas = r86.areas.map((a) => ({ area: a.area, pontos: a.pontos, nivelLabel: nivelArea86(a.pontos, a.respondidas)?.label ?? "não avaliado", sinalizada: a.pontos > 8 }));
+            } else {
+              const t0 = triagensMulti[0];
+              const r = parseTriagem(t0.respostas);
+              if (!r) return null;
+              const res = calcTriagem(r, { tipoEscola: t0.tipoEscola, trabalhoPais: t0.trabalhoPais });
+              areas = res.ranking.map((a) => ({ area: a.area, pontos: a.pontos, nivelLabel: a.nivel.label, sinalizada: a.pontos > 8 }));
+            }
             return <TriagemValidacaoPanel patientId={patientId} areas={areas} historico={validacoes}
               onSaved={(v) => setValidacoes((h) => [v, ...h])} />;
           })()}
@@ -1201,9 +1200,9 @@ export default function PatientDetail() {
       {t86Open && patient && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
           <MotionCard className="w-full max-w-4xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-            <h2 className="text-2xl font-bold font-display mb-1">Triagem multidisciplinar · 86 perguntas</h2>
+            <h2 className="text-2xl font-bold font-display mb-1">Nova Triagem</h2>
             <p className="text-sm text-muted-foreground mb-4">{patient.name}</p>
-            <Triagem86Form patientId={patient.id} onCancel={() => setT86Open(false)} onSaved={async (res) => {
+            <Triagem86Form patientId={patient.id} patient={patient} onPatientUpdated={setPatient} onCancel={() => setT86Open(false)} onSaved={async (res) => {
               setT86Open(false);
               setT86List((prev) => [res.triagem, ...prev]);
               try { const fresh = await getPatient(patientId); if (fresh) setPatient(fresh); } catch { /* mantém */ }

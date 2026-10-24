@@ -1,5 +1,4 @@
-import { ITENS_86, AREAS_86, opcoesDe, calcularResultado86, FAIXAS_RENDA, AVISO_TRIAGEM, ALERTA_RISCO, RISCO_CODES } from "@/lib/triagem-86";
-import { classificarV2 } from "@/lib/triagem-multi";
+import { ITENS_86, AREAS_86, opcoesDe, calcularResultado86, FAIXAS_RENDA, AVISO_TRIAGEM, ALERTA_RISCO, RISCO_CODES, nivelArea86, sugestoes86 } from "@/lib/triagem-86";
 import type { Triagem86 } from "@/lib/triagem-86-rpc";
 
 const esc = (s: string) =>
@@ -44,10 +43,10 @@ export function printTriagem86(t: Triagem86, p: PacienteInfo) {
   const riscos = r.prioridades.filter((x) => RISCO_CODES.includes(x.code));
 
   const areasRows = r.areas.map((a) => {
-    const n = classificarV2(a.pontos);
+    const n = nivelArea86(a.pontos, a.respondidas);
     const obs = [a.naoSei ? `${a.naoSei} não sei` : "", a.naoAplica ? `${a.naoAplica} não se aplica` : ""].filter(Boolean).join(" · ");
     return `<tr><td><b>${esc(a.area)}</b></td><td class="c"><b>${a.pontos}</b>/30</td><td class="c">${a.respondidas ? `${a.pct}%` : "não avaliado"}</td>
-      <td><span class="dot" style="background:${n.hex}"></span>${a.respondidas ? esc(n.label) : "não avaliado"}</td><td class="s">${esc(obs)}</td></tr>`;
+      <td>${n ? `<span class="dot" style="background:${n.hex}"></span>${esc(n.label)}` : "não avaliado"}</td><td class="s">${esc(obs)}</td></tr>`;
   }).join("");
 
   const respostas = [...AREAS_86, "Sociofamiliar", "Prioridades"].map((g) => {
@@ -113,6 +112,7 @@ export function printTriagem86(t: Triagem86, p: PacienteInfo) {
     <div class="box"><h3>Prioridade Clínica</h3>${r.prioridades.length ? r.prioridades.map((x) => `<p style="margin:2px 0">• ${x.code} ${esc(x.titulo)}</p>`).join("") : `<p style="margin:0;color:#6b7280">Nenhum sinal marcado</p>`}${r.prioridadesNaoSei ? `<p class="s">${r.prioridadesNaoSei} item(ns) “não sei”</p>` : ""}</div>
     <div class="box"><h3>Vulnerabilidade Social</h3>${r.social.length ? r.social.map((x) => `<p style="margin:2px 0">• ${esc(x.titulo)}${x.intensidade === "parcial" ? " (em parte)" : ""}</p>`).join("") : `<p style="margin:0;color:#6b7280">Nenhuma barreira marcada</p>`}${r.socialNaoInformado ? `<p class="s">${r.socialNaoInformado} preferiu(ram) não informar</p>` : ""}</div>
   </div>
+  <div class="box"><h3>Sugestões de Encaminhamento</h3>${sugestoes86(r).filter((x) => x !== ALERTA_RISCO).map((x) => `<p style="margin:2px 0">• ${esc(x)}</p>`).join("")}<p class="s" style="margin:6px 0 0">Sugestões orientativas: a equipe técnica valida cada especialidade.</p></div>
   <div class="box"><h3>Respostas</h3><div class="resps">${respostas}</div></div>
   <div class="nota"><p style="margin:0 0 4px;font-weight:700">Nota Técnica</p><p style="margin:0">${esc(AVISO_TRIAGEM)} Os resultados indicam possíveis necessidades e servem como apoio para encaminhamento para avaliação especializada.</p></div>
   <div class="footer">NFS – Gestão Terapêutica · Documento gerado em ${esc(new Date().toLocaleDateString("pt-BR"))}</div>

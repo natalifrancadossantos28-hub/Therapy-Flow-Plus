@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, AlertTriangle, Info, Printer } from "lucide-react";
+import { upsertPatient, type Patient } from "@/lib/arco-rpc";
+import { printTriagem86 } from "@/lib/print-triagem-86";
 import { Button, Card, Input } from "@/components/ui-custom";
 import { cn } from "@/lib/utils";
 import {
   ITENS_86, AREAS_86, opcoesDe, calcularResultado86, FAIXAS_RENDA, BENEFICIOS,
-  AVISO_TRIAGEM, ALERTA_RISCO, RISCO_CODES, type Respostas86, type Social86, type Item86, type Resultado86,
+  AVISO_TRIAGEM, ALERTA_RISCO, RISCO_CODES, sugestoes86, type Respostas86, type Social86, type Item86, type Resultado86,
 } from "@/lib/triagem-86";
 import { saveTriagem86, type SaveTriagem86Result, type Triagem86 } from "@/lib/triagem-86-rpc";
 
@@ -27,7 +29,7 @@ function ItemRow({ it, value, onChange }: { it: Item86; value?: string; onChange
         {opcoesDe(it).map((o) => (
           <button key={o.valor} type="button" onClick={() => onChange(o.valor)}
             className={cn("px-2.5 py-1 rounded-lg text-xs border transition-colors",
-              value === o.valor ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted")}>
+              value === o.valor ? corOpcao(it, o.valor) : "border-border hover:bg-muted")}>
             {o.label}
           </button>
         ))}
@@ -87,79 +89,186 @@ export function Triagem86Card({ t, onPrint }: { t: Triagem86; onPrint?: () => vo
   );
 }
 
-export function Triagem86Form({ patientId, onSaved, onCancel }: {
-  patientId: number; onSaved: (r: SaveTriagem86Result) => void; onCancel: () => void;
+const corOpcao = (it: Item86, v: string) => {
+  if (v === "ns" || v === "na" || v === "pni") return "bg-slate-500 text-white border-slate-500";
+  if (it.tipo === "clinica") return ["bg-emerald-500 border-emerald-500", "bg-blue-500 border-blue-500", "bg-amber-500 border-amber-500", "bg-rose-500 border-rose-500"][Number(v)] + " text-white";
+  if (v === "sim" || v === "ninguem") return "bg-rose-500 text-white border-rose-500";
+  if (v === "as_vezes") return "bg-amber-500 text-white border-amber-500";
+  return "bg-emerald-500 text-white border-emerald-500";
+};
+
+type Dados = Pick<Patient, "dateOfBirth" | "cpf" | "cns" | "guardianName" | "guardianPhone" | "phone" | "address" | "motherName" | "fatherName" | "diagnosis">;
+const DADOS_CAMPOS: { k: keyof Dados; l: string; type?: string }[] = [
+  { k: "dateOfBirth", l: "Data de nascimento", type: "date" }, { k: "cpf", l: "CPF" }, { k: "cns", l: "Cartão SUS" },
+  { k: "guardianName", l: "Responsável" }, { k: "guardianPhone", l: "Telefone do responsável" }, { k: "phone", l: "Telefone" },
+  { k: "motherName", l: "Nome da mãe" }, { k: "fatherName", l: "Nome do pai" }, { k: "address", l: "Endereço" }, { k: "diagnosis", l: "Diagnóstico" },
+];
+
+/**
+ * Triagem única: dados do paciente → 7 especialidades → sociofamiliar →
+ * prioridades → resultado/sugestões → Finalizar → Imprimir. Usa a Triagem 86
+ * (save_triagem_86). A avaliação ABC continua separada.
+ */
+export function Triagem86Form({ patientId, patient, editarDados = true, onPatientUpdated, onSaved, onCancel }: {
+  patientId: number; patient?: Patient | null; editarDados?: boolean; onPatientUpdated?: (p: Patient) => void;
+  onSaved: (r: SaveTriagem86Result) => void; onCancel: () => void;
 }) {
+  const comDados = !!patient && editarDados;
+  const etapas = [...(comDados ? ["Dados do paciente"] : []), ...GRUPOS, "Resultado"];
+  const [etapa, setEtapa] = useState(0);
   const [resp, setResp] = useState<Respostas86>({});
   const [social, setSocial] = useState<Social86>({});
-  const [grupo, setGrupo] = useState<string>(GRUPOS[0]);
+  const [dados, setDados] = useState<Dados>(() => Object.fromEntries(DADOS_CAMPOS.map(({ k }) => [k, patient?.[k] ?? ""])) as Dados);
   const [responsavel, setResponsavel] = useState("");
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [salvo, setSalvo] = useState<{ res: SaveTriagem86Result; paciente: Patient | null } | null>(null);
   const r = useMemo(() => calcularResultado86(resp, social), [resp, social]);
+  const grupo = etapas[etapa];
   const itens = ITENS_86.filter((i) => i.grupo === grupo);
   const falta = (g: string) => ITENS_86.filter((i) => i.grupo === g && r.faltando.includes(i.code)).length;
+  const irPara = (n: number) => { setEtapa(n); setErro(null); document.getElementById("triagem-unica-topo")?.scrollIntoView({ behavior: "smooth" }); };
 
-  const salvar = async () => {
+  const finalizar = async () => {
     if (!responsavel.trim()) { setErro("Informe quem preencheu a triagem."); return; }
     if (r.faltando.length) { setErro(`Faltam ${r.faltando.length} perguntas: ${r.faltando.slice(0, 6).join(", ")}${r.faltando.length > 6 ? "…" : ""}`); return; }
     setSaving(true); setErro(null);
-    try { onSaved(await saveTriagem86(patientId, resp, social, responsavel.trim())); }
-    catch (e) { setErro(e instanceof Error ? e.message : "Erro ao salvar. A migração 0128 já foi aplicada?"); }
+    try {
+      let pac: Patient | null = patient ?? null;
+      if (patient && comDados && DADOS_CAMPOS.some(({ k }) => (dados[k] || null) !== (patient[k] || null))) {
+        const d = (k: keyof Dados) => (dados[k] as string)?.trim() || null;
+        pac = await upsertPatient(patient.id, {
+          name: patient.name, prontuario: patient.prontuario, entryDate: patient.entryDate, email: patient.email,
+          trabalhoPais: patient.trabalhoPais, localAtendimento: patient.localAtendimento, outroAtendimento: patient.outroAtendimento,
+          notes: patient.notes, photoUrl: patient.photoUrl,
+          dateOfBirth: d("dateOfBirth"), cpf: d("cpf"), cns: d("cns"), phone: d("phone"), address: d("address"),
+          motherName: d("motherName"), fatherName: d("fatherName"), guardianName: d("guardianName"),
+          guardianPhone: d("guardianPhone"), diagnosis: d("diagnosis"),
+        });
+        onPatientUpdated?.(pac);
+      }
+      const res = await saveTriagem86(patientId, resp, social, responsavel.trim());
+      setSalvo({ res, paciente: pac });
+    } catch (e) { setErro(e instanceof Error ? e.message : "Erro ao salvar."); }
     finally { setSaving(false); }
   };
 
+  if (salvo) {
+    const { res, paciente } = salvo;
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-4">
+          <p className="font-bold text-emerald-400">Triagem finalizada e salva.</p>
+          <p className="text-sm text-muted-foreground">{res.addedSpecialties?.length ? `Incluída na fila: ${res.addedSpecialties.join(", ")}.` : res.reason === "all_already_queued" ? "Já estava nas filas cabíveis; notas atualizadas." : "Notas por área atualizadas."}</p>
+        </div>
+        <Resultado86View r={r} />
+        <Sugestoes r={r} />
+        <div className="flex flex-wrap gap-2">
+          {paciente && <Button className="gap-2" onClick={() => printTriagem86(res.triagem, paciente)}><Printer className="w-4 h-4" /> Imprimir relatório</Button>}
+          <Button variant="outline" onClick={() => onSaved(res)}>Concluir</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">{AVISO_TRIAGEM} Clique no título para ver a explicação simples. A avaliação ABC continua separada.</p>
+    <div className="space-y-4" id="triagem-unica-topo">
+      <p className="text-xs text-muted-foreground">{AVISO_TRIAGEM} Responda de 0 a 3 (0 = nunca, 3 = sempre). Clique no título para ver a explicação simples. A avaliação ABC continua separada.</p>
       <div className="flex flex-wrap gap-1.5">
-        {GRUPOS.map((g) => (
-          <button key={g} type="button" onClick={() => setGrupo(g)}
-            className={cn("px-3 py-1.5 rounded-full text-xs font-semibold border",
-              grupo === g ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted")}>
-            {g} {falta(g) > 0 ? <span className="opacity-70">({falta(g)})</span> : "✓"}
-          </button>
-        ))}
+        {etapas.map((g, n) => {
+          const f = GRUPOS.includes(g as typeof GRUPOS[number]) ? falta(g) : 0;
+          return (
+            <button key={g} type="button" onClick={() => irPara(n)}
+              className={cn("px-3 py-1.5 rounded-full text-xs font-semibold border",
+                etapa === n ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted")}>
+              {n + 1}. {g} {GRUPOS.includes(g as typeof GRUPOS[number]) ? (f > 0 ? <span className="opacity-70">({f})</span> : "✓") : null}
+            </button>
+          );
+        })}
       </div>
-      <div className="space-y-2">
-        {itens.map((it) => it.code === "S01" ? (
-          <div key={it.code} className="rounded-xl border border-border p-3 space-y-2">
-            <p className="text-sm"><b className="font-mono text-primary text-[11px] mr-2">S01</b><b>{it.titulo}</b> — {it.simples}</p>
-            <div className="flex flex-wrap gap-2 items-center">
-              <Input type="number" min={1} max={30} className="w-32" placeholder="Moradores" value={social.moradores ?? ""}
-                onChange={(e) => setSocial((s) => ({ ...s, moradores: e.target.value ? Number(e.target.value) : null }))} />
-              {FAIXAS_RENDA.map((o) => (
-                <button key={o.valor} type="button" onClick={() => setSocial((s) => ({ ...s, renda: o.valor }))}
-                  className={cn("px-2.5 py-1 rounded-lg text-xs border", social.renda === o.valor ? "bg-primary text-primary-foreground border-primary" : "border-border")}>{o.label}</button>
-              ))}
-            </div>
+
+      {grupo === "Dados do paciente" && patient && (
+        <div className="rounded-xl border border-border p-4 space-y-3">
+          <p className="text-sm"><b>{patient.name}</b>{patient.prontuario ? ` · Prontuário ${patient.prontuario}` : ""}</p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {DADOS_CAMPOS.map(({ k, l, type }) => (
+              <label key={k} className={cn("text-xs font-semibold text-muted-foreground space-y-1", k === "address" && "sm:col-span-2")}>
+                <span>{l}</span>
+                <Input type={type ?? "text"} value={(dados[k] as string) ?? ""} onChange={(e) => setDados((d) => ({ ...d, [k]: e.target.value }))} />
+              </label>
+            ))}
           </div>
-        ) : it.code === "S02" ? (
-          <div key={it.code} className="rounded-xl border border-border p-3 space-y-2">
-            <p className="text-sm"><b className="font-mono text-primary text-[11px] mr-2">S02</b><b>{it.titulo}</b> — {it.simples}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {[["sim", "Sim"], ["nao", "Não"], ["pni", "Prefere não informar"]].map(([v, l]) => (
-                <button key={v} type="button" onClick={() => setSocial((s) => ({ ...s, beneficio: v }))}
-                  className={cn("px-2.5 py-1 rounded-lg text-xs border", social.beneficio === v ? "bg-primary text-primary-foreground border-primary" : "border-border")}>{l}</button>
-              ))}
-              {social.beneficio === "sim" && BENEFICIOS.map((b) => (
-                <button key={b} type="button" onClick={() => setSocial((s) => ({ ...s, beneficioTipo: b }))}
-                  className={cn("px-2.5 py-1 rounded-lg text-xs border", social.beneficioTipo === b ? "bg-emerald-600 text-white border-emerald-600" : "border-border")}>{b}</button>
-              ))}
+          <p className="text-[11px] text-muted-foreground">As alterações são gravadas no cadastro ao finalizar a triagem.</p>
+        </div>
+      )}
+
+      {grupo === "Resultado" ? (
+        <div className="space-y-4">
+          <Resultado86View r={r} />
+          <Sugestoes r={r} />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {itens.map((it) => it.code === "S01" ? (
+            <div key={it.code} className="rounded-xl border border-border p-3 space-y-2">
+              <p className="text-sm"><b className="font-mono text-primary text-[11px] mr-2">S01</b><b>{it.titulo}</b> — {it.simples}</p>
+              <div className="flex flex-wrap gap-2 items-center">
+                <Input type="number" min={1} max={30} className="w-32" placeholder="Moradores" value={social.moradores ?? ""}
+                  onChange={(e) => setSocial((s) => ({ ...s, moradores: e.target.value ? Number(e.target.value) : null }))} />
+                {FAIXAS_RENDA.map((o) => (
+                  <button key={o.valor} type="button" onClick={() => setSocial((s) => ({ ...s, renda: o.valor }))}
+                    className={cn("px-2.5 py-1 rounded-lg text-xs border", social.renda === o.valor ? "bg-primary text-primary-foreground border-primary" : "border-border")}>{o.label}</button>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <ItemRow key={it.code} it={it} value={resp[it.code]} onChange={(v) => setResp((p) => ({ ...p, [it.code]: v }))} />
-        ))}
-      </div>
-      <Card className="p-4"><p className="text-sm font-bold mb-2">Resumo (atualiza enquanto responde)</p><Resultado86View r={r} /></Card>
-      <div className="flex flex-wrap items-center gap-2">
-        <Input className="max-w-xs" placeholder="Responsável pelo preenchimento" value={responsavel} onChange={(e) => setResponsavel(e.target.value)} />
-        <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : "Salvar triagem e incluir nas filas"}</Button>
+          ) : it.code === "S02" ? (
+            <div key={it.code} className="rounded-xl border border-border p-3 space-y-2">
+              <p className="text-sm"><b className="font-mono text-primary text-[11px] mr-2">S02</b><b>{it.titulo}</b> — {it.simples}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[["sim", "Sim"], ["nao", "Não"], ["pni", "Prefere não informar"]].map(([v, l]) => (
+                  <button key={v} type="button" onClick={() => setSocial((s) => ({ ...s, beneficio: v }))}
+                    className={cn("px-2.5 py-1 rounded-lg text-xs border", social.beneficio === v ? "bg-primary text-primary-foreground border-primary" : "border-border")}>{l}</button>
+                ))}
+                {social.beneficio === "sim" && BENEFICIOS.map((b) => (
+                  <button key={b} type="button" onClick={() => setSocial((s) => ({ ...s, beneficioTipo: b }))}
+                    className={cn("px-2.5 py-1 rounded-lg text-xs border", social.beneficioTipo === b ? "bg-emerald-600 text-white border-emerald-600" : "border-border")}>{b}</button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <ItemRow key={it.code} it={it} value={resp[it.code]} onChange={(v) => setResp((p) => ({ ...p, [it.code]: v }))} />
+          ))}
+          {itens.length > 0 && AREAS_86.includes(grupo as typeof AREAS_86[number]) && (() => {
+            const a = r.areas.find((x) => x.area === grupo)!;
+            return <p className="text-sm font-semibold text-right">Pontuação {grupo}: {a.pontos}/30</p>;
+          })()}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
         <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
+        {etapa > 0 && <Button variant="outline" onClick={() => irPara(etapa - 1)}>← Voltar</Button>}
+        {grupo !== "Resultado" ? (
+          <Button onClick={() => irPara(etapa + 1)}>Próxima etapa →</Button>
+        ) : (
+          <>
+            <Input className="max-w-xs" placeholder="Responsável pelo preenchimento" value={responsavel} onChange={(e) => setResponsavel(e.target.value)} />
+            <Button onClick={finalizar} disabled={saving}>{saving ? "Salvando…" : "Finalizar Triagem"}</Button>
+          </>
+        )}
       </div>
       {erro && <p className="text-sm text-red-500">{erro}</p>}
-      <p className="text-[11px] text-muted-foreground">Ao salvar, a criança entra automaticamente nas filas das especialidades com pontuação (sem duplicar; quem já está mantém a data de entrada).</p>
+      {grupo === "Resultado" && <p className="text-[11px] text-muted-foreground">Ao finalizar, a criança entra automaticamente nas filas das especialidades com pontuação (sem duplicar; quem já está mantém a data de entrada).</p>}
+    </div>
+  );
+}
+
+function Sugestoes({ r }: { r: Resultado86 }) {
+  return (
+    <div className="rounded-xl border border-border p-3">
+      <p className="text-xs font-bold uppercase text-muted-foreground mb-1">D · Sugestões de encaminhamento</p>
+      {sugestoes86(r).filter((x) => x !== ALERTA_RISCO).map((x) => <p key={x} className="text-sm">• {x}</p>)}
+      <p className="text-[11px] text-muted-foreground mt-1">Orientativas: a equipe técnica valida cada especialidade.</p>
     </div>
   );
 }

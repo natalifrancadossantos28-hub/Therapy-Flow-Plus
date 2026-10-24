@@ -104,10 +104,10 @@ export type Opcao = { valor: string; label: string; pontos?: number };
 // Escala de frequência dos itens clínicos. "Não sei" e "Não se aplica" não
 // contam como ausência de necessidade: ficam fora da soma e são sinalizados.
 export const OPCOES_CLINICA: Opcao[] = [
-  { valor: "0", label: "Nunca", pontos: 0 },
-  { valor: "1", label: "Raramente", pontos: 1 },
-  { valor: "2", label: "Frequentemente", pontos: 2 },
-  { valor: "3", label: "Sempre", pontos: 3 },
+  { valor: "0", label: "0 · Nunca", pontos: 0 },
+  { valor: "1", label: "1 · Raramente", pontos: 1 },
+  { valor: "2", label: "2 · Frequentemente", pontos: 2 },
+  { valor: "3", label: "3 · Sempre", pontos: 3 },
   { valor: "ns", label: "Não sei informar" },
   { valor: "na", label: "Não se aplica" },
 ];
@@ -204,3 +204,26 @@ export const AVISO_TRIAGEM =
 export const ALERTA_RISCO =
   "Sinal de risco: orientar encaminhamento conforme o protocolo de saúde (urgência/rede), não apenas aguardar a fila.";
 export const RISCO_CODES = ["PR02", "PR03", "PR05"];
+
+/** Faixa por área (0–30), igual à triagem anterior: 0–8 baixa, 9–17 moderada, 18–30 alta. */
+export function nivelArea86(pontos: number, respondidas: number): { label: string; hex: string; sugerir: boolean } | null {
+  if (!respondidas) return null;
+  if (pontos <= 8) return { label: "Baixa sinalização", hex: "#10b981", sugerir: false };
+  if (pontos <= 17) return { label: "Sinalização moderada", hex: "#f59e0b", sugerir: true };
+  return { label: "Alta sinalização", hex: "#f43f5e", sugerir: true };
+}
+
+/** Sugestões de encaminhamento (orientativas; a equipe valida cada uma). */
+export function sugestoes86(r: Resultado86): string[] {
+  const out: string[] = [];
+  if (r.prioridades.some((p) => RISCO_CODES.includes(p.code))) out.push(ALERTA_RISCO);
+  const areas = r.areas
+    .map((a) => ({ a, n: nivelArea86(a.pontos, a.respondidas) }))
+    .filter((x) => x.n?.sugerir)
+    .sort((x, y) => y.a.pontos - x.a.pontos);
+  for (const { a, n } of areas) out.push(`Avaliação em ${a.area} (${a.pontos}/30 · ${n!.label.toLowerCase()}).`);
+  if (r.prioridades.length) out.push(`Avaliação técnica prioritária: ${r.prioridades.map((p) => p.titulo.toLowerCase()).join("; ")}.`);
+  if (r.social.length) out.push(`Orientar serviço social / CRAS: ${r.social.map((s) => s.titulo.toLowerCase()).join("; ")}.`);
+  if (!out.length) out.push("Sem sinalização relevante nesta triagem: seguir fluxo regular.");
+  return out;
+}
