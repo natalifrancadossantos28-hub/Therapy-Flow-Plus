@@ -47,10 +47,11 @@ import { PrioridadeClinicaCard, PrioridadeClinicaForm } from "@/components/Prior
 import { TriagemValidacaoPanel } from "@/components/TriagemValidacao";
 import { listPrioridadesClinicas, listTriagemValidacoes, type PrioridadeClinica, type TriagemValidacao } from "@/lib/fila-indicadores";
 import { calcularResultado as calcTriagem, parseRespostas as parseTriagem } from "@/lib/triagem-multi";
-import { TriagemMultiForm, TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
+import { TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
 import { Triagem86Form, Triagem86Card } from "@/components/Triagem86";
 import { listTriagens86, type Triagem86 } from "@/lib/triagem-86-rpc";
 import { printTriagemMulti } from "@/lib/print-triagem";
+import { printTriagem86 } from "@/lib/print-triagem-86";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
 // para padronizar com o restante do sistema. _calc_priority no banco continua
@@ -149,13 +150,11 @@ export default function PatientDetail() {
   const [avfForm, setAvfForm] = useState<{ tipo: AvaliacaoFuncionalTipo; specialty: string; entradaRef: AvaliacaoFuncional | null } | null>(null);
   const [avfNovaEspecialidade, setAvfNovaEspecialidade] = useState("");
   const [triagensMulti, setTriagensMulti] = useState<TriagemMulti[]>([]);
-  const [triagemMultiForm, setTriagemMultiForm] = useState<{ base: TriagemMulti | null } | null>(null);
   const [triagemMultiView, setTriagemMultiView] = useState<TriagemMulti | null>(null);
   const [t86List, setT86List] = useState<Triagem86[]>([]);
   const [t86Open, setT86Open] = useState(false);
   useEffect(() => { listTriagens86(patientId).then(setT86List).catch(() => setT86List([])); }, [patientId]);
   const triagemViewRef = useRef<HTMLDivElement>(null);
-  const triagemCompactRef = useRef<HTMLDivElement>(null);
   const [sPsicologia, setSPsicologia] = useState("");
   const [sPsicomotricidade, setSPsicomotricidade] = useState("");
   const [sFisioterapia, setSFisioterapia] = useState("");
@@ -801,12 +800,9 @@ export default function PatientDetail() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 justify-end">
-                <Button size="sm" onClick={() => setTriagemMultiForm({ base: null })} className="gap-2">
+                <Button size="sm" onClick={() => setT86Open(true)} className="gap-2">
                   <ClipboardCheck className="w-4 h-4" />
-                  {triagensMulti.length > 0 ? "Nova Triagem" : "Fazer Triagem"}
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => setT86Open(true)} className="gap-2">
-                  <ClipboardCheck className="w-4 h-4" /> Triagem 86 perguntas
+                  {t86List.length > 0 || triagensMulti.length > 0 ? "Nova Triagem" : "Fazer Triagem"}
                 </Button>
                 <Button variant="outline" size="sm" onClick={openTriagemEdit} className="gap-2">
                   <Pencil className="w-4 h-4" />
@@ -815,32 +811,30 @@ export default function PatientDetail() {
               </div>
             </div>
 
-            {t86List[0] && <div className="mb-4"><Triagem86Card t={t86List[0]} /></div>}
-            {triagensMulti.length > 0 && (
-              <div className="mb-5 space-y-3">
-                <div ref={triagemCompactRef}><TriagemMultiResultado triagem={triagensMulti[0]} patient={patient} compact /></div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setTriagemMultiView(triagensMulti[0])}>
-                    <FileText className="w-4 h-4" /> Ver completa
-                  </Button>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={() => printTriagemMulti(triagemCompactRef.current, { nome: patient.name, prontuario: patient.prontuario, data: triagensMulti[0].data || formatDate(triagensMulti[0].createdAt.slice(0, 10)) })}>
-                    <Printer className="w-4 h-4" /> Imprimir / PDF
-                  </Button>
-                  <Button variant="ghost" size="sm" className="gap-2" onClick={() => setTriagemMultiForm({ base: triagensMulti[0] })}>
-                    <Pencil className="w-4 h-4" /> Editar respostas
-                  </Button>
-                  {triagensMulti.length > 1 && (
-                    <span className="text-xs text-muted-foreground">
-                      Anteriores:{" "}
-                      {triagensMulti.slice(1).map((t) => (
-                        <button key={t.id} type="button" className="underline mr-2 hover:text-primary" onClick={() => setTriagemMultiView(t)}>
-                          {t.data || formatDate(t.createdAt.slice(0, 10))}
-                        </button>
-                      ))}
-                    </span>
-                  )}
-                </div>
+            {t86List[0] && (
+              <div className="mb-4 space-y-2">
+                <Triagem86Card t={t86List[0]} onPrint={() => printTriagem86(t86List[0], patient)} />
+                {t86List.length > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    Anteriores (imprimir):{" "}
+                    {t86List.slice(1).map((t) => (
+                      <button key={t.id} type="button" className="underline mr-2 hover:text-primary" onClick={() => printTriagem86(t, patient)}>
+                        {new Date(t.createdAt).toLocaleDateString("pt-BR")}
+                      </button>
+                    ))}
+                  </p>
+                )}
               </div>
+            )}
+            {triagensMulti.length > 0 && (
+              <p className="mb-5 text-xs text-muted-foreground">
+                Triagens do questionário anterior (ver e imprimir):{" "}
+                {triagensMulti.map((t) => (
+                  <button key={t.id} type="button" className="underline mr-2 hover:text-primary" onClick={() => setTriagemMultiView(t)}>
+                    {t.data || formatDate(t.createdAt.slice(0, 10))}
+                  </button>
+                ))}
+              </p>
             )}
 
             {triagemFeita ? (
@@ -1216,34 +1210,6 @@ export default function PatientDetail() {
               toast({ title: res.addedToQueue ? "Triagem salva e incluída na fila" : "Triagem salva",
                 description: res.addedSpecialties?.length ? `Fila: ${res.addedSpecialties.join(", ")}` : res.reason === "all_already_queued" ? "Já estava nas filas cabíveis; notas atualizadas." : "Notas por área atualizadas." });
             }} />
-          </MotionCard>
-        </div>
-      )}
-
-      {triagemMultiForm && patient && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto print:static print:p-0 print:bg-white">
-          <MotionCard className="w-full max-w-4xl p-6 my-4 print:shadow-none print:border-0" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-            <h2 className="text-2xl font-bold font-display mb-1">Triagem Multidisciplinar</h2>
-            <p className="text-sm text-muted-foreground mb-5">{patient.name} — avaliação multidisciplinar para crianças e adolescentes (0–18 anos)</p>
-            <TriagemMultiForm
-              patient={patient}
-              base={triagemMultiForm.base}
-              professionalName={getProfessionalSession()?.professionalName ?? null}
-              professionalSpecialty={getProfessionalSession()?.specialty ?? null}
-              onCancel={() => setTriagemMultiForm(null)}
-              onSaved={async (t, link) => {
-                setTriagemMultiForm(null);
-                setTriagensMulti(prev => [t, ...prev.filter(x => x.id !== t.id)]);
-                try { const fresh = await getPatient(patientId); if (fresh) setPatient(fresh); } catch { /* mantém estado atual */ }
-                if (link?.addedToQueue && link.addedSpecialties?.length) {
-                  toast({ title: "Triagem salva e paciente na fila!", description: `Fila: ${link.addedSpecialties.join(", ")}${link.priority ? ` · Prioridade: ${link.priority}` : ""}` });
-                } else if (link?.reason === "all_already_queued") {
-                  toast({ title: "Triagem salva", description: "O paciente já estava na fila; as notas por área foram atualizadas." });
-                } else {
-                  toast({ title: "Triagem salva", description: link?.reason === "blocked_status" ? "Paciente com status que não entra na fila; notas atualizadas." : "Notas por área atualizadas no prontuário." });
-                }
-              }}
-            />
           </MotionCard>
         </div>
       )}

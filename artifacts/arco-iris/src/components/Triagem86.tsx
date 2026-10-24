@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, AlertTriangle, Info } from "lucide-react";
+import { ChevronDown, AlertTriangle, Info, Printer } from "lucide-react";
 import { Button, Card, Input } from "@/components/ui-custom";
 import { cn } from "@/lib/utils";
 import {
@@ -74,11 +74,14 @@ export function Resultado86View({ r, compact }: { r: Resultado86; compact?: bool
   );
 }
 
-export function Triagem86Card({ t }: { t: Triagem86 }) {
+export function Triagem86Card({ t, onPrint }: { t: Triagem86; onPrint?: () => void }) {
   const r = useMemo(() => calcularResultado86(t.respostas, t.social ?? {}), [t]);
   return (
     <Card className="p-4">
-      <p className="text-sm font-bold mb-2">Triagem 86 · {new Date(t.createdAt).toLocaleDateString("pt-BR")}{t.responsavel ? ` · ${t.responsavel}` : ""}</p>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-sm font-bold">Triagem · {new Date(t.createdAt).toLocaleDateString("pt-BR")}{t.responsavel ? ` · ${t.responsavel}` : ""}</p>
+        {onPrint && <Button variant="outline" size="sm" className="gap-2" onClick={onPrint}><Printer className="w-4 h-4" /> Imprimir / PDF</Button>}
+      </div>
       <Resultado86View r={r} compact />
     </Card>
   );
