@@ -48,6 +48,8 @@ import { TriagemValidacaoPanel } from "@/components/TriagemValidacao";
 import { listPrioridadesClinicas, listTriagemValidacoes, type PrioridadeClinica, type TriagemValidacao } from "@/lib/fila-indicadores";
 import { calcularResultado as calcTriagem, parseRespostas as parseTriagem } from "@/lib/triagem-multi";
 import { TriagemMultiForm, TriagemMultiResultado } from "@/components/TriagemMultidisciplinar";
+import { Triagem86Form, Triagem86Card } from "@/components/Triagem86";
+import { listTriagens86, type Triagem86 } from "@/lib/triagem-86-rpc";
 import { printTriagemMulti } from "@/lib/print-triagem";
 
 // Score interno permanece em 0-360 (8 áreas × 0-45), mas exibimos em escala /150
@@ -149,6 +151,9 @@ export default function PatientDetail() {
   const [triagensMulti, setTriagensMulti] = useState<TriagemMulti[]>([]);
   const [triagemMultiForm, setTriagemMultiForm] = useState<{ base: TriagemMulti | null } | null>(null);
   const [triagemMultiView, setTriagemMultiView] = useState<TriagemMulti | null>(null);
+  const [t86List, setT86List] = useState<Triagem86[]>([]);
+  const [t86Open, setT86Open] = useState(false);
+  useEffect(() => { listTriagens86(patientId).then(setT86List).catch(() => setT86List([])); }, [patientId]);
   const triagemViewRef = useRef<HTMLDivElement>(null);
   const triagemCompactRef = useRef<HTMLDivElement>(null);
   const [sPsicologia, setSPsicologia] = useState("");
@@ -800,6 +805,9 @@ export default function PatientDetail() {
                   <ClipboardCheck className="w-4 h-4" />
                   {triagensMulti.length > 0 ? "Nova Triagem" : "Fazer Triagem"}
                 </Button>
+                <Button size="sm" variant="secondary" onClick={() => setT86Open(true)} className="gap-2">
+                  <ClipboardCheck className="w-4 h-4" /> Triagem 86 perguntas
+                </Button>
                 <Button variant="outline" size="sm" onClick={openTriagemEdit} className="gap-2">
                   <Pencil className="w-4 h-4" />
                   Notas por área
@@ -807,6 +815,7 @@ export default function PatientDetail() {
               </div>
             </div>
 
+            {t86List[0] && <div className="mb-4"><Triagem86Card t={t86List[0]} /></div>}
             {triagensMulti.length > 0 && (
               <div className="mb-5 space-y-3">
                 <div ref={triagemCompactRef}><TriagemMultiResultado triagem={triagensMulti[0]} patient={patient} compact /></div>
@@ -1194,6 +1203,22 @@ export default function PatientDetail() {
           </Card>
         </div>
       </div>
+
+      {t86Open && patient && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <MotionCard className="w-full max-w-4xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <h2 className="text-2xl font-bold font-display mb-1">Triagem multidisciplinar · 86 perguntas</h2>
+            <p className="text-sm text-muted-foreground mb-4">{patient.name}</p>
+            <Triagem86Form patientId={patient.id} onCancel={() => setT86Open(false)} onSaved={async (res) => {
+              setT86Open(false);
+              setT86List((prev) => [res.triagem, ...prev]);
+              try { const fresh = await getPatient(patientId); if (fresh) setPatient(fresh); } catch { /* mantém */ }
+              toast({ title: res.addedToQueue ? "Triagem salva e incluída na fila" : "Triagem salva",
+                description: res.addedSpecialties?.length ? `Fila: ${res.addedSpecialties.join(", ")}` : res.reason === "all_already_queued" ? "Já estava nas filas cabíveis; notas atualizadas." : "Notas por área atualizadas." });
+            }} />
+          </MotionCard>
+        </div>
+      )}
 
       {triagemMultiForm && patient && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto print:static print:p-0 print:bg-white">
