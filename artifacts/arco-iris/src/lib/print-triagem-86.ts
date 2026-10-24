@@ -143,6 +143,10 @@ export function printTriagem86(t: Triagem86, p: PacienteInfo, opts?: { tipo?: st
         : `<p class="vazio">Nenhuma barreira marcada</p>`)}
     </div>
     ${secao(icH("file"), "CONSIDERAÇÕES FINAIS", `<p class="sg">Sugestões de encaminhamento (orientativas; a equipe técnica valida):</p><ul class="sug">${sugest.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><div class="branco curto"></div>`, "cons")}
+    <div class="ass">
+      <div><span></span><p>Assinatura da mãe / responsável</p><p class="n">${esc(p.guardianName || "")}</p></div>
+      <div><span></span><p>Assinatura do aplicador</p><p class="n">${esc(t.responsavel || "")}</p></div>
+    </div>
     <div class="rod"><span>NFS – Gestão Terapêutica · gerado em ${esc(new Date().toLocaleDateString("pt-BR"))}</span><span>Página 2 de 2</span></div>
   </section>`;
 
@@ -195,6 +199,9 @@ export function printTriagem86(t: Triagem86, p: PacienteInfo, opts?: { tipo?: st
   .vazio { color: #64748b; margin: 4px 0; }
   .cons { flex: 1; display: flex; flex-direction: column; } .cons .sec-b { flex: 1; }
   .sg { margin: 2px 0; font-size: 10.5px; font-weight: 700; color: #334155; } ul.sug li { font-size: 10.5px; margin: 2px 0; }
+  .ass { display: grid; grid-template-columns: 1fr 1fr; gap: 12mm; padding: 6mm 4mm 0; break-inside: avoid; }
+  .ass span { display: block; border-bottom: 1px solid #0f172a; height: 10mm; }
+  .ass p { margin: 3px 0 0; text-align: center; font-size: 10.5px; font-weight: 700; color: #334155; } .ass p.n { font-weight: 400; color: #64748b; min-height: 12px; }
   @page { size: A4 portrait; margin: 0; }
   @media print { body { background: #fff; } .bar { display: none !important; } .page { margin: 0; break-after: page; } .page:last-child { break-after: auto; } }
 </style></head><body>
