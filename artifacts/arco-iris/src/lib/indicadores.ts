@@ -29,9 +29,13 @@ export function dedupeApts<T extends { patientId: number; professionalId: number
   });
 }
 
-/** Capacidade de pacientes do profissional (padrão 25 p/ 20h e 35 p/ 30h/40h). */
-export const capacidadeMax = (c: Pick<ProfessionalCapacity, "maxPatients" | "cargaHoraria">) =>
-  c.maxPatients || ((c.cargaHoraria || "").startsWith("20") ? 25 : 35);
+/** Regra da clínica: todo profissional atende de 30 (meta mínima) a 35 pacientes (máximo), seja 20h ou 30h. */
+export const CAPACIDADE_META = 30;
+export const CAPACIDADE_MAX = 35;
+/** Capacidade usada nas vagas/ocupação. Ignora o antigo padrão do banco (25 p/ 20h). */
+export const capacidadeMax = (_c?: Pick<ProfessionalCapacity, "maxPatients" | "cargaHoraria">) => CAPACIDADE_MAX;
+export const abaixoDaMeta = (cs: Pick<ProfessionalCapacity, "currentPatients">[]) =>
+  cs.filter((c) => c.currentPatients < CAPACIDADE_META).length;
 
 export type PeriodKind = "semana" | "mes" | "ano";
 export type Bucket = { key: string; label: string; from: string; to: string };
