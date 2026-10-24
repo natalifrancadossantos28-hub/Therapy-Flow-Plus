@@ -13,6 +13,8 @@ import { useSessionEpochGuard } from "@/lib/session-epoch";
 // ── Lazy-loaded pages (code-splitting) ──────────────────────────────────────
 const Portal = lazy(() => import("@/pages/portal"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
+const PainelGestao = lazy(() => import("@/pages/painel-gestao"));
+const PrestacaoContas = lazy(() => import("@/pages/prestacao-contas"));
 const Professionals = lazy(() => import("@/pages/professionals"));
 const ProfessionalDetail = lazy(() => import("@/pages/professional-detail"));
 const Patients = lazy(() => import("@/pages/patients"));
@@ -70,7 +72,9 @@ function Router() {
           <Layout>
             <Suspense fallback={<PageLoader />}>
               <Switch>
-                <Route path="/">{() => <AdminGuard><Dashboard /></AdminGuard>}</Route>
+                <Route path="/">{() => <AdminGuard><PainelGestao /></AdminGuard>}</Route>
+                <Route path="/dashboard-detalhes">{() => <AdminGuard><Dashboard /></AdminGuard>}</Route>
+                <Route path="/prestacao-contas">{() => <AdminGuard><PrestacaoContas /></AdminGuard>}</Route>
                 <Route path="/professionals">{() => <AdminGuard><Professionals /></AdminGuard>}</Route>
                 <Route path="/professionals/:id">{(params) => <AdminGuard><ProfessionalDetail /></AdminGuard>}</Route>
                 <Route path="/patients">{() => <AdminGuard requiredScope="reception"><Patients /></AdminGuard>}</Route>
