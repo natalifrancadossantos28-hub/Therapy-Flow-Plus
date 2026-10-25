@@ -788,7 +788,7 @@ export default function Patients() {
 
       {wizardTriagem && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
-          <MotionCard className="w-full max-w-4xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+          <MotionCard className="w-full max-w-5xl p-8 my-4 leitura-ampliada" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <CadastroEtapas atual={2} />
             <h2 className="text-xl font-bold font-display mb-1">Triagem multidisciplinar</h2>
             <p className="text-sm text-muted-foreground mb-5">{wizardTriagem.prontuario ? `${wizardTriagem.prontuario} · ` : ""}{wizardTriagem.name}</p>
@@ -815,7 +815,7 @@ export default function Patients() {
 
       {abcTriagem && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
-          <MotionCard className="w-full max-w-3xl p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+          <MotionCard className={cn("w-full max-w-3xl p-6 my-4", abcNoWizard && "max-w-5xl p-8 leitura-ampliada")} initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             {abcNoWizard && <CadastroEtapas atual={3} />}
             <p className="text-xs text-muted-foreground mb-4">
               {abcNoWizard && wizardT86
@@ -850,10 +850,10 @@ export default function Patients() {
         const abcIn = abc ? abcPrintInput(pat, abc, t86.responsavel) : null;
         return (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
-            <MotionCard className="w-full max-w-2xl p-6 my-4 space-y-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <MotionCard className="w-full max-w-5xl p-8 my-4 space-y-5 leitura-ampliada" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
               <div>
                 <CadastroEtapas atual={4} />
-                <h2 className="text-xl font-bold font-display mb-1">Finalização</h2>
+                <h2 className="text-xl font-bold font-display mb-1">Relatório e impressão</h2>
                 <p className="text-sm text-muted-foreground">{pat.prontuario ? `${pat.prontuario} · ` : ""}{pat.name}</p>
               </div>
               {res ? (
@@ -900,7 +900,7 @@ export default function Patients() {
 
       {isDialogOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <MotionCard className="w-full max-w-lg p-6 overflow-y-auto max-h-[90vh]" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+          <MotionCard className="w-full max-w-5xl p-8 overflow-y-auto max-h-[92vh] leitura-ampliada" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             {fromWhatsapp && (
               <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl text-xs font-medium"
                 style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", color: "#7c3aed" }}>
@@ -1137,28 +1137,30 @@ export default function Patients() {
   );
 }
 
-const CADASTRO_ETAPAS = ["Dados do paciente", "Triagem Multidisciplinar", "Avaliação ABC", "Finalização"];
+const CADASTRO_ETAPAS = ["Dados do paciente", "Triagem Multidisciplinar", "Avaliação ABC", "Impressão do relatório"];
 
 function CadastroEtapas({ atual }: { atual: number }) {
+  const pct = Math.round(((atual - 1) / (CADASTRO_ETAPAS.length - 1)) * 100);
   return (
-    <ol className="flex items-center gap-2 mb-4 text-xs font-semibold flex-wrap">
-      {CADASTRO_ETAPAS.map((label, i) => {
-        const n = i + 1;
-        return (
-          <li
-            key={label}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-1 rounded-full border",
-              n === atual ? "bg-primary text-primary-foreground border-primary"
-                : n < atual ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+    <div className="mb-6">
+      <ol className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {CADASTRO_ETAPAS.map((label, i) => {
+          const n = i + 1;
+          return (
+            <li key={label} className={cn(
+              "flex items-center gap-2.5 px-3 py-2.5 rounded-xl border font-semibold",
+              n === atual ? "bg-primary text-primary-foreground border-primary shadow-[0_0_14px_-4px_rgba(34,211,238,0.8)]"
+                : n < atual ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                 : "bg-secondary text-muted-foreground border-border",
-            )}
-          >
-            <span>{n}</span>
-            <span>{label}</span>
-          </li>
-        );
-      })}
-    </ol>
+            )}>
+              <span className={cn("w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-sm font-bold border",
+                n === atual ? "bg-white/20 border-white/40" : "border-current")}>{n < atual ? "✓" : n}</span>
+              <span className="text-sm leading-tight">Etapa {n}<br /><span className="font-bold">{label}</span></span>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="mt-3 h-2 rounded-full bg-secondary overflow-hidden"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} /></div>
+    </div>
   );
 }
