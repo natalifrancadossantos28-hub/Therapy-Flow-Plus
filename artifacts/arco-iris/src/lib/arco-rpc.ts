@@ -906,6 +906,15 @@ export async function getPatientPdf(id: number): Promise<PatientPdfData> {
 
 export type WaitingListEntry = {
   id: number;
+  /** 0130: alerta de risco na última Triagem 86 — passa na frente da alternância. */
+  urgente?: boolean | null;
+  /** Códigos PR01/PR02/PR03/PR05/PR08 marcados na triagem. */
+  alertaRisco?: string[] | null;
+  /** '0-5' | '6+' | null (sem data de nascimento) — grupo da alternância. */
+  grupoIdade?: string | null;
+  /** Escola particular ou terapia particular: vai pra trás dentro do grupo. */
+  particular?: boolean | null;
+  escolaParticular?: boolean | null;
   companyId: number;
   patientId: number;
   patientName: string;

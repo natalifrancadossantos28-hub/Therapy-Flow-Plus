@@ -194,7 +194,8 @@ export const AVISO_TRIAGEM =
   "A triagem é orientativa: não estabelece diagnóstico nem substitui a avaliação profissional.";
 export const ALERTA_RISCO =
   "Sinal de risco: orientar encaminhamento conforme o protocolo de saúde (urgência/rede), não apenas aguardar a fila.";
-export const RISCO_CODES = ["PR02", "PR03", "PR05"];
+/** Alerta de risco: passa na frente da alternância por idade na fila (0130). */
+export const RISCO_CODES = ["PR01", "PR02", "PR03", "PR05", "PR08"];
 
 /** Faixa por área (0–30), igual à triagem anterior: 0–8 baixa, 9–17 moderada, 18–30 alta. */
 export function nivelArea86(pontos: number, respondidas: number): { label: string; hex: string; sugerir: boolean } | null {
@@ -221,18 +222,16 @@ export function sugestoes86(r: Resultado86): string[] {
 
 /** Mínimo de pontos (0–30) para a especialidade ser encaminhada à fila. */
 export const ENCAMINHAR_MIN = 9;
-export const ENCAMINHAR_MAX = 3;
 
 /**
- * Prévia das especialidades que vão para a fila: as 3 maiores pontuações com
- * ≥ 9 pontos. Empate: maior % das respostas válidas e, depois, a ordem das
- * áreas. Mesma regra do servidor (migração 0129, `_t86_encaminhar`).
+ * Prévia das especialidades que vão para a fila: todas as áreas com ≥ 9 pontos,
+ * da maior para a menor pontuação. Mesma regra do servidor (migração 0130,
+ * `_t86_encaminhar`); bebê com menos de 2 anos também entra na Fisioterapia.
  */
 export function previaEncaminhamento86(r: Resultado86): string[] {
   return r.areas
     .map((a, i) => ({ a, i, pct: a.respondidas ? a.pontos / (a.respondidas * 3) : 0 }))
     .filter((x) => x.a.pontos >= ENCAMINHAR_MIN)
     .sort((x, y) => y.a.pontos - x.a.pontos || y.pct - x.pct || x.i - y.i)
-    .slice(0, ENCAMINHAR_MAX)
     .map((x) => x.a.area);
 }

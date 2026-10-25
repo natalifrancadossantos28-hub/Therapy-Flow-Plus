@@ -100,13 +100,28 @@ const waitTone = (days: number) =>
   : days >= 90 ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/40"
   : "text-muted-foreground bg-secondary/40 border-border";
 
-// Explica a posição com as mesmas regras da ordenação do servidor (0119).
+// Explica a posição com as mesmas regras da ordenação do servidor (0130).
+const RISCO_LABEL: Record<string, string> = {
+  PR01: "perda de habilidades", PR02: "autoagressão", PR03: "agressão a outros",
+  PR05: "alimentação/deglutição", PR08: "desregulação intensa",
+};
 function motivoPosicao(e: WaitingListEntry): string[] {
   const m: string[] = [];
-  if (e.prioridadeMaxima) m.push(`Prioridade Máxima${e.prioridadeMaximaRazao ? `: ${e.prioridadeMaximaRazao}` : ""} — fica no topo.`);
+  if (e.urgente) {
+    m.push(`Urgência — alerta de risco na triagem (${(e.alertaRisco ?? []).map((c) => RISCO_LABEL[c] ?? c).join(", ")}): passa na frente da alternância.`);
+  } else if (e.grupoIdade) {
+    m.push(`Alternância por idade: grupo ${e.grupoIdade === "0-5" ? "primeira infância (0–5 anos)" : "6 anos ou mais"}. A fila chama 1 de 0–5 e 1 de 6+.`);
+  } else {
+    m.push("Sem data de nascimento: fica depois da alternância por idade.");
+  }
+  if (e.prioridadeMaxima) {
+    const r = e.prioridadeMaximaRazao === "bebe_fisio" ? "bebê < 2 anos (estimulação precoce)" : e.prioridadeMaximaRazao;
+    m.push(`Prioridade Máxima${r ? `: ${r}` : ""} — primeiro dentro do grupo de idade.`);
+  }
   if (e.demandaPrioritaria) m.push(`Demanda prioritária pelo diagnóstico/CID (${e.demandaPrioritaria}) — logo após a Prioridade Máxima.`);
+  if (e.particular) m.push("Escola particular ou terapia particular: vai pra trás dentro do grupo.");
   if (e.ordenacao === "chegada") {
-    m.push("Nesta especialidade a fila segue a ordem de chegada (a pontuação não muda a posição).");
+    m.push("Dentro do grupo segue a ordem de chegada (a pontuação não muda a posição).");
   } else {
     const base = e.scoreEspecialidade != null ? `${areaToUi(e.scoreEspecialidade)}/${AREA_MAX_UI} na especialidade` : `${e.scoreTotal150 ?? 0}/150 (score geral)`;
     const extras = [
@@ -116,7 +131,7 @@ function motivoPosicao(e: WaitingListEntry): string[] {
       e.atendeFora ? `−${e.penalidadeFora ?? 5} já atende fora` : "",
       e.abcTotal ? `ABC ${e.abcTotal} pts somado` : "",
     ].filter(Boolean).join(", ");
-    m.push(`Pontuação: ${base}${extras ? ` (${extras})` : ""}. Maior pontuação fica na frente.`);
+    m.push(`Pontuação: ${base}${extras ? ` (${extras})` : ""}. Maior pontuação fica na frente dentro do grupo.`);
   }
   m.push(`Empate: quem entrou primeiro (${formatDate(e.entryDate)}).`);
   return m;
@@ -589,17 +604,14 @@ export default function WaitingList() {
           <span className="text-muted-foreground">→</span>
           <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">VERDE – Baixo</span>
           <span className="w-full text-[11px] text-muted-foreground">
-            Em toda especialidade a ordem é: <strong>Prioridade Máxima</strong> (abrigo / idade na Fono e Fisio) →
-            <strong>demanda prioritária</strong> pelo diagnóstico/CID → o resto.
-            No "resto", <strong>Fonoaudiologia</strong> e <strong>Fisioterapia</strong> usam a pontuação (nota da triagem + Checklist ABC, as cores acima);
-            as demais especialidades seguem a <strong>ordem de chegada</strong>. Quem está sem triagem fica como "Baixo" e entra pela data.
+            Em toda especialidade: <strong>Urgência</strong> (alerta de risco da triagem: perda de habilidades, autoagressão,
+            agressão a outros, alimentação/deglutição, desregulação intensa) → depois a fila <strong>alterna 1 criança de 0–5 anos e 1 de 6 anos ou mais</strong>
+            (se um grupo acabar, segue o outro; sem data de nascimento fica no fim).
           </span>
           <span className="w-full text-[11px] text-muted-foreground">
-            Pais <strong>desempregados</strong> somam +10 pontos e trabalho <strong>informal/roça</strong> +5.
-            Quem já atende no <strong>particular</strong> perde 10 pontos, o bônus de idade e a Prioridade Máxima por idade;
-            quem atende no <strong>CAPS/Reabilitação</strong> perde só 5 pontos. Abrigo mantém Prioridade Máxima.
-            Pelo diagnóstico/CID, quem tem <strong>deficiência</strong> passa na frente na especialidade que mais precisa
-            (ex.: paralisia cerebral, física e visual na Fisio/T.O.; auditiva na Fono; intelectual e TEA na Psico/T.O.), logo depois da Prioridade Máxima.
+            Dentro de cada grupo de idade: <strong>Prioridade Máxima</strong> (abrigo; na Fisio, bebê com menos de 2 anos ou idade &lt; 5 com demanda de Fisio na triagem) →
+            <strong>demanda prioritária</strong> pelo diagnóstico/CID → o resto. Quem estuda em <strong>escola particular</strong> ou faz <strong>terapia particular</strong> vai pra trás.
+            A <strong>Fisioterapia</strong> usa a pontuação (triagem + Checklist ABC); as demais, inclusive a Fono, seguem a <strong>ordem de chegada</strong>.
           </span>
         </div>
         <select
@@ -850,7 +862,7 @@ export default function WaitingList() {
                         {entry.atendeFora && (
                           <div
                             title={entry.atendeForaTipo === "particular"
-                              ? "Já faz atendimento particular: −10 pontos, sem bônus de idade e sem Prioridade Máxima por idade."
+                              ? "Já faz atendimento particular: vai pra trás dentro do grupo de idade."
                               : `Já atende na rede pública${entry.localAtendimento ? ` (${entry.localAtendimento})` : ""}: −5 pontos, mantém a prioridade.`}
                             className="mt-1 text-[11px] font-bold text-amber-500"
                           >
