@@ -17,7 +17,7 @@ export type Triagem86 = {
   encaminhamento?: Encaminhamento86 | null;
 };
 
-/** Registro do encaminhamento à fila (migração 0129): 3 maiores pontuações com ≥ 9 pontos. */
+/** Registro do encaminhamento à fila (migração 0130): todas as áreas com ≥ 9 pontos (+ Fisio para bebê < 2 anos). */
 export type Encaminhamento86 = {
   em: string; origem: string; criterio: string;
   areas: { especialidade: string; pontos: number; respondidas: number; encaminhada: boolean }[];
