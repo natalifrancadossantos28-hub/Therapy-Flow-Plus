@@ -120,7 +120,7 @@ const DADOS_CAMPOS: { k: keyof Dados; l: string; type?: string }[] = [
 ];
 
 /**
- * Triagem única: dados do paciente → 7 especialidades → sociofamiliar →
+ * Triagem única: dados do paciente → 6 especialidades → sociofamiliar →
  * prioridades → resultado/sugestões → Finalizar → Imprimir. Usa a Triagem 86
  * (save_triagem_86). A avaliação ABC continua separada.
  */
