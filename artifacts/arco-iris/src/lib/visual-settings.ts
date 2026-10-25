@@ -7,10 +7,13 @@ import { getCompanySession } from "./portal-session";
 
 const BASE = import.meta.env.BASE_URL;
 
-export type GalleryCategory = "inc" | "sau" | "inf" | "tec" | "amb" | "abs";
+export type GalleryCategory = "inc" | "sau" | "inf" | "tec" | "amb" | "abs" | "ter" | "hos" | "pai";
 
 export const GALLERY_CATEGORIES: Array<{ id: GalleryCategory | "all" | "own"; label: string }> = [
   { id: "all", label: "Todas" },
+  { id: "ter", label: "Área terapêutica" },
+  { id: "hos", label: "Hospitalar" },
+  { id: "pai", label: "Paisagens" },
   { id: "inc", label: "Inclusão e diversidade" },
   { id: "sau", label: "Saúde e reabilitação" },
   { id: "inf", label: "Desenvolvimento infantil" },
@@ -35,12 +38,53 @@ export const BUILTIN_IMAGES: BuiltinImage[] = [
   { id: "abstrato-azul", name: "Degradê azul", cat: "abs" },
   { id: "abstrato-lilas", name: "Degradê lilás", cat: "abs" },
   { id: "abstrato-suave", name: "Degradê suave", cat: "abs" },
+  { id: "ter-fono", name: "Sala de fonoaudiologia", cat: "ter" },
+  { id: "ter-psico", name: "Sala de psicologia infantil", cat: "ter" },
+  { id: "ter-to", name: "Sala de terapia ocupacional", cat: "ter" },
+  { id: "ter-fisio", name: "Fisioterapia infantil", cat: "ter" },
+  { id: "ter-psicomot", name: "Sala de psicomotricidade", cat: "ter" },
+  { id: "ter-sensorial", name: "Sala sensorial", cat: "ter" },
+  { id: "ter-integracao", name: "Integração sensorial", cat: "ter" },
+  { id: "ter-tatame", name: "Tatame terapêutico", cat: "ter" },
+  { id: "ter-brinquedos", name: "Brinquedos terapêuticos", cat: "ter" },
+  { id: "ter-musica", name: "Musicoterapia", cat: "ter" },
+  { id: "ter-aquatica", name: "Hidroterapia", cat: "ter" },
+  { id: "ter-edfisica", name: "Educação física adaptada", cat: "ter" },
+  { id: "ter-nutri", name: "Consultório de nutrição", cat: "ter" },
+  { id: "ter-psicoped", name: "Sala de psicopedagogia", cat: "ter" },
+  { id: "ter-jardim", name: "Jardim terapêutico", cat: "ter" },
+  { id: "hosp-recepcao", name: "Recepção hospitalar", cat: "hos" },
+  { id: "hosp-corredor", name: "Corredor do hospital", cat: "hos" },
+  { id: "hosp-consultorio", name: "Consultório médico", cat: "hos" },
+  { id: "hosp-pediatria", name: "Consultório pediátrico", cat: "hos" },
+  { id: "hosp-espera", name: "Sala de espera", cat: "hos" },
+  { id: "hosp-enfermaria", name: "Enfermaria", cat: "hos" },
+  { id: "hosp-equipamentos", name: "Equipamentos de saúde", cat: "hos" },
+  { id: "hosp-laboratorio", name: "Laboratório", cat: "hos" },
+  { id: "hosp-fachada", name: "Fachada da unidade de saúde", cat: "hos" },
+  { id: "hosp-noite", name: "Hospital à noite", cat: "hos" },
+  { id: "hosp-farmacia", name: "Farmácia", cat: "hos" },
+  { id: "hosp-reabilitacao", name: "Centro de reabilitação", cat: "hos" },
+  { id: "hosp-ambulatorio", name: "Ambulatório", cat: "hos" },
+  { id: "hosp-estetoscopio", name: "Estetoscópio", cat: "hos" },
+  { id: "hosp-janela", name: "Quarto com vista", cat: "hos" },
+  { id: "pai-praia", name: "Praia ao amanhecer", cat: "pai" },
+  { id: "pai-montanhas", name: "Montanhas", cat: "pai" },
+  { id: "pai-campo", name: "Campo verde", cat: "pai" },
+  { id: "pai-lago", name: "Lago sereno", cat: "pai" },
+  { id: "pai-ceu", name: "Céu estrelado", cat: "pai" },
+  { id: "pai-floresta", name: "Floresta", cat: "pai" },
+  { id: "pai-cachoeira", name: "Cachoeira", cat: "pai" },
+  { id: "pai-flores", name: "Campo de flores", cat: "pai" },
+  { id: "pai-nuvens", name: "Céu com nuvens", cat: "pai" },
+  { id: "pai-por-do-sol", name: "Pôr do sol", cat: "pai" },
 ];
 
 export const DEFAULT_REF = "builtin:clinica";
 export const DEFAULT_VEIL = 45;
 
 export const builtinUrl = (id: string) => `${BASE}images/fundos/${id}.jpg`;
+export const builtinThumbUrl = (id: string) => `${BASE}images/fundos/thumbs/${id}.jpg`;
 
 export type VisualOrder = "seq" | "random" | "week";
 export type VisualConfig = {
