@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Users, Hourglass, CalendarClock, CheckCircle2, XCircle, DoorOpen, ShieldAlert, Stethoscope } from "lucide-react";
 import type { Patient, Professional, WaitingListEntry } from "@/lib/arco-rpc";
 import { listFilaIndicadores, type FilaIndicador } from "@/lib/fila-indicadores";
+import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 type Apt = { professionalId: number; status: string; date?: string };
 type Ocup = { specialty: string; pacientesAtivos: number; capacidade: number };
@@ -23,7 +24,7 @@ export function DashboardKpis(props: {
   useEffect(() => { listFilaIndicadores().then(setInd).catch(() => {}); }, []);
 
   const profSpec = useMemo(() => new Map(props.professionals.map((p) => [p.id, p.specialty ?? ""])), [props.professionals]);
-  const especialidades = useMemo(() => Array.from(new Set(props.professionals.map((p) => p.specialty).filter(Boolean) as string[])).sort(), [props.professionals]);
+  const especialidades = useMemo(() => Array.from(new Set(props.professionals.map((p) => p.specialty).filter((s): s is string => !!s && !isTransportSpecialty(s)))).sort(), [props.professionals]);
   const situacoes = useMemo(() => Array.from(new Set(props.patients.map((p) => p.status).filter(Boolean) as string[])).sort(), [props.patients]);
 
   const k = useMemo(() => {

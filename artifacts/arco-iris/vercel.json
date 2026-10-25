@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ../../lib ../../package.json ../../pnpm-lock.yaml ../../pnpm-workspace.yaml ../../tsconfig.base.json ../../tsconfig.json",
   "buildCommand": "cd ../.. && pnpm install && pnpm --filter @workspace/arco-iris build",
   "outputDirectory": "dist",
   "installCommand": "cd ../.. && pnpm install",
