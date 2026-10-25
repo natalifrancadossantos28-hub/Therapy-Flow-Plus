@@ -9,6 +9,9 @@ const esc = (s: string) =>
 type PacienteInfo = {
   name: string; prontuario?: string | null; dateOfBirth?: string | null; cpf?: string | null; cns?: string | null;
   guardianName?: string | null; phone?: string | null; address?: string | null;
+  guardianPhone?: string | null; motherName?: string | null; fatherName?: string | null; diagnosis?: string | null;
+  outroAtendimento?: boolean | null; localAtendimento?: string | null; escolaPublica?: boolean | null;
+  trabalhoPais?: string | null; abrigoCasaCrianca?: boolean | null;
 };
 
 const fmtData = (iso?: string | null) => (iso ? new Date(iso.length <= 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("pt-BR") : "");
@@ -78,148 +81,139 @@ function grafico(areas: { area: string; pontos: number; respondidas: number }[])
 function triagem86Doc(t: Triagem86, p: PacienteInfo, opts?: { tipo?: string }): { titulo: string; css: string; paginas: string } {
   const r = calcularResultado86(t.respostas ?? {}, t.social ?? {});
   const criado = new Date(t.createdAt);
+  const avaliadas = r.areas.filter((a) => a.respondidas);
+  const max = avaliadas.length * 30 || 210;
   const totalPts = r.areas.reduce((s, a) => s + a.pontos, 0);
-  const pctTotal = Math.round((totalPts / 210) * 100);
+  const pctTotal = Math.round((totalPts / max) * 100);
   const riscos = r.prioridades.filter((x) => RISCO_CODES.includes(x.code));
-  const sugTodas = sugestoes86(r).filter((x) => x !== ALERTA_RISCO);
-  const sugAreas = sugTodas.filter((x) => x.startsWith("Avaliação em "));
-  const sugest = [
-    ...(sugAreas.length ? [`Avaliação em: ${sugAreas.map((x) => x.replace(/^Avaliação em /, "").replace(/\.$/, "")).join("; ")}.`] : []),
-    ...sugTodas.filter((x) => !x.startsWith("Avaliação em ")),
-  ];
   const enc = t.encaminhamento?.encaminhadas ?? previaEncaminhamento86(r);
-  const encPrevia = !t.encaminhamento;
-  const demais = r.areas.filter((a) => !enc.includes(a.area)).map((a) => a.area);
+  const pctA = (a: { pontos: number }) => Math.round((a.pontos / 30) * 100);
+  const niveis = r.areas.map((a) => ({ a, n: nivelArea86(a.pontos, a.respondidas) }));
+  const cont = { alta: niveis.filter((x) => x.n?.label === "Alta sinalização").length, mod: niveis.filter((x) => x.n?.label === "Sinalização moderada").length, baixa: niveis.filter((x) => x.n?.label === "Baixa sinalização").length };
+  const dataStr = criado.toLocaleDateString("pt-BR");
 
-  const cab = (sub: string) => `<div class="cab">
-    <div class="logo"><span class="nfs">NFS</span><span class="gt">Gestão<br>Terapêutica</span></div>
-    <div class="linha"></div>
-    <div class="tit"><b>TRIAGEM MULTIDISCIPLINAR</b><span>${esc(sub)}</span></div></div>`;
-  const campo = (ic: string, l: string, v?: string | null, extra = "") =>
-    `<div class="campo"><span class="ic">${ic}</span><div><p class="l">${esc(l)}</p><p class="v ${extra}">${esc(v || "—")}</p></div></div>`;
-  const secao = (ic: string, t2: string, corpo: string, cls = "") =>
-    `<div class="sec ${cls}"><div class="sec-h"><span class="ic sm">${ic}</span>${esc(t2)}</div><div class="sec-b">${corpo}</div></div>`;
+  const cab = (sub: string) => `<div class="cab"><div class="logo"><span class="nfs">NFS</span><span class="gt">Gestão<br>Terapêutica</span></div>
+    <div class="tit"><b>TRIAGEM MULTIDISCIPLINAR</b><span>${esc(sub)}</span><em>${esc(dataStr)}</em></div></div>`;
+  const sec = (ico: string, titulo: string, corpo: string, extra = "") =>
+    `<div class="sec"><div class="sec-h"><span class="ib">${icH(ico)}</span>${esc(titulo)}${extra}</div><div class="sec-b">${corpo}</div></div>`;
+  const kv = (l: string, v?: string | null, span = false) => `<div class="kv${span ? " span" : ""}"><span class="k">${esc(l)}</span><span class="v">${esc(v || "—")}</span></div>`;
+  const radio = (opts2: [string, boolean | null][]) => opts2.map(([l, on]) => `<span class="rd"><i class="${on ? "on" : ""}"></i>${esc(l)}</span>`).join("");
+  const yes = (b?: boolean | null): [boolean | null, boolean | null] => [b === true, b === false];
 
-  const linhas = r.areas.map((a) => {
-    const n = nivelArea86(a.pontos, a.respondidas);
-    const pill = n ? PILL[n.label] : null;
-    return `<tr><td class="esp"><span class="ai" style="background:${AREA_COR[a.area] ?? "#94a3b8"}"></span>${esc(a.area)}</td>
-      <td class="c">${a.respondidas ? a.pontos : "–"}</td><td class="c">${a.respondidas ? `${a.pct}%` : "–"}</td>
-      <td class="c">${pill ? `<span class="pill" style="background:${pill[1]};color:${pill[2]}">${pill[0]}</span>` : `<span class="pill na">não avaliado</span>`}</td>
-      <td class="c">${enc.includes(a.area) ? `<span class="pill fila">✓ Fila</span>` : `<span class="av">Avaliada</span>`}</td></tr>`;
-  }).join("");
-
-  const folha1 = `<section class="page">${cab("RELATÓRIO DE TRIAGEM")}
-    <div class="pac">
-      <div class="pac-n"><p class="lbl">PACIENTE</p><p class="nome">${esc(p.name || "—")}</p></div>
-      <div class="pac-p"><span class="ic big">${svg("file", "#0b1f4d", 30)}</span><div><p class="lbl">PRONTUÁRIO</p><p class="pront">${esc(p.prontuario?.trim() || "—")}</p></div></div>
-    </div>
-    ${secao(icH("user"), "DADOS DO PACIENTE", `<div class="grid">
-      ${campo(ic("cal"), "Data de nascimento", fmtData(p.dateOfBirth), "b")}${campo(ic("users"), "Idade", idade(p.dateOfBirth), "b")}
-      ${campo(ic("card"), "CPF", p.cpf)}${campo(ic("plus"), "Cartão SUS", p.cns)}
-      ${campo(ic("user"), "Responsável", p.guardianName)}${campo(ic("phone"), "Telefone", p.phone)}
-      ${campo(ic("home"), "Endereço", p.address)}${campo(ic("users"), "Preenchido por", t.responsavel)}
+  const [atS, atN] = yes(p.outroAtendimento);
+  const estuda = p.escolaPublica == null ? null : true;
+  const folha1 = `<section class="page">${cab("RELATÓRIO DE AVALIAÇÃO")}
+    ${sec("user", "1. IDENTIFICAÇÃO DO PACIENTE", `<div class="g2">
+      ${kv("Nome completo", p.name, true)}${kv("Data de nascimento", fmtData(p.dateOfBirth))}${kv("Idade", idade(p.dateOfBirth))}
+      ${kv("CPF", p.cpf)}${kv("Cartão SUS", p.cns)}${kv("Nome da mãe", p.motherName)}${kv("Nome do pai", p.fatherName)}
+      ${kv("Responsável", p.guardianName)}${kv("Telefone do responsável", p.guardianPhone)}${kv("Telefone para contato", p.phone)}${kv("Endereço", p.address)}
+    </div>`, `<span class="pront"><small>PRONTUÁRIO</small>${esc(p.prontuario?.trim() || "—")}</span>`)}
+    ${sec("home", "2. INFORMAÇÕES COMPLEMENTARES", `<div class="g2">
+      ${kv("Diagnóstico (CID)", p.diagnosis, true)}
+      <div class="kv"><span class="k">Realiza atendimento atualmente?</span><span class="v">${radio([["Sim", atS], ["Não", atN]])}</span></div>
+      ${kv("Onde realiza o atendimento", p.outroAtendimento ? p.localAtendimento : null)}
+      <div class="kv"><span class="k">Estuda?</span><span class="v">${radio([["Sim", estuda], ["Não", null]])}</span></div>
+      <div class="kv"><span class="k">Rede de ensino</span><span class="v">${radio([["Pública", p.escolaPublica === true], ["Particular", p.escolaPublica === false]])}</span></div>
+      ${kv("Trabalho dos pais", p.trabalhoPais)}
+      <div class="kv"><span class="k">Reside em</span><span class="v">${radio([["Residência familiar", p.abrigoCasaCrianca === false], ["Abrigo / Casa da Criança", p.abrigoCasaCrianca === true]])}</span></div>
     </div>`)}
-    ${secao(icH("file"), "DADOS DA TRIAGEM", `<div class="grid">
-      ${campo(ic("cal"), "Data da triagem", criado.toLocaleDateString("pt-BR"), "b")}${campo(ic("clock"), "Horário", criado.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), "b")}
-      ${campo(ic("user"), "Aplicador", t.responsavel)}${campo(ic("file"), "Tipo de triagem", opts?.tipo || "Triagem inicial")}
+    ${sec("cal", "3. DADOS DA TRIAGEM", `<div class="g4">
+      <div class="mini">${ic("cal")}<div><span class="k">Data da triagem</span><b>${esc(dataStr)}</b></div></div>
+      <div class="mini">${ic("clock")}<div><span class="k">Horário</span><b>${esc(criado.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }))}</b></div></div>
+      <div class="mini">${ic("user")}<div><span class="k">Aplicador</span><b>${esc(t.responsavel || "—")}</b></div></div>
+      <div class="mini">${ic("file")}<div><span class="k">Tipo de triagem</span><b>${esc(opts?.tipo || "Triagem inicial")}</b></div></div>
     </div>`)}
-    ${secao(icH("msg"), "OBSERVAÇÕES", `<div class="branco"></div>`, "obs")}
-    <div class="ass">
-      <div><span></span><p>Assinatura da mãe / responsável</p><p class="n">${esc(p.guardianName || "")}</p></div>
-      <div><span></span><p>Assinatura do aplicador</p><p class="n">${esc(t.responsavel || "")}</p></div>
-    </div>
+    <div class="total"><span class="tb">${svg("chart", "#fff", 34)}</span>
+      <div class="tt"><b>PONTUAÇÃO TOTAL</b><span>Soma das ${avaliadas.length || 7} especialidades (10 perguntas cada, de 0 a 3 pontos)</span><div class="barra"><div style="width:${pctTotal}%"></div></div></div>
+      <div class="num"><b>${totalPts} / ${max}</b><span>${pctTotal}%</span></div></div>
     <div class="rod"><span>${esc(AVISO_TRIAGEM)}</span><span>Página 1 de 2</span></div>
   </section>`;
 
-  const folha2 = `<section class="page">${cab("RESULTADOS E ENCAMINHAMENTOS")}
-    <div class="total">
-      <span class="ic big">${svg("chart", "#0b1f4d", 30)}</span>
-      <div class="tt"><p class="h">PONTUAÇÃO CLÍNICA TOTAL</p><p class="s">Soma das 7 especialidades (10 perguntas cada, 0 a 3 pontos)</p>
-        <div class="barra"><div style="width:${pctTotal}%"></div></div></div>
-      <div class="num"><b>${totalPts} / 210</b><span>${pctTotal}%</span></div>
-    </div>
+  // Teia (radar) — 0 a 100% por especialidade.
+  const N = r.areas.length, cx = 260, cy = 175, R = 120;
+  const pt = (i: number, f: number) => { const ang = -Math.PI / 2 + (2 * Math.PI * i) / N; return [cx + Math.cos(ang) * R * f, cy + Math.sin(ang) * R * f]; };
+  const grid = [0.25, 0.5, 0.75, 1].map((f) => `<polygon points="${r.areas.map((_, i) => pt(i, f).join(",")).join(" ")}" fill="none" stroke="#dbe4ef"/>`).join("")
+    + r.areas.map((_, i) => `<line x1="${cx}" y1="${cy}" x2="${pt(i, 1)[0]}" y2="${pt(i, 1)[1]}" stroke="#e5e7eb"/>`).join("")
+    + [25, 50, 75, 100].map((v) => `<text x="${cx + 3}" y="${cy - R * v / 100 + 3}" font-size="8" fill="#64748b">${v}</text>`).join("");
+  const poly = `<polygon points="${r.areas.map((a, i) => pt(i, pctA(a) / 100).join(",")).join(" ")}" fill="rgba(59,130,246,0.25)" stroke="#1d4ed8" stroke-width="2"/>`
+    + r.areas.map((a, i) => { const [x, y] = pt(i, pctA(a) / 100); return `<circle cx="${x}" cy="${y}" r="4" fill="#1d4ed8"/>`; }).join("");
+  const labels = r.areas.map((a, i) => {
+    const [x, y] = pt(i, 1.28); const anchor = x < cx - 10 ? "end" : x > cx + 10 ? "start" : "middle";
+    const cor = AREA_COR[a.area] ?? "#334155";
+    return `<text x="${x}" y="${y}" font-size="13" font-weight="700" text-anchor="${anchor}" fill="#0f172a">${esc(a.area)}</text>
+      <text x="${x}" y="${y + 15}" font-size="16" font-weight="800" text-anchor="${anchor}" fill="${cor}">${a.respondidas ? `${pctA(a)}%` : "não avaliado"}</text>`;
+  }).join("");
+  const teia = `<svg viewBox="0 0 520 345" width="100%" height="215">${grid}${poly}${labels}</svg>`;
+
+  const linhas = niveis.map(({ a, n }) => {
+    const pill = n ? PILL[n.label] : null;
+    const ind = enc.includes(a.area) ? "Prioridade" : n?.sugerir ? "Avaliação" : n ? "Fluxo regular" : "—";
+    return `<tr><td><span class="dot" style="background:${AREA_COR[a.area] ?? "#94a3b8"}"></span>${esc(a.area)}</td>
+      <td class="c"><b>${a.respondidas ? a.pontos : "–"}</b></td>
+      <td><div class="mb"><div style="width:${pctA(a)}%;background:${AREA_COR[a.area] ?? "#94a3b8"}"></div></div></td>
+      <td class="c">${a.respondidas ? `${pctA(a)}%` : "–"}</td>
+      <td class="c">${pill ? `<span class="pill" style="background:${pill[1]};color:${pill[2]}">${pill[0]}</span>` : `<span class="pill na">não avaliado</span>`}</td>
+      <td class="c ${ind === "Prioridade" ? "pr" : ""}">${ind}</td></tr>`;
+  }).join("");
+
+  const totN = cont.alta + cont.mod + cont.baixa || 1, C = 2 * Math.PI * 42;
+  let off = 0;
+  const arcs = ([[cont.alta, "#ef4444"], [cont.mod, "#f59e0b"], [cont.baixa, "#22c55e"]] as [number, string][]).map(([v, cor]) => {
+    const len = (v / totN) * C; const s = `<circle cx="55" cy="55" r="42" fill="none" stroke="${cor}" stroke-width="16" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 55 55)"/>`; off += len; return s;
+  }).join("");
+  const donut = `<div class="donut"><svg viewBox="0 0 110 110" width="105" height="105"><circle cx="55" cy="55" r="42" fill="none" stroke="#eef2f7" stroke-width="16"/>${arcs}
+      <text x="55" y="53" font-size="17" font-weight="800" text-anchor="middle" fill="#0b1f4d">${totalPts}</text><text x="55" y="66" font-size="8" text-anchor="middle" fill="#475569">pontos (${pctTotal}%)</text></svg>
+    <div class="leg"><p><i style="background:#ef4444"></i>Alta: ${cont.alta} área${cont.alta === 1 ? "" : "s"}</p><p><i style="background:#f59e0b"></i>Moderada: ${cont.mod} área${cont.mod === 1 ? "" : "s"}</p><p><i style="background:#22c55e"></i>Baixa: ${cont.baixa} área${cont.baixa === 1 ? "" : "s"}</p></div></div>`;
+
+  const encTxt = `<p>Conforme resultados da triagem, recomenda-se encaminhamento para: <b>${esc(enc.length ? enc.join(", ") : "nenhuma especialidade com indicador de prioridade")}</b>.</p>
+    ${r.prioridades.length ? `<p>Prioridades clínicas: ${esc(r.prioridades.map((x) => x.titulo).join("; "))}.</p>` : ""}
+    ${r.social.length ? `<p>Vulnerabilidade social: ${esc(r.social.map((x) => x.titulo).join("; "))} — orientar serviço social/CRAS.</p>` : ""}
+    <p class="s">Os encaminhamentos devem seguir o protocolo da equipe técnica do serviço.</p>`;
+
+  const folha2 = `<section class="page p2">${cab("RESULTADOS E ENCAMINHAMENTOS")}
     ${riscos.length ? `<div class="alerta">Atenção: ${esc(ALERTA_RISCO)}</div>` : ""}
-    <div class="duas">
-      ${secao(icH("search"), "RESULTADO POR ÁREA", `<table><thead><tr><th>ESPECIALIDADE</th><th class="c">PONTOS<br>(0–30)</th><th class="c">%</th><th class="c">NÍVEL</th><th class="c">FILA</th></tr></thead><tbody>${linhas}</tbody></table>
-        <p class="encl"><b>Encaminhadas à fila${encPrevia ? " (previstas)" : ""}:</b> ${esc(enc.join(", ") || `nenhuma (sem área com ${ENCAMINHAR_MIN} pontos ou mais)`)}<br><b>Demais avaliadas:</b> ${esc(demais.join(", ") || "—")}</p>`, "res")}
-      ${secao(icH("trend"), "GRÁFICO COMPARATIVO", `${grafico(r.areas)}
-        <div class="faixa"><p class="fh">FAIXA DE CLASSIFICAÇÃO <span>(por especialidade)</span></p>
-          <p><i style="background:#22c55e"></i><b>0 – 8</b> Baixa sinalização</p>
-          <p><i style="background:#f59e0b"></i><b>9 – 17</b> Sinalização moderada</p>
-          <p><i style="background:#ef4444"></i><b>18 – 30</b> Alta sinalização</p>
-          <p class="nt">“Não sei” e “Não se aplica” não somam pontos.</p></div>`, "graf")}
-    </div>
-    <div class="duas iguais">
-      ${secao(icH("target"), "PRIORIDADES CLÍNICAS IDENTIFICADAS", r.prioridades.length
-        ? `<ul class="red">${r.prioridades.map((x) => `<li><b>${x.code}</b> ${esc(x.titulo)}</li>`).join("")}</ul>`
-        : `<p class="vazio">Nenhum sinal marcado</p>`, "prio")}
-      ${secao(icH("users"), "VULNERABILIDADE SOCIAL", r.social.length
-        ? `<ul>${r.social.map((x) => `<li>${esc(x.titulo)}${x.intensidade === "parcial" ? " (em parte)" : ""}</li>`).join("")}</ul>`
-        : `<p class="vazio">Nenhuma barreira marcada</p>`)}
-    </div>
-    ${secao(icH("file"), "CONSIDERAÇÕES FINAIS", `<p class="sg">Sugestões de encaminhamento (orientativas; a equipe técnica valida):</p><ul class="sug">${sugest.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><div class="branco curto"></div>`, "cons")}
-    ${termoCienciaHtml({ triagem: "Triagem Multidisciplinar", paciente: p.name, prontuario: p.prontuario,
-      responsavel: p.guardianName, aplicador: t.responsavel, data: criado.toLocaleDateString("pt-BR") })}
-    <div class="rod"><span>NFS – Gestão Terapêutica · gerado em ${esc(new Date().toLocaleDateString("pt-BR"))}</span><span>Página 2 de 2</span></div>
+    ${sec("chart", "4. TEIA DE RESULTADOS", teia)}
+    ${sec("chart", "5. RESULTADO POR ESPECIALIDADE", `<table><thead><tr><th>Especialidade</th><th class="c">Pontuação<br>(0 – 30)</th><th></th><th class="c">%</th><th class="c">Nível</th><th class="c">Indicação</th></tr></thead><tbody>${linhas}</tbody></table>`)}
+    <div class="duas">${sec("target", "6. CLASSIFICAÇÃO DOS NÍVEIS", donut)}${sec("target", "7. ENCAMINHAMENTO", encTxt)}</div>
+    ${termoCienciaHtml({ triagem: "Triagem Multidisciplinar", paciente: p.name, prontuario: p.prontuario, responsavel: p.guardianName, aplicador: t.responsavel, data: dataStr })}
+    <div class="rod"><span>Resultados da triagem multidisciplinar. Triagem orientativa, não estabelece diagnóstico.</span><span>Página 2 de 2</span></div>
   </section>`;
 
   const titulo = `Triagem_${esc((p.name || "Paciente").replace(/\s+/g, "_"))}${p.prontuario ? `_${esc(p.prontuario)}` : ""}`;
   const css = `
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 0; background: #e2e8f0; font-size: 12px; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 0; background: #e2e8f0; font-size: 13px; }
   .bar { display: flex; gap: 10px; padding: 14px; justify-content: center; }
-  .page { width: 210mm; height: 297mm; margin: 0 auto 14px; background: #fff; padding: 11mm 11mm 9mm; display: flex; flex-direction: column; gap: 4mm; overflow: hidden; }
-  .cab { display: flex; align-items: center; gap: 14px; }
-  .logo { display: flex; align-items: center; gap: 6px; }
-  .nfs { font-size: 34px; font-weight: 900; color: #0b1f4d; letter-spacing: -1px; }
-  .gt { font-size: 13px; line-height: 1.1; color: #0b1f4d; }
-  .linha { flex: 1; height: 1px; background: #94a3b8; }
-  .tit { text-align: right; } .tit b { display: block; font-size: 15px; color: #0b1f4d; } .tit span { font-size: 11px; color: #64748b; letter-spacing: .08em; font-weight: 700; }
-  .ic { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; background: #eef2f7; font-size: 15px; flex-shrink: 0; }
-  .ic.sm { width: 24px; height: 24px; font-size: 12px; background: #0b1f4d; margin-right: 8px; }
-  .ic.big { width: 40px; height: 40px; font-size: 20px; background: transparent; }
-  .pac { display: flex; gap: 0; border-radius: 10px; overflow: hidden; background: #eef2f7; }
-  .pac-n { flex: 1; padding: 12px 16px; } .pac-p { display: flex; align-items: center; gap: 8px; background: #dbe4ef; padding: 12px 18px; }
-  .lbl { font-size: 11px; font-weight: 800; margin: 0 0 2px; color: #0b1f4d; }
-  .nome { font-size: 25px; font-weight: 900; text-transform: uppercase; margin: 0; color: #0b1f4d; line-height: 1.1; }
-  .pront { font-size: 34px; font-weight: 900; margin: 0; color: #0b1f4d; line-height: 1; }
-  .sec { border: 1px solid #dbe4ef; border-radius: 10px; overflow: hidden; break-inside: avoid; }
-  .sec-h { display: flex; align-items: center; background: #eef2f7; padding: 7px 12px; font-weight: 800; font-size: 14px; color: #0b1f4d; }
-  .sec-b { padding: 6px 12px 8px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; }
-  .campo { display: flex; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid #f1f5f9; }
-  .campo .l { margin: 0; font-size: 12px; font-weight: 700; color: #334155; } .campo .v { margin: 1px 0 0; font-size: 16px; } .campo .v.b { font-weight: 800; font-size: 18px; }
-  .obs { flex: 1; display: flex; flex-direction: column; } .obs .sec-b { flex: 1; } .branco { height: 100%; min-height: 30mm; }
-  .branco.curto { min-height: 4mm; }
-  .rod { display: flex; justify-content: space-between; gap: 10px; font-size: 9.5px; color: #64748b; margin-top: auto; }
-  .total { display: flex; align-items: center; gap: 12px; background: #eef2f7; border-radius: 10px; padding: 10px 14px; }
-  .tt { flex: 1; } .tt .h { margin: 0; font-weight: 800; font-size: 15px; color: #0b1f4d; } .tt .s { margin: 2px 0 6px; font-size: 11.5px; color: #475569; }
-  .barra { height: 9px; border-radius: 9px; background: #dbe4ef; overflow: hidden; } .barra div { height: 100%; background: #1e3a6e; border-radius: 9px; }
-  .num { text-align: right; } .num b { display: block; font-size: 24px; color: #0b1f4d; } .num span { font-size: 15px; font-weight: 800; color: #0b1f4d; }
-  .alerta { border: 2px solid #dc2626; background: #fef2f2; color: #991b1b; font-weight: 700; border-radius: 8px; padding: 6px 10px; font-size: 11px; }
-  .duas { display: grid; grid-template-columns: 1.5fr 1fr; gap: 3mm; } .duas.iguais { grid-template-columns: 1fr 1fr; }
-  .page table { width: 100%; border-collapse: collapse; }
-  .page th { font-size: 11px; text-align: left; color: #0b1f4d; padding: 5px 4px; border-bottom: 1px solid #dbe4ef; }
-  .page td { padding: 4px 3px; border-bottom: 1px solid #f1f5f9; font-size: 12.5px; } .c { text-align: center; }
-  .esp { white-space: nowrap; } .ai { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
-  .pill { display: inline-block; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11.5px; min-width: 62px; } .pill.na { background: #f1f5f9; color: #64748b; font-style: italic; }
-  .faixa { background: #f8fafc; border-radius: 8px; padding: 6px 8px; margin-top: 4px; }
-  .faixa p { margin: 2px 0; font-size: 11.5px; display: flex; align-items: center; gap: 6px; } .faixa i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; } .faixa b { width: 42px; }
-  .faixa .fh { font-weight: 800; color: #0b1f4d; display: block; } .faixa .fh span { font-weight: 400; } .faixa .nt { color: #64748b; font-size: 9.5px; display: block; }
-  .prio { border-color: #fecdd3; } .prio .sec-h { background: #fff1f2; color: #9f1239; } .prio .ic.sm { background: #be123c; } .prio .sec-b { background: #fff7f8; }
-  .page ul { margin: 2px 0; padding-left: 16px; } .page li { margin: 3px 0; font-size: 13px; }
-  .pill.fila { background: #0b1f4d; color: #fff; min-width: 0; white-space: nowrap; } .av { font-size: 10px; color: #64748b; }
-  .encl { margin: 6px 0 0; font-size: 10.5px; line-height: 1.5; } ul.red li::marker { color: #dc2626; }
-  .vazio { color: #64748b; margin: 4px 0; }
-  .cons { flex: 1; display: flex; flex-direction: column; } .cons .sec-b { flex: 1; }
-  .sg { margin: 2px 0; font-size: 12px; font-weight: 700; color: #334155; } ul.sug li { font-size: 12px; margin: 2px 0; }
-  .ass { display: grid; grid-template-columns: 1fr 1fr; gap: 12mm; padding: 6mm 4mm 0; break-inside: avoid; }
-  .ass span { display: block; border-bottom: 1px solid #0f172a; height: 10mm; }
-  .ass p { margin: 3px 0 0; text-align: center; font-size: 10.5px; font-weight: 700; color: #334155; } .ass p.n { font-weight: 400; color: #64748b; min-height: 12px; }
-  @page { size: A4 portrait; margin: 15mm; } @page t86 { margin: 0; } .page { page: t86; }
-  @media print { body { background: #fff; } .bar { display: none !important; } .page { margin: 0; break-after: page; } .page:last-child { break-after: auto; } }
-`;
+  .page { width: 210mm; height: 297mm; margin: 0 auto 14px; background: #fff; padding: 10mm 11mm 8mm; display: flex; flex-direction: column; gap: 3.5mm; overflow: hidden; }
+  .cab { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #bfd3ea; padding-bottom: 6px; }
+  .logo { display: flex; align-items: center; gap: 8px; } .nfs { font-size: 40px; font-weight: 900; color: #0b1f4d; letter-spacing: -1px; } .gt { font-size: 16px; line-height: 1.1; color: #0b1f4d; }
+  .tit { text-align: right; } .tit b { display: block; font-size: 17px; color: #0b1f4d; } .tit span { display: block; font-size: 12px; color: #334155; letter-spacing: .06em; } .tit em { font-style: normal; font-size: 12px; color: #475569; }
+  .sec { border: 1px solid #dbe4ef; border-radius: 10px; overflow: hidden; break-inside: avoid; flex-shrink: 0; }
+  .sec-h { display: flex; align-items: center; gap: 10px; background: #eef4fb; padding: 4px 12px; font-weight: 800; font-size: 15px; color: #0b1f4d; position: relative; }
+  .ib { width: 30px; height: 30px; border-radius: 7px; background: #0b1f4d; display: inline-flex; align-items: center; justify-content: center; }
+  .pront { margin-left: auto; background: #cfe3fb; border-radius: 10px; padding: 4px 16px; text-align: center; font-size: 26px; font-weight: 900; line-height: 1; } .pront small { display: block; font-size: 9px; font-weight: 700; letter-spacing: .06em; color: #1e3a6e; }
+  .sec-b { padding: 4px 12px 8px; }
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+  .kv { display: flex; flex-direction: column; padding: 8px 0; border-bottom: 1px solid #eef2f7; } .kv.span { grid-column: 1 / -1; }
+  .k { font-size: 13px; color: #334155; } .v { font-size: 16px; font-weight: 700; color: #0f172a; }
+  .rd { display: inline-flex; align-items: center; gap: 6px; margin-right: 18px; font-weight: 400; } .rd i { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #94a3b8; display: inline-block; } .rd i.on { border-color: #1d4ed8; background: radial-gradient(#1d4ed8 45%, #fff 50%); }
+  .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; } .mini { display: flex; gap: 8px; align-items: center; padding: 12px 0; } .mini b { display: block; font-size: 15px; }
+  .total { display: flex; align-items: center; gap: 14px; background: #eef4fb; border-radius: 10px; overflow: hidden; } .tb { background: #1d4ed8; padding: 26px; display: flex; }
+  .tt { flex: 1; } .tt b { display: block; font-size: 18px; color: #0b1f4d; } .tt span { font-size: 12px; color: #334155; } .barra { height: 10px; border-radius: 9px; background: #cfe3fb; overflow: hidden; margin-top: 6px; } .barra div { height: 100%; background: #1d4ed8; }
+  .num { text-align: right; padding-right: 16px; } .num b { display: block; font-size: 30px; color: #0b1f4d; } .num span { font-size: 26px; font-weight: 900; color: #0b1f4d; }
+  .page.p2 { gap: 2.5mm; }
+  .rod { display: flex; justify-content: space-between; gap: 10px; font-size: 10px; color: #64748b; margin-top: auto; }
+  .alerta { border: 2px solid #dc2626; background: #fef2f2; color: #991b1b; font-weight: 700; border-radius: 8px; padding: 5px 10px; font-size: 11.5px; }
+  table { width: 100%; border-collapse: collapse; } th { font-size: 12px; text-align: left; color: #0b1f4d; padding: 4px; border-bottom: 1px solid #dbe4ef; font-weight: 700; }
+  td { padding: 2px 4px; border-bottom: 1px solid #f1f5f9; font-size: 13.5px; } .c { text-align: center; } td.pr { font-weight: 800; color: #0b1f4d; }
+  .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+  .mb { width: 90px; height: 9px; border-radius: 9px; background: #eef2f7; overflow: hidden; } .mb div { height: 100%; border-radius: 9px; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; min-width: 70px; } .pill.na { background: #f1f5f9; color: #64748b; font-style: italic; }
+  .duas { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
+  .donut { display: flex; align-items: center; gap: 12px; } .leg p { margin: 6px 0; font-size: 13.5px; display: flex; align-items: center; gap: 8px; } .leg i { width: 13px; height: 13px; border-radius: 50%; display: inline-block; }
+  .sec-b p { margin: 3px 0; font-size: 12.5px; } .sec-b p.s { color: #475569; font-size: 12px; }
+  @page { size: A4 portrait; margin: 0; }
+  @media print { body { background: #fff; } .bar { display: none !important; } .page { margin: 0; break-after: page; } .page:last-of-type { break-after: auto; } }`;
   return { titulo, css, paginas: folha1 + folha2 };
 }
 
