@@ -1,5 +1,5 @@
 // Triagem multidisciplinar — 86 perguntas (documento institucional de 24/10/2026).
-// 70 itens clínicos (7 especialidades x 10), 6 sociofamiliares e 10 de
+// 60 itens clínicos (6 especialidades x 10; Educação Física retirada), 6 sociofamiliares e 10 de
 // identificação de prioridades. Não substitui o ABC nem a avaliação profissional.
 
 export type TipoItem = "clinica" | "social" | "prioridade";
@@ -7,7 +7,7 @@ export type Item86 = { code: string; tipo: TipoItem; grupo: string; titulo: stri
 
 export const AREAS_86 = [
   "Fonoaudiologia", "Psicologia", "Terapia Ocupacional", "Fisioterapia",
-  "Psicomotricidade", "Nutrição", "Educação Física",
+  "Psicomotricidade", "Nutrição",
 ] as const;
 
 export const ITENS_86: Item86[] = [
@@ -71,16 +71,6 @@ export const ITENS_86: Item86[] = [
   { code: "N08", tipo: "clinica", grupo: "Nutrição", titulo: "Rotina alimentar", tecnica: "A criança apresenta dificuldades importantes na organização e manutenção de uma rotina alimentar adequada?", simples: "Seu filho tem dificuldades frequentes para realizar as refeições ou manter uma rotina de alimentação?" },
   { code: "N09", tipo: "clinica", grupo: "Nutrição", titulo: "Necessidade de suporte alimentar", tecnica: "A criança necessita de adaptações ou suporte específico para manter alimentação nutricionalmente adequada?", simples: "Seu filho precisa de alguma adaptação, orientação ou cuidado especial para conseguir se alimentar adequadamente?" },
   { code: "N10", tipo: "clinica", grupo: "Nutrição", titulo: "Impacto nutricional", tecnica: "As dificuldades alimentares da criança apresentam repercussões relevantes na saúde ou no desenvolvimento?", simples: "As dificuldades para comer têm prejudicado a saúde, o crescimento ou as atividades diárias do seu filho?" },
-  { code: "EF01", tipo: "clinica", grupo: "Educação Física", titulo: "Participação em atividades físicas", tecnica: "A criança apresenta restrições na participação em atividades físicas e recreativas?", simples: "Seu filho tem dificuldade para participar de brincadeiras e atividades que envolvem movimento?" },
-  { code: "EF02", tipo: "clinica", grupo: "Educação Física", titulo: "Coordenação durante jogos", tecnica: "A criança apresenta dificuldades de coordenação motora durante atividades físicas estruturadas?", simples: "Seu filho tem dificuldade para realizar movimentos durante jogos, brincadeiras ou atividades esportivas?" },
-  { code: "EF03", tipo: "clinica", grupo: "Educação Física", titulo: "Resistência funcional", tecnica: "A criança apresenta baixa tolerância funcional à atividade física?", simples: "Seu filho apresenta cansaço excessivo ou dificuldade para acompanhar atividades físicas adequadas à sua condição?" },
-  { code: "EF04", tipo: "clinica", grupo: "Educação Física", titulo: "Adaptação esportiva", tecnica: "A criança apresenta necessidade de adaptações para participação em atividades esportivas?", simples: "Seu filho precisa de mudanças nas regras, nos materiais ou no ambiente para conseguir participar de atividades físicas?" },
-  { code: "EF05", tipo: "clinica", grupo: "Educação Física", titulo: "Jogos coletivos", tecnica: "A criança apresenta dificuldades para participar de jogos e atividades físicas coletivas?", simples: "Seu filho tem dificuldade para participar de brincadeiras ou esportes em grupo?" },
-  { code: "EF06", tipo: "clinica", grupo: "Educação Física", titulo: "Habilidades motoras fundamentais", tecnica: "A criança apresenta dificuldades na execução de habilidades motoras fundamentais?", simples: "Seu filho tem dificuldade para correr, saltar, lançar ou receber objetos, considerando suas possibilidades físicas?" },
-  { code: "EF07", tipo: "clinica", grupo: "Educação Física", titulo: "Acesso à prática esportiva", tecnica: "A criança apresenta barreiras de acesso às práticas corporais e esportivas?", simples: "Seu filho deixa de participar de atividades físicas porque faltam locais acessíveis, adaptações ou oportunidades?" },
-  { code: "EF08", tipo: "clinica", grupo: "Educação Física", titulo: "Segurança nas atividades", tecnica: "A criança necessita de supervisão ou adaptações específicas para participar de atividades físicas com segurança?", simples: "Seu filho precisa de cuidados ou adaptações especiais para brincar e praticar exercícios com segurança?" },
-  { code: "EF09", tipo: "clinica", grupo: "Educação Física", titulo: "Inclusão recreativa", tecnica: "A criança apresenta restrições de participação em atividades recreativas inclusivas?", simples: "Seu filho encontra dificuldades para participar de atividades recreativas com outras crianças?" },
-  { code: "EF10", tipo: "clinica", grupo: "Educação Física", titulo: "Interesse e participação esportiva", tecnica: "A criança demonstra interesse em atividades físicas, mas apresenta dificuldades funcionais ou ambientais que limitam sua participação?", simples: "Seu filho demonstra vontade de participar de esportes ou brincadeiras com movimento, mas encontra dificuldades para conseguir?" },
   { code: "S01", tipo: "social", grupo: "Sociofamiliar", titulo: "Renda familiar", tecnica: "Qual é a condição socioeconômica familiar, considerando renda e composição domiciliar?", simples: "Quantas pessoas moram na sua casa e qual é, aproximadamente, a renda mensal total da família?" },
   { code: "S02", tipo: "social", grupo: "Sociofamiliar", titulo: "Benefícios socioassistenciais", tecnica: "A família possui acesso a benefícios socioassistenciais?", simples: "Sua família recebe Bolsa Família, BPC ou algum outro benefício social?" },
   { code: "S03", tipo: "social", grupo: "Sociofamiliar", titulo: "Transporte e acessibilidade", tecnica: "A família apresenta barreiras de transporte para acesso aos serviços terapêuticos?", simples: "Você tem dificuldade para trazer seu filho às terapias por falta de transporte, dinheiro para passagem ou transporte adaptado?" },
