@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowDown, ArrowUp, Check, Eye, ImagePlus, Lock, Pin, RefreshCw, RotateCcw, Save, Shuffle, Trash2, X, CalendarDays, ListOrdered } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  BUILTIN_IMAGES, GALLERY_CATEGORIES, DEFAULT_CONFIG, DEFAULT_REF, builtinUrl, parseRef, portalVeilGradient,
+  BUILTIN_IMAGES, GALLERY_CATEGORIES, DEFAULT_CONFIG, DEFAULT_REF, builtinUrl, builtinThumbUrl, parseRef, portalVeilGradient,
   getVisualSettings, previewVisualSchedule, getCustomImage, verifyVisualAdmin, saveVisualSettings,
   addVisualImage, deleteVisualImage, fileToDataUrls,
   type VisualConfig, type CustomImage, type ScheduleDay, type GalleryCategory, type VisualOrder,
@@ -73,7 +73,7 @@ export default function PersonalizacaoVisual() {
   }, [config, images, loading, loadError]);
 
   const gallery: GalleryItem[] = useMemo(() => [
-    ...BUILTIN_IMAGES.map((b) => ({ ref: `builtin:${b.id}`, name: b.name, cat: b.cat, thumb: builtinUrl(b.id), own: false })),
+    ...BUILTIN_IMAGES.map((b) => ({ ref: `builtin:${b.id}`, name: b.name, cat: b.cat, thumb: builtinThumbUrl(b.id), own: false })),
     ...images.map((i) => ({ ref: `custom:${i.id}`, name: i.name, cat: "own" as const, thumb: i.thumb, own: true, id: i.id })),
   ], [images]);
 
