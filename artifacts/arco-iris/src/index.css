@@ -460,3 +460,15 @@
   body:has([data-triagem-print]) #main-content > *:not(:has([data-triagem-print])) { display: none !important; }
   @page { size: A4 portrait; margin: 12mm; }
 }
+
+/* Cadastro/triagem/ABC: letras maiores para leitura (só apresentação). */
+.leitura-ampliada { font-size: 1.0625rem; }
+.leitura-ampliada .text-\[10px\], .leitura-ampliada .text-\[11px\] { font-size: 0.875rem !important; }
+.leitura-ampliada .text-xs { font-size: 0.9375rem !important; line-height: 1.4rem; }
+.leitura-ampliada .text-sm { font-size: 1.0625rem !important; line-height: 1.6rem; }
+.leitura-ampliada .text-base { font-size: 1.125rem !important; }
+.leitura-ampliada .text-lg { font-size: 1.25rem !important; }
+.leitura-ampliada .text-xl { font-size: 1.5rem !important; }
+.leitura-ampliada label { font-size: 1rem; }
+.leitura-ampliada input:not([type="checkbox"]):not([type="radio"]), .leitura-ampliada select, .leitura-ampliada textarea { font-size: 1.0625rem; min-height: 2.875rem; }
+.leitura-ampliada button { font-size: inherit; }

@@ -68,7 +68,7 @@ function grafico(areas: { area: string; pontos: number; respondidas: number }[])
       <text x="${x + bw / 2}" y="${y(a.pontos) - 3}" font-size="9" font-weight="700" text-anchor="middle" fill="#0f172a">${a.respondidas ? a.pontos : "–"}</text>
       <text x="${x + bw / 2}" y="${base + 11}" font-size="7.5" text-anchor="middle" fill="#475569">${esc(lbl)}</text>`;
   }).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="150">${grid}${bars}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="120">${grid}${bars}</svg>`;
 }
 
 /**
@@ -185,35 +185,35 @@ function triagem86Doc(t: Triagem86, p: PacienteInfo, opts?: { tipo?: string }): 
   .nome { font-size: 25px; font-weight: 900; text-transform: uppercase; margin: 0; color: #0b1f4d; line-height: 1.1; }
   .pront { font-size: 34px; font-weight: 900; margin: 0; color: #0b1f4d; line-height: 1; }
   .sec { border: 1px solid #dbe4ef; border-radius: 10px; overflow: hidden; break-inside: avoid; }
-  .sec-h { display: flex; align-items: center; background: #eef2f7; padding: 7px 12px; font-weight: 800; font-size: 12.5px; color: #0b1f4d; }
+  .sec-h { display: flex; align-items: center; background: #eef2f7; padding: 7px 12px; font-weight: 800; font-size: 14px; color: #0b1f4d; }
   .sec-b { padding: 6px 12px 8px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; }
   .campo { display: flex; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid #f1f5f9; }
-  .campo .l { margin: 0; font-size: 10.5px; font-weight: 700; color: #334155; } .campo .v { margin: 1px 0 0; font-size: 14px; } .campo .v.b { font-weight: 800; font-size: 16px; }
+  .campo .l { margin: 0; font-size: 12px; font-weight: 700; color: #334155; } .campo .v { margin: 1px 0 0; font-size: 16px; } .campo .v.b { font-weight: 800; font-size: 18px; }
   .obs { flex: 1; display: flex; flex-direction: column; } .obs .sec-b { flex: 1; } .branco { height: 100%; min-height: 30mm; }
   .branco.curto { min-height: 4mm; }
   .rod { display: flex; justify-content: space-between; gap: 10px; font-size: 9.5px; color: #64748b; margin-top: auto; }
   .total { display: flex; align-items: center; gap: 12px; background: #eef2f7; border-radius: 10px; padding: 10px 14px; }
-  .tt { flex: 1; } .tt .h { margin: 0; font-weight: 800; font-size: 13px; color: #0b1f4d; } .tt .s { margin: 2px 0 6px; font-size: 10px; color: #475569; }
+  .tt { flex: 1; } .tt .h { margin: 0; font-weight: 800; font-size: 15px; color: #0b1f4d; } .tt .s { margin: 2px 0 6px; font-size: 11.5px; color: #475569; }
   .barra { height: 9px; border-radius: 9px; background: #dbe4ef; overflow: hidden; } .barra div { height: 100%; background: #1e3a6e; border-radius: 9px; }
   .num { text-align: right; } .num b { display: block; font-size: 24px; color: #0b1f4d; } .num span { font-size: 15px; font-weight: 800; color: #0b1f4d; }
   .alerta { border: 2px solid #dc2626; background: #fef2f2; color: #991b1b; font-weight: 700; border-radius: 8px; padding: 6px 10px; font-size: 11px; }
-  .duas { display: grid; grid-template-columns: 1.15fr 1fr; gap: 4mm; } .duas.iguais { grid-template-columns: 1fr 1fr; }
+  .duas { display: grid; grid-template-columns: 1.5fr 1fr; gap: 3mm; } .duas.iguais { grid-template-columns: 1fr 1fr; }
   .page table { width: 100%; border-collapse: collapse; }
-  .page th { font-size: 9.5px; text-align: left; color: #0b1f4d; padding: 5px 4px; border-bottom: 1px solid #dbe4ef; }
-  .page td { padding: 5px 4px; border-bottom: 1px solid #f1f5f9; font-size: 11.5px; } .c { text-align: center; }
+  .page th { font-size: 11px; text-align: left; color: #0b1f4d; padding: 5px 4px; border-bottom: 1px solid #dbe4ef; }
+  .page td { padding: 4px 3px; border-bottom: 1px solid #f1f5f9; font-size: 12.5px; } .c { text-align: center; }
   .esp { white-space: nowrap; } .ai { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
-  .pill { display: inline-block; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 10.5px; min-width: 64px; } .pill.na { background: #f1f5f9; color: #64748b; font-style: italic; }
+  .pill { display: inline-block; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11.5px; min-width: 62px; } .pill.na { background: #f1f5f9; color: #64748b; font-style: italic; }
   .faixa { background: #f8fafc; border-radius: 8px; padding: 6px 8px; margin-top: 4px; }
-  .faixa p { margin: 2px 0; font-size: 10.5px; display: flex; align-items: center; gap: 6px; } .faixa i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; } .faixa b { width: 42px; }
+  .faixa p { margin: 2px 0; font-size: 11.5px; display: flex; align-items: center; gap: 6px; } .faixa i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; } .faixa b { width: 42px; }
   .faixa .fh { font-weight: 800; color: #0b1f4d; display: block; } .faixa .fh span { font-weight: 400; } .faixa .nt { color: #64748b; font-size: 9.5px; display: block; }
   .prio { border-color: #fecdd3; } .prio .sec-h { background: #fff1f2; color: #9f1239; } .prio .ic.sm { background: #be123c; } .prio .sec-b { background: #fff7f8; }
-  .page ul { margin: 2px 0; padding-left: 16px; } .page li { margin: 3px 0; font-size: 11.5px; }
+  .page ul { margin: 2px 0; padding-left: 16px; } .page li { margin: 3px 0; font-size: 13px; }
   .pill.fila { background: #0b1f4d; color: #fff; min-width: 0; white-space: nowrap; } .av { font-size: 10px; color: #64748b; }
   .encl { margin: 6px 0 0; font-size: 10.5px; line-height: 1.5; } ul.red li::marker { color: #dc2626; }
   .vazio { color: #64748b; margin: 4px 0; }
   .cons { flex: 1; display: flex; flex-direction: column; } .cons .sec-b { flex: 1; }
-  .sg { margin: 2px 0; font-size: 10.5px; font-weight: 700; color: #334155; } ul.sug li { font-size: 10.5px; margin: 2px 0; }
+  .sg { margin: 2px 0; font-size: 12px; font-weight: 700; color: #334155; } ul.sug li { font-size: 12px; margin: 2px 0; }
   .ass { display: grid; grid-template-columns: 1fr 1fr; gap: 12mm; padding: 6mm 4mm 0; break-inside: avoid; }
   .ass span { display: block; border-bottom: 1px solid #0f172a; height: 10mm; }
   .ass p { margin: 3px 0 0; text-align: center; font-size: 10.5px; font-weight: 700; color: #334155; } .ass p.n { font-weight: 400; color: #64748b; min-height: 12px; }
