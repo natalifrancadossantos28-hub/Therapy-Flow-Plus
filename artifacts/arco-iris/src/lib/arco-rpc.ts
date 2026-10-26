@@ -915,6 +915,8 @@ export type WaitingListEntry = {
   /** Escola particular ou terapia particular: vai pra trás dentro do grupo. */
   particular?: boolean | null;
   escolaParticular?: boolean | null;
+  /** 0131: Nutrição sem laudo — não disputa vaga, vai pro fim da fila. */
+  semLaudo?: boolean | null;
   companyId: number;
   patientId: number;
   patientName: string;
@@ -1044,6 +1046,20 @@ export async function deleteWaitingListEntry(id: number): Promise<void> {
     p_id: id,
   });
   if (error) throw error;
+}
+
+/** Marca/desmarca SEM LAUDO numa entrada da fila da Nutrição (0131). */
+export async function setWaitingListSemLaudo(id: number, semLaudo: boolean): Promise<{ id: number; semLaudo: boolean }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("set_waiting_list_sem_laudo", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_sem_laudo: semLaudo,
+  });
+  if (error) throw error;
+  return data as { id: number; semLaudo: boolean };
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   listWaitingList,
   deleteWaitingListEntry,
   setWaitingListPaused,
+  setWaitingListSemLaudo,
   listWaitingListHistory,
   type WaitingListHistoryEntry,
   addPatientToFila,
@@ -107,6 +108,13 @@ const RISCO_LABEL: Record<string, string> = {
 };
 function motivoPosicao(e: WaitingListEntry): string[] {
   const m: string[] = [];
+  if (e.semLaudo) {
+    return [
+      "SEM LAUDO (Nutrição): não disputa vaga, fica no fim da fila.",
+      `Entre os sem laudo vale a ordem de chegada (${formatDate(e.entryDate)}).`,
+      "Quando o laudo chegar, desmarque \"Sem laudo\" e a criança volta à posição normal.",
+    ];
+  }
   if (e.urgente) {
     m.push(`Urgência — alerta de risco na triagem (${(e.alertaRisco ?? []).map((c) => RISCO_LABEL[c] ?? c).join(", ")}): passa na frente da alternância.`);
   } else if (e.grupoIdade) {
@@ -486,6 +494,24 @@ export default function WaitingList() {
 
   useEffect(() => { if (histOpen) loadHistory(); }, [histOpen, loadHistory]);
 
+  const isNutricao = (entry: WaitingListEntry) => (entry.specialty ?? "").toLowerCase().startsWith("nutri");
+
+  const handleSemLaudo = async (entry: WaitingListEntry) => {
+    const novo = !entry.semLaudo;
+    try {
+      await setWaitingListSemLaudo(entry.id, novo);
+      toast({
+        title: novo ? "Marcado sem laudo" : "Laudo confirmado",
+        description: novo
+          ? `${entry.patientName} foi para o fim da fila da Nutrição.`
+          : `${entry.patientName} voltou à posição normal na fila da Nutrição.`,
+      });
+      load();
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message || "Falha ao salvar.", variant: "destructive" });
+    }
+  };
+
   const handleUnpause = async (entry: WaitingListEntry) => {
     try {
       await setWaitingListPaused(entry.id, false);
@@ -851,6 +877,14 @@ export default function WaitingList() {
                             ⚠ sem triagem
                           </div>
                         )}
+                        {entry.semLaudo && (
+                          <div
+                            title="Nutrição sem laudo: não disputa vaga, fica no fim da fila (ordem de chegada)."
+                            className="mt-1 inline-block text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-zinc-500/20 text-zinc-300 border border-zinc-500/50"
+                          >
+                            sem laudo
+                          </div>
+                        )}
                         {entry.demandaPrioritaria && (
                           <div
                             title={`Demanda prioritária pelo diagnóstico/CID: ${entry.demandaPrioritaria}. Fica logo depois da Prioridade Máxima nesta especialidade.`}
@@ -978,6 +1012,18 @@ export default function WaitingList() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1 flex-wrap">
+                          {isNutricao(entry) && (
+                            <Button
+                              variant="outline"
+                              title={entry.semLaudo
+                                ? "Laudo chegou: volta à posição normal na fila da Nutrição"
+                                : "Sem laudo: vai para o fim da fila da Nutrição (não disputa vaga)"}
+                              className="h-8 gap-1.5 text-xs border-zinc-500/40 text-zinc-300 hover:bg-zinc-500/10"
+                              onClick={() => handleSemLaudo(entry)}
+                            >
+                              {entry.semLaudo ? "Laudo OK" : "Sem laudo"}
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             title="Pausar atendimento (busca ativa) — tira da disputa por vaga sem remover"
