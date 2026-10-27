@@ -45,3 +45,6 @@ window.fetch = function (input: RequestInfo | URL, options: RequestInit = {}) {
 };
 
 createRoot(document.getElementById("root")!).render(<App />);
+
+import { aplicarEscala } from "@/lib/font-scale";
+aplicarEscala();
