@@ -38,6 +38,7 @@ const navItems: NavItem[] = [
   { href: "/pausados", label: "Pausados / Busca Ativa", icon: Snowflake, scopes: ["admin", "reception"], group: "Atendimento" },
   { href: "/agenda", label: "Agenda Geral", icon: Calendar, scopes: ["admin"], group: "Organização" },
   { href: "/agenda-mensal", label: "Agenda Mensal", icon: CalendarDays, scopes: ["admin"], group: "Organização" },
+  { href: "/agenda-claudia", label: "Agenda da Cláudia", icon: CalendarClock, scopes: ["admin"], group: "Organização" },
   { href: "/agenda-administrativa", label: "Agenda Administrativa", icon: CalendarClock, scopes: ["admin"], group: "Organização" },
   { href: "/salas", label: "Gestão de Salas", icon: DoorOpen, scopes: ["admin"], group: "Organização" },
   { href: "/feriados", label: "Feriados & Ausências", icon: CalendarOff, scopes: ["admin", "reception"], group: "Organização" },

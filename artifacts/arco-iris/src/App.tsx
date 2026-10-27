@@ -25,6 +25,7 @@ const Pausados = lazy(() => import("@/pages/pausados"));
 const Agenda = lazy(() => import("@/pages/agenda"));
 const AgendaMensal = lazy(() => import("@/pages/agenda-mensal"));
 const AgendaProfissionais = lazy(() => import("@/pages/agenda-profissionais"));
+const AgendaClaudia = lazy(() => import("@/pages/agenda-claudia"));
 const GestaoContratos = lazy(() => import("@/pages/gestao-contratos"));
 const Salas = lazy(() => import("@/pages/salas"));
 const Feriados = lazy(() => import("@/pages/feriados"));
@@ -69,6 +70,7 @@ function Router() {
         <Route path="/portal" component={Portal} />
         <Route path="/master" component={PainelMaster} />
         <Route path="/agenda-profissionais" component={AgendaProfissionais} />
+        <Route path="/agenda-claudia" component={AgendaClaudia} />
         <Route>
           <Layout>
             <Suspense fallback={<PageLoader />}>

@@ -75,6 +75,11 @@ function writeDeviceCompany(session: CompanySession) {
   }
 }
 
+/** Slug da empresa já usada neste aparelho (login atual ou cadastro do aparelho). */
+export function getDeviceCompanySlug(): string | null {
+  return getCompanySession()?.companySlug ?? readDeviceCompany()?.companySlug ?? null;
+}
+
 export function getCompanySession(): CompanySession | null {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
