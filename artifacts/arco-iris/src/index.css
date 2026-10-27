@@ -472,3 +472,6 @@
 .leitura-ampliada label { font-size: 1rem; }
 .leitura-ampliada input:not([type="checkbox"]):not([type="radio"]), .leitura-ampliada select, .leitura-ampliada textarea { font-size: 1.0625rem; min-height: 2.875rem; }
 .leitura-ampliada button { font-size: inherit; }
+
+/* Celular: letras um pouco maiores por padrão (o A+/A− do topo muda por aparelho). */
+@media (max-width: 767px) { html { font-size: 112.5%; } }
