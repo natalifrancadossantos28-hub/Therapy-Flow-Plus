@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Saudacao } from "@/components/Saudacao";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
-  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette, ChevronDown, BarChart3, FileText } from "lucide-react";
+  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette, ChevronDown, BarChart3, FileText, CalendarClock } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
@@ -10,6 +10,7 @@ import { logoutAllDevices } from "@/lib/session-epoch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useThemeTick } from "@/lib/theme";
 import { BackgroundPicker } from "@/components/BackgroundPicker";
+import { LembretesAviso } from "@/components/LembretesAviso";
 import { appBackgroundStyle, useBackground } from "@/lib/background";
 
 type NavItem = {
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { href: "/pausados", label: "Pausados / Busca Ativa", icon: Snowflake, scopes: ["admin", "reception"], group: "Atendimento" },
   { href: "/agenda", label: "Agenda Geral", icon: Calendar, scopes: ["admin"], group: "Organização" },
   { href: "/agenda-mensal", label: "Agenda Mensal", icon: CalendarDays, scopes: ["admin"], group: "Organização" },
+  { href: "/agenda-administrativa", label: "Agenda Administrativa", icon: CalendarClock, scopes: ["admin"], group: "Organização" },
   { href: "/salas", label: "Gestão de Salas", icon: DoorOpen, scopes: ["admin"], group: "Organização" },
   { href: "/feriados", label: "Feriados & Ausências", icon: CalendarOff, scopes: ["admin", "reception"], group: "Organização" },
   { href: "/datas-conscientizacao", label: "Datas de Conscientização", icon: HeartHandshake, scopes: ["admin", "reception"], group: "Administração" },
@@ -236,6 +238,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         >
           <Saudacao />
           {children}
+          {scope === "admin" && <LembretesAviso />}
         </motion.div>
       </main>
     </div>
