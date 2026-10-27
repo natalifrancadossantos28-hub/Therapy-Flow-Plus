@@ -74,7 +74,7 @@ function periodo(h: number) {
 }
 
 /** Saudação conforme o horário (Brasília), com o nome de quem está usando e uma frase que muda a cada período. */
-export function Saudacao({ nome, detalhe }: { nome?: string | null; detalhe?: string | null }) {
+export function Saudacao({ nome, detalhe, pessoaId }: { nome?: string | null; detalhe?: string | null; pessoaId?: number | null }) {
   const [agora, setAgora] = useState(agoraBR);
   useEffect(() => {
     const t = setInterval(() => setAgora(agoraBR()), 60_000);
@@ -82,18 +82,21 @@ export function Saudacao({ nome, detalhe }: { nome?: string | null; detalhe?: st
   }, []);
 
   let quem = nome?.trim() || "";
+  let id = pessoaId ?? null;
   let sub = detalhe ?? null;
   if (!quem) {
     const prof = getProfessionalSession();
     const scope = getCurrentScope();
-    if (prof?.professionalName) { quem = prof.professionalName; sub = sub ?? prof.specialty ?? null; }
+    if (prof?.professionalName) { quem = prof.professionalName; sub = sub ?? prof.specialty ?? null; id = id ?? prof.professionalId; }
     else quem = scope === "reception" ? "Equipe da Recepção" : "Equipe de Gestão";
   }
   const { idx, texto, Icon, cor } = periodo(agora.getHours());
   // Muda a cada período (manhã/tarde/noite); a madrugada usa a frase da noite anterior.
   const base = new Date(agora.getTime() - (agora.getHours() < 5 ? 86400000 : 0));
   const dias = Math.floor(base.getTime() / 86400000);
-  const fraseAtual = frase(dias * 3 + idx);
+  // Cada pessoa tem um deslocamento próprio: no mesmo período, colegas veem frases diferentes.
+  const semente = id ?? [...quem].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % TOTAL_FRASES, 7);
+  const fraseAtual = frase(dias * 3 + idx + semente * 37);
   const data = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
   return (

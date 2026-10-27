@@ -172,7 +172,7 @@ export default function AgendaProfissionais() {
           </div>
         ) : (
           <>
-            {selectedProf && <Saudacao nome={selectedProf.name} detalhe={selectedProf.specialty} />}
+            {selectedProf && <Saudacao nome={selectedProf.name} detalhe={selectedProf.specialty} pessoaId={selectedProf.id} />}
             <MensagensComemorativas professionalId={selectedProf?.id ?? null} />
             {!isAdminViewing && selectedProf && (
               <RecadoEquipeComposer
