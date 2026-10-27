@@ -32,6 +32,8 @@ import {
   type PatientPdfData,
   type PatientAbsencesInfo,
   type PatientDischarge,
+  listWaitingList,
+  setWaitingListEntryDate,
 } from "@/lib/arco-rpc";
 import { AREA_MAX_UI, areaToDb, areaToUi } from "@/lib/score-scale";
 import { isTransportSpecialty, SPECIALTIES } from "@/lib/specialty-colors";
@@ -110,6 +112,8 @@ const PRIORITY_LABEL: Record<string, string> = {
   leve: "AZUL – Leve",
   baixo: "VERDE – Baixo",
 };
+
+type FilaRow = { id: number; specialty: string; entryDate: string; position: number | null; waitDays: number | null; paused: boolean };
 
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -252,8 +256,36 @@ export default function PatientDetail() {
     }
   };
 
+  const [filaRows, setFilaRows] = useState<FilaRow[]>([]);
+  const [filaDates, setFilaDates] = useState<Record<number, string>>({});
+
+  const loadFilaRows = async (): Promise<FilaRow[]> => {
+    const all = await listWaitingList().catch(() => []);
+    const rows: FilaRow[] = [];
+    const posBySpec: Record<string, number> = {};
+    for (const e of all) {
+      const spec = e.specialty || "Sem especialidade";
+      if (!e.paused) posBySpec[spec] = (posBySpec[spec] ?? 0) + 1;
+      if (e.patientId !== patientId) continue;
+      rows.push({
+        id: e.id,
+        specialty: spec,
+        entryDate: (e.entryDate || "").slice(0, 10),
+        position: e.paused ? null : posBySpec[spec],
+        waitDays: typeof e.waitDays === "number" ? e.waitDays : null,
+        paused: !!e.paused,
+      });
+    }
+    setFilaRows(rows);
+    setFilaDates(Object.fromEntries(rows.map(r => [r.id, r.entryDate])));
+    return rows;
+  };
+
   const openEditModal = () => {
     if (!patient) return;
+    setFilaRows([]);
+    setFilaDates({});
+    loadFilaRows();
     setEditName(patient.name || "");
     setEditProntuario(patient.prontuario || "");
     setEditEntryDate(patient.entryDate || "");
@@ -302,8 +334,21 @@ export default function PatientDetail() {
         photoUrl: editPhotoUrl,
       });
       setPatient(updated);
+      const changed = filaRows.filter(r => filaDates[r.id] && filaDates[r.id] !== r.entryDate);
+      for (const r of changed) {
+        await setWaitingListEntryDate(r.id, filaDates[r.id], "Corrigido no cadastro do paciente");
+      }
       setEditOpen(false);
-      toast({ title: "Dados atualizados!", description: "As informações do paciente foram salvas com sucesso." });
+      if (changed.length) {
+        const rows = await loadFilaRows();
+        const resumo = rows
+          .filter(r => changed.some(c => c.id === r.id))
+          .map(r => `${r.specialty}: ${r.position ? `${r.position}º lugar` : "pausado"}${r.waitDays != null ? `, ${r.waitDays} dias` : ""}`)
+          .join(" · ");
+        toast({ title: "Dados e fila atualizados!", description: `Nova posição na fila — ${resumo}` });
+      } else {
+        toast({ title: "Dados atualizados!", description: "As informações do paciente foram salvas com sucesso." });
+      }
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: err?.message || "Falha inesperada.", variant: "destructive" });
     } finally {
@@ -1506,9 +1551,42 @@ export default function PatientDetail() {
                   <div>
                     <Label className="text-sm font-semibold">Data de Entrada</Label>
                     <Input type="date" value={editEntryDate} onChange={e => setEditEntryDate(e.target.value)} className="mt-1" />
-                    <p className="text-[11px] text-muted-foreground mt-1">Data de cadastro na unidade. A data de cada fila se corrige na Fila de Espera, clicando na data.</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">Data de cadastro na unidade.</p>
                   </div>
                 </div>
+                {filaRows.length > 0 && (
+                  <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/5 p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <Label className="text-sm font-semibold">Data de entrada em cada fila de espera</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={!editEntryDate}
+                        onClick={() => setFilaDates(Object.fromEntries(filaRows.map(r => [r.id, editEntryDate])))}
+                      >
+                        Usar a data de entrada em todas as filas
+                      </Button>
+                    </div>
+                    {filaRows.map(r => (
+                      <div key={r.id} className="grid grid-cols-[1fr_auto] items-center gap-3">
+                        <div className="text-sm">
+                          <span className="font-semibold">{r.specialty}</span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            {r.paused ? "pausado" : `${r.position}º lugar`}{r.waitDays != null ? ` · ${r.waitDays} dias` : ""}
+                          </span>
+                        </div>
+                        <Input
+                          type="date"
+                          value={filaDates[r.id] ?? ""}
+                          onChange={e => setFilaDates(d => ({ ...d, [r.id]: e.target.value }))}
+                          className={`w-44 ${filaDates[r.id] !== r.entryDate ? "border-amber-400" : ""}`}
+                        />
+                      </div>
+                    ))}
+                    <p className="text-[11px] text-muted-foreground">Só muda a fila que você alterar. Ao salvar, a posição é recalculada com as mesmas regras de prioridade, e a correção fica no histórico da fila.</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-semibold">Data de Nascimento</Label>
