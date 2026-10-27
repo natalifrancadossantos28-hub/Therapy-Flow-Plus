@@ -162,9 +162,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="md:hidden flex items-center justify-between p-4 bg-card border-b border-border z-20">
         <div className="flex items-center gap-2">
           <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-8 h-8 rounded-lg" />
-          <span className="font-display font-bold text-lg text-primary">NFS</span>
+          <span className="font-display font-bold text-lg text-primary hidden min-[420px]:inline">NFS</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <BackgroundPicker bgKey={bgKey} subtitle={bgSubtitle} placement="down-right" />
           <FontSizeToggle />
           <ThemeToggle compact />
