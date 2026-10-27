@@ -179,7 +179,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-card border-b border-border overflow-hidden z-10"
+            className="md:hidden bg-card border-b border-border overflow-y-auto overscroll-contain max-h-[calc(100dvh-4rem)] z-10"
           >
             <nav aria-label="Menu principal" className="flex flex-col p-4 gap-2">
               <NavLinks />
