@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Saudacao } from "@/components/Saudacao";
 import { Calendar as CalendarIcon, Lock, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BackgroundPicker } from "@/components/BackgroundPicker";
@@ -171,6 +172,7 @@ export default function AgendaProfissionais() {
           </div>
         ) : (
           <>
+            {selectedProf && <Saudacao nome={selectedProf.name} detalhe={selectedProf.specialty} />}
             <MensagensComemorativas professionalId={selectedProf?.id ?? null} />
             {!isAdminViewing && selectedProf && (
               <RecadoEquipeComposer
