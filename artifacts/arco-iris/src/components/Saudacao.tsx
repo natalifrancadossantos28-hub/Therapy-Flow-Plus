@@ -2,39 +2,65 @@ import { useEffect, useState } from "react";
 import { Sun, Sunset, Moon } from "lucide-react";
 import { getCurrentScope, getProfessionalSession } from "@/lib/portal-session";
 
-const FRASES = [
-  "Cada pequeno avanço de uma criança é uma grande conquista. Obrigado por fazer parte disso.",
+// 25 aberturas × 20 complementos = 500 frases diferentes.
+const ABERTURAS = [
+  "Cada pequeno avanço de uma criança é uma grande conquista.",
   "O cuidado que você oferece hoje transforma o amanhã de uma família inteira.",
   "Seu trabalho é ponte entre a dificuldade e a possibilidade.",
-  "Paciência, afeto e técnica: a combinação que muda vidas.",
+  "Paciência, afeto e técnica formam a combinação que muda vidas.",
   "Quem cuida com amor deixa marcas que o tempo não apaga.",
-  "Hoje é mais um dia para acolher, ensinar e acreditar.",
-  "Por trás de cada sessão existe uma família cheia de esperança. Obrigado por cuidar dela.",
+  "Por trás de cada sessão existe uma família cheia de esperança.",
   "Respeitar o tempo de cada criança é o primeiro passo para o seu desenvolvimento.",
-  "Seu olhar atento faz diferença na vida de quem mais precisa.",
   "Grandes transformações começam com pequenos gestos de cuidado.",
-  "Uma equipe unida faz da terapia um lugar de confiança e acolhimento.",
   "Cada sorriso conquistado na terapia vale o dia inteiro.",
-  "Acolher também é tratar. Obrigado pela sua dedicação.",
+  "Acolher também é tratar.",
   "Você não apenas atende: você abre caminhos.",
   "O desenvolvimento acontece no encontro entre ciência e afeto.",
-  "Toda criança merece alguém que acredite no seu potencial. Hoje, esse alguém é você.",
+  "Toda criança merece alguém que acredite no seu potencial.",
   "Persistência e carinho constroem conquistas que pareciam impossíveis.",
-  "Seu compromisso fortalece a nossa missão de cuidar com excelência.",
-  "Cada família que sai daqui mais confiante é fruto do seu trabalho.",
   "Escutar com atenção é um dos gestos mais terapêuticos que existem.",
   "O progresso não precisa ser rápido, precisa ser constante.",
-  "Que o dia de hoje seja leve, produtivo e cheio de boas conquistas.",
-  "Cuidar de quem cuida também importa. Respire, você está fazendo um ótimo trabalho.",
-  "Excelência é feita de detalhes, e você cuida de cada um deles.",
+  "Excelência é feita de detalhes, e cada detalhe conta.",
   "Juntos, transformamos desafios em desenvolvimento.",
-  "Sua presença traz segurança para quem ainda está aprendendo a confiar.",
-  "Cada atendimento é uma oportunidade de fazer o bem com competência.",
   "Ensinar uma nova habilidade é entregar liberdade para o futuro.",
   "A dedicação de hoje é a autonomia de amanhã.",
-  "Obrigado por escolher, todos os dias, fazer a diferença.",
   "Onde há cuidado verdadeiro, há evolução.",
+  "Cada família que sai daqui mais confiante é fruto do trabalho de toda a equipe.",
+  "Uma equipe unida faz da terapia um lugar de confiança.",
+  "Sua presença traz segurança para quem ainda está aprendendo a confiar.",
+  "Cada conquista, por menor que pareça, merece ser celebrada.",
 ];
+const COMPLEMENTOS = [
+  "Obrigado por fazer parte disso.",
+  "Que o seu dia seja leve e cheio de boas conquistas.",
+  "Obrigado pela sua dedicação.",
+  "Seu trabalho faz a diferença.",
+  "Conte sempre com a nossa equipe.",
+  "Que hoje seja um dia de bons encontros.",
+  "Respire, você está fazendo um ótimo trabalho.",
+  "Siga em frente com confiança.",
+  "Hoje é mais um dia para acolher, ensinar e acreditar.",
+  "Obrigado por escolher fazer a diferença todos os dias.",
+  "Que não falte energia nem carinho no seu dia.",
+  "Cuidar de quem cuida também importa.",
+  "Seu compromisso fortalece a nossa missão.",
+  "Bom trabalho e ótimos atendimentos.",
+  "Acredite no poder do seu trabalho.",
+  "Cada atendimento é uma chance de fazer o bem.",
+  "Que o seu olhar atento continue iluminando caminhos.",
+  "A NFS tem orgulho de ter você na equipe.",
+  "Que este período seja produtivo e tranquilo.",
+  "Você é parte essencial dessa história.",
+];
+const TOTAL_FRASES = ABERTURAS.length * COMPLEMENTOS.length;
+
+/** Frase n (0..499): percorre todas as combinações sem repetir a abertura em seguida. */
+function frase(n: number) {
+  const i = ((n % TOTAL_FRASES) + TOTAL_FRASES) % TOTAL_FRASES;
+  const a = i % ABERTURAS.length;
+  const b = (Math.floor(i / ABERTURAS.length) + a) % COMPLEMENTOS.length;
+  return `${ABERTURAS[a]} ${COMPLEMENTOS[b]}`;
+}
 
 function agoraBR() {
   const s = new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
@@ -42,16 +68,12 @@ function agoraBR() {
 }
 
 function periodo(h: number) {
-  if (h >= 5 && h < 12) return { texto: "Bom dia", Icon: Sun, cor: "text-amber-300" };
-  if (h >= 12 && h < 18) return { texto: "Boa tarde", Icon: Sunset, cor: "text-orange-300" };
-  return { texto: "Boa noite", Icon: Moon, cor: "text-indigo-300" };
+  if (h >= 5 && h < 12) return { idx: 0, texto: "Bom dia", Icon: Sun, cor: "text-amber-300" };
+  if (h >= 12 && h < 18) return { idx: 1, texto: "Boa tarde", Icon: Sunset, cor: "text-orange-300" };
+  return { idx: 2, texto: "Boa noite", Icon: Moon, cor: "text-indigo-300" };
 }
 
-function diaDoAno(d: Date) {
-  return Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
-}
-
-/** Saudação conforme o horário (Brasília), com o nome de quem está usando e uma frase do dia. */
+/** Saudação conforme o horário (Brasília), com o nome de quem está usando e uma frase que muda a cada período. */
 export function Saudacao({ nome, detalhe }: { nome?: string | null; detalhe?: string | null }) {
   const [agora, setAgora] = useState(agoraBR);
   useEffect(() => {
@@ -67,8 +89,11 @@ export function Saudacao({ nome, detalhe }: { nome?: string | null; detalhe?: st
     if (prof?.professionalName) { quem = prof.professionalName; sub = sub ?? prof.specialty ?? null; }
     else quem = scope === "reception" ? "Equipe da Recepção" : "Equipe de Gestão";
   }
-  const { texto, Icon, cor } = periodo(agora.getHours());
-  const frase = FRASES[diaDoAno(agora) % FRASES.length];
+  const { idx, texto, Icon, cor } = periodo(agora.getHours());
+  // Muda a cada período (manhã/tarde/noite); a madrugada usa a frase da noite anterior.
+  const base = new Date(agora.getTime() - (agora.getHours() < 5 ? 86400000 : 0));
+  const dias = Math.floor(base.getTime() / 86400000);
+  const fraseAtual = frase(dias * 3 + idx);
   const data = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
   return (
@@ -81,7 +106,7 @@ export function Saudacao({ nome, detalhe }: { nome?: string | null; detalhe?: st
           {texto}, <span className="text-primary">{quem}</span>
           {sub && <span className="ml-2 text-sm font-medium text-muted-foreground">· {sub}</span>}
         </p>
-        <p className="mt-1 text-sm md:text-[15px] italic text-foreground/80">“{frase}”</p>
+        <p className="mt-1 text-sm md:text-[15px] italic text-foreground/80">“{fraseAtual}”</p>
       </div>
       <p className="hidden md:block shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{data}</p>
     </div>
