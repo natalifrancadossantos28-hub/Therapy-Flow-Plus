@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { Saudacao } from "@/components/Saudacao";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
   Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette, ChevronDown, BarChart3, FileText } from "lucide-react";
@@ -233,6 +234,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
+          <Saudacao />
           {children}
         </motion.div>
       </main>
