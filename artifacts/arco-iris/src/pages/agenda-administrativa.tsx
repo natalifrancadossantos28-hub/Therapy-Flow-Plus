@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { format, addDays, subDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarClock, Bell, Check, Pencil, Trash2, MapPin, RotateCcw } from "lucide-react";
+import { CalendarClock, Bell, Check, Pencil, Trash2, MapPin, RotateCcw, Smartphone } from "lucide-react";
 import { Card, Button, Input, Label, Select } from "@/components/ui-custom";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -10,6 +10,7 @@ import {
   listCompromissos, saveCompromisso, setCompromissoConcluido, deleteCompromisso, migracaoPendente, type Compromisso,
 } from "@/lib/agenda-admin-rpc";
 import { COMPROMISSOS_EVENTO, inicioDe, faltaTexto } from "@/components/LembretesAviso";
+import { baixarIcs, linkGoogleAgenda } from "@/lib/compromisso-celular";
 
 const ANTECEDENCIAS: [number, string][] = [
   [0, "Na hora"], [10, "10 minutos antes"], [30, "30 minutos antes"],
@@ -102,6 +103,17 @@ export default function AgendaAdministrativa() {
             <p className="text-[11px] mt-1 flex items-center gap-1 text-primary"><Bell className="w-3 h-3" />
               Aviso {rotulo(c.antecedenciaMin).toLowerCase()} · {faltaTexto(min)}</p>
           )}
+          {!passado && !c.concluido && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => baixarIcs(c)}>
+                <Smartphone className="w-4 h-4" /> Adicionar no iPhone
+              </Button>
+              <a href={linkGoogleAgenda(c)} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-border text-sm font-semibold hover:bg-secondary">
+                <Smartphone className="w-4 h-4" /> Adicionar no Google Agenda (Android)
+              </a>
+            </div>
+          )}
         </div>
         <div className="flex gap-1 shrink-0">
           {c.concluido
@@ -161,6 +173,7 @@ export default function AgendaAdministrativa() {
             {perm === "granted" && <p>Avisos do navegador ativados neste computador.</p>}
             {perm === "denied" && <p>Avisos do navegador bloqueados nas configurações. Os avisos na tela do sistema continuam.</p>}
             <p>O aviso aparece com o sistema aberto (em qualquer tela), com som. “Lembrar em 10 min” adia o aviso.</p>
+            <p><b>Para o celular avisar mesmo com o sistema fechado:</b> toque em “Adicionar no iPhone” ou “Adicionar no Google Agenda” no compromisso. Se mudar o horário aqui, toque de novo.</p>
           </div>
         </Card>
 
