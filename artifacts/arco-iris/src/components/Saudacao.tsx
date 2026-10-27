@@ -52,6 +52,7 @@ const COMPLEMENTOS = [
   "Que este período seja produtivo e tranquilo.",
   "Você é parte essencial dessa história.",
 ];
+const FECHO_EXPEDIENTE = "Bom trabalho e ótimos atendimentos.";
 const TOTAL_FRASES = ABERTURAS.length * COMPLEMENTOS.length;
 
 /** Frase n (0..499): percorre todas as combinações sem repetir a abertura em seguida. */
@@ -96,7 +97,12 @@ export function Saudacao({ nome, detalhe, pessoaId }: { nome?: string | null; de
   const dias = Math.floor(base.getTime() / 86400000);
   // Cada pessoa tem um deslocamento próprio: no mesmo período, colegas veem frases diferentes.
   const semente = id ?? [...quem].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % TOTAL_FRASES, 7);
-  const fraseAtual = frase(dias * 3 + idx + semente * 37);
+  const n = dias * 3 + idx + semente * 37;
+  // Até as 17h a frase sempre termina com o desejo de bom trabalho.
+  const h = agora.getHours();
+  const fraseAtual = h >= 5 && h < 17
+    ? `${ABERTURAS[((n % ABERTURAS.length) + ABERTURAS.length) % ABERTURAS.length]} ${FECHO_EXPEDIENTE}`
+    : frase(n);
   const data = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
   return (
