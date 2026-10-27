@@ -1049,6 +1049,25 @@ export async function deleteWaitingListEntry(id: number): Promise<void> {
 }
 
 /** Marca/desmarca SEM LAUDO numa entrada da fila da Nutrição (0131). */
+/** 0132: corrige a data de entrada de UMA especialidade (fica no histórico). */
+export async function setWaitingListEntryDate(
+  id: number,
+  entryDate: string,
+  motivo: string,
+): Promise<{ id: number; entryDate: string; anterior: string | null }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("set_waiting_list_entry_date", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_entry_date: entryDate,
+    p_motivo: motivo,
+  });
+  if (error) throw error;
+  return data as { id: number; entryDate: string; anterior: string | null };
+}
+
 export async function setWaitingListSemLaudo(id: number, semLaudo: boolean): Promise<{ id: number; semLaudo: boolean }> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();

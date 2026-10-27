@@ -1506,6 +1506,7 @@ export default function PatientDetail() {
                   <div>
                     <Label className="text-sm font-semibold">Data de Entrada</Label>
                     <Input type="date" value={editEntryDate} onChange={e => setEditEntryDate(e.target.value)} className="mt-1" />
+                    <p className="text-[11px] text-muted-foreground mt-1">Data de cadastro na unidade. A data de cada fila se corrige na Fila de Espera, clicando na data.</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">

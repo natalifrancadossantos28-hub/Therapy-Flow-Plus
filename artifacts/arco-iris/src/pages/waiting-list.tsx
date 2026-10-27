@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Card, MotionCard, Button, Badge, Label, Select, Input } from "@/components/ui-custom";
-import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search, LogOut, History, Clock, X } from "lucide-react";
+import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search, LogOut, History, Clock, X, CalendarClock } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate, calcIdade } from "@/lib/utils";
@@ -20,6 +20,7 @@ import {
   deleteWaitingListEntry,
   setWaitingListPaused,
   setWaitingListSemLaudo,
+  setWaitingListEntryDate,
   listWaitingListHistory,
   type WaitingListHistoryEntry,
   addPatientToFila,
@@ -89,6 +90,7 @@ const HIST_LABEL: Record<string, { label: string; cls: string }> = {
   pausa:              { label: "Pausa / busca ativa", cls: "bg-sky-500/15 text-sky-400 border-sky-500/40" },
   retorno:            { label: "Voltou à fila",       cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/40" },
   retorno_automatico: { label: "Voltou (prazo venceu)", cls: "bg-yellow-500/15 text-yellow-400 border-yellow-500/40" },
+  data_corrigida:     { label: "Data corrigida",      cls: "bg-indigo-500/15 text-indigo-300 border-indigo-500/40" },
 };
 
 const waitDaysOf = (e: WaitingListEntry): number => {
@@ -169,6 +171,10 @@ export default function WaitingList() {
   const [saidaMotivo, setSaidaMotivo] = useState("");
   const [saidaLoading, setSaidaLoading] = useState(false);
   const [pauseTarget, setPauseTarget] = useState<WaitingListEntry | null>(null);
+  const [dateTarget, setDateTarget] = useState<WaitingListEntry | null>(null);
+  const [dateValue, setDateValue] = useState("");
+  const [dateMotivo, setDateMotivo] = useState("");
+  const [dateLoading, setDateLoading] = useState(false);
   const [pauseReason, setPauseReason] = useState<string>(PAUSE_REASONS[0]);
   const [pauseOther, setPauseOther] = useState("");
   const [pauseReturn, setPauseReturn] = useState("");
@@ -495,6 +501,34 @@ export default function WaitingList() {
   useEffect(() => { if (histOpen) loadHistory(); }, [histOpen, loadHistory]);
 
   const isNutricao = (entry: WaitingListEntry) => (entry.specialty ?? "").toLowerCase().startsWith("nutri");
+
+  const openDateFix = (entry: WaitingListEntry) => {
+    setDateTarget(entry);
+    setDateValue((entry.entryDate || "").slice(0, 10));
+    setDateMotivo("");
+  };
+
+  const confirmDateFix = async () => {
+    if (!dateTarget) return;
+    if (!dateValue || !dateMotivo.trim()) {
+      toast({ title: "Preencha a data e o motivo", variant: "destructive" });
+      return;
+    }
+    setDateLoading(true);
+    try {
+      await setWaitingListEntryDate(dateTarget.id, dateValue, dateMotivo.trim());
+      toast({
+        title: "Data corrigida",
+        description: `${dateTarget.patientName}${dateTarget.specialty ? ` — ${dateTarget.specialty}` : ""}: entrada em ${formatDate(dateValue)}. Posição e tempo de espera recalculados.`,
+      });
+      setDateTarget(null);
+      load();
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message || "Falha ao salvar.", variant: "destructive" });
+    } finally {
+      setDateLoading(false);
+    }
+  };
 
   const handleSemLaudo = async (entry: WaitingListEntry) => {
     const novo = !entry.semLaudo;
@@ -1001,7 +1035,16 @@ export default function WaitingList() {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 font-medium">{formatDate(entry.entryDate)}</td>
+                      <td className="px-6 py-4 font-medium">
+                        <button
+                          type="button"
+                          onClick={() => openDateFix(entry)}
+                          title="Corrigir a data de entrada nesta especialidade"
+                          className="inline-flex items-center gap-1 hover:text-primary hover:underline"
+                        >
+                          {formatDate(entry.entryDate)} <CalendarClock className="w-3.5 h-3.5 opacity-60" />
+                        </button>
+                      </td>
                       <td className="px-6 py-4">
                         {(() => { const d = waitDaysOf(entry); return (
                           <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-md border ${waitTone(d)}`}
@@ -1163,6 +1206,36 @@ export default function WaitingList() {
             </table>
           </div>
         </Card>
+      )}
+
+      {dateTarget && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <MotionCard className="w-full max-w-md p-6 overflow-visible border-indigo-500/40" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold font-display flex items-center gap-2"><CalendarClock className="w-5 h-5 text-indigo-300" /> Corrigir data de entrada</h2>
+                <p className="text-sm text-muted-foreground mt-1">{dateTarget.patientName}{dateTarget.specialty ? ` — ${dateTarget.specialty}` : ""}. Muda só esta especialidade; a data do cadastro e as outras filas continuam iguais.</p>
+              </div>
+              <button type="button" onClick={() => setDateTarget(null)} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label>Data real do encaminhamento para esta especialidade</Label>
+                <Input type="date" value={dateValue} onChange={e => setDateValue(e.target.value)} />
+                <p className="text-xs text-muted-foreground mt-1">Data atual na fila: {formatDate(dateTarget.entryDate)}.</p>
+              </div>
+              <div>
+                <Label>Motivo da correção</Label>
+                <Input placeholder="Ex.: encaminhamento de 03/09/2025 registrado com atraso" value={dateMotivo} onChange={e => setDateMotivo(e.target.value)} />
+                <p className="text-xs text-muted-foreground mt-1">Fica registrado no histórico da fila (data anterior → nova). A posição segue as mesmas regras de prioridade; a data só conta como critério de chegada.</p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setDateTarget(null)} disabled={dateLoading}>Cancelar</Button>
+                <Button onClick={confirmDateFix} disabled={dateLoading} className="gap-1.5"><CalendarClock className="w-4 h-4" /> {dateLoading ? "Salvando…" : "Salvar data"}</Button>
+              </div>
+            </div>
+          </MotionCard>
+        </div>
       )}
 
       {pauseTarget && (
