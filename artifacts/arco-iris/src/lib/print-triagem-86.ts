@@ -143,7 +143,7 @@ function triagem86Doc(t: Triagem86, p: PacienteInfo, opts?: { tipo?: string }): 
     return `<text x="${x}" y="${y}" font-size="13" font-weight="700" text-anchor="${anchor}" fill="#0f172a">${esc(a.area)}</text>
       <text x="${x}" y="${y + 15}" font-size="16" font-weight="800" text-anchor="${anchor}" fill="${cor}">${a.respondidas ? `${pctA(a)}%` : "não avaliado"}</text>`;
   }).join("");
-  const teia = `<svg viewBox="0 0 520 345" width="100%" height="215">${grid}${poly}${labels}</svg>`;
+  const teia = `<svg viewBox="0 0 520 345" width="100%" height="225">${grid}${poly}${labels}</svg>`;
 
   const linhas = niveis.map(({ a, n }) => {
     const pill = n ? PILL[n.label] : null;
@@ -161,7 +161,7 @@ function triagem86Doc(t: Triagem86, p: PacienteInfo, opts?: { tipo?: string }): 
   const arcs = ([[cont.alta, "#ef4444"], [cont.mod, "#f59e0b"], [cont.baixa, "#22c55e"]] as [number, string][]).map(([v, cor]) => {
     const len = (v / totN) * C; const s = `<circle cx="55" cy="55" r="42" fill="none" stroke="${cor}" stroke-width="16" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 55 55)"/>`; off += len; return s;
   }).join("");
-  const donut = `<div class="donut"><svg viewBox="0 0 110 110" width="105" height="105"><circle cx="55" cy="55" r="42" fill="none" stroke="#eef2f7" stroke-width="16"/>${arcs}
+  const donut = `<div class="donut"><svg viewBox="0 0 110 110" width="120" height="120"><circle cx="55" cy="55" r="42" fill="none" stroke="#eef2f7" stroke-width="16"/>${arcs}
       <text x="55" y="53" font-size="17" font-weight="800" text-anchor="middle" fill="#0b1f4d">${totalPts}</text><text x="55" y="66" font-size="8" text-anchor="middle" fill="#475569">pontos (${pctTotal}%)</text></svg>
     <div class="leg"><p><i style="background:#ef4444"></i>Alta: ${cont.alta} área${cont.alta === 1 ? "" : "s"}</p><p><i style="background:#f59e0b"></i>Moderada: ${cont.mod} área${cont.mod === 1 ? "" : "s"}</p><p><i style="background:#22c55e"></i>Baixa: ${cont.baixa} área${cont.baixa === 1 ? "" : "s"}</p></div></div>`;
 
@@ -184,36 +184,37 @@ function triagem86Doc(t: Triagem86, p: PacienteInfo, opts?: { tipo?: string }): 
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 0; background: #e2e8f0; font-size: 13px; }
   .bar { display: flex; gap: 10px; padding: 14px; justify-content: center; }
-  .page { width: 210mm; height: 297mm; margin: 0 auto 14px; background: #fff; padding: 10mm 11mm 8mm; display: flex; flex-direction: column; gap: 3.5mm; overflow: hidden; }
+  .page { width: 210mm; height: 297mm; margin: 0 auto 14px; background: #fff; padding: 9mm 10mm 7mm; display: flex; flex-direction: column; gap: 3.5mm; overflow: hidden; }
   .cab { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #bfd3ea; padding-bottom: 6px; }
   .logo { display: flex; align-items: center; gap: 8px; } .nfs { font-size: 40px; font-weight: 900; color: #0b1f4d; letter-spacing: -1px; } .gt { font-size: 16px; line-height: 1.1; color: #0b1f4d; }
   .tit { text-align: right; } .tit b { display: block; font-size: 17px; color: #0b1f4d; } .tit span { display: block; font-size: 12px; color: #334155; letter-spacing: .06em; } .tit em { font-style: normal; font-size: 12px; color: #475569; }
   .sec { border: 1px solid #dbe4ef; border-radius: 10px; overflow: hidden; break-inside: avoid; flex-shrink: 0; }
-  .sec-h { display: flex; align-items: center; gap: 10px; background: #eef4fb; padding: 4px 12px; font-weight: 800; font-size: 15px; color: #0b1f4d; position: relative; }
+  .sec-h { display: flex; align-items: center; gap: 10px; background: #eef4fb; padding: 5px 14px; font-weight: 800; font-size: 18px; color: #0b1f4d; position: relative; }
   .ib { width: 30px; height: 30px; border-radius: 7px; background: #0b1f4d; display: inline-flex; align-items: center; justify-content: center; }
   .pront { margin-left: auto; background: #cfe3fb; border-radius: 10px; padding: 4px 16px; text-align: center; font-size: 26px; font-weight: 900; line-height: 1; } .pront small { display: block; font-size: 9px; font-weight: 700; letter-spacing: .06em; color: #1e3a6e; }
-  .sec-b { padding: 4px 12px 8px; }
+  .sec-b { padding: 4px 14px 8px; }
   .g2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
-  .kv { display: flex; flex-direction: column; padding: 8px 0; border-bottom: 1px solid #eef2f7; } .kv.span { grid-column: 1 / -1; }
-  .k { font-size: 13px; color: #334155; } .v { font-size: 16px; font-weight: 700; color: #0f172a; }
-  .rd { display: inline-flex; align-items: center; gap: 6px; margin-right: 18px; font-weight: 400; } .rd i { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #94a3b8; display: inline-block; } .rd i.on { border-color: #1d4ed8; background: radial-gradient(#1d4ed8 45%, #fff 50%); }
-  .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; } .mini { display: flex; gap: 8px; align-items: center; padding: 12px 0; } .mini b { display: block; font-size: 15px; }
+  .kv { display: flex; flex-direction: column; padding: 5px 0; border-bottom: 1px solid #eef2f7; } .kv.span { grid-column: 1 / -1; }
+  .k { font-size: 14px; color: #334155; } .v { font-size: 17.5px; font-weight: 700; color: #0f172a; }
+  .rd { display: inline-flex; align-items: center; gap: 6px; margin-right: 18px; font-weight: 400; } .rd i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #94a3b8; display: inline-block; } .rd i.on { border-color: #1d4ed8; background: radial-gradient(#1d4ed8 45%, #fff 50%); }
+  .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; } .mini { display: flex; gap: 8px; align-items: center; padding: 8px 0; } .mini b { display: block; font-size: 17px; }
   .total { display: flex; align-items: center; gap: 14px; background: #eef4fb; border-radius: 10px; overflow: hidden; } .tb { background: #1d4ed8; padding: 26px; display: flex; }
-  .tt { flex: 1; } .tt b { display: block; font-size: 18px; color: #0b1f4d; } .tt span { font-size: 12px; color: #334155; } .barra { height: 10px; border-radius: 9px; background: #cfe3fb; overflow: hidden; margin-top: 6px; } .barra div { height: 100%; background: #1d4ed8; }
-  .num { text-align: right; padding-right: 16px; } .num b { display: block; font-size: 30px; color: #0b1f4d; } .num span { font-size: 26px; font-weight: 900; color: #0b1f4d; }
+  .tt { flex: 1; } .tt b { display: block; font-size: 22px; color: #0b1f4d; } .tt span { font-size: 14px; color: #334155; } .barra { height: 10px; border-radius: 9px; background: #cfe3fb; overflow: hidden; margin-top: 6px; } .barra div { height: 100%; background: #1d4ed8; }
+  .num { text-align: right; padding-right: 16px; } .num b { display: block; font-size: 36px; color: #0b1f4d; } .num span { font-size: 26px; font-weight: 900; color: #0b1f4d; }
   .page.p2 { gap: 2.5mm; }
-  .rod { display: flex; justify-content: space-between; gap: 10px; font-size: 10px; color: #64748b; margin-top: auto; }
-  .alerta { border: 2px solid #dc2626; background: #fef2f2; color: #991b1b; font-weight: 700; border-radius: 8px; padding: 5px 10px; font-size: 11.5px; }
-  table { width: 100%; border-collapse: collapse; } th { font-size: 12px; text-align: left; color: #0b1f4d; padding: 4px; border-bottom: 1px solid #dbe4ef; font-weight: 700; }
-  td { padding: 2px 4px; border-bottom: 1px solid #f1f5f9; font-size: 13.5px; } .c { text-align: center; } td.pr { font-weight: 800; color: #0b1f4d; }
-  .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
-  .mb { width: 90px; height: 9px; border-radius: 9px; background: #eef2f7; overflow: hidden; } .mb div { height: 100%; border-radius: 9px; }
-  .pill { display: inline-block; padding: 2px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; min-width: 70px; } .pill.na { background: #f1f5f9; color: #64748b; font-style: italic; }
+  .rod { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: #64748b; margin-top: auto; }
+  .alerta { border: 2px solid #dc2626; background: #fef2f2; color: #991b1b; font-weight: 700; border-radius: 8px; padding: 6px 12px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; } th { font-size: 14.5px; text-align: left; color: #0b1f4d; padding: 6px 4px; border-bottom: 1px solid #dbe4ef; font-weight: 700; }
+  td { padding: 4px 4px; border-bottom: 1px solid #f1f5f9; font-size: 16.5px; } .c { text-align: center; } td.pr { font-weight: 800; color: #0b1f4d; }
+  .dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+  .mb { width: 100px; height: 11px; border-radius: 9px; background: #eef2f7; overflow: hidden; } .mb div { height: 100%; border-radius: 9px; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 6px; font-weight: 700; font-size: 14px; min-width: 84px; } .pill.na { background: #f1f5f9; color: #64748b; font-style: italic; }
   .duas { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
-  .donut { display: flex; align-items: center; gap: 12px; } .leg p { margin: 6px 0; font-size: 13.5px; display: flex; align-items: center; gap: 8px; } .leg i { width: 13px; height: 13px; border-radius: 50%; display: inline-block; }
-  .sec-b p { margin: 3px 0; font-size: 12.5px; } .sec-b p.s { color: #475569; font-size: 12px; }
-  @page { size: A4 portrait; margin: 0; }
-  @media print { body { background: #fff; } .bar { display: none !important; } .page { margin: 0; break-after: page; } .page:last-of-type { break-after: auto; } }`;
+  .donut { display: flex; align-items: center; gap: 12px; } .leg p { margin: 8px 0; font-size: 16.5px; display: flex; align-items: center; gap: 8px; } .leg i { width: 13px; height: 13px; border-radius: 50%; display: inline-block; }
+  .sec-b p { margin: 5px 0; font-size: 15.5px; line-height: 1.35; } .sec-b p.s { color: #475569; font-size: 14px; }
+  .termo { padding: 12px 16px 10px !important; } .termo p:first-child { font-size: 14.5px !important; } .termo > p:nth-child(2) { font-size: 13.5px !important; line-height: 1.5 !important; } .termo div p { font-size: 13px !important; }
+  @page { size: A4 portrait; margin: 5mm; }
+  @media print { body { background: #fff; } .bar { display: none !important; } .page { margin: 0; width: 200mm; height: 286mm; padding: 4mm 5mm 2mm; break-after: page; } .page:last-of-type { break-after: auto; } }`;
   return { titulo, css, paginas: folha1 + folha2 };
 }
 
