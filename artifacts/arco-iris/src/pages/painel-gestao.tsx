@@ -12,7 +12,7 @@ import {
 } from "@/lib/arco-rpc";
 import { isTransportSpecialty, SPECIALTIES } from "@/lib/specialty-colors";
 import {
-  type PeriodKind, periodRange, shiftPeriod, resumoAgenda, dedupeApts, statusOf, capacidadeMax, abaixoDaMeta, CAPACIDADE_META, hojeISO, fmtPct, NAO_AVALIADO,
+  type PeriodKind, periodRange, shiftPeriod, resumoAgenda, dedupeApts, statusOf, capacidadeMax, abaixoDaMeta, CAPACIDADE_META, CAPACIDADE_MAX, hojeISO, fmtPct, NAO_AVALIADO,
   ST_REALIZADO, ST_FALTA, ST_AGENDA_ATIVA, ST_PACIENTE_ENCERRADO, ST_PACIENTE_VINCULO,
 } from "@/lib/indicadores";
 
@@ -92,7 +92,6 @@ export default function PainelGestao() {
   const capF = useMemo(() => (cap ?? []).filter((c) => !isTransportSpecialty(c.specialty) && (profId != null ? c.id === profId : esp === "__all__" || (c.specialty || "").trim() === esp)), [cap, esp, profId]);
   const capTotal = capF.reduce((s, c) => s + capacidadeMax(c), 0);
   const capUsada = capF.reduce((s, c) => s + c.currentPatients, 0);
-  const vagas = capF.reduce((s, c) => s + Math.max(0, capacidadeMax(c) - c.currentPatients), 0);
   const ocupacao = capTotal > 0 ? Math.round((capUsada / capTotal) * 100) : null;
 
   const pausedItems = useMemo(() => {
@@ -154,8 +153,8 @@ export default function PainelGestao() {
       origem: "Faltas não justificadas (Ausente) até hoje. Justificadas/abonadas não entram e aparecem embaixo." },
     { icon: ListTodo, label: "Fila de espera", value: v(fila ? filaAtiva.length : null, false), sub: filaCongelados > 0 ? `+${filaCongelados} congelados à parte` : "aguardando vaga", tone: "#fb923c",
       origem: "Pacientes ativos na fila (mesmo número da página Fila de Espera). Congelados não entram. Filtro por especialidade." },
-    { icon: DoorOpen, label: "Vagas", value: v(cap ? vagas : null, false), sub: `ocupação ${fmtPct(ocupacao)}${cap ? ` · ${abaixoDaMeta(capF)} abaixo de ${CAPACIDADE_META}` : ""}`, tone: "#a78bfa",
-      origem: "Soma, por profissional, de capacidade − pacientes com agenda ativa (capacidade padrão 25 p/ 20h e 35 p/ 30/40h). Ocupação = pacientes ÷ capacidade." },
+    { icon: DoorOpen, label: "Ocupação da equipe", value: cap ? fmtPct(ocupacao) : v(null, false), sub: cap ? `${abaixoDaMeta(capF)} abaixo de ${CAPACIDADE_META} pacientes` : "", tone: "#a78bfa",
+      origem: `Pacientes com agenda ativa ÷ capacidade (até ${CAPACIDADE_MAX} por profissional).` },
     { icon: Snowflake, label: "Pacientes pausados", value: v(pausedItems ? pausedItems.length : null, false), sub: pausedItems ? `${pausedItems.filter((i) => i.source === "fila").length} fila · ${pausedItems.filter((i) => i.source === "agenda").length} agenda` : "", tone: "#67e8f9",
       origem: "Pausas ativas na fila (congelados) e na agenda, da mesma lista da página Pausados / Busca Ativa." },
   ];
@@ -258,16 +257,16 @@ export default function PainelGestao() {
 
       <div className="space-y-2">
         <h2 className="font-bold text-sm text-muted-foreground uppercase tracking-wide">Detalhes (clique para abrir)</h2>
-        <Detalhe id="prof" titulo="Ocupação e atendimentos por profissional" resumo={`${capF.length} profissionais · ${vagas} vagas`} aberto={aberto} setAberto={setAberto}>
+        <Detalhe id="prof" titulo="Ocupação e atendimentos por profissional" resumo={`${capF.length} profissionais`} aberto={aberto} setAberto={setAberto}>
           <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground uppercase"><tr><th className="text-left py-2">Profissional</th><th className="text-left">Especialidade</th><th className="text-right">Pacientes</th><th className="text-right">Capacidade</th><th className="text-right">Vagas</th><th className="text-right">Atend. período</th><th className="text-right">Faltas</th></tr></thead>
+            <thead className="text-xs text-muted-foreground uppercase"><tr><th className="text-left py-2">Profissional</th><th className="text-left">Especialidade</th><th className="text-right">Pacientes</th><th className="text-right">Capacidade</th><th className="text-right">Atend. período</th><th className="text-right">Faltas</th></tr></thead>
             <tbody>
               {[...capF].sort((a, b) => a.name.localeCompare(b.name)).map((c) => {
                 const pp = porProfissional.get(c.id);
                 return (
                   <tr key={c.id} className="border-t border-border">
                     <td className="py-2">{c.name}</td><td>{c.specialty || "—"}</td><td className="text-right">{c.currentPatients}</td><td className="text-right">{capacidadeMax(c)}</td>
-                    <td className="text-right">{Math.max(0, capacidadeMax(c) - c.currentPatients)}</td><td className="text-right">{pp ? pp.realizados : NAO_AVALIADO}</td><td className="text-right">{pp ? pp.faltas : NAO_AVALIADO}</td>
+                    <td className="text-right">{pp ? pp.realizados : NAO_AVALIADO}</td><td className="text-right">{pp ? pp.faltas : NAO_AVALIADO}</td>
                   </tr>
                 );
               })}

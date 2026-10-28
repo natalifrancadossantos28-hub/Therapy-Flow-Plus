@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Users, Hourglass, CalendarClock, CheckCircle2, XCircle, DoorOpen, ShieldAlert, Stethoscope } from "lucide-react";
+import { Users, Hourglass, CalendarClock, CheckCircle2, XCircle, ShieldAlert, Stethoscope } from "lucide-react";
 import type { Patient, Professional, WaitingListEntry } from "@/lib/arco-rpc";
 import { listFilaIndicadores, type FilaIndicador } from "@/lib/fila-indicadores";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
@@ -57,7 +57,6 @@ export function DashboardKpis(props: {
     { t: "Atendimentos de hoje", v: k.hoje, s: "agendados para hoje", I: CalendarClock, c: "#38bdf8" },
     { t: "Atendimentos realizados", v: k.realizados, s: periodoLabel, I: CheckCircle2, c: "#34d399" },
     { t: "Faltas", v: k.faltas, s: periodoLabel, I: XCircle, c: "#f87171" },
-    { t: "Vagas disponíveis", v: k.vagas, s: "pela capacidade dos profissionais", I: DoorOpen, c: "#22d3ee" },
     { t: "Avaliação prioritária", v: k.prioritarios, s: "na fila com prioridade máxima/elevada", I: ShieldAlert, c: "#fb7185" },
     { t: "Profissionais em atendimento", v: k.profissionais, s: "com agenda hoje", I: Stethoscope, c: "#60a5fa" },
   ];
