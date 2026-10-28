@@ -26,20 +26,20 @@ if (typeof window !== "undefined") {
   window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e as BeforeInstall; });
 }
 
-function useManifestAgenda(nome: string) {
+function useManifestAgenda(nome: string, falar: boolean) {
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     const meta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
     const antes = { href: link?.getAttribute("href"), titulo: meta?.content, doc: document.title };
-    link?.setAttribute("href", "/manifest-agenda.webmanifest");
-    if (meta) meta.content = "Agenda";
+    link?.setAttribute("href", falar ? "/manifest-falar.webmanifest" : "/manifest-agenda.webmanifest");
+    if (meta) meta.content = falar ? "Falar" : "Agenda";
     document.title = `Agenda da ${nome}`;
     return () => {
       if (link && antes.href) link.setAttribute("href", antes.href);
       if (meta && antes.titulo) meta.content = antes.titulo;
       document.title = antes.doc;
     };
-  }, [nome]);
+  }, [nome, falar]);
 }
 
 function Fundo({ children }: { children: React.ReactNode }) {
@@ -56,9 +56,10 @@ function Titulo({ nome }: { nome: string }) {
 
 export default function AgendaClaudia() {
   const [sessao, setSessao] = useState<AgxSessao | null>(() => api.getSessao());
-  useManifestAgenda(sessao ? primeiroNome(sessao.dona.nome) : "Cláudia");
+  const falar = window.location.pathname.replace(/\/+$/, "").endsWith("/falar");
+  useManifestAgenda(sessao ? primeiroNome(sessao.dona.nome) : "Cláudia", falar);
   const sair = useCallback(() => { void api.sair(); setSessao(null); }, []);
-  return <Fundo>{sessao ? <Agenda sessao={sessao} onSair={sair} /> : <Entrada onEntrou={setSessao} />}</Fundo>;
+  return <Fundo>{!sessao ? <Entrada onEntrou={setSessao} /> : falar ? <TelaFalar sessao={sessao} onSair={sair} /> : <Agenda sessao={sessao} onSair={sair} />}</Fundo>;
 }
 
 // ---------------------------------------------------------------- entrada por PIN
@@ -175,7 +176,6 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
   const [diaSel, setDiaSel] = useState(hoje);
   const [vista, setVista] = useState<"dia" | "semana" | "mes">("mes");
   const [form, setForm] = useState<AgxInput | null>(null);
-  const [assistente, setAssistente] = useState(false);
   const [aviso, setAviso] = useState("");
   const [erroGeral, setErroGeral] = useState("");
   const calRef = useRef<HTMLDivElement>(null);
@@ -206,12 +206,13 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
   const salvar = async (c: AgxInput) => {
     try {
       await api.salvar(c);
-      setForm(null); setAssistente(false); setDiaSel(c.data); setMes(startOfMonth(parseISO(c.data)));
+      setForm(null); setDiaSel(c.data); setMes(startOfMonth(parseISO(c.data)));
       avisar("✅ Compromisso salvo!"); carregar();
     } catch (e) { falhou(e); }
   };
   const h = new Date().getHours();
   const saudacao = `${h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"}, ${primeiroNome(sessao.usuario.nome)}!`;
+  const irFalar = () => { window.location.href = "/agenda-claudia/falar"; };
   const ir = (r: React.RefObject<HTMLDivElement | null>) => r.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
@@ -237,7 +238,7 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
           <BotaoGrande cor="from-blue-600 to-blue-700" icone="📅" texto="Minha Agenda" onClick={() => ir(calRef)} />
           <BotaoGrande cor="from-green-600 to-green-700" icone="➕" texto="Novo Compromisso" onClick={() => setForm(novo(hoje))} />
-          <BotaoGrande cor="from-purple-600 to-purple-700" icone="🎙️" texto="Falar" onClick={() => setAssistente(true)} />
+          <BotaoGrande cor="from-purple-600 to-purple-700" icone="🎙️" texto="Falar" onClick={irFalar} />
           <BotaoGrande cor="from-orange-600 to-orange-700" icone="🔔" texto="Lembretes" onClick={() => ir(avRef)} />
         </div>
       </div>
@@ -270,12 +271,10 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
       {souDona && <PainelAcessos avisar={avisar} falhou={falhou} />}
       <PainelHistorico lista={lista} />
 
-      <button onClick={() => setAssistente(true)} aria-label="Assistente: falar ou digitar compromisso"
+      <button onClick={irFalar} aria-label="Falar compromisso"
         className="fixed right-5 bottom-6 z-30 w-20 h-20 rounded-full text-4xl text-white shadow-2xl"
         style={{ background: "linear-gradient(135deg,#38bdf8,#8b5cf6)", boxShadow: "0 0 0 8px rgba(56,189,248,.18),0 12px 30px rgba(0,0,0,.45)" }}>🎙️</button>
 
-      {assistente && <Assistente nome={primeiroNome(sessao.usuario.nome)} onFechar={() => setAssistente(false)} onSalvar={salvar}
-        onCorrigir={(c) => { setAssistente(false); setForm(c); }} novo={novo} />}
       {form && <Formulario inicial={form} lista={lista} onFechar={() => setForm(null)} onSalvar={salvar}
         onConcluir={async (c, v) => { try { await api.concluir(c, v); setForm(null); carregar(); avisar(v ? "Marcado como concluído." : "Reaberto."); } catch (e) { falhou(e); } }}
         onExcluir={async (c) => { try { await api.excluir(c); setForm(null); carregar(); avisar("Compromisso excluído."); } catch (e) { falhou(e); } }} />}
@@ -303,6 +302,7 @@ function Item({ c, onClick }: { c: AgxCompromisso; onClick: () => void }) {
           {c.local && <>📍 {c.local} · </>}
           <span className="font-bold rounded-full px-2" style={{ background: `${cat.cor}55` }}>{cat.nome}</span>
           {c.criadoPor && <> · por {primeiroNome(c.criadoPor)}</>}
+          {c.avisoVistoEm && <> · <b className="text-green-300">✔ aviso visto {format(parseISO(c.avisoVistoEm), "HH:mm")}</b></>}
         </span>
       </span>
     </button>
@@ -436,26 +436,39 @@ function Formulario({ inicial, lista, onFechar, onSalvar, onConcluir, onExcluir 
 }
 const toMin = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
 
-// ---------------------------------------------------------------- assistente (voz / texto)
+// ---------------------------------------------------------------- falar (microfone grande)
 type Reconhecedor = { lang: string; interimResults: boolean; continuous: boolean; start: () => void; stop: () => void;
   onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
   onerror: ((e: { error: string }) => void) | null; onend: (() => void) | null };
 
-function Assistente({ nome, onFechar, onSalvar, onCorrigir, novo }: {
-  nome: string; onFechar: () => void; onSalvar: (c: AgxInput) => void; onCorrigir: (c: AgxInput) => void;
-  novo: (data?: string, extra?: Partial<AgxInput>) => AgxInput;
-}) {
-  const [txt, setTxt] = useState("");
+const novoCompromisso = (data: string, extra: Partial<AgxInput> = {}): AgxInput => ({
+  id: null, titulo: "", data, hora: "09:00", local: null, observacao: null, categoria: "reuniao",
+  avisarVespera: true, avisarDia: true, antecedenciaMin: 60, ...extra,
+});
+
+function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
+  const nome = primeiroNome(sessao.usuario.nome);
+  const inicial = new URLSearchParams(window.location.search).get("texto") ?? "";
+  const [txt, setTxt] = useState(inicial);
   const [ouvindo, setOuvindo] = useState(false);
   const [dica, setDica] = useState("");
-  const [res, setRes] = useState<Interpretacao | null>(null);
+  const [res, setRes] = useState<Interpretacao | null>(() => (inicial.trim() ? interpretarFrase(inicial) : null));
+  const [form, setForm] = useState<AgxInput | null>(null);
+  const [salvo, setSalvo] = useState("");
+  const [podeInstalar, setPodeInstalar] = useState(() => Boolean(installEvt));
   const rec = useRef<Reconhecedor | null>(null);
-  const Rec = (window as unknown as { SpeechRecognition?: new () => Reconhecedor; webkitSpeechRecognition?: new () => Reconhecedor }).SpeechRecognition
-    ?? (window as unknown as { webkitSpeechRecognition?: new () => Reconhecedor }).webkitSpeechRecognition;
+  const w = window as unknown as { SpeechRecognition?: new () => Reconhecedor; webkitSpeechRecognition?: new () => Reconhecedor };
+  const Rec = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+  useEffect(() => () => rec.current?.stop(), []);
+  useEffect(() => {
+    const f = (e: Event) => { e.preventDefault(); installEvt = e as BeforeInstall; setPodeInstalar(true); };
+    window.addEventListener("beforeinstallprompt", f);
+    return () => window.removeEventListener("beforeinstallprompt", f);
+  }, []);
 
-  const entender = (t = txt) => { if (t.trim()) setRes(interpretarFrase(t)); };
+  const entender = (t = txt) => { setSalvo(""); if (t.trim()) setRes(interpretarFrase(t)); };
   const ouvir = () => {
-    setRes(null);
+    setRes(null); setSalvo("");
     if (!Rec) { setDica("Toque no campo abaixo e use o microfone 🎤 do teclado do celular para falar."); return; }
     try {
       const r = new Rec();
@@ -467,45 +480,81 @@ function Assistente({ nome, onFechar, onSalvar, onCorrigir, novo }: {
       };
       r.onerror = (e) => setDica(e.error === "not-allowed" || e.error === "service-not-allowed"
         ? "O microfone está bloqueado. Libere o microfone para o NFs nas configurações, ou use o microfone 🎤 do teclado."
-        : e.error === "no-speech" ? "Não ouvi nada. Toque em Falar e diga o compromisso." : "Não consegui ouvir. Use o microfone 🎤 do teclado.");
+        : e.error === "no-speech" ? "Não ouvi nada. Toque no microfone e fale o compromisso."
+        : e.error === "network" ? "Sem internet: o reconhecimento de voz precisa de internet." : "Não consegui ouvir. Use o microfone 🎤 do teclado.");
       r.onend = () => setOuvindo(false);
       rec.current = r; r.start(); setOuvindo(true); setDica("");
     } catch { setDica("Use o microfone 🎤 do teclado do celular para falar."); }
   };
-  useEffect(() => () => rec.current?.stop(), []);
-
-  const input = res && novo(res.data ?? undefined, {
-    titulo: res.titulo, hora: res.diaTodo ? null : res.hora ?? "", local: res.local, categoria: res.categoria,
+  const salvar = async (c: AgxInput) => {
+    try {
+      await api.salvar(c);
+      setSalvo(`${c.titulo} · ${dataLonga(c.data)} · ${horaTxt(c.hora)}`);
+      setRes(null); setTxt(""); setForm(null);
+      window.history.replaceState(null, "", "/agenda-claudia/falar");
+    } catch (e) { if (api.sessaoInvalida(e)) onSair(); else setDica(erroTxt(e)); }
+  };
+  const input = res && novoCompromisso(res.data ?? ISO(new Date()), {
+    titulo: res.titulo, hora: res.diaTodo ? null : res.hora ?? "09:00", local: res.local, categoria: res.categoria,
   });
-  const pronto = res && res.data && (res.hora || res.diaTodo);
+  const pronto = Boolean(res && res.data && (res.hora || res.diaTodo));
   return (
-    <Folha titulo={`Olá, ${nome}! O que deseja agendar?`} onFechar={onFechar}>
-      <div className="space-y-4">
-        <button onClick={ouvindo ? () => rec.current?.stop() : ouvir}
-          className={`${btnBase} w-full h-24 text-2xl ${ouvindo ? "bg-red-500 animate-pulse" : "bg-gradient-to-br from-purple-600 to-violet-700"}`}>
-          {ouvindo ? "🔴 Ouvindo… toque para parar" : "🎙️ Tocar e falar"}</button>
-        <p className="text-base text-white/70">Exemplo: “Amanhã às 9 horas reunião na Prefeitura.”</p>
-        {dica && <p className="text-lg text-amber-300">{dica}</p>}
-        <textarea className={`${campo} h-28 py-3`} value={txt} onChange={(e) => { setTxt(e.target.value); setRes(null); }} placeholder="Ou escreva aqui o compromisso…" />
-        {!res && <button onClick={() => entender()} disabled={!txt.trim()} className={`${btnBase} w-full h-16 text-2xl bg-sky-400 text-sky-950`}>Continuar</button>}
-        {res && input && (
-          <div className="rounded-2xl bg-sky-400/10 border border-sky-300/40 p-4 space-y-2 text-xl">
-            <p>{nome}, entendi assim:</p>
-            <p className="text-2xl font-black">{res.titulo}</p>
-            <p>📅 {res.data ? <span className="capitalize">{dataLonga(res.data)}</span> : <b className="text-amber-300">faltou o dia</b>}</p>
-            <p>⏰ {res.diaTodo ? "Dia todo" : res.hora ? horaTxt(res.hora) : <b className="text-amber-300">faltou o horário</b>}</p>
-            <p>📍 {res.local ?? <i className="text-white/60">local não informado</i>}</p>
-            <p>🏷️ {categoria(res.categoria).nome}</p>
-            {!pronto && <p className="text-lg text-amber-200">Fale ou escreva de novo com {res.falta.map((x) => (x === "data" ? "o dia" : "o horário")).join(" e ")}, ou toque em Corrigir para escolher.</p>}
-            <div className="grid grid-cols-3 gap-2 pt-2">
-              <button disabled={!pronto} onClick={() => onSalvar(input)} className={`${btnBase} h-16 text-xl bg-green-500 text-green-950`}>Salvar</button>
-              <button onClick={() => onCorrigir({ ...input, data: input.data || ISO(new Date()), hora: res.diaTodo ? null : res.hora ?? "09:00" })} className={`${btnBase} h-16 text-xl bg-yellow-400 text-yellow-950`}>Corrigir</button>
-              <button onClick={() => { setRes(null); setTxt(""); }} className={`${btnBase} h-16 text-xl bg-white/15`}>Cancelar</button>
-            </div>
-          </div>
-        )}
+    <div className="space-y-5 max-w-xl mx-auto">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-3xl font-black">Olá, {nome}!</p>
+        <a href="/agenda-claudia" className={`${btnBase} px-4 py-3 text-lg bg-white/10 border border-white/20`}>📅 Ver agenda</a>
       </div>
-    </Folha>
+      <button onClick={ouvindo ? () => rec.current?.stop() : ouvir} aria-label={ouvindo ? "Parar de ouvir" : "Tocar e falar"}
+        className={`mx-auto flex flex-col items-center justify-center w-64 h-64 rounded-full text-8xl shadow-2xl transition active:scale-95 ${ouvindo ? "bg-red-500 animate-pulse" : ""}`}
+        style={ouvindo ? undefined : { background: "linear-gradient(135deg,#38bdf8,#8b5cf6)", boxShadow: "0 0 0 14px rgba(56,189,248,.18),0 20px 40px rgba(0,0,0,.45)" }}>
+        🎙️<span className="text-2xl font-black mt-2">{ouvindo ? "Ouvindo…" : "Toque e fale"}</span>
+      </button>
+      <p className="text-center text-lg text-white/75">Ex.: “Agendar reunião amanhã às 9 horas na Prefeitura”</p>
+      {dica && <p className="text-xl text-amber-300 text-center" role="alert">{dica}</p>}
+      {salvo && <div className="rounded-2xl bg-green-500/20 border border-green-400/50 p-4 text-xl" role="status"><b>✅ Salvo na agenda:</b> <span className="capitalize">{salvo}</span></div>}
+      {res && input && (
+        <div className="rounded-2xl bg-sky-400/10 border border-sky-300/40 p-4 space-y-2 text-xl">
+          <p className="text-2xl font-black">{res.titulo}</p>
+          <p>📅 {res.data ? <span className="capitalize">{dataLonga(res.data)}</span> : <b className="text-amber-300">faltou o dia</b>}</p>
+          <p>⏰ {res.diaTodo ? "Dia todo" : res.hora ? horaTxt(res.hora) : <b className="text-amber-300">faltou o horário</b>}</p>
+          {res.local && <p>📍 {res.local}</p>}
+          {!pronto && <p className="text-lg text-amber-200">Fale de novo com {res.falta.map((x) => (x === "data" ? "o dia" : "o horário")).join(" e ")}, ou toque em Corrigir.</p>}
+          <div className="grid grid-cols-3 gap-2 pt-2">
+            <button disabled={!pronto} onClick={() => salvar(input)} className={`${btnBase} h-16 text-xl bg-green-500 text-green-950`}>Salvar</button>
+            <button onClick={() => setForm(input)} className={`${btnBase} h-16 text-xl bg-yellow-400 text-yellow-950`}>Corrigir</button>
+            <button onClick={() => { setRes(null); setTxt(""); }} className={`${btnBase} h-16 text-xl bg-white/15`}>Cancelar</button>
+          </div>
+        </div>
+      )}
+      <textarea className={`${campo} h-24 py-3`} value={txt} onChange={(e) => { setTxt(e.target.value); setRes(null); }} placeholder="Ou escreva aqui o compromisso…" />
+      {!res && txt.trim() && <button onClick={() => entender()} className={`${btnBase} w-full h-16 text-2xl bg-sky-400 text-sky-950`}>Continuar</button>}
+      {!instalado() && ehAndroid() && podeInstalar && (
+        <button onClick={async () => { await installEvt?.prompt(); installEvt = null; setPodeInstalar(false); }}
+          className={`${btnBase} w-full h-16 text-xl bg-white/10 border border-white/25`}>📲 Colocar o botão “Falar” na tela inicial</button>
+      )}
+      {ehIOS() && <AtalhoIphone />}
+      {form && <Formulario inicial={form} lista={[]} onFechar={() => setForm(null)} onSalvar={salvar} onConcluir={() => {}} onExcluir={() => {}} />}
+    </div>
+  );
+}
+
+function AtalhoIphone() {
+  const [aberto, setAberto] = useState(false);
+  const url = `${window.location.origin}/agenda-claudia/falar?texto=`;
+  return (
+    <div className={glass}>
+      <button onClick={() => setAberto(!aberto)} className="w-full flex justify-between items-center text-xl font-black text-left">
+        <span>🍎 iPhone: botão de microfone na tela inicial</span><span>{aberto ? "▲" : "▼"}</span></button>
+      {aberto && <ol className="mt-3 space-y-2 text-lg list-decimal pl-6">
+        <li>Abra o app <b>Atalhos</b> (já vem no iPhone) e toque em <b>+</b>.</li>
+        <li>Adicione a ação <b>Ditar Texto</b> (idioma: Português).</li>
+        <li>Adicione a ação <b>Codificar URL</b> (vai usar o “Texto Ditado”).</li>
+        <li>Adicione a ação <b>Abrir URLs</b> e escreva: <code className="break-all bg-black/30 px-1 rounded">{url}</code> e, logo depois, escolha a variável <b>Texto Codificado</b>.</li>
+        <li>Dê o nome <b>Agendar</b> e toque em <b>Compartilhar → Adicionar à Tela de Início</b>.</li>
+        <li>Pronto: toque no ícone <b>Agendar</b>, fale o compromisso e confirme. Também funciona dizendo “E aí Siri, Agendar”.</li>
+        <li className="text-white/70">Na primeira vez, o Safari pede o PIN da agenda.</li>
+      </ol>}
+    </div>
   );
 }
 

@@ -13,16 +13,25 @@ self.addEventListener("push", (e) => {
     renotify: Boolean(d.tag),
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
-    data: { url: d.url || "/agenda-claudia" },
+    data: { url: d.url || "/agenda-claudia", ack: d.ack || null },
+    actions: d.ack ? [{ action: "visto", title: "Ok, vi" }] : [],
     requireInteraction: d.tag !== "teste",
     vibrate: [200, 100, 200],
   }));
 });
 
+function marcarVisto(ack) {
+  if (!ack) return Promise.resolve();
+  return fetch("/api/agenda/visto", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ack }) }).catch(() => {});
+}
+
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
+  const visto = marcarVisto(e.notification.data?.ack);
+  if (e.action === "visto") { e.waitUntil(visto); return; }
   const url = new URL(e.notification.data?.url || "/agenda-claudia", self.location.origin).href;
   e.waitUntil((async () => {
+    await visto;
     const abertas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const c of abertas) {
       if (c.url.startsWith(self.location.origin)) { await c.focus(); if ("navigate" in c) await c.navigate(url); return; }

@@ -24,9 +24,9 @@ export type AgxSessao = { slug: string; token: string; usuario: Pessoa; dona: { 
 export type AgxCompromisso = {
   id: number; titulo: string; data: string; hora: string | null; local: string | null; observacao: string | null;
   categoria: Categoria; avisarVespera: boolean; avisarDia: boolean; antecedenciaMin: number | null; concluido: boolean;
-  criadoPor: string | null; atualizadoPor: string | null; createdAt: string; updatedAt: string;
+  criadoPor: string | null; atualizadoPor: string | null; createdAt: string; updatedAt: string; avisoVistoEm?: string | null;
 };
-export type AgxInput = Omit<AgxCompromisso, "id" | "concluido" | "criadoPor" | "atualizadoPor" | "createdAt" | "updatedAt"> & { id?: number | null };
+export type AgxInput = Omit<AgxCompromisso, "id" | "concluido" | "criadoPor" | "atualizadoPor" | "createdAt" | "updatedAt" | "avisoVistoEm"> & { id?: number | null };
 
 export function getSessao(): AgxSessao | null {
   try { const r = localStorage.getItem(KEY); return r ? (JSON.parse(r) as AgxSessao) : null; } catch { return null; }
