@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { FileDown, ShieldCheck } from "lucide-react";
+import { FileDown, ShieldCheck, Landmark } from "lucide-react";
 import { Card, Button } from "@/components/ui-custom";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
-  listProfessionals, listProfessionalsCapacity, listWaitingList, listAppointments, listPausedOverview,
+  listProfessionals, listProfessionalsCapacity, listWaitingList, listAppointments, listPausedOverview, listPatients,
   type Professional, type ProfessionalCapacity, type WaitingListEntry, type AppointmentListItem, type PausedOverviewItem,
 } from "@/lib/arco-rpc";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
 import { openReportWindow, escHtml } from "@/lib/print-report-shell";
+import { openRequerimento, requerimentoHtml, ultimosMesesCompletos } from "@/lib/print-requerimento";
 import { resumoAgenda, capacidadeMax, abaixoDaMeta, CAPACIDADE_META, CAPACIDADE_MAX, hojeISO, fmtPct, fmtDias, diasDesde, media, NAO_AVALIADO, type ResumoAgenda } from "@/lib/indicadores";
 
 // Prestação de contas: só números agregados — nenhum nome, prontuário ou telefone.
@@ -110,6 +111,35 @@ export default function PrestacaoContas() {
     openReportWindow({ title: "Prestação de Contas — Atendimento Terapêutico", subParts: [periodoLabel], body: `<style>h3{font-size:13px;margin:16px 0 6px;color:#0e7490}@page{size:A4 portrait;margin:12mm}</style>${body}` });
   };
 
+  const [reqNum, setReqNum] = useState("87/2026");
+  const [reqDest, setReqDest] = useState("Exma. Sra. Vereadora Francine Bello de Oliveira Nemeth");
+  const [reqAssunto, setReqAssunto] = useState("atendimentos realizados no Centro Integrado Arco-Íris");
+  const [reqLoading, setReqLoading] = useState(false);
+  const gerarRequerimento = async () => {
+    const win = window.open("", "_blank");
+    if (win) win.document.write('<p style="font-family:Arial;padding:24px">Montando o relatório, aguarde…</p>');
+    setReqLoading(true);
+    try {
+      const meses = ultimosMesesCompletos(4);
+      const [y, m] = meses[meses.length - 1].split("-").map(Number);
+      const [aptsR, pats] = await Promise.all([
+        listAppointments({ dateFrom: `${meses[0]}-01`, dateTo: format(new Date(y, m, 0), "yyyy-MM-dd") }),
+        listPatients({ status: null }),
+      ]);
+      const pacientesEmAtendimento = pats.filter((p) => (p.status || "").toLowerCase() === "atendimento").length;
+      const html = requerimentoHtml(
+        { cap, fila, pacientesEmAtendimento, apts: aptsR, specByProf: specById, meses },
+        { numero: reqNum.trim(), destinatario: reqDest.trim(), assunto: reqAssunto.trim() },
+      );
+      if (win) { win.document.open(); win.document.write(html); win.document.close(); }
+      else openRequerimento({ cap, fila, pacientesEmAtendimento, apts: aptsR, specByProf: specById, meses }, { numero: reqNum.trim(), destinatario: reqDest.trim(), assunto: reqAssunto.trim() });
+    } catch {
+      if (win) win.document.body.innerHTML = '<p style="font-family:Arial;padding:24px">Não foi possível montar o relatório. Tente de novo.</p>';
+    } finally {
+      setReqLoading(false);
+    }
+  };
+
   const sel = "rounded-xl border border-border bg-card/70 px-3 py-2 text-sm";
   return (
     <div className="space-y-6">
@@ -129,6 +159,21 @@ export default function PrestacaoContas() {
           {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{format(new Date(2000, i, 1), "MMMM", { locale: ptBR })}</option>)}
         </select>
         {apts === null && <span className="text-xs text-muted-foreground animate-pulse">Carregando agenda…</span>}
+      </Card>
+      <Card className="p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Landmark className="w-5 h-5 text-primary" />
+          <h2 className="font-bold">Resposta a requerimento da Câmara (ofício com gráficos)</h2>
+        </div>
+        <p className="text-xs text-muted-foreground">Responde as 7 perguntas: especialidades, atendimentos por mês, pacientes, vagas, fila e espera. Números de hoje, sem nomes de crianças.</p>
+        <div className="grid md:grid-cols-3 gap-2">
+          <label className="text-xs font-semibold">Requerimento nº<input className={`${sel} w-full mt-1`} value={reqNum} onChange={(e) => setReqNum(e.target.value)} /></label>
+          <label className="text-xs font-semibold">Para (vereador/a)<input className={`${sel} w-full mt-1`} value={reqDest} onChange={(e) => setReqDest(e.target.value)} /></label>
+          <label className="text-xs font-semibold">Assunto<input className={`${sel} w-full mt-1`} value={reqAssunto} onChange={(e) => setReqAssunto(e.target.value)} /></label>
+        </div>
+        <Button className="gap-2" onClick={gerarRequerimento} disabled={reqLoading || !cap.length}>
+          <FileDown className="w-4 h-4" /> {reqLoading ? "Montando relatório…" : "Gerar relatório para imprimir"}
+        </Button>
       </Card>
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
         {kpis.map(([t, v]) => (
