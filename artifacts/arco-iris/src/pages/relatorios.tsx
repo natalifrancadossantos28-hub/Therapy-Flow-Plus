@@ -97,7 +97,7 @@ export default function Relatorios() {
     ["Tempo médio de espera", `${r.esperaMedia} dias`], ["Casos prioritários", r.prioritarios],
     ["Atendimentos realizados", r.realizados], ["Faltas", r.faltas],
     ["Cancelamentos", r.cancelados], ["Reagendamentos", r.reagendados],
-    ["Ocupação", `${r.ocupacao}%`], ["Vagas disponíveis", r.vagas],
+    ["Ocupação", `${r.ocupacao}%`],
   ];
   const inp = "rounded-xl border border-border bg-card px-3 py-2 text-sm";
 

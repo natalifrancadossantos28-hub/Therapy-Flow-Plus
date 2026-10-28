@@ -70,7 +70,6 @@ export default function PrestacaoContas() {
   const capC = cap.filter((c) => !isTransportSpecialty(c.specialty));
   const capTotal = capC.reduce((s, c) => s + capacidadeMax(c), 0);
   const capUsada = capC.reduce((s, c) => s + c.currentPatients, 0);
-  const vagas = capC.reduce((s, c) => s + Math.max(0, capacidadeMax(c) - c.currentPatients), 0);
   const esperaGeral = media(filaAtiva.filter((w) => w.entryDate).map((w) => diasDesde(w.entryDate)));
   const prioritarios = filaAtiva.filter((w) => (w as { prioridadeMaxima?: boolean }).prioridadeMaxima).length;
   const pausados = paused ? paused.fila.length + paused.agenda.length : null;
@@ -87,7 +86,6 @@ export default function PrestacaoContas() {
     ["Aguardando na fila (hoje)", n(filaAtiva.length)],
     ["Espera média na fila", fmtDias(esperaGeral)],
     ["Casos prioritários na fila", n(prioritarios)],
-    [`Vagas disponíveis (hoje · até ${CAPACIDADE_MAX} por profissional)`, n(capTotal ? vagas : null)],
     [`Profissionais abaixo de ${CAPACIDADE_META} pacientes`, n(capTotal ? abaixoDaMeta(capC) : null)],
     ["Ocupação da equipe (hoje)", fmtPct(capTotal ? Math.round((capUsada / capTotal) * 100) : null)],
     ["Pausas ativas (hoje)", n(pausados)],
@@ -106,7 +104,7 @@ export default function PrestacaoContas() {
       porMes.length ? `<h3>2. Evolução mensal</h3>` + tabela(["Mês", "Atendimentos", "Pacientes distintos", "Faltas", "Justificadas", "Presença"], porMes.map((m) => [m.mes, ...linhaResumo(m.r)])) : "",
       `<h3>${porMes.length ? 3 : 2}. Por especialidade</h3>`,
       tabela(["Especialidade", "Atendimentos", "Pacientes distintos", "Faltas", "Justificadas", "Presença", "Na fila", "Espera média"], porEsp.map((e) => [e.s, ...linhaResumo(e.r), n(e.fila), fmtDias(e.espera)])),
-      `<p class="s" style="margin-top:14px">Notas: "Atendimentos realizados" = sessões com presença registrada na agenda do NFS Gestão (não substitui o registro assistencial do e-SUS). Presença = realizados ÷ (realizados + faltas não justificadas). Fila, vagas, ocupação e pausas refletem a situação no dia da emissão. "${NAO_AVALIADO}" indica ausência de dados para o cálculo. Relatório sem dados pessoais.</p>`,
+      `<p class="s" style="margin-top:14px">Notas: "Atendimentos realizados" = sessões com presença registrada na agenda do NFS Gestão (não substitui o registro assistencial do e-SUS). Presença = realizados ÷ (realizados + faltas não justificadas). Fila, ocupação e pausas refletem a situação no dia da emissão. "${NAO_AVALIADO}" indica ausência de dados para o cálculo. Relatório sem dados pessoais.</p>`,
     ].join("");
     openReportWindow({ title: "Prestação de Contas — Atendimento Terapêutico", subParts: [periodoLabel], body: `<style>h3{font-size:13px;margin:16px 0 6px;color:#0e7490}@page{size:A4 portrait;margin:12mm}</style>${body}` });
   };
@@ -165,7 +163,7 @@ export default function PrestacaoContas() {
           <Landmark className="w-5 h-5 text-primary" />
           <h2 className="font-bold">Resposta a requerimento da Câmara (ofício com gráficos)</h2>
         </div>
-        <p className="text-xs text-muted-foreground">Responde as 7 perguntas: especialidades, atendimentos por mês, pacientes, vagas, fila e espera. Números de hoje, sem nomes de crianças.</p>
+        <p className="text-xs text-muted-foreground">Responde as 7 perguntas: especialidades, atendimentos por mês, pacientes, fila e espera. Números de hoje, sem nomes de crianças.</p>
         <div className="grid md:grid-cols-3 gap-2">
           <label className="text-xs font-semibold">Requerimento nº<input className={`${sel} w-full mt-1`} value={reqNum} onChange={(e) => setReqNum(e.target.value)} /></label>
           <label className="text-xs font-semibold">Para (vereador/a)<input className={`${sel} w-full mt-1`} value={reqDest} onChange={(e) => setReqDest(e.target.value)} /></label>
@@ -193,7 +191,7 @@ export default function PrestacaoContas() {
         <h2 className="font-bold mb-3">Por especialidade</h2>
         <Tabela head={["Especialidade", "Atendimentos", "Pacientes distintos", "Faltas", "Justificadas", "Presença", "Na fila", "Espera média"]} rows={porEsp.map((e) => [e.s, ...linhaResumo(e.r), n(e.fila), fmtDias(e.espera)])} />
       </Card>
-      <p className="text-xs text-muted-foreground">"Atendimentos realizados" = presença registrada na agenda do NFS, não o registro assistencial do e-SUS. Fila, vagas, ocupação e pausas são a situação de hoje.</p>
+      <p className="text-xs text-muted-foreground">"Atendimentos realizados" = presença registrada na agenda do NFS, não o registro assistencial do e-SUS. Fila, ocupação e pausas são a situação de hoje.</p>
     </div>
   );
 }
