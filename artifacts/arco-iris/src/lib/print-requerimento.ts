@@ -19,7 +19,7 @@ export type RequerimentoDados = {
   meses: string[];
 };
 
-const TEAL = "#0e5c75", TEAL2 = "#4fa3b8", GOLD = "#c8962e", GRAY = "#d6dde2";
+const TEAL = "#0e5c75", TEAL2 = "#4fa3b8", GOLD = "#c8962e";
 const MESN = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const EXC = new Set(["desmarcado", "cancelado", "remanejado", "pausado", "remarcado"]);
 const n = (x: number) => x.toLocaleString("pt-BR");
@@ -51,23 +51,6 @@ function hbar(items: [string, number][], color: string, fmt: (v: number) => stri
     o.push(`<rect x="${lw}" y="${y}" width="${Math.max(bw, 2).toFixed(1)}" height="${bh}" rx="3" fill="${color}"/>`);
     o.push(`<text x="${(lw + bw + 6).toFixed(1)}" y="${y + bh / 2 + 4}" fill="#111" font-weight="bold">${fmt(v)}</text>`);
   });
-  return o.join("") + "</svg>";
-}
-
-function stack(items: [string, number, number][], w = 640, bh = 18, lw = 190) {
-  const mx = Math.max(1, ...items.map(([, t]) => t));
-  const h = items.length * (bh + 8) + 30;
-  const sc = (w - lw - 170) / mx;
-  const o = [`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="11">`];
-  items.forEach(([l, t, oc], i) => {
-    const y = i * (bh + 8) + 4;
-    o.push(`<text x="${lw - 8}" y="${y + bh / 2 + 4}" text-anchor="end" fill="#1f2937">${escHtml(l)}</text>`);
-    o.push(`<rect x="${lw}" y="${y}" width="${(t * sc).toFixed(1)}" height="${bh}" rx="3" fill="${GRAY}"/>`);
-    o.push(`<rect x="${lw}" y="${y}" width="${(oc * sc).toFixed(1)}" height="${bh}" rx="3" fill="${TEAL}"/>`);
-    o.push(`<text x="${(lw + t * sc + 6).toFixed(1)}" y="${y + bh / 2 + 4}" fill="#111"><tspan font-weight="bold">${oc}</tspan> de ${t} · ${t - oc} disponíveis</text>`);
-  });
-  const y = items.length * (bh + 8) + 14;
-  o.push(`<rect x="${lw}" y="${y}" width="12" height="12" fill="${TEAL}"/><text x="${lw + 18}" y="${y + 10}">Vagas ocupadas</text><rect x="${lw + 130}" y="${y}" width="12" height="12" fill="${GRAY}"/><text x="${lw + 148}" y="${y + 10}">Vagas disponíveis</text>`);
   return o.join("") + "</svg>";
 }
 
@@ -116,7 +99,6 @@ export function requerimentoHtml(d: RequerimentoDados, o: RequerimentoOpts): str
   const espGeral = Math.round(mean(allw));
   const dist = new Set(d.fila.map((w) => w.patientId)).size;
   const semprof = Array.from(agu.keys()).filter((s) => !byS.has(s));
-  const TV = Array.from(vag.values()).reduce((a, b) => a + b, 0);
   const TO = Array.from(ocu.values()).reduce((a, b) => a + b, 0);
   const totMed = Array.from(med.values()).reduce((a, b) => a + b, 0);
   const emMeses = (x: number) => `${x} dias (≈ ${(x / 30).toFixed(1).replace(".", ",")} meses)`;
@@ -131,7 +113,7 @@ export function requerimentoHtml(d: RequerimentoDados, o: RequerimentoOpts): str
 
   const q1 = tab(["Especialidade", "Profissionais"], ESP.map((s) => [s, byS.get(s)!.length]), ["Total", cap.length]);
   const q2 = hbar(desc(Array.from(med.entries()), (x) => x[1]), TEAL);
-  const q4 = stack(ESP.map((s) => [s, vag.get(s)!, ocu.get(s)!] as [string, number, number]).sort((a, b) => b[1] - a[1]));
+  const q4 = hbar(ESP.map((s) => [s, ocu.get(s)!] as [string, number]).sort((a, b) => b[1] - a[1]), TEAL);
   const q5 = hbar(desc(Array.from(agu.entries()), (x) => x[1]), GOLD);
   const q6 = hbar(desc(esp, (x) => x[1]), TEAL2, (v) => `${v} dias`);
   const dataExt = `${hd} de ${MESN[hm - 1]} de ${hy}`;
@@ -171,7 +153,7 @@ table{width:100%;border-collapse:collapse;margin:4px 0}th{background:${TEAL};col
 ${Q(1, "Quais são as especialidades e os atendimentos atualmente oferecidos?", `O Centro oferece <b>${ESP.length} especialidades</b>, com <b>${cap.length} profissionais</b>. Os atendimentos são terapêuticos, individuais e agendados semanalmente. A entrada é feita pela <b>Triagem Multidisciplinar</b>, que indica as especialidades de que cada criança precisa.`, q1)}
 ${Q(2, "Quantos atendimentos são realizados mensalmente em cada especialidade?", `São realizados, em média, <b>${n(totMed)} atendimentos por mês</b>.`, `${q2}<p class="nota">Média dos meses de ${mesesLabel}. Não inclui sessões desmarcadas ou remanejadas.</p>`)}
 ${Q(3, "Qual é o número total de pacientes que utilizam os serviços?", `Atualmente, <b>${n(d.pacientesEmAtendimento)} pacientes</b> estão em atendimento no Centro. Muitos são atendidos em mais de uma especialidade.`)}
-${Q(4, "Quantas vagas são disponibilizadas e quantas estão ocupadas?", `São <b>${n(TV)} vagas</b>, com <b>${n(TO)} ocupadas</b> (${TV ? Math.round((TO * 100) / TV) : 0}%). Cada profissional atende até ${CAPACIDADE_MAX} pacientes.`, q4 + tab(["Especialidade", "Vagas", "Ocupadas", "Disponíveis"], ESP.map((s) => [s, vag.get(s)!, ocu.get(s)!, vag.get(s)! - ocu.get(s)!]), ["Total", TV, TO, TV - TO]))}
+${Q(4, "Quantas vagas são disponibilizadas e quantas estão ocupadas?", `Hoje são <b>${n(TO)} vagas ocupadas</b>. Não há vagas disponíveis: os novos pacientes aguardam na fila de espera.`, q4 + tab(["Especialidade", "Vagas ocupadas"], ESP.map((s) => [s, ocu.get(s)!]), ["Total", TO]))}
 ${Q(5, "Qual é o número de pacientes que aguardam atendimento por especialidade?", `<b>${n(dist)} crianças</b> aguardam atendimento. Como uma mesma criança pode aguardar em mais de uma especialidade, a soma do gráfico é maior que esse número.${semprof.length ? ` A especialidade de <b>${escHtml(semprof.join(", "))}</b> não conta hoje com profissional na equipe.` : ""}`, q5)}
 ${Q(6, "Qual é o tempo médio de espera em cada especialidade?", `O tempo médio de espera é de <b>${emMeses(espGeral)}</b>.`, `${q6}<p class="nota">Tempo contado da entrada na fila até a data deste ofício. A ordem da fila segue critérios técnicos: primeiro os casos de urgência, depois a alternância entre crianças da primeira infância (0 a 5 anos) e crianças maiores, e então a ordem de chegada. Bebês com menos de 2 anos têm prioridade na Fisioterapia (estimulação precoce).</p>`)}
 ${Q(7, "Existe previsão de ampliação de vagas ou profissionais? Quais medidas e qual o prazo?", "", '<div class="linha"></div>'.repeat(4))}
