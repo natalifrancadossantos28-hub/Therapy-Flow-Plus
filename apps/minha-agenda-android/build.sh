@@ -9,7 +9,7 @@ mkdir -p build/generated build/classes build/dex build/test
 javac -source 8 -target 8 -d build/test src/br/com/nfs/minhaagenda/Planner.java tests/PlannerTest.java
 java -cp build/test br.com.nfs.minhaagenda.PlannerTest
 "$NFS_ANDROID_BUILD_TOOLS/aapt2" compile --dir res -o build/resources.zip
-"$NFS_ANDROID_BUILD_TOOLS/aapt2" link -o build/resources.apk --manifest AndroidManifest.xml -I "$NFS_ANDROID_PLATFORM/android.jar" --java build/generated build/resources.zip
+"$NFS_ANDROID_BUILD_TOOLS/aapt2" link -o build/resources.apk --manifest AndroidManifest.xml -I "$NFS_ANDROID_PLATFORM/android.jar" --java build/generated -A assets build/resources.zip
 find src build/generated -name '*.java' > build/java-files.txt
 javac -encoding UTF-8 -source 8 -target 8 -Xlint:deprecation -classpath "$NFS_ANDROID_PLATFORM/android.jar" -d build/classes @build/java-files.txt
 python3 - <<'PY'

@@ -1,78 +1,92 @@
-# Minha Agenda — Android, versão de teste 0.1
+# Minha Agenda Android — versão 0.2 com a interface original e voz
 
-Aplicativo Android nativo para os mesmos perfis e compromissos da agenda NFs.
-Não altera o banco nem cria outros titulares. A sessão usa o PIN existente e os
-RPCs com autorização por token. O APK contém somente a chave pública da API,
-nunca chave administrativa, PIN de usuário ou segredo do servidor.
+A abertura agora usa **a própria interface da agenda oficial**, com calendário,
+cores, botões, formulário, confirmação e interpretação de frases do site. O botão
+**Toque e fale** é ligado ao reconhecimento de voz do Android em português. O texto
+reconhecido preenche o formulário original para revisão; não salva automaticamente.
+A permissão de microfone é pedida pelo Android, e a escuta para ao sair da tela.
 
-## Instalação e primeiro teste
+O despertador continua nativo: `AlarmManager.setAlarmClock`, serviço de áudio,
+melodia local em repetição, vibração e intenção de tela cheia. A tela do alarme
+usa fundo azul em degradê, letras grandes e botão dourado **PARAR AVISO · JÁ VI**.
+A agenda não precisa estar aberta na hora do alarme já sincronizado.
 
-1. Baixe `Minha-Agenda-Android-teste.apk` no Android 9 ou posterior e instale.
-   O Android pode pedir autorização para instalar pelo aplicativo usado no download.
-2. Abra **Minha Agenda**, escolha o nome e entre com o mesmo PIN da agenda.
-3. Libere **Notificações**, **Alarmes e lembretes** e, quando solicitado,
-   **Aviso em tela cheia**. Os botões levam às telas do próprio Android.
-4. Confira o volume de **alarme**, que é separado do volume de mídia.
-5. Toque em **Testar alarme em 30 segundos**, volte à tela inicial e bloqueie
-   a tela. A música deve tocar, e **PARAR AVISO · JÁ VI** deve encerrá-la.
-6. Repita o teste com o aparelho em uso, depois teste um compromisso real.
-   Após confirmar o funcionamento nativo, os avisos do site podem ser desligados
-   em cada navegador para evitar receber avisos duplicados.
+## Atualizar e testar antes de entregar
 
-## Funcionamento e limites
+1. Instale o APK atualizado por cima da versão 0.1; ele tem o mesmo pacote e
+   assinatura, com `versionCode=2`. Abra **Minha Agenda**.
+2. A sessão anterior é reaproveitada quando disponível. Se necessário, entre
+   com o mesmo PIN. Nenhum compromisso é copiado para outra agenda.
+3. Toque no microfone da agenda, depois em **Toque e fale**, e permita o microfone.
+   Exemplo: “Agendar reunião amanhã às 9 horas na Prefeitura”. Confira os dados
+   reconhecidos e toque em **Salvar**, como no site.
+4. Aguarde a confirmação **Alarmes sincronizados** no botão discreto inferior.
+5. Toque em **Despertador → Configurar e testar → Testar alarme em 30 segundos**.
+   Se faltar uma permissão, o teste abre a configuração correspondente. Depois
+   de liberar todas e voltar, o teste pode ser agendado automaticamente.
+6. Volte para a tela inicial e bloqueie o aparelho. Verifique som, tela grande e
+   parada pelo botão. Se falhar, abra **Diagnóstico do último teste**.
 
-- Usa `AlarmManager.setAlarmClock`, sem navegador, WebView ou JavaScript em segundo plano.
-- Horários de Ibiúna: `America/Sao_Paulo`. Aviso na hora independente da antecedência.
-- Alarme com serviço de reprodução de áudio; melodia local em repetição e vibração
-  até confirmação. Chamadas e configurações de áudio do Android são respeitadas.
-- Notificação de categoria ALARM com intenção de tela cheia. O Android decide
-  a apresentação: bloqueado pode abrir a tela; em uso pode exibir um aviso no topo.
-  Não força sobreposição sobre outros aplicativos nem contorna o bloqueio de segurança.
-- Os próximos 90 dias são sincronizados. Alarmes já sincronizados não precisam
-  de internet e são restaurados após reinício/deslocamento de relógio/fuso.
-- Criar, editar ou concluir pelo aplicativo atualiza os alarmes locais imediatamente
-  após a resposta do servidor. Alterações no site/outro aparelho só valem localmente
-  após **Atualizar** ou uma sincronização de segundo plano (`JobScheduler`, intervalo
-  mínimo de 15 minutos, sujeito a bateria e disponibilidade de rede). Não há
-  sincronização remota instantânea nesta versão.
-- **Não avisar**, dia todo e concluídos não criam alarme. Sair remove os alarmes
-  desta instalação e revoga a sessão, preservando os compromissos no servidor.
-- Celular desligado, **Forçar parada**, restrições de bateria, permissões revogadas,
-  volume zerado e Não perturbe podem impedir o aviso. Faça o teste no aparelho físico.
-- Não é versão iPhone nem publicação na Play Store. Não há atualização automática.
+## Correções após o primeiro teste no aparelho
 
-## Segurança e construção
+A usuária informou que a versão 0.1 não despertou; ainda não foi identificada a
+etapa exata da falha. A versão 0.2 deixa de apenas recusar o teste silenciosamente
+quando faltam permissões e conduz à configuração necessária. O diagnóstico local
+registra agendamento, chamada pelo Android, início do serviço, início do áudio e
+confirmação. Não registra título, PIN, token nem fala. Caso o MediaPlayer falhe,
+o serviço tenta o som de alarme do próprio aparelho.
 
-Dados de sessão e cache são cifrados com AES-GCM usando Android Keystore. Backup
-desativado. Comunicação HTTPS somente com o projeto Supabase existente. Componentes
-de alarme não exportados; o serviço de JobScheduler exige permissão do sistema.
+**Isso não comprova a correção no aparelho físico:** novo teste é obrigatório
+antes de usar para reuniões importantes ou entregar à Cláudia.
 
-Construção sem Gradle e sem bibliotecas de terceiros: Java 17, Android SDK API 36,
-Build Tools 36.0.0, Python 3 e zip. A compilação local também foi verificada com
-Eclipse JDT 3.42.0 sobre Java 17. Defina as variáveis listadas em `build.sh` e execute:
+## Arquitetura e segurança
+
+- Interface carregada por HTTPS de `nfs-gestao-oficial.vercel.app`, sem acesso a
+  arquivos locais, conteúdo misto, depuração web ou janelas adicionais.
+- A ponte JavaScript só fornece voz e pedido de sincronização. Não expõe PIN,
+  sessão, leitura de arquivos, configurações ou execução de RPC arbitrário.
+  Seus métodos conferem origem e rota da agenda antes de executar.
+- Recursos externos limitados ao projeto Supabase já utilizado e fontes Google.
+  Navegação externa é bloqueada; permissões web são negadas. Microfone é nativo.
+- A sessão da interface fica no armazenamento privado do WebView, como no site.
+  A cópia de sessão/cache do agendador é cifrada por AES-GCM no Android Keystore.
+  A sessão é validada no servidor por `agenda_exec_eu` antes de sincronizar.
+- Salvamentos e mudanças da interface solicitam atualização do agendador.
+  Sair da agenda remove os alarmes e a sessão nativa desta instalação.
+- Mesmos RPCs e autorização por token. O APK inclui só chave pública da API.
+  Não altera banco, regras de acesso, titulares ou dados de outras pessoas.
+
+## Limites
+
+- Internet é necessária para abrir/usar a interface e reconhecer voz, conforme
+  o serviço de reconhecimento disponível no aparelho. Alarmes já sincronizados
+  continuam locais e não precisam da internet na hora do aviso.
+- Horário de Ibiúna (`America/Sao_Paulo`), próximos 90 dias; aviso antecipado e
+  na hora independentes. Concluídos, sem horário e Não avisar não despertam.
+- Mudanças feitas em outro aparelho/site chegam após atualização ou JobScheduler,
+  cujo intervalo é de 15 minutos ou mais, sujeito ao Android e à conexão.
+- Android decide a apresentação: bloqueado pode abrir a tela; em uso pode mostrar
+  um aviso no topo. Permissões, volume, Não perturbe, Forçar parada, restrições de
+  bateria e aparelho desligado interferem no resultado. Não usa sobreposição global.
+- Android 9 ou posterior. Versão de teste, sem Play Store nem atualização automática.
+  Não é versão iPhone. Depois de validar, desligue avisos antigos do navegador se
+  não quiser notificações duplicadas.
+
+## Construção e validação
+
+Java 17 (ou Eclipse JDT 3.42.0), Android SDK API 36, Build Tools 36.0.0, Python 3 e zip.
+Defina as variáveis indicadas em `build.sh`; o keystore usa alias `minha-agenda`.
+Não comite a chave de assinatura nem a senha.
 
 ```bash
 bash build.sh
+node tests/native-voice.test.mjs
 ```
 
-O keystore deve conter o alias `minha-agenda`; a senha é lida de um arquivo privado.
-Não comite nem compartilhe chaves de assinatura. O APK entregue tem assinatura de
-desenvolvimento. Uma distribuição definitiva precisa conservar sua chave privada
-para permitir atualizações compatíveis.
+Validação: testes Java de horários/fuso/reagendamento/opt-out/concluídos; teste da
+ponte de voz (parcial/final/permissão negada/preenchimento sem salvar); compilação,
+DEX, alinhamento e assinatura do APK. Pendente: teste completo no aparelho físico,
+incluindo microfone, interpretação/revisão, salvar/sincronizar, bloqueio, som e parada.
 
-## Validação realizada
-
-- Compilação das classes e recursos, geração de DEX, alinhamento e verificação da
-  assinatura do APK.
-- Testes Java das regras de fuso, hora, antecedência, ausência de duplicatas,
-  reagendamento, opt-out, concluídos, dia todo e datas inválidas.
-- Consulta de leitura ao RPC público de perfis do projeto correto; nenhum PIN real
-  foi acessado e nenhum compromisso de produção foi criado durante os testes.
-- Inspeção do manifesto e da disponibilidade da melodia no APK.
-
-**Pendente:** instalação, login, volume, tela bloqueada, toque, parada, reboot e
-sincronização no Android físico. Compilação não comprova esses comportamentos.
-
-Referências oficiais consultadas:
-- https://developer.android.com/develop/ui/views/notifications/time-sensitive
-- https://developer.android.com/develop/background-work/services/alarms/schedule
+Referências: https://developer.android.com/develop/ui/views/notifications/time-sensitive
+ e https://developer.android.com/develop/background-work/services/alarms/schedule
