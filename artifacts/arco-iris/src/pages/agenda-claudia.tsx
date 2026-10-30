@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addDays, addMonths, endOfMonth, endOfWeek, format, isSameMonth, parseISO, startOfMonth, startOfWeek, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { AgendaClaudiaAlarme } from "@/components/AgendaClaudiaAlarme";
 import * as api from "@/lib/agenda-exec-rpc";
 import { CATEGORIAS, categoria, type AgxCompromisso, type AgxInput, type AgxSessao, type Pessoa } from "@/lib/agenda-exec-rpc";
 import { interpretarFrase, type Interpretacao } from "@/lib/agenda-exec-voz";
@@ -267,6 +268,7 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
         </div>
       </div>
 
+      {souDona && <AgendaClaudiaAlarme donaId={sessao.dona.id} compromissos={lista} />}
       <div ref={avRef}><PainelAvisos sessao={sessao} avisar={avisar} /></div>
       {souDona && <PainelAcessos avisar={avisar} falhou={falhou} />}
       <PainelHistorico lista={lista} />
@@ -589,7 +591,7 @@ function PainelAvisos({ sessao, avisar }: { sessao: AgxSessao; avisar: (t: strin
   return (
     <div className={glass}>
       <p className="text-2xl font-black mb-1">🔔 Lembretes no celular</p>
-      <p className="text-lg text-white/75 mb-3">Chegam mesmo com o app fechado: às 18h do dia anterior, às 7h do dia e antes do horário.</p>
+      <p className="text-lg text-white/75 mb-3">Com a permissão do celular, chegam mesmo com o app fechado: no dia anterior, no dia, antes e na hora do compromisso. O som segue as configurações do aparelho.</p>
       {!souDona ? (
         <p className="text-xl">Os avisos vão só para o celular da {dona}. {status && <>Ela tem {status.aparelhos} {status.aparelhos === 1 ? "aparelho ativo" : "aparelhos ativos"}.</>}</p>
       ) : (

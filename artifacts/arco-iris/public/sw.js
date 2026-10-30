@@ -16,6 +16,7 @@ self.addEventListener("push", (e) => {
     data: { url: d.url || "/agenda-claudia", ack: d.ack || null },
     actions: d.ack ? [{ action: "visto", title: "Ok, vi" }] : [],
     requireInteraction: d.tag !== "teste",
+    silent: false,
     vibrate: [200, 100, 200],
   }));
 });
