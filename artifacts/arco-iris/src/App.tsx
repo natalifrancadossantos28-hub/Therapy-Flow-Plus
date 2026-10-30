@@ -70,6 +70,8 @@ function Router() {
         <Route path="/portal" component={Portal} />
         <Route path="/master" component={PainelMaster} />
         <Route path="/agenda-profissionais" component={AgendaProfissionais} />
+        <Route path="/minha-agenda/falar" component={AgendaClaudia} />
+        <Route path="/minha-agenda" component={AgendaClaudia} />
         <Route path="/agenda-claudia/falar" component={AgendaClaudia} />
         <Route path="/agenda-claudia" component={AgendaClaudia} />
         <Route>
