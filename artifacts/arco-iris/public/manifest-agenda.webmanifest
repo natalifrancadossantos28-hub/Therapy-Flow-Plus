@@ -1,10 +1,10 @@
 {
-  "name": "Agenda da Cláudia · NFs Gestão",
-  "short_name": "Agenda",
+  "name": "Minha Agenda · NFs Gestão",
+  "short_name": "Minha Agenda",
   "description": "Agenda executiva com lembretes no celular",
   "lang": "pt-BR",
   "id": "/agenda-claudia",
-  "start_url": "/agenda-claudia",
+  "start_url": "/minha-agenda",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

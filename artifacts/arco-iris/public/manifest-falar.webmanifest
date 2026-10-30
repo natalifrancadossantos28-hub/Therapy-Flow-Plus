@@ -1,10 +1,10 @@
 {
-  "name": "Falar · Agenda da Cláudia",
+  "name": "Falar · Minha Agenda",
   "short_name": "Falar",
   "description": "Toque e fale para agendar",
   "lang": "pt-BR",
   "id": "/agenda-claudia/falar",
-  "start_url": "/agenda-claudia/falar",
+  "start_url": "/minha-agenda/falar",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
