@@ -5,12 +5,12 @@ import { printTriagem86 } from "@/lib/print-triagem-86";
 import { Button, Card, Input } from "@/components/ui-custom";
 import { cn } from "@/lib/utils";
 import {
-  ITENS_86, AREAS_86, opcoesDe, calcularResultado86, FAIXAS_RENDA, BENEFICIOS,
-  AVISO_TRIAGEM, ALERTA_RISCO, RISCO_CODES, sugestoes86, previaEncaminhamento86, ENCAMINHAR_MIN, type Respostas86, type Social86, type Item86, type Resultado86,
+  ITENS_86, ITENS_TRIAGEM_ATUAL, erroDecisaoPrioridadeFila, AREAS_86, opcoesDe, calcularResultado86,
+  AVISO_TRIAGEM, ALERTA_RISCO, RISCO_CODES, sugestoes86, previaEncaminhamento86, ENCAMINHAR_MIN, type Respostas86, type Social86, type Item86, type Resultado86, type DecisaoPrioridadeFila,
 } from "@/lib/triagem-86";
 import { saveTriagem86, type SaveTriagem86Result, type Triagem86 } from "@/lib/triagem-86-rpc";
 
-const GRUPOS = [...AREAS_86, "Sociofamiliar", "Prioridades"] as const;
+const GRUPOS = [...AREAS_86] as const;
 
 /** Cor de cada grupo (mesmo padrão de cores por área da avaliação ABC). */
 export const COR_GRUPO: Record<string, string> = {
@@ -57,7 +57,7 @@ function ItemRow({ it, value, onChange }: { it: Item86; value?: string; onChange
 }
 
 /** `encaminhadas`: especialidades que vão (ou foram) para a fila; as demais aparecem como avaliadas. */
-export function Resultado86View({ r, compact, encaminhadas }: { r: Resultado86; compact?: boolean; encaminhadas?: string[] | null }) {
+export function Resultado86View({ r, compact, encaminhadas, decisao }: { r: Resultado86; compact?: boolean; encaminhadas?: string[] | null; decisao?: DecisaoPrioridadeFila }) {
   const riscos = r.prioridades.filter((p) => RISCO_CODES.includes(p.code));
   return (
     <div className="space-y-3">
@@ -82,7 +82,11 @@ export function Resultado86View({ r, compact, encaminhadas }: { r: Resultado86; 
           })}
         </div>
       </div>
-      <div className="grid sm:grid-cols-2 gap-2 text-sm">
+      {decisao ? <div className="rounded-lg border border-border p-3 text-sm">
+        <p className="font-bold">Decisão técnica de prioridade para convocação</p>
+        <p>{decisao.prioritaria ? `Sim: ${decisao.especialidades.join(", ")}` : "Não — segue o fluxo habitual da fila."}</p>
+        {decisao.prioritaria && <p>Justificativa: {decisao.justificativa}</p>}
+      </div> : <div className="grid sm:grid-cols-2 gap-2 text-sm">
         <div className="rounded-lg border border-border p-2">
           <p className="text-xs font-bold uppercase text-muted-foreground">B · Prioridade clínica</p>
           {r.prioridades.length ? r.prioridades.map((p) => <p key={p.code}>• {p.code} {p.titulo}</p>) : <p className="text-muted-foreground">Nenhum sinal marcado</p>}
@@ -93,7 +97,7 @@ export function Resultado86View({ r, compact, encaminhadas }: { r: Resultado86; 
           {r.social.length ? r.social.map((s) => <p key={s.code}>• {s.titulo}{s.intensidade === "parcial" ? " (em parte)" : ""}</p>) : <p className="text-muted-foreground">Nenhuma barreira marcada</p>}
           {r.socialNaoInformado > 0 && <p className="text-[11px] text-muted-foreground">{r.socialNaoInformado} preferiu(ram) não informar — não penaliza</p>}
         </div>
-      </div>
+      </div>}
       <p className="text-[11px] text-muted-foreground">{AVISO_TRIAGEM}</p>
     </div>
   );
@@ -107,7 +111,7 @@ export function Triagem86Card({ t, onPrint }: { t: Triagem86; onPrint?: () => vo
         <p className="text-sm font-bold">Triagem · {new Date(t.createdAt).toLocaleDateString("pt-BR")}{t.responsavel ? ` · ${t.responsavel}` : ""}</p>
         {onPrint && <Button variant="outline" size="sm" className="gap-2" onClick={onPrint}><Printer className="w-4 h-4" /> Imprimir / PDF</Button>}
       </div>
-      <Resultado86View r={r} compact encaminhadas={t.encaminhamento?.encaminhadas ?? null} />
+      <Resultado86View r={r} compact encaminhadas={t.encaminhamento?.encaminhadas ?? null} decisao={t.social?.prioridadeFila} />
     </Card>
   );
 }
@@ -120,8 +124,8 @@ const DADOS_CAMPOS: { k: keyof Dados; l: string; type?: string }[] = [
 ];
 
 /**
- * Triagem única: dados do paciente → 6 especialidades → sociofamiliar →
- * prioridades → resultado/sugestões → Finalizar → Imprimir. Usa a Triagem 86
+ * Triagem única: dados do paciente → especialidades → decisão técnica final.
+ * Sem blocos extras sociofamiliares ou de prioridade automática. Usa a Triagem 86
  * (save_triagem_86). A avaliação ABC continua separada.
  */
 export function Triagem86Form({ patientId, patient, editarDados = true, tipoTriagem, enfileirar = true, resumoAoSalvar = true, onPatientUpdated, onSaved, onCancel }: {
@@ -137,14 +141,26 @@ export function Triagem86Form({ patientId, patient, editarDados = true, tipoTria
   const etapas = [...(comDados ? ["Dados do paciente"] : []), ...GRUPOS, "Resultado"];
   const [etapa, setEtapa] = useState(0);
   const [resp, setResp] = useState<Respostas86>({});
-  const [social, setSocial] = useState<Social86>({});
+  const [decisao, setDecisao] = useState<DecisaoPrioridadeFila>({ prioritaria: false, especialidades: [], justificativa: "" });
+  const social: Social86 = { formulario: "clinico", prioridadeFila: decisao };
   const [dados, setDados] = useState<Dados>(() => Object.fromEntries(DADOS_CAMPOS.map(({ k }) => [k, patient?.[k] ?? ""])) as Dados);
   const [responsavel, setResponsavel] = useState("");
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvo, setSalvo] = useState<{ res: SaveTriagem86Result; paciente: Patient | null } | null>(null);
-  const r = useMemo(() => calcularResultado86(resp, social), [resp, social]);
-  const previa = useMemo(() => previaEncaminhamento86(r), [r]);
+  const r = useMemo(() => calcularResultado86(resp, {}), [resp]);
+  const faltando = ITENS_TRIAGEM_ATUAL.filter(i => !resp[i.code]).map(i => i.code);
+  const previa = useMemo(() => {
+    const areas = previaEncaminhamento86(r);
+    const dob = patient?.dateOfBirth;
+    if (dob) {
+      const birth = new Date(dob + "T12:00:00");
+      const now = new Date();
+      const cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear()-2);
+      if (birth <= now && birth > cutoff && !areas.includes("Fisioterapia")) areas.push("Fisioterapia");
+    }
+    return areas;
+  }, [r, patient?.dateOfBirth]);
   const totalPts = r.areas.reduce((s, a) => s + a.pontos, 0);
   const riscos = r.prioridades.filter((p) => RISCO_CODES.includes(p.code));
   const grupo = etapas[etapa];
@@ -154,7 +170,9 @@ export function Triagem86Form({ patientId, patient, editarDados = true, tipoTria
 
   const finalizar = async () => {
     if (!responsavel.trim()) { setErro("Informe quem preencheu a triagem."); return; }
-    if (r.faltando.length) { setErro(`Faltam ${r.faltando.length} perguntas: ${r.faltando.slice(0, 6).join(", ")}${r.faltando.length > 6 ? "…" : ""}`); return; }
+    if (faltando.length) { setErro(`Faltam ${faltando.length} perguntas: ${faltando.slice(0, 6).join(", ")}${faltando.length > 6 ? "…" : ""}`); return; }
+    const decisaoErro = erroDecisaoPrioridadeFila(decisao, previa);
+    if (decisaoErro) { setErro(decisaoErro); return; }
     setSaving(true); setErro(null);
     try {
       let pac: Patient | null = patient ?? null;
@@ -185,7 +203,7 @@ export function Triagem86Form({ patientId, patient, editarDados = true, tipoTria
           <p className="font-bold text-emerald-400">Triagem finalizada e salva.</p>
           <p className="text-sm text-muted-foreground">{res.addedSpecialties?.length ? `Incluída na fila: ${res.addedSpecialties.join(", ")}.` : res.reason === "all_already_queued" ? "Já estava nas filas cabíveis; notas atualizadas." : res.reason === "no_eligible_specialties" ? `Nenhuma especialidade com ${ENCAMINHAR_MIN} pontos ou mais: não entrou na fila.` : "Notas por área atualizadas."}</p>
         </div>
-        <Resultado86View r={r} encaminhadas={res.encaminhamento?.encaminhadas ?? res.specialties ?? null} />
+        <Resultado86View r={r} encaminhadas={res.encaminhamento?.encaminhadas ?? res.specialties ?? null} decisao={decisao} />
         <Sugestoes r={r} />
         <div className="flex flex-wrap gap-2">
           {paciente && <Button className="gap-2" onClick={() => printTriagem86(res.triagem, paciente, { tipo: tipoTriagem })}><Printer className="w-4 h-4" /> Imprimir relatório</Button>}
@@ -214,7 +232,7 @@ export function Triagem86Form({ patientId, patient, editarDados = true, tipoTria
       <div className="sticky top-0 z-10 rounded-xl border border-border bg-background/90 backdrop-blur p-3 shadow-sm">
         <div className="flex items-baseline gap-3 flex-wrap">
           <span className="text-3xl font-black leading-none">{totalPts}</span>
-          <span className="text-sm font-semibold">Pontuação clínica total <span className="text-muted-foreground font-normal">/ 210 · {ITENS_86.length - r.faltando.length}/{ITENS_86.length} respondidas</span></span>
+          <span className="text-sm font-semibold">Pontuação total <span className="text-muted-foreground font-normal">/ 210 · {ITENS_TRIAGEM_ATUAL.length - faltando.length}/{ITENS_TRIAGEM_ATUAL.length} respondidas</span></span>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2">
           {r.areas.map((a) => {
@@ -227,8 +245,7 @@ export function Triagem86Form({ patientId, patient, editarDados = true, tipoTria
               </span>
             );
           })}
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border border-red-500/50 text-red-500">Prioridade {r.prioridades.length}</span>
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border border-teal-500/50 text-teal-500">Social {r.social.length}</span>
+
         </div>
         {riscos.length > 0 && <p className="mt-2 text-xs font-semibold text-red-500 flex gap-1.5"><AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{ALERTA_RISCO}</p>}
       </div>
@@ -250,40 +267,26 @@ export function Triagem86Form({ patientId, patient, editarDados = true, tipoTria
 
       {grupo === "Resultado" ? (
         <div className="space-y-4">
-          <Resultado86View r={r} encaminhadas={previa} />
+          <Resultado86View r={r} encaminhadas={previa} decisao={decisao} />
+          <fieldset className="rounded-xl border-2 border-primary/40 p-4 space-y-3">
+            <legend className="font-bold px-1">Decisão final da triadora</legend>
+            <p className="font-semibold">Esta criança precisa de prioridade para convocação, à frente da ordem habitual?</p>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex gap-2 items-center"><input type="radio" name="prioridade-final" checked={!decisao.prioritaria} onChange={() => setDecisao({ prioritaria: false, especialidades: [], justificativa: "" })} />Não — segue a ordem habitual</label>
+              <label className="flex gap-2 items-center"><input type="radio" name="prioridade-final" checked={decisao.prioritaria} onChange={() => setDecisao(d => ({ ...d, prioritaria: true }))} />Sim — prioridade validada</label>
+            </div>
+            {decisao.prioritaria && <>
+              <p className="text-sm">Em qual especialidade?</p>
+              <div className="flex flex-wrap gap-3">{previa.map(s => <label key={s} className="flex gap-2 text-sm"><input type="checkbox" checked={decisao.especialidades.includes(s)} onChange={e => setDecisao(d => ({ ...d, especialidades: e.target.checked ? [...d.especialidades, s] : d.especialidades.filter(x => x!==s) }))} />{s}</label>)}</div>
+              <label className="block text-sm">Justificativa da prioridade<textarea className="block w-full rounded-lg border border-border bg-background p-2 mt-1" value={decisao.justificativa} onChange={e => setDecisao(d => ({ ...d, justificativa: e.target.value }))} /></label>
+            </>}
+            <p className="text-xs text-muted-foreground">A decisão fica registrada com a triagem e o nome da responsável. A pontuação e o diagnóstico, sozinhos, não antecipam a posição. Filas já existentes mantêm sua data e validações anteriores.</p>
+          </fieldset>
           <Sugestoes r={r} />
         </div>
       ) : (
         <div className="space-y-2">
-          {itens.map((it) => it.code === "S01" ? (
-            <div key={it.code} className="rounded-xl border border-border p-3 space-y-2">
-              <p className="text-sm"><b className="font-mono text-primary text-[11px] mr-2">S01</b><b>{it.titulo}</b> — {it.simples}</p>
-              <div className="flex flex-wrap gap-2 items-center">
-                <Input type="number" min={1} max={30} className="w-32" placeholder="Moradores" value={social.moradores ?? ""}
-                  onChange={(e) => setSocial((s) => ({ ...s, moradores: e.target.value ? Number(e.target.value) : null }))} />
-                {FAIXAS_RENDA.map((o) => (
-                  <button key={o.valor} type="button" onClick={() => setSocial((s) => ({ ...s, renda: o.valor }))}
-                    className={cn("px-2.5 py-1 rounded-lg text-xs border", social.renda === o.valor ? "bg-primary text-primary-foreground border-primary" : "border-border")}>{o.label}</button>
-                ))}
-              </div>
-            </div>
-          ) : it.code === "S02" ? (
-            <div key={it.code} className="rounded-xl border border-border p-3 space-y-2">
-              <p className="text-sm"><b className="font-mono text-primary text-[11px] mr-2">S02</b><b>{it.titulo}</b> — {it.simples}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {[["sim", "Sim"], ["nao", "Não"], ["pni", "Prefere não informar"]].map(([v, l]) => (
-                  <button key={v} type="button" onClick={() => setSocial((s) => ({ ...s, beneficio: v }))}
-                    className={cn("px-2.5 py-1 rounded-lg text-xs border", social.beneficio === v ? "bg-primary text-primary-foreground border-primary" : "border-border")}>{l}</button>
-                ))}
-                {social.beneficio === "sim" && BENEFICIOS.map((b) => (
-                  <button key={b} type="button" onClick={() => setSocial((s) => ({ ...s, beneficioTipo: b }))}
-                    className={cn("px-2.5 py-1 rounded-lg text-xs border", social.beneficioTipo === b ? "bg-emerald-600 text-white border-emerald-600" : "border-border")}>{b}</button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <ItemRow key={it.code} it={it} value={resp[it.code]} onChange={(v) => setResp((p) => ({ ...p, [it.code]: v }))} />
-          ))}
+          {itens.map((it) => <ItemRow key={it.code} it={it} value={resp[it.code]} onChange={(v) => setResp(p => ({ ...p, [it.code]: v }))} />)}
           {itens.length > 0 && AREAS_86.includes(grupo as typeof AREAS_86[number]) && (() => {
             const a = r.areas.find((x) => x.area === grupo)!;
             return <p className="text-sm font-semibold text-right">Pontuação {grupo}: {a.pontos}/30</p>;
@@ -304,7 +307,7 @@ export function Triagem86Form({ patientId, patient, editarDados = true, tipoTria
         )}
       </div>
       {erro && <p className="text-sm text-red-500">{erro}</p>}
-      {grupo === "Resultado" && <p className="text-[11px] text-muted-foreground">{enfileirar ? "Ao finalizar" : "Ao concluir a Avaliação ABC"}, a criança entra automaticamente nas filas das 3 especialidades com maior pontuação ({ENCAMINHAR_MIN} pontos ou mais), sem duplicar; quem já está na fila mantém a data de entrada.</p>}
+      {grupo === "Resultado" && <p className="text-[11px] text-muted-foreground">{enfileirar ? "Ao finalizar" : "Ao concluir a Avaliação ABC"}, a criança entra automaticamente nas filas das especialidades elegíveis pela pontuação ({ENCAMINHAR_MIN} pontos ou mais), sem duplicar; quem já está na fila mantém a data de entrada.</p>}
     </div>
   );
 }
