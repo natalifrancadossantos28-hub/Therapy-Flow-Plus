@@ -8,7 +8,7 @@ import { interpretarFrase, type Interpretacao } from "@/lib/agenda-exec-voz";
 import { ativarAvisos, assinaturaAtual, desativarAvisos, ehAndroid, ehIOS, instalado, pushSuportado } from "@/lib/agenda-exec-push";
 import { getCompanySession } from "@/lib/portal-session";
 
-// Agenda da Cláudia: tela própria, letras e botões grandes, sem o menu do sistema.
+// Minha Agenda: tela própria, letras e botões grandes, sem o menu do sistema.
 
 const ISO = (d: Date) => format(d, "yyyy-MM-dd");
 const horaTxt = (h: string | null) => (h ? (h.endsWith(":00") ? h.slice(0, 2) + "h" : h.replace(":", "h")) : "Dia todo");
@@ -33,8 +33,8 @@ function useManifestAgenda(nome: string, falar: boolean) {
     const meta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
     const antes = { href: link?.getAttribute("href"), titulo: meta?.content, doc: document.title };
     link?.setAttribute("href", falar ? "/manifest-falar.webmanifest" : "/manifest-agenda.webmanifest");
-    if (meta) meta.content = falar ? "Falar" : "Agenda";
-    document.title = `Agenda da ${nome}`;
+    if (meta) meta.content = falar ? "Falar" : "Minha Agenda";
+    document.title = "Minha Agenda";
     return () => {
       if (link && antes.href) link.setAttribute("href", antes.href);
       if (meta && antes.titulo) meta.content = antes.titulo;
@@ -52,7 +52,7 @@ function Fundo({ children }: { children: React.ReactNode }) {
 }
 
 function Titulo({ nome }: { nome: string }) {
-  return <h1 className="text-5xl md:text-6xl text-white leading-tight" style={{ fontFamily: "Caveat, 'Brush Script MT', cursive", textShadow: "0 2px 14px rgba(0,0,0,.6)" }}>Agenda da {nome}</h1>;
+  return <h1 className="text-5xl md:text-6xl text-white leading-tight" style={{ fontFamily: "Caveat, 'Brush Script MT', cursive", textShadow: "0 2px 14px rgba(0,0,0,.6)" }}>Minha Agenda</h1>;
 }
 
 export default function AgendaClaudia() {
@@ -603,7 +603,7 @@ function PainelAvisos({ sessao, avisar }: { sessao: AgxSessao; avisar: (t: strin
               <p>1. Abra este endereço no <b>Safari</b>.</p>
               <p>2. Toque em <b>Compartilhar</b> (quadrado com a seta para cima).</p>
               <p>3. Toque em <b>Adicionar à Tela de Início</b> e depois em <b>Adicionar</b>.</p>
-              <p>4. Abra pelo ícone <b>Agenda</b> e toque em <b>Ativar avisos</b>.</p>
+              <p>4. Abra pelo ícone <b>Minha Agenda</b> e toque em <b>Ativar avisos</b>.</p>
             </div>
           )}
           {!instalado() && ehAndroid() && podeInstalar && (
