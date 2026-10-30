@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createLatestRequest } from "@/lib/latest-request";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   addDays,
@@ -54,6 +55,13 @@ export default function AgendaMensal() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [appointmentsRaw, setAppointments] = useState<AppointmentListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const requests = useRef(createLatestRequest());
+  const viewKey = `${format(monthRef, "yyyy-MM")}:${profFilter}`;
+  const viewKeyRef = useRef(viewKey);
+  viewKeyRef.current = viewKey;
+  const fetchLatestRef = useRef<() => void>(() => {});
+  useEffect(() => () => requests.current.invalidate(), []);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [firstEvalDone, setFirstEvalDone] = useState<Set<string>>(new Set());
 
@@ -90,29 +98,35 @@ export default function AgendaMensal() {
     listFirstEvaluationDone().then(setFirstEvalDone).catch(console.error);
     // Completa as séries recorrentes ativas antes de montar a grade do mês.
     estenderRecorrencias()
-      .then(r => { if (r.criados > 0) fetchAppointments(); })
+      .then(r => { if (r.criados > 0) fetchLatestRef.current(); })
       .catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAppointments = () => {
+    const request = requests.current.start(viewKey);
     setLoading(true);
+    setLoadError(null);
     listAppointments({
       dateFrom: format(gridStart, "yyyy-MM-dd"),
       dateTo: format(gridEnd, "yyyy-MM-dd"),
       professionalId: profFilter ? parseInt(profFilter) : null,
     })
-      .then((list) =>
-        setAppointments(
-          list.filter((a) => !isHiddenByPatientStatus(a.patientStatus, a.date, todayBR())),
-        ),
-      )
+      .then((list) => {
+        if (!requests.current.accepts(request, viewKeyRef.current)) return;
+        setAppointments(list.filter((a) => !isHiddenByPatientStatus(a.patientStatus, a.date, todayBR())));
+      })
       .catch((e) => {
+        if (!requests.current.accepts(request, viewKeyRef.current)) return;
         console.error(e);
         setAppointments([]);
+        setLoadError("Não foi possível carregar a agenda. Tente novamente.");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (requests.current.accepts(request, viewKeyRef.current)) setLoading(false);
+      });
   };
+  fetchLatestRef.current = fetchAppointments;
 
   useEffect(() => {
     fetchAppointments();
@@ -201,6 +215,7 @@ export default function AgendaMensal() {
 
   return (
     <div className="space-y-6 pb-12">
+      {loadError && <div role="alert" className="flex items-center gap-3 rounded-xl border border-destructive p-3 text-sm text-destructive">{loadError}<Button variant="outline" onClick={fetchAppointments}>Tentar novamente</Button></div>}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-3">

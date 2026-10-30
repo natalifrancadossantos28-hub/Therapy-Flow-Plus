@@ -85,7 +85,7 @@ export default function PrestacaoContas() {
     ["Cancelamentos", n(apts ? geral.cancelados : null)],
     ["Aguardando na fila (hoje)", n(filaAtiva.length)],
     ["Espera média na fila", fmtDias(esperaGeral)],
-    ["Casos prioritários na fila", n(prioritarios)],
+    ["Prioridade máxima na fila (social/idade)", n(prioritarios)],
     [`Profissionais abaixo de ${CAPACIDADE_META} pacientes`, n(capTotal ? abaixoDaMeta(capC) : null)],
     ["Ocupação da equipe (hoje)", fmtPct(capTotal ? Math.round((capUsada / capTotal) * 100) : null)],
     ["Pausas ativas (hoje)", n(pausados)],

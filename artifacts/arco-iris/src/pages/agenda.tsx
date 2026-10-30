@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createLatestRequest } from "@/lib/latest-request";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Card, Select, Button, Label } from "@/components/ui-custom";
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
@@ -634,24 +635,35 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const weekDates = weekDays.map(d => format(d, "yyyy-MM-dd"));
   const today = format(new Date(), "yyyy-MM-dd");
 
+  const agendaRequests = useRef(createLatestRequest());
+  const multiRequests = useRef(createLatestRequest());
+  useEffect(() => () => { agendaRequests.current.invalidate(); multiRequests.current.invalidate(); }, []);
   const loadedRangeRef = useRef<{ from: string; to: string } | null>(null);
 
   // Atendimento Multi: linhas de OUTROS profissionais que têm este profissional
   // como parceiro. Sem isso o horário aparece livre na grade de quem foi
   // convidado sempre que a linha própria dele não existe (ou a série divergiu).
   const fetchMultiPartners = (dateFrom: string, dateTo: string) => {
-    const profName = professionals.find(p => String(p.id) === selectedProfId)?.name;
+    const profIdAtRequest = selectedProfId;
+    const request = multiRequests.current.start(profIdAtRequest);
+    const profName = professionals.find(p => String(p.id) === profIdAtRequest)?.name;
     if (!profName) { setMultiPartnerRows([]); return; }
     listMultiPartnerAppointments({ professionalName: profName, dateFrom, dateTo })
-      .then(list => setMultiPartnerRows(
-        list.filter(a => !isHiddenByPatientStatus(a.patientStatus, a.date, todayBR())) as Appointment[]
-      ))
-      .catch(err => console.error("fetchMultiPartners error:", err));
+      .then(list => {
+        if (!multiRequests.current.accepts(request, selectedProfIdRef.current)) return;
+        setMultiPartnerRows(list.filter(a => !isHiddenByPatientStatus(a.patientStatus, a.date, todayBR())) as Appointment[]);
+      })
+      .catch(err => {
+        if (!multiRequests.current.accepts(request, selectedProfIdRef.current)) return;
+        setMultiPartnerRows([]);
+        console.error("fetchMultiPartners error:", err);
+      });
   };
 
   const fetchAppointments = (refDate?: Date) => {
     if (!selectedProfId) return;
     const profIdAtRequest = selectedProfId;
+    const request = agendaRequests.current.start(profIdAtRequest);
     const ref = refDate ?? weekRef;
     const rangeStart = addDays(startOfWeek(ref, { weekStartsOn: 1 }), -56);
     const rangeEnd = addDays(startOfWeek(ref, { weekStartsOn: 1 }), 60);
@@ -666,7 +678,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     })
       .then((list) => {
         // Resposta de um profissional que já não é o selecionado: descarta.
-        if (selectedProfIdRef.current !== profIdAtRequest) return;
+        if (!agendaRequests.current.accepts(request, selectedProfIdRef.current)) return;
         setAppointments(
         withCiclo(
           list.filter(a => !isHiddenByPatientStatus(a.patientStatus, a.date, todayBR()))
@@ -674,7 +686,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         );
       })
       .catch((err) => {
-        if (selectedProfIdRef.current !== profIdAtRequest) return;
+        if (!agendaRequests.current.accepts(request, selectedProfIdRef.current)) return;
         console.error("fetchAppointments error:", err);
         toast({ title: "Erro ao carregar agenda", description: err?.message || String(err), variant: "destructive" });
       });
