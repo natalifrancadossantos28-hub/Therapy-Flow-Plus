@@ -147,13 +147,13 @@ function triagem86Doc(t: Triagem86, p: PacienteInfo, opts?: { tipo?: string }): 
 
   const linhas = niveis.map(({ a, n }) => {
     const pill = n ? PILL[n.label] : null;
-    const ind = enc.includes(a.area) ? "Prioridade" : n?.sugerir ? "Avaliação" : n ? "Fluxo regular" : "—";
+    const ind = enc.includes(a.area) ? "Encaminhada à fila" : n?.sugerir ? "Avaliação" : n ? "Fluxo regular" : "—";
     return `<tr><td><span class="dot" style="background:${AREA_COR[a.area] ?? "#94a3b8"}"></span>${esc(a.area)}</td>
       <td class="c"><b>${a.respondidas ? a.pontos : "–"}</b></td>
       <td><div class="mb"><div style="width:${pctA(a)}%;background:${AREA_COR[a.area] ?? "#94a3b8"}"></div></div></td>
       <td class="c">${a.respondidas ? `${pctA(a)}%` : "–"}</td>
       <td class="c">${pill ? `<span class="pill" style="background:${pill[1]};color:${pill[2]}">${pill[0]}</span>` : `<span class="pill na">não avaliado</span>`}</td>
-      <td class="c ${ind === "Prioridade" ? "pr" : ""}">${ind}</td></tr>`;
+      <td class="c ${ind === "Encaminhada à fila" ? "pr" : ""}">${ind}</td></tr>`;
   }).join("");
 
   const totN = cont.alta + cont.mod + cont.baixa || 1, C = 2 * Math.PI * 42;
@@ -166,7 +166,8 @@ function triagem86Doc(t: Triagem86, p: PacienteInfo, opts?: { tipo?: string }): 
     <div class="leg"><p><i style="background:#ef4444"></i>Alta: ${cont.alta} área${cont.alta === 1 ? "" : "s"}</p><p><i style="background:#f59e0b"></i>Moderada: ${cont.mod} área${cont.mod === 1 ? "" : "s"}</p><p><i style="background:#22c55e"></i>Baixa: ${cont.baixa} área${cont.baixa === 1 ? "" : "s"}</p></div></div>`;
 
   const encTxt = `<p>Conforme resultados da triagem, recomenda-se encaminhamento para: <b>${esc(enc.length ? enc.join(", ") : "nenhuma especialidade com indicador de prioridade")}</b>.</p>
-    ${r.prioridades.length ? `<p>Prioridades clínicas: ${esc(r.prioridades.map((x) => x.titulo).join("; "))}.</p>` : ""}
+    ${t.social?.prioridadeFila ? `<p><b>Decisão técnica de prioridade para convocação:</b> ${t.social.prioridadeFila.prioritaria ? `Sim — ${esc(t.social.prioridadeFila.especialidades.join(", "))}. Justificativa: ${esc(t.social.prioridadeFila.justificativa)}` : "Não — segue o fluxo habitual da fila."}</p>` : ""}
+    ${r.prioridades.length ? `<p>Sinais registrados na triagem: ${esc(r.prioridades.map((x) => x.titulo).join("; "))}.</p>` : ""}
     ${r.social.length ? `<p>Vulnerabilidade social: ${esc(r.social.map((x) => x.titulo).join("; "))} — orientar serviço social/CRAS.</p>` : ""}
     <p class="s">Os encaminhamentos devem seguir o protocolo da equipe técnica do serviço.</p>`;
 

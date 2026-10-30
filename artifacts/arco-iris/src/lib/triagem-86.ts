@@ -135,7 +135,18 @@ export const FAIXAS_RENDA: Opcao[] = [
 export const BENEFICIOS = ["Bolsa Família", "BPC/LOAS", "Outro"] as const;
 
 export type Respostas86 = Record<string, string>;
-export type Social86 = { moradores?: number | null; renda?: string | null; beneficio?: string | null; beneficioTipo?: string | null };
+export type DecisaoPrioridadeFila = { prioritaria: boolean; especialidades: string[]; justificativa: string };
+export type Social86 = { moradores?: number | null; renda?: string | null; beneficio?: string | null; beneficioTipo?: string | null;
+  formulario?: "clinico"; prioridadeFila?: DecisaoPrioridadeFila;
+};
+/** Perguntas atuais; itens antigos continuam disponíveis para ler o histórico. */
+export const ITENS_TRIAGEM_ATUAL = ITENS_86.filter(i => i.tipo === "clinica");
+export function erroDecisaoPrioridadeFila(d: DecisaoPrioridadeFila, elegiveis: string[]): string | null {
+  if (!d.prioritaria) return null;
+  if (!d.especialidades.length || d.especialidades.some(s => !elegiveis.includes(s))) return "Selecione pelo menos uma especialidade encaminhada para a prioridade.";
+  if (!d.justificativa.trim()) return "Justifique a necessidade de prioridade para convocação.";
+  return null;
+}
 
 export function opcoesDe(it: Item86): Opcao[] {
   if (it.tipo === "clinica") return OPCOES_CLINICA;
