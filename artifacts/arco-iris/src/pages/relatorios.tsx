@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { capacidadeMax } from "@/lib/indicadores";
+import { resumoAgenda, capacidadeMax, dedupeApts, hojeISO, statusOf } from "@/lib/indicadores";
 import { format, startOfMonth, subMonths } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { BarChart3, Printer } from "lucide-react";
@@ -12,9 +12,6 @@ import {
 import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 type Cap = Awaited<ReturnType<typeof listProfessionalsCapacity>>[number];
-const REALIZADO = new Set(["atendimento", "presente", "alta"]);
-const FALTA = new Set(["ausente", "falta_nao_justificada", "falta_justificada", "justificado", "abonado"]);
-const CANCELADO = new Set(["cancelado", "desmarcado"]);
 const REAGENDADO = new Set(["remarcado", "remanejado"]);
 const hoje = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 const dias = (iso: string) => Math.max(0, Math.round((Date.parse(hoje()) - Date.parse(iso)) / 86_400_000));
@@ -44,27 +41,27 @@ export default function Relatorios() {
   }, [from, to]);
 
   const profSpec = useMemo(() => new Map(profs.map((p) => [p.id, p.specialty ?? ""])), [profs]);
-  const especialidades = useMemo(() => Array.from(new Set(profs.map((p) => p.specialty).filter((s): s is string => !!s && !isTransportSpecialty(s)))).sort(), [profs]);
+  const especialidades = useMemo(() => Array.from(new Set([...profs.map((p) => p.specialty), ...fila.map((w) => w.specialty)].filter((s): s is string => !!s && !isTransportSpecialty(s)))).sort(), [profs, fila]);
 
   const r = useMemo(() => {
     const aptsC = apts.filter((a) => {
       const s = profSpec.get(a.professionalId) ?? "";
       return !isTransportSpecialty(s) && (esp === "__all__" || s === esp);
     });
-    const st = (a: AppointmentListItem) => (a.status || "agendado").toLowerCase();
+    const resumo = resumoAgenda(aptsC);
     const filaC = fila.filter((w) => esp === "__all__" || w.specialty === esp);
     const filaAtiva = filaC.filter((w) => !w.paused);
     const capC = cap.filter((c) => !isTransportSpecialty(c.specialty) && (esp === "__all__" || c.specialty === esp));
     const capMax = capC.reduce((s, c) => s + capacidadeMax(c), 0);
     const capCur = capC.reduce((s, c) => s + c.currentPatients, 0);
-    const porEsp: Record<string, { atendidas: Set<number>; fila: number; espera: number[] }> = {};
+    const porEsp: Record<string, { fila: number; espera: number[] }> = {};
     for (const a of aptsC) {
       const s = profSpec.get(a.professionalId) || "Sem especialidade";
-      (porEsp[s] ??= { atendidas: new Set(), fila: 0, espera: [] }).atendidas.add(a.patientId);
+      porEsp[s] ??= { fila: 0, espera: [] };
     }
     for (const w of filaAtiva) {
       const s = w.specialty || "Sem especialidade";
-      const e = (porEsp[s] ??= { atendidas: new Set(), fila: 0, espera: [] });
+      const e = (porEsp[s] ??= { fila: 0, espera: [] });
       e.fila++; if (w.entryDate) e.espera.push(dias(w.entryDate));
     }
     const esperas = filaAtiva.filter((w) => w.entryDate).map((w) => dias(w.entryDate));
@@ -75,17 +72,18 @@ export default function Relatorios() {
     }
     return {
       cadastradas: patients.length,
-      realizados: aptsC.filter((a) => REALIZADO.has(st(a))).length,
-      faltas: aptsC.filter((a) => FALTA.has(st(a))).length,
-      cancelados: aptsC.filter((a) => CANCELADO.has(st(a))).length,
-      reagendados: aptsC.filter((a) => REAGENDADO.has(st(a))).length,
+      realizados: resumo.realizados,
+      faltas: resumo.faltas,
+      justificadas: resumo.justificadas,
+      cancelados: resumo.cancelados,
+      reagendados: dedupeApts(aptsC).filter((a) => a.date <= hojeISO() && REAGENDADO.has(statusOf(a))).length,
       ocupacao: capMax > 0 ? Math.round((capCur / capMax) * 100) : 0,
       vagas: capC.reduce((s, c) => s + Math.max(0, capacidadeMax(c) - c.currentPatients), 0),
       prioritarios: filaAtiva.filter((w) => w.prioridadeMaxima).length,
       aguardando: filaAtiva.length,
       esperaMedia: esperas.length ? Math.round(esperas.reduce((s, d) => s + d, 0) / esperas.length) : 0,
       porEsp: Object.entries(porEsp).map(([s, v]) => ({
-        s, atendidas: v.atendidas.size, fila: v.fila,
+        s, atendidas: resumoAgenda(aptsC.filter((a) => (profSpec.get(a.professionalId) || "Sem especialidade") === s)).pacientesAtendidos, fila: v.fila,
         espera: v.espera.length ? Math.round(v.espera.reduce((a, b) => a + b, 0) / v.espera.length) : 0,
       })).sort((a, b) => b.fila + b.atendidas - (a.fila + a.atendidas)),
       meses,
@@ -94,8 +92,8 @@ export default function Relatorios() {
 
   const kpis: [string, string | number][] = [
     ["Crianças cadastradas", r.cadastradas], ["Aguardando na fila", r.aguardando],
-    ["Tempo médio de espera", `${r.esperaMedia} dias`], ["Casos prioritários", r.prioritarios],
-    ["Atendimentos realizados", r.realizados], ["Faltas", r.faltas],
+    ["Tempo médio de espera", `${r.esperaMedia} dias`], ["Prioridade máxima na fila", r.prioritarios],
+    ["Atendimentos realizados", r.realizados], ["Faltas não justificadas", r.faltas], ["Faltas justificadas", r.justificadas],
     ["Cancelamentos", r.cancelados], ["Reagendamentos", r.reagendados],
     ["Ocupação", `${r.ocupacao}%`],
   ];
@@ -129,6 +127,7 @@ export default function Relatorios() {
           </Card>
         ))}
       </div>
+      <p className="text-xs text-muted-foreground">Atendimentos e faltas seguem os mesmos critérios do Painel de Gestão, até hoje. Justificadas ficam separadas. Prioridade máxima conta apenas a marcação social/idade; não representa todas as cores da fila nem o nível do ABC. Fila e ocupação refletem a situação atual.</p>
       <div className="grid lg:grid-cols-2 gap-4">
         <Card className="p-5">
           <h3 className="font-bold mb-3">Crianças por especialidade</h3>

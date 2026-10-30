@@ -28,7 +28,7 @@ function simular(lista: WaitingListEntry[], resumo: Record<string, Triagem86Resu
     // Mantém as categorias de hoje (Prioridade Máxima, demanda por CID) na
     // frente; dentro de cada categoria a proposta soma os pesos à pontuação.
     const cat = (e: WaitingListEntry) => (e.prioridadeMaxima ? 0 : e.demandaPrioritaria ? 1 : 2);
-    const base = (l: Linha) => (l.e.ordenacao === "chegada" ? 0 : (l.e.scoreEspecialidade ?? 0));
+    const base = (l: Linha) => ((l.e.ordenacao === "chegada" || l.e.ordenacao === "tecnica_validada") ? 0 : (l.e.scoreEspecialidade ?? 0));
     const ord = [...linhas].sort((a, b) => cat(a.e) - cat(b.e) || (base(b) + b.extra) - (base(a) + a.extra) || a.atual - b.atual);
     ord.forEach((l, i) => { l.proposta = i + 1; });
     out[esp] = linhas;
@@ -117,7 +117,7 @@ export default function SimulacaoFila() {
                   <td className="p-2 font-bold">{l.proposta}º</td>
                   <td className="p-2">{l.atual}º {l.atual !== l.proposta && <span className={l.proposta < l.atual ? "text-emerald-500" : "text-red-400"}>({l.proposta < l.atual ? "▲" : "▼"}{Math.abs(l.atual - l.proposta)})</span>}</td>
                   <td className="p-2">{l.e.patientName}</td>
-                  <td className="p-2">{l.e.ordenacao === "chegada" ? "ordem de chegada" : (l.e.scoreEspecialidade ?? 0)}</td>
+                  <td className="p-2">{(l.e.ordenacao === "chegada" || l.e.ordenacao === "tecnica_validada") ? "ordem de chegada" : (l.e.scoreEspecialidade ?? 0)}</td>
                   <td className="p-2">{l.extra || "—"}</td>
                   <td className="p-2">{Math.floor((l.e.waitDays ?? 0) / 30)} meses</td>
                 </tr>

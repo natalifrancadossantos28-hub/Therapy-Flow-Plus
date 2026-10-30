@@ -6,6 +6,7 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { getPriorityColor, formatDate, calcIdade } from "@/lib/utils";
 import { specialtyTone, specialtyShortLabel, SPECIALTIES, isCaregiverSpecialty } from "@/lib/specialty-colors";
+import { ValidarCriteriosFila } from "@/components/ValidarCriteriosFila";
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { supabase } from "@/lib/supabase";
 import { AREA_MAX_UI, areaToUi } from "@/lib/score-scale";
@@ -38,6 +39,7 @@ import {
 // Regra de faixa etária: a fila de espera prioriza crianças. Pacientes acima
 // de 11 anos NÃO permanecem na fila (mas continuam cadastrados normalmente).
 const MAX_AGE_FILA = 11;
+const PAGE_SIZE = 25;
 
 // True se o paciente (pela data de nascimento) está acima da idade limite da
 // fila. Datas ausentes/inválidas (NaN) NÃO são consideradas acima do limite,
@@ -117,6 +119,24 @@ function motivoPosicao(e: WaitingListEntry): string[] {
       "Quando o laudo chegar, desmarque \"Sem laudo\" e a criança volta à posição normal.",
     ];
   }
+  if (e.ordenacao === "tecnica_validada") {
+    if (e.urgente) m.push(`Urgência validada por ${e.criteriosResponsavel ?? "equipe técnica"}: primeiro bloco da fila.`);
+    else {
+      if (e.particular) m.push("Escola particular confirmada ou atendimento fora: bloco final, após a fila regular.");
+      if (e.especialidadesAtivas != null) m.push(e.especialidadesAtivas===0
+        ? "Nenhuma especialidade em atendimento: primeiro bloco de acesso."
+        : e.especialidadesAtivas===1 ? "Uma especialidade em atendimento: após quem ainda não tem nenhuma."
+        : `${e.especialidadesAtivas} especialidades em atendimento: bloco de menor prioridade para uma nova vaga (duas ou mais).`);
+      if (e.prioridadeMaximaRazao === "bebe_fisio") m.push("Bebê com menos de 2 anos: estimulação precoce na Fisioterapia, dentro do seu bloco.");
+      else if (e.grupoIdade) m.push(`Alternância: 1 criança de 0–5 anos e 1 de 6 anos ou mais. Grupo desta criança: ${e.grupoIdade}.`);
+      else m.push("Data de nascimento ausente: depois dos grupos etários, dentro do seu bloco.");
+    }
+    m.push(`Dentro do bloco/grupo: ordem de chegada (${formatDate(e.entryDate)}). Empate: registro mais antigo, depois identificador.`);
+    if (e.alertaRisco?.length && !e.urgente) m.push(`Alerta para avaliação técnica (${e.alertaRisco.map(c => RISCO_LABEL[c] ?? c).join(", ")}); não antecipa a posição sozinho.`);
+    if (e.criteriosJustificativa) m.push(`Justificativa registrada: ${e.criteriosJustificativa}`);
+    m.push("Diagnóstico, nível de suporte e pontuação não definem urgência automaticamente.");
+    return m;
+  }
   if (e.urgente) {
     m.push(`Urgência — alerta de risco na triagem (${(e.alertaRisco ?? []).map((c) => RISCO_LABEL[c] ?? c).join(", ")}): passa na frente da alternância.`);
   } else if (e.grupoIdade) {
@@ -162,9 +182,11 @@ export default function WaitingList() {
   const [manualSearch, setManualSearch] = useState("");
   const [filterSpecialty, setFilterSpecialty] = useState<string>("__all__");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [indicadores, setIndicadores] = useState<Record<string, FilaIndicador>>({});
   const [situacoes, setSituacoes] = useState<FilaSituacao[]>([]);
   const [filterNivel, setFilterNivel] = useState<"__all__" | NivelPrioridade | "sem">("__all__");
+  useEffect(() => { setPage(1); }, [searchQuery, filterSpecialty, filterNivel]);
   // Saída do paciente (Alta / Desistência / Óbito) direto pela fila.
   const [saidaTarget, setSaidaTarget] = useState<WaitingListEntry | null>(null);
   const [saidaTipo, setSaidaTipo] = useState<"Alta" | "Desistência" | "Óbito">("Alta");
@@ -626,8 +648,13 @@ export default function WaitingList() {
     const sp: string = entry.specialty ?? "__null__";
     return sp === filterSpecialty;
   };
+  const technicalOrder = waitingList.some(e => e.ordenacao === "tecnica_validada");
   const displayList = activeList.filter(matchesFilter);
   const displayPausedList = pausedList.filter(matchesFilter);
+  const totalPages = Math.max(1, Math.ceil(displayList.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageEntries = displayList.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
     <div className="space-y-8">
@@ -655,7 +682,7 @@ export default function WaitingList() {
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground bg-secondary/40 border border-border rounded-xl px-4 py-2.5 flex-1">
-          <span className="font-semibold">Ordenação por prioridade:</span>
+          <span className="font-semibold">{technicalOrder ? "Classificação informativa:" : "Ordenação por prioridade:"}</span>
           <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold border border-rose-200">VERMELHO – Elevado</span>
           <span className="text-muted-foreground">→</span>
           <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold border border-orange-200">LARANJA – Moderado</span>
@@ -663,6 +690,15 @@ export default function WaitingList() {
           <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-bold border border-sky-200">AZUL – Leve</span>
           <span className="text-muted-foreground">→</span>
           <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">VERDE – Baixo</span>
+          {technicalOrder ? (
+            <span className="w-full text-[11px] text-muted-foreground">
+              <strong>Urgência validada pela equipe</strong> primeiro. Bebês com menos de 2 anos têm prioridade na Fisioterapia.
+              Para novas vagas: primeiro quem não tem atendimento, depois quem tem uma especialidade, depois quem tem duas ou mais.
+              Dentro de cada bloco, alternância de 1 criança de 0–5 anos e 1 de 6 anos ou mais, por ordem de chegada dentro de cada grupo.
+              Escola particular confirmada ou atendimento fora: bloco final, salvo urgência validada.
+              Sinais da triagem e diagnóstico, sozinhos, não antecipam a posição. Nutrição sem laudo permanece no fim.
+            </span>
+          ) : (<>
           <span className="w-full text-[11px] text-muted-foreground">
             Em toda especialidade: <strong>Urgência</strong> (alerta de risco da triagem: perda de habilidades, autoagressão,
             agressão a outros, alimentação/deglutição, desregulação intensa) → depois a fila <strong>alterna 1 criança de 0–5 anos e 1 de 6 anos ou mais</strong>
@@ -673,6 +709,7 @@ export default function WaitingList() {
             <strong>demanda prioritária</strong> pelo diagnóstico/CID → o resto. Quem estuda em <strong>escola particular</strong> ou faz <strong>terapia particular</strong> vai pra trás.
             A <strong>Fisioterapia</strong> usa a pontuação (triagem + Checklist ABC); as demais, inclusive a Fono, seguem a <strong>ordem de chegada</strong>.
           </span>
+          </>)}
         </div>
         <select
           value={filterNivel}
@@ -815,7 +852,7 @@ export default function WaitingList() {
                 <th className="px-6 py-4">Posição</th>
                 <th className="px-6 py-4">Paciente</th>
                 <th className="px-6 py-4">Especialidade</th>
-                <th className="px-6 py-4">Prioridade</th>
+                <th className="px-6 py-4">Classificação da fila / ABC</th>
                 <th className="px-6 py-4">Indicadores</th>
                 <th className="px-6 py-4">Score</th>
                 <th className="px-6 py-4">Entrada</th>
@@ -843,7 +880,7 @@ export default function WaitingList() {
                   </td>
                 </tr>
               ) : (
-                displayList.map((entry) => {
+                pageEntries.map((entry) => {
                   const pos = perSpecialtyPosition.get(entry.id) ?? "—";
                   return (
                     <tr key={entry.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
@@ -892,6 +929,7 @@ export default function WaitingList() {
                         {entry.specialty || "Qualquer especialidade"}
                       </td>
                       <td className="px-6 py-4">
+                        <p className="text-[10px] text-muted-foreground mb-1">Classificação da fila</p>
                         <Badge className={getPriorityColor(entry.priority)}>
                           {PRIORITY_LABEL[entry.priority] ?? entry.priority}
                         </Badge>
@@ -901,6 +939,7 @@ export default function WaitingList() {
                             ? `Checklist ABC (avaliação de entrada): ${entry.abcTotal} pontos. O ABC não pula a fila: soma junto com a nota da triagem na pontuação da especialidade.`
                             : "Sem avaliação ABC: a pontuação fica só com a nota da triagem."}
                         >
+                          <span className="text-[10px] text-muted-foreground mr-1">Checklist ABC:</span>
                           <AbcNivelBadge nivel={entry.abcNivel ?? null} total={entry.abcTotal ?? null} />
                         </div>
                         {entry.ordenacao === "prioridade" && entry.scoreEspecialidade == null && !entry.triagemScore && (
@@ -921,7 +960,7 @@ export default function WaitingList() {
                         )}
                         {entry.demandaPrioritaria && (
                           <div
-                            title={`Demanda prioritária pelo diagnóstico/CID: ${entry.demandaPrioritaria}. Fica logo depois da Prioridade Máxima nesta especialidade.`}
+                            title={entry.ordenacao === "tecnica_validada" ? `Diagnóstico/CID: ${entry.demandaPrioritaria}. Não altera a posição automaticamente.` : `Demanda prioritária pelo diagnóstico/CID: ${entry.demandaPrioritaria}. Fica logo depois da Prioridade Máxima nesta especialidade.`}
                             className="mt-1 text-[11px] font-bold text-rose-500"
                           >
                             ★ {entry.demandaPrioritaria}
@@ -929,17 +968,17 @@ export default function WaitingList() {
                         )}
                         {entry.atendeFora && (
                           <div
-                            title={entry.atendeForaTipo === "particular"
+                            title={entry.ordenacao === "tecnica_validada" ? "Atendimento fora informado no cadastro: bloco final, salvo urgência validada." : entry.atendeForaTipo === "particular"
                               ? "Já faz atendimento particular: vai pra trás dentro do grupo de idade."
                               : `Já atende na rede pública${entry.localAtendimento ? ` (${entry.localAtendimento})` : ""}: −5 pontos, mantém a prioridade.`}
                             className="mt-1 text-[11px] font-bold text-amber-500"
                           >
-                            {entry.atendeForaTipo === "particular" ? "⚠ particular · −10" : `⚠ atende fora · −${entry.penalidadeFora ?? 5}`}
+                            {entry.ordenacao === "tecnica_validada" ? "⚠ atendimento fora · bloco final" : entry.atendeForaTipo === "particular" ? "⚠ particular · −10" : `⚠ atende fora · −${entry.penalidadeFora ?? 5}`}
                           </div>
                         )}
-                        {entry.ordenacao === "chegada" && (
+                        {(entry.ordenacao === "chegada" || entry.ordenacao === "tecnica_validada") && (
                           <div
-                            title="Nesta especialidade a fila segue a ordem de chegada: do mais antigo para o mais novo pela data de entrada. A cor indica só a gravidade clínica."
+                            title={entry.ordenacao === "tecnica_validada" ? "Após os blocos técnicos e a alternância por idade, vale a ordem de chegada dentro do grupo." : "Nesta especialidade a fila segue a ordem de chegada: do mais antigo para o mais novo pela data de entrada."}
                             className="mt-1 text-[11px] font-semibold text-muted-foreground"
                           >
                             ⏱ ordem de chegada
@@ -963,6 +1002,13 @@ export default function WaitingList() {
                               {val && (
                                 <span className="text-[11px] font-semibold" style={{ color: DECISAO_INFO[val].color }}>{DECISAO_INFO[val].label}</span>
                               )}
+                              {entry.ordenacao === "tecnica_validada" && <>
+                                {entry.especialidadesAtivas != null && <span className="text-xs font-semibold" title={(entry.areasAtivas??[]).join(", ") || "Nenhuma terapia iniciada com vínculo atual"}>{entry.especialidadesAtivas===0 ? "Sem atendimento · prioridade de acesso" : `${entry.especialidadesAtivas} especialidade(s) em atendimento${entry.especialidadesAtivas>=2 ? " · menor prioridade para nova vaga" : ""}`}</span>}
+                                {entry.urgente && <span className="text-xs font-bold text-red-500">Urgência validada</span>}
+                                {entry.alertaRisco?.length && !entry.urgente ? <span className="text-xs font-semibold text-amber-500">Alerta da triagem: avaliar urgência</span> : null}
+                                {entry.escolaParticular && <span className="text-xs text-amber-500">Escola particular confirmada · bloco final</span>}
+                                <ValidarCriteriosFila entry={entry} onSaved={async () => { setWaitingList(await listWaitingList()); }} />
+                              </>}
                               <SituacaoFila
                                 waitingListId={entry.id}
                                 historico={situacoes.filter((s) => s.waitingListId === entry.id || (s.patientId === entry.patientId && s.specialty === entry.specialty))}
@@ -1117,6 +1163,16 @@ export default function WaitingList() {
           </table>
         </div>
       </Card>
+
+      {!isLoading && displayList.length > 0 && (
+        <nav aria-label="Paginação da fila" className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">Mostrando {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, displayList.length)} de {displayList.length} entradas · Página {currentPage} de {totalPages}</p>
+          <div className="flex gap-2">
+            <Button variant="outline" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Anterior</Button>
+            <Button variant="outline" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>Próxima</Button>
+          </div>
+        </nav>
+      )}
 
       {pausedList.length > 0 && (
         <Card className="p-0 overflow-hidden border-sky-500/30">

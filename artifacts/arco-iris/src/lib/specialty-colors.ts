@@ -315,7 +315,7 @@ export function specialtyShortLabel(specialty: string | null | undefined): strin
     case "psicoped":           return "Psicoped.";
     case "psicomotricidade":   return "Psicomotr.";
     case "pilates":            return "Pilates";
-    case "edfisica":           return "Ed. Física";
+    case "edfisica":           return normalize(specialty).includes("oficina") ? "Ed. Física (Oficina)" : "Ed. Física";
     case "oficina":            return "Oficina";
     case "oficina_maes":       return "Oficina Mães";
     case "nutricao":           return "Nutrição";

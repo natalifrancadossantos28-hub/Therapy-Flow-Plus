@@ -915,6 +915,12 @@ export type WaitingListEntry = {
   /** Escola particular ou terapia particular: vai pra trás dentro do grupo. */
   particular?: boolean | null;
   escolaParticular?: boolean | null;
+  /** Especialidades clínicas distintas com atendimento iniciado e vínculo atual. Não conta sessões nem filas. */
+  especialidadesAtivas?: number;
+  areasAtivas?: string[];
+  criteriosValidacaoId?: number | null;
+  criteriosResponsavel?: string | null;
+  criteriosJustificativa?: string | null;
   /** 0131: Nutrição sem laudo — não disputa vaga, vai pro fim da fila. */
   semLaudo?: boolean | null;
   companyId: number;
@@ -959,7 +965,7 @@ export type WaitingListEntry = {
   scoreEspecialidadeTotal?: number | null;
   /** Bônus de idade: <4 anos = +50, 4-6 anos = +20, >6 = 0. */
   ageBonus?: number | null;
-  /** 'prioridade' (Fono/Fisio) | 'chegada' (FIFO nas demais especialidades). */
+  /** 'tecnica_validada' (0135): urgência confirmada, alternância e chegada. */
   ordenacao?: string | null;
   /** Data (YYYY-MM-DD) em que a busca ativa vence e o paciente volta sozinho à fila. */
   pausedReturnDate?: string | null;
@@ -1010,6 +1016,19 @@ export async function listWaitingList(opts?: {
   });
   if (error) throw error;
   return (data ?? []) as WaitingListEntry[];
+}
+
+export async function validarCriteriosFila(input: {
+  id: number; urgente: boolean; escolaParticular: boolean;
+  responsavel: string; justificativa: string; expectedId: number | null;
+}): Promise<void> {
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await requireSupabase().rpc("validar_criterios_fila", {
+    p_slug: slug, p_password: password, p_waiting_list_id: input.id,
+    p_urgente: input.urgente, p_escola_particular: input.escolaParticular,
+    p_responsavel: input.responsavel, p_justificativa: input.justificativa, p_expected_id: input.expectedId,
+  });
+  if (error) throw error;
 }
 
 export type WaitingListPayload = {
