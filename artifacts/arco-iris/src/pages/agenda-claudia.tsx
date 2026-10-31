@@ -45,7 +45,27 @@ function useManifestAgenda(nome: string, falar: boolean) {
 
 function Fundo({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh text-white text-lg" style={{ background: "linear-gradient(135deg,rgba(11,21,48,.96),rgba(30,58,138,.9)),radial-gradient(circle at 20% 10%,#1e40af,transparent 50%),#0b1530" }}>
+    <div className="agenda-executiva min-h-dvh text-white text-lg" style={{ background: "linear-gradient(135deg,rgba(11,21,48,.96),rgba(30,58,138,.9)),radial-gradient(circle at 20% 10%,#1e40af,transparent 50%),#0b1530" }}>
+      <style>{`
+        .agenda-executiva { overflow-wrap: anywhere; }
+        .agenda-executiva .agenda-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+        .agenda-executiva .agenda-action { min-width: 0; height: auto; min-height: 8.5rem; padding: 1rem .75rem; }
+        .agenda-executiva .agenda-action-icon { font-size: 2rem; line-height: 1.2; flex-shrink: 0; }
+        .agenda-executiva .agenda-action-label { display: block; width: 100%; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.3; text-align: center; }
+        .agenda-executiva .agenda-view-tab { min-width: 0; height: auto; min-height: 3rem; padding: .65rem .25rem; white-space: normal; }
+        .agenda-executiva .agenda-item-time { flex-shrink: 0; }
+        .agenda-executiva .agenda-item-detail { overflow-wrap: anywhere; }
+        @media (max-width: 420px) {
+          .agenda-executiva .agenda-actions { grid-template-columns: minmax(0, 1fr); }
+          .agenda-executiva .agenda-action { flex-direction: row; min-height: 5rem; gap: .75rem; }
+          .agenda-executiva .agenda-action-label { width: auto; flex: 1; text-align: left; }
+          .agenda-executiva .agenda-item { flex-direction: column; align-items: flex-start; gap: .5rem; }
+          .agenda-executiva .agenda-item-detail { width: 100%; }
+        }
+        @media (min-width: 1100px) {
+          .agenda-executiva .agenda-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+      `}</style>
       <div className="max-w-5xl mx-auto px-4 pt-5 pb-36">{children}</div>
     </div>
   );
@@ -236,7 +256,7 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
         {doDia(hoje).length === 0 ? <p className="text-xl text-white/80 py-2">Hoje você não tem compromissos.</p>
           : <><p className="text-xl font-bold">Hoje você tem {doDia(hoje).length} {doDia(hoje).length === 1 ? "compromisso" : "compromissos"}:</p>
             {doDia(hoje).map((c) => <Item key={c.id} c={c} onClick={() => setForm(c)} />)}</>}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+        <div className="agenda-actions grid grid-cols-2 gap-3 mt-4">
           <BotaoGrande cor="from-blue-600 to-blue-700" icone="📅" texto="Minha Agenda" onClick={() => ir(calRef)} />
           <BotaoGrande cor="from-green-600 to-green-700" icone="➕" texto="Novo Compromisso" onClick={() => setForm(novo(hoje))} />
           <BotaoGrande cor="from-purple-600 to-purple-700" icone="🎙️" texto="Falar" onClick={irFalar} />
@@ -247,7 +267,7 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
       <div className={glass} ref={calRef}>
         <div className="flex gap-2 mb-4">
           {(["dia", "semana", "mes"] as const).map((v) => (
-            <button key={v} onClick={() => setVista(v)} className={`${btnBase} flex-1 h-12 text-lg ${vista === v ? "bg-sky-400 text-sky-950" : "bg-white/10 border border-white/20"}`}>{v === "dia" ? "Dia" : v === "semana" ? "Semana" : "Mês"}</button>
+            <button key={v} onClick={() => setVista(v)} className={`${btnBase} agenda-view-tab flex-1 h-12 text-lg ${vista === v ? "bg-sky-400 text-sky-950" : "bg-white/10 border border-white/20"}`}>{v === "dia" ? "Dia" : v === "semana" ? "Semana" : "Mês"}</button>
           ))}
         </div>
         {vista === "mes" && <Mes mes={mes} setMes={setMes} diaSel={diaSel} setDiaSel={setDiaSel} doDia={doDia} hoje={hoje} />}
@@ -287,8 +307,8 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
 
 function BotaoGrande({ cor, icone, texto, onClick }: { cor: string; icone: string; texto: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`${btnBase} bg-gradient-to-br ${cor} h-28 text-xl flex flex-col items-center justify-center gap-1 shadow-xl`}>
-      <span className="text-4xl" aria-hidden>{icone}</span>{texto}
+    <button onClick={onClick} className={`${btnBase} bg-gradient-to-br ${cor} agenda-action text-xl flex flex-col items-center justify-center gap-2 shadow-xl`}>
+      <span className="agenda-action-icon" aria-hidden>{icone}</span><span className="agenda-action-label">{texto}</span>
     </button>
   );
 }
@@ -296,9 +316,9 @@ function BotaoGrande({ cor, icone, texto, onClick }: { cor: string; icone: strin
 function Item({ c, onClick }: { c: AgxCompromisso; onClick: () => void }) {
   const cat = categoria(c.categoria);
   return (
-    <button onClick={onClick} className={`w-full text-left flex gap-4 items-center rounded-2xl bg-white/[0.06] p-4 my-2 border-l-8 ${c.concluido ? "opacity-50" : ""}`} style={{ borderColor: cat.cor }}>
-      <span className="text-2xl font-black min-w-[4.5rem]">{horaTxt(c.hora)}</span>
-      <span className="flex-1 min-w-0">
+    <button onClick={onClick} className={`agenda-item w-full text-left flex gap-4 items-center rounded-2xl bg-white/[0.06] p-4 my-2 border-l-8 ${c.concluido ? "opacity-50" : ""}`} style={{ borderColor: cat.cor }}>
+      <span className="agenda-item-time text-2xl font-black min-w-[4.5rem]">{horaTxt(c.hora)}</span>
+      <span className="agenda-item-detail flex-1 min-w-0">
         <span className={`block text-xl font-bold ${c.concluido ? "line-through" : ""}`}>{c.titulo}</span>
         <span className="block text-base text-white/70">
           {c.local && <>📍 {c.local} · </>}
