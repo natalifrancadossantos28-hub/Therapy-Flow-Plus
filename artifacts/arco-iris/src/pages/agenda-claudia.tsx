@@ -4,7 +4,7 @@ import { ptBR } from "date-fns/locale";
 import { AgendaClaudiaAlarme } from "@/components/AgendaClaudiaAlarme";
 import * as api from "@/lib/agenda-exec-rpc";
 import { CATEGORIAS, categoria, type AgxCompromisso, type AgxInput, type AgxSessao, type Pessoa } from "@/lib/agenda-exec-rpc";
-import { interpretarFrase, type Interpretacao } from "@/lib/agenda-exec-voz";
+import { interpretarFrase, comandoVoz, type Interpretacao } from "@/lib/agenda-exec-voz";
 import { ativarAvisos, assinaturaAtual, desativarAvisos, ehAndroid, ehIOS, instalado, pushSuportado } from "@/lib/agenda-exec-push";
 import { getCompanySession } from "@/lib/portal-session";
 
@@ -199,6 +199,8 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
   const [form, setForm] = useState<AgxInput | null>(null);
   const [aviso, setAviso] = useState("");
   const [erroGeral, setErroGeral] = useState("");
+  const [gravandoAgenda,setGravandoAgenda]=useState(false);
+  const travaAgenda=useRef(false);
   const calRef = useRef<HTMLDivElement>(null);
   const avRef = useRef<HTMLDivElement>(null);
 
@@ -225,11 +227,13 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
     avisarVespera: true, avisarDia: true, antecedenciaMin: 60, ...extra,
   });
   const salvar = async (c: AgxInput) => {
+    if(travaAgenda.current)return;
+    travaAgenda.current=true;setGravandoAgenda(true);setErroGeral("");
     try {
       await api.salvar(c);
       setForm(null); setDiaSel(c.data); setMes(startOfMonth(parseISO(c.data)));
       avisar("✅ Compromisso salvo!"); carregar();
-    } catch (e) { falhou(e); }
+    } catch (e) { falhou(e); } finally {travaAgenda.current=false;setGravandoAgenda(false);}
   };
   const h = new Date().getHours();
   const saudacao = `${h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"}, ${primeiroNome(sessao.usuario.nome)}!`;
@@ -297,7 +301,7 @@ function Agenda({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
         className="fixed right-5 bottom-6 z-30 w-20 h-20 rounded-full text-4xl text-white shadow-2xl"
         style={{ background: "linear-gradient(135deg,#38bdf8,#8b5cf6)", boxShadow: "0 0 0 8px rgba(56,189,248,.18),0 12px 30px rgba(0,0,0,.45)" }}>🎙️</button>
 
-      {form && <Formulario inicial={form} lista={lista} onFechar={() => setForm(null)} onSalvar={salvar}
+      {form && <Formulario salvando={gravandoAgenda} erroSalvar={erroGeral} inicial={form} lista={lista} onFechar={() => setForm(null)} onSalvar={salvar}
         onConcluir={async (c, v) => { try { await api.concluir(c, v); setForm(null); carregar(); avisar(v ? "Marcado como concluído." : "Reaberto."); } catch (e) { falhou(e); } }}
         onExcluir={async (c) => { try { await api.excluir(c); setForm(null); carregar(); avisar("Compromisso excluído."); } catch (e) { falhou(e); } }} />}
       {aviso && <div role="status" className="fixed left-1/2 -translate-x-1/2 bottom-32 z-50 rounded-2xl bg-slate-900 border border-white/20 px-6 py-4 text-xl font-bold shadow-2xl">{aviso}</div>}
@@ -394,8 +398,8 @@ function Folha({ titulo, onFechar, children }: { titulo: string; onFechar: () =>
   );
 }
 
-function Formulario({ inicial, lista, onFechar, onSalvar, onConcluir, onExcluir }: {
-  inicial: AgxInput | AgxCompromisso; lista: AgxCompromisso[]; onFechar: () => void; onSalvar: (c: AgxInput) => void;
+function Formulario({ inicial, lista, onFechar, onSalvar, onConcluir, onExcluir, erroSalvar, salvando = false }: {
+  erroSalvar?: string; salvando?: boolean; inicial: AgxInput | AgxCompromisso; lista: AgxCompromisso[]; onFechar: () => void; onSalvar: (c: AgxInput) => void;
   onConcluir: (id: number, v: boolean) => void; onExcluir: (id: number) => void;
 }) {
   const [f, setF] = useState<AgxInput>(inicial);
@@ -410,7 +414,7 @@ function Formulario({ inicial, lista, onFechar, onSalvar, onConcluir, onExcluir 
     onSalvar(f);
   };
   return (
-    <Folha titulo={f.id ? "Editar compromisso" : "Novo compromisso"} onFechar={onFechar}>
+    <Folha titulo={f.id ? "Editar compromisso" : "Novo compromisso"} onFechar={salvando ? () => {} : onFechar}>
       <div className="space-y-4">
         <label className="block"><span className="font-bold">O que é?</span>
           <input className={campo} value={f.titulo} onChange={(e) => set("titulo", e.target.value)} placeholder="Ex.: Reunião na Prefeitura" autoFocus={!f.id} /></label>
@@ -446,8 +450,8 @@ function Formulario({ inicial, lista, onFechar, onSalvar, onConcluir, onExcluir 
         {existente && (existente.criadoPor || existente.atualizadoPor) && <p className="text-base text-white/60">
           Criado por {existente.criadoPor ?? "—"} · {format(parseISO(existente.createdAt), "dd/MM HH:mm")}
           {existente.atualizadoPor && existente.updatedAt !== existente.createdAt && <> · alterado por {existente.atualizadoPor} · {format(parseISO(existente.updatedAt), "dd/MM HH:mm")}</>}</p>}
-        {msg && <p className="text-lg text-amber-300" role="alert">{msg}</p>}
-        <button onClick={enviar} className={`${btnBase} w-full h-16 text-2xl bg-green-500 text-green-950`}>Salvar</button>
+        {(msg || erroSalvar) && <p className="text-lg text-amber-300" role="alert">{msg || erroSalvar}</p>}
+        <button disabled={salvando} aria-busy={salvando} onClick={enviar} className={`${btnBase} w-full h-16 text-2xl bg-green-500 text-green-950`}>{salvando ? "Salvando…" : "Salvar"}</button>
         {existente && <div className="grid grid-cols-2 gap-3">
           <button onClick={() => onConcluir(existente.id, !existente.concluido)} className={`${btnBase} h-14 text-lg bg-white/10 border border-white/20`}>{existente.concluido ? "Reabrir" : "✔ Concluído"}</button>
           <button onClick={() => { if (window.confirm(`Excluir "${existente.titulo}"?`)) onExcluir(existente.id); }} className={`${btnBase} h-14 text-lg bg-red-500/80`}>Excluir</button>
@@ -488,34 +492,95 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     return () => window.removeEventListener("beforeinstallprompt", f);
   }, []);
 
-  const entender = (t = txt) => { setSalvo(""); if (t.trim()) setRes(interpretarFrase(t)); };
-  const ouvir = () => {
-    setRes(null); setSalvo("");
-    if (!Rec) { setDica("Toque no campo abaixo e use o microfone 🎤 do teclado do celular para falar."); return; }
-    try {
-      const r = new Rec();
-      r.lang = "pt-BR"; r.interimResults = true; r.continuous = false;
-      r.onresult = (e) => {
-        const t = Array.from(e.results).map((x) => x[0].transcript).join(" ");
-        setTxt(t);
-        if (e.results[e.results.length - 1].isFinal) entender(t);
-      };
-      r.onerror = (e) => setDica(e.error === "not-allowed" || e.error === "service-not-allowed"
-        ? "O microfone está bloqueado. Libere o microfone para o NFs nas configurações, ou use o microfone 🎤 do teclado."
-        : e.error === "no-speech" ? "Não ouvi nada. Toque no microfone e fale o compromisso."
-        : e.error === "network" ? "Sem internet: o reconhecimento de voz precisa de internet." : "Não consegui ouvir. Use o microfone 🎤 do teclado.");
-      r.onend = () => setOuvindo(false);
-      rec.current = r; r.start(); setOuvindo(true); setDica("");
-    } catch { setDica("Use o microfone 🎤 do teclado do celular para falar."); }
+  const [gravando, setGravando] = useState(false);
+  const trava = useRef(false);
+  const repeticao = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const continuarEscuta = useRef(false);
+  const iniciar = useRef<() => void>(() => {});
+  const receber = useRef<(t: string) => boolean>(() => false);
+  const falarResultado = (t: string) => {
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    window.speechSynthesis.cancel();
+    const frase = new SpeechSynthesisUtterance(t); frase.lang="pt-BR";
+    window.speechSynthesis.speak(frase);
   };
+  const pararEscuta = () => {
+    continuarEscuta.current=false;
+    if(repeticao.current)clearTimeout(repeticao.current);
+    rec.current?.stop();setOuvindo(false);
+  };
+  useEffect(()=>()=>{
+    continuarEscuta.current=false;
+    if(repeticao.current)clearTimeout(repeticao.current);
+    rec.current?.stop();
+  },[]);
   const salvar = async (c: AgxInput) => {
+    if(trava.current)return;
+    trava.current=true;setGravando(true);setDica("Salvando… aguarde a confirmação.");pararEscuta();
     try {
       await api.salvar(c);
       setSalvo(`${c.titulo} · ${dataLonga(c.data)} · ${horaTxt(c.hora)}`);
-      setRes(null); setTxt(""); setForm(null);
+      setRes(null); setTxt(""); setForm(null);setDica("");
+      falarResultado("Compromisso salvo na agenda.");
       window.history.replaceState(null, "", "/agenda-claudia/falar");
-    } catch (e) { if (api.sessaoInvalida(e)) onSair(); else setDica(erroTxt(e)); }
+    } catch (e) {
+      if (api.sessaoInvalida(e)) onSair();
+      else {setDica(erroTxt(e));falarResultado("Não foi possível confirmar a gravação. Confira o aviso na tela.");}
+    } finally {trava.current=false;setGravando(false);}
   };
+  const confirmar = () => {
+    if(!res?.data || (!res.hora && !res.diaTodo)) {
+      setDica("Ainda falta o dia ou o horário. Diga o compromisso completo, por exemplo: reunião hoje à meia-noite e quarenta. Ou toque em Corrigir.");return;
+    }
+    void salvar(novoCompromisso(res.data,{titulo:res.titulo,hora:res.diaTodo?null:res.hora,local:res.local,categoria:res.categoria}));
+  };
+  const cancelar = () => {pararEscuta();setRes(null);setTxt("");setForm(null);setSalvo("");setDica("Cancelado. Nenhum novo compromisso foi salvo.");falarResultado("Cancelado.");};
+  const entender = (t = txt): boolean => {
+    if(trava.current)return false;
+    const comando=comandoVoz(t);
+    if(comando) {
+      if(comando==="cancelar"){cancelar();return false;}
+      if(!res){setDica("Primeiro diga o compromisso, o dia e o horário.");return true;}
+      if(comando==="salvar"){confirmar();return false;}
+      setRes(null);setSalvo("");setDica("Diga novamente o compromisso completo com o dia e o horário.");return true;
+    }
+    setSalvo("");
+    if(!t.trim())return false;
+    setTxt(t);const resultado=interpretarFrase(t);setRes(resultado);
+    setDica(resultado.falta.length ? "Faltou o dia ou o horário. Diga o compromisso completo ou toque em Corrigir." : "Confira os dados. Diga salvar, corrigir ou cancelar.");
+    return true;
+  };
+  receber.current=entender;
+  const ouvir = () => {
+    if(trava.current)return;
+    if (!Rec) { setDica("Use o microfone do teclado para ditar o compromisso e depois toque em Continuar."); return; }
+    try {
+      if(repeticao.current)clearTimeout(repeticao.current);
+      const r = new Rec();
+      r.lang = "pt-BR"; r.interimResults = true; r.continuous = false;
+      continuarEscuta.current=false;
+      r.onresult = (e) => {
+        const t = Array.from(e.results).map((x) => x[0].transcript).join(" ");
+        if (e.results[e.results.length - 1].isFinal) continuarEscuta.current=receber.current(t);
+      };
+      r.onerror = (e) => {
+        continuarEscuta.current=false;
+        setDica(e.error === "not-allowed" || e.error === "service-not-allowed"
+          ? "O microfone está bloqueado. Libere o microfone para a agenda nas configurações, ou use o microfone do teclado."
+          : e.error === "no-speech" ? "Não ouvi nada. Toque no microfone para falar, ou use os botões abaixo."
+          : e.error === "network" ? "Confira a internet para usar a voz. Os botões continuam disponíveis." : "Não consegui ouvir. Toque no microfone ou use os botões.");
+      };
+      r.onend = () => {
+        if(rec.current!==r)return;
+        setOuvindo(false);rec.current=null;
+        if(continuarEscuta.current && document.visibilityState!=="hidden") {
+          repeticao.current=setTimeout(()=>{continuarEscuta.current=false;iniciar.current();},500);
+        }
+      };
+      rec.current = r; r.start(); setOuvindo(true);
+    } catch {continuarEscuta.current=false;setOuvindo(false);setDica("Toque no microfone para tentar de novo, ou use os botões abaixo.");}
+  };
+  iniciar.current=ouvir;
   const input = res && novoCompromisso(res.data ?? ISO(new Date()), {
     titulo: res.titulo, hora: res.diaTodo ? null : res.hora ?? "09:00", local: res.local, categoria: res.categoria,
   });
@@ -526,12 +591,12 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
         <p className="text-3xl font-black">Olá, {nome}!</p>
         <a href="/agenda-claudia" className={`${btnBase} px-4 py-3 text-lg bg-white/10 border border-white/20`}>📅 Ver agenda</a>
       </div>
-      <button onClick={ouvindo ? () => rec.current?.stop() : ouvir} aria-label={ouvindo ? "Parar de ouvir" : "Tocar e falar"}
+      <button data-native-recognition="react" onClick={ouvindo ? pararEscuta : ouvir} aria-label={ouvindo ? "Parar de ouvir" : "Tocar e falar"}
         className={`mx-auto flex flex-col items-center justify-center w-64 h-64 rounded-full text-8xl shadow-2xl transition active:scale-95 ${ouvindo ? "bg-red-500 animate-pulse" : ""}`}
         style={ouvindo ? undefined : { background: "linear-gradient(135deg,#38bdf8,#8b5cf6)", boxShadow: "0 0 0 14px rgba(56,189,248,.18),0 20px 40px rgba(0,0,0,.45)" }}>
-        🎙️<span className="text-2xl font-black mt-2">{ouvindo ? "Ouvindo…" : "Toque e fale"}</span>
+        🎙️<span className="text-2xl font-black mt-2">{ouvindo ? "Ouvindo…" : res ? "Diga sua opção" : "Toque e fale"}</span>
       </button>
-      <p className="text-center text-lg text-white/75">Ex.: “Agendar reunião amanhã às 9 horas na Prefeitura”</p>
+      <p className="text-center text-lg text-white/75">Diga o compromisso com o dia e o horário. Depois diga “salvar”, “corrigir” ou “cancelar”.</p>
       {dica && <p className="text-xl text-amber-300 text-center" role="alert">{dica}</p>}
       {salvo && <div className="rounded-2xl bg-green-500/20 border border-green-400/50 p-4 text-xl" role="status"><b>✅ Salvo na agenda:</b> <span className="capitalize">{salvo}</span></div>}
       {res && input && (
@@ -541,10 +606,10 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
           <p>⏰ {res.diaTodo ? "Dia todo" : res.hora ? horaTxt(res.hora) : <b className="text-amber-300">faltou o horário</b>}</p>
           {res.local && <p>📍 {res.local}</p>}
           {!pronto && <p className="text-lg text-amber-200">Fale de novo com {res.falta.map((x) => (x === "data" ? "o dia" : "o horário")).join(" e ")}, ou toque em Corrigir.</p>}
-          <div className="grid grid-cols-3 gap-2 pt-2">
-            <button disabled={!pronto} onClick={() => salvar(input)} className={`${btnBase} h-16 text-xl bg-green-500 text-green-950`}>Salvar</button>
-            <button onClick={() => setForm(input)} className={`${btnBase} h-16 text-xl bg-yellow-400 text-yellow-950`}>Corrigir</button>
-            <button onClick={() => { setRes(null); setTxt(""); }} className={`${btnBase} h-16 text-xl bg-white/15`}>Cancelar</button>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+            <button disabled={gravando} onClick={confirmar} aria-busy={gravando} className={`${btnBase} min-h-16 py-3 text-xl bg-green-500 text-green-950`}>{gravando ? "Salvando…" : "Salvar"}</button>
+            <button disabled={gravando} onClick={() => {pararEscuta();setDica("");setForm(input);}} className={`${btnBase} h-16 text-xl bg-yellow-400 text-yellow-950`}>Corrigir</button>
+            <button disabled={gravando} onClick={cancelar} className={`${btnBase} h-16 text-xl bg-white/15`}>Cancelar</button>
           </div>
         </div>
       )}
@@ -555,7 +620,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
           className={`${btnBase} w-full h-16 text-xl bg-white/10 border border-white/25`}>📲 Colocar o botão “Falar” na tela inicial</button>
       )}
       {ehIOS() && <AtalhoIphone />}
-      {form && <Formulario inicial={form} lista={[]} onFechar={() => setForm(null)} onSalvar={salvar} onConcluir={() => {}} onExcluir={() => {}} />}
+      {form && <Formulario erroSalvar={dica} salvando={gravando} inicial={form} lista={[]} onFechar={() => setForm(null)} onSalvar={salvar} onConcluir={() => {}} onExcluir={() => {}} />}
     </div>
   );
 }

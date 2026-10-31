@@ -16,26 +16,45 @@ const sem = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").to
 const ISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const NUM: Record<string, number> = {
-  uma: 1, um: 1, duas: 2, dois: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12,
+  zero: 0, uma: 1, um: 1, duas: 2, dois: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12,
   treze: 13, quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19, vinte: 20,
 };
+for (const [nome, valor] of [["vinte", 20], ["trinta", 30], ["quarenta", 40], ["cinquenta", 50]] as const) {
+  NUM[nome] = valor;
+  for (const unidade of ["um", "dois", "tres", "quatro", "cinco", "seis", "sete", "oito", "nove"]) NUM[`${nome} e ${unidade}`] = valor + NUM[unidade];
+}
+
+export type ComandoVoz = "salvar" | "corrigir" | "cancelar";
+/** Só frases de comando completas: mencionar salvar/cancelar em um título não confirma nada. */
+export function comandoVoz(frase: string): ComandoVoz | null {
+  const t = sem(frase).replace(/[.,!?;:]/g, "").trim().replace(/\s+/g, " ").replace(/ por favor$/, "");
+  if (/^(?:pode |quero )?(?:salvar|salva|salve|confirmar|confirma|confirmo)(?: o compromisso)?$/.test(t)) return "salvar";
+  if (/^(?:pode |quero )?(?:cancelar|cancela|cancele)(?: o compromisso)?$/.test(t)) return "cancelar";
+  if (/^(?:pode |quero )?(?:corrigir|corrige|corrija|corrigir o compromisso)$/.test(t)) return "corrigir";
+  return null;
+}
+
 const MESES = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const SEMANA = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
 
 // Trechos de data/hora; são removidos do texto antes de achar título e local.
 const RE_DATA = [
-  /\bdepois de amanha\b/, /\bamanha\b/, /\bhoje\b/,
+  /\bdepois de amanha\b/, /\bamanha\b/, /\bhoje\b/, /\bagora\b/,
   /\b(?:(?:na|no|nesta|neste|nessa|nesse|proxima|proximo)\s+)?(?:domingo|segunda|terca|quarta|quinta|sexta|sabado)(?:[\s-]*feira)?(?:\s+que vem)?\b/,
   /\b(?:no\s+)?dia\s+\d{1,2}(?:\s*(?:\/|de)\s*(?:\d{1,2}|janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro))?\b/,
   /\b\d{1,2}\s*\/\s*\d{1,2}(?:\s*\/\s*\d{2,4})?\b/,
   /\b\d{1,2}\s+de\s+(?:janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/,
   /\b(?:o\s+)?dia (?:todo|inteiro)\b/,
 ];
-const PAL_NUM = Object.keys(NUM).join("|");
+const PAL_NUM = Object.keys(NUM).sort((a,b) => b.length-a.length).join("|");
+const VALOR = `(?:\\d{1,2}|${PAL_NUM})`;
+const MINUTO = `(?:meia|${VALOR})`;
+const PERIODO = `(?:\\s+(?:da|de)\\s+(manha|tarde|noite|madrugada))?`;
+const RE_ESPECIAL = new RegExp(`\\b(?:(?:a|as|ao)\\s+)?(meia[\\s-]+noite|meio[\\s-]+dia)(?:\\s+(?:e\\s+)?(${MINUTO})(?:\\s+minutos?)?)?\\b`);
 const RE_HORA = [
-  new RegExp(`\\b(?:as|a partir das|pelas|por volta das)?\\s*(\\d{1,2}|${PAL_NUM})\\s*(?:h|:|horas?)\\s*(?:e\\s+)?(\\d{1,2}|meia)?(?:\\s*(?:minutos?|min))?(?:\\s+(?:da|de)\\s+(manha|tarde|noite))?\\b`),
-  new RegExp(`\\b(?:as|pelas)\\s+(\\d{1,2}|${PAL_NUM})(?:\\s+e\\s+(meia|\\d{1,2}))?(?:\\s+(?:da|de)\\s+(manha|tarde|noite))?\\b`),
-  /\b(?:ao\s+)?meio[\s-]dia(?:\s+e\s+meia)?\b/,
+  new RegExp(`\\b(?:as|a partir das|pelas|por volta das)?\\s*(${VALOR})\\s*(?:h|:|horas?)\\s*(?:e\\s+)?(${MINUTO})?(?:\\s*(?:minutos?|min))?${PERIODO}\\b`),
+  new RegExp(`\\b(?:as|pelas)\\s+(${VALOR})(?:\\s+e\\s+(${MINUTO}))?${PERIODO}\\b`),
+  RE_ESPECIAL,
 ];
 
 function numero(s: string | undefined): number | null {
@@ -48,7 +67,7 @@ function acharData(t: string, hoje: Date): Date | null {
   const d = (n: number) => { const x = new Date(hoje); x.setDate(x.getDate() + n); return x; };
   if (/\bdepois de amanha\b/.test(t)) return d(2);
   if (/\bamanha\b/.test(t)) return d(1);
-  if (/\bhoje\b/.test(t)) return d(0);
+  if (/\b(?:hoje|agora)\b/.test(t)) return d(0);
   const sem = t.match(/\b(domingo|segunda|terca|quarta|quinta|sexta|sabado)\b/);
   if (sem) {
     let n = (SEMANA.indexOf(sem[1]) - hoje.getDay() + 7) % 7;
@@ -70,8 +89,12 @@ function acharData(t: string, hoje: Date): Date | null {
 }
 
 function acharHora(t: string): string | null {
-  if (/\bmeio[\s-]dia e meia\b/.test(t)) return "12:30";
-  if (/\bmeio[\s-]dia\b/.test(t)) return "12:00";
+  const especial = t.match(RE_ESPECIAL);
+  if (especial) {
+    const min = especial[2] === "meia" ? 30 : numero(especial[2]) ?? 0;
+    if (min > 59) return null;
+    return `${especial[1].startsWith("meia") ? "00" : "12"}:${String(min).padStart(2,"0")}`;
+  }
   for (const re of RE_HORA.slice(0, 2)) {
     const m = t.match(re);
     if (!m) continue;
@@ -80,6 +103,7 @@ function acharHora(t: string): string | null {
     const min = m[2] === "meia" ? 30 : numero(m[2]) ?? 0;
     const periodo = m[3];
     if ((periodo === "tarde" || periodo === "noite") && h < 12) h += 12;
+    if (periodo === "madrugada" && h === 12) h = 0;
     if (h > 23 || min > 59) continue;
     return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
   }
