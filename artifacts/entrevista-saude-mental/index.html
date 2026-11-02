@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Avaliação TEA e TDAH — 12+ e adultos</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230e7490'/%3E%3Cpath d='M32 50s-16-9.5-16-21a9 9 0 0 1 16-5.6A9 9 0 0 1 48 29c0 11.5-16 21-16 21z' fill='%23fff'/%3E%3C/svg%3E" />
+<style>
+:root{
+  --bg:#0b1324; --bg2:#0f1a30; --card:#131f38; --card2:#182742; --line:#24365a; --txt:#e6edf7; --mut:#93a4c3;
+  --pri:#22b8cf; --pri2:#0e7490; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --vio:#a78bfa;
+  --r:16px; font-family: Inter, "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+}
+html.light{ --bg:#f3f6fb; --bg2:#ffffff; --card:#ffffff; --card2:#f5f8fc; --line:#d8e1ee; --txt:#0f1d33; --mut:#55657f; --pri:#0e7490; --pri2:#0e7490; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-size:17px;line-height:1.5}
+button,input,textarea,select{font:inherit;color:inherit}
+.top{background:linear-gradient(120deg,#0e7490,#1e3a8a 60%,#4c1d95);color:#fff;padding:18px 20px;position:relative}
+.top .in{max-width:1180px;margin:0 auto;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.brand{display:flex;gap:12px;align-items:center}
+.logo{width:46px;height:46px;border-radius:12px;background:#fff;display:grid;place-items:center;flex-shrink:0}
+.top h1{margin:0;font-size:22px;letter-spacing:-.3px}
+.top p{margin:2px 0 0;opacity:.8;font-size:14px}
+.tbtns{display:flex;gap:8px;flex-wrap:wrap}
+.tb{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:8px 12px;font-size:14px;font-weight:600;cursor:pointer;color:#fff}
+.tb:hover{background:rgba(255,255,255,.24)}
+.wrap{max-width:1180px;margin:0 auto;padding:18px;display:grid;grid-template-columns:270px 1fr;gap:18px;align-items:start}
+@media (max-width:900px){.wrap{grid-template-columns:1fr}.side{position:static!important;max-height:none!important}}
+.side{position:sticky;top:12px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px;max-height:calc(100vh - 24px);overflow:auto}
+.side .st{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-radius:12px;padding:9px 10px;cursor:pointer;font-size:15px}
+.side .st:hover{background:var(--card2)}
+.side .st.on{background:var(--pri2);color:#fff}
+.side .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--card2);border:1px solid var(--line);font-size:12px;font-weight:700;flex-shrink:0}
+.side .st.on .n{background:#fff;color:var(--pri2)}
+.side .c{margin-left:auto;font-size:12px;opacity:.75;white-space:nowrap}
+.side .dot{width:9px;height:9px;border-radius:50%;background:var(--bad);flex-shrink:0}
+@media (max-width:900px){.alert{position:static}.side{display:flex;overflow-x:auto;gap:6px}.side .st{white-space:nowrap;width:auto}.side .c{display:none}}
+.main{min-width:0}
+.prog{height:8px;border-radius:8px;background:var(--card2);overflow:hidden;margin-bottom:14px;border:1px solid var(--line)}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--pri),var(--vio));width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:14px}
+.card h2{margin:0 0 4px;font-size:24px;letter-spacing:-.3px}
+.card h3{margin:18px 0 8px;font-size:19px;color:var(--pri)}
+.ref{display:inline-block;background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:3px 12px;font-size:14px;color:var(--mut);margin:6px 0 10px}
+.note{border-left:4px solid var(--pri);background:var(--card2);padding:10px 14px;border-radius:10px;margin:10px 0;color:var(--txt)}
+.note.w{border-color:var(--warn)} .note.b{border-color:var(--bad)}
+.q{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+.q.done{border-color:color-mix(in srgb,var(--pri) 55%,var(--line))}
+.qh{display:flex;gap:10px;align-items:flex-start}
+.code{font-weight:800;color:var(--pri);min-width:34px}
+.opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding-left:44px}
+@media (max-width:600px){.opts{padding-left:0}}
+.op{border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:8px 12px;cursor:pointer;font-size:15px;font-weight:600;min-height:44px}
+.op:hover{border-color:var(--pri)}
+.op.on{background:var(--pri2);border-color:var(--pri2);color:#fff}
+.op.on.sim{background:#b45309;border-color:#b45309}
+label.f{display:block;font-weight:600;font-size:15px;color:var(--mut);margin:12px 0 5px}
+input[type=text],input[type=date],input[type=number],textarea{width:100%;background:var(--bg2);border:1.5px solid var(--line);border-radius:12px;padding:11px 12px;outline:none}
+input:focus,textarea:focus{border-color:var(--pri)}
+textarea{min-height:84px;resize:vertical}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.g3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:0 14px}
+@media (max-width:700px){.g2,.g3{grid-template-columns:1fr}}
+.nav{display:flex;justify-content:space-between;gap:10px;margin:6px 0 30px}
+.btn{border:0;border-radius:14px;padding:13px 20px;font-weight:700;cursor:pointer;font-size:16px}
+.btn.p{background:linear-gradient(90deg,#16a34a,#22c55e);color:#fff}
+.btn.s{background:var(--card);border:1.5px solid var(--line)}
+.btn.v{background:linear-gradient(90deg,#0e7490,#6d28d9);color:#fff}
+.alert{position:sticky;top:0;z-index:20;max-height:40vh;overflow:auto;background:#7f1d1d;color:#fff;padding:12px 18px;display:none}
+.alert .in{max-width:1180px;margin:0 auto;display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.alert b{font-size:16px}
+.alert ul{margin:4px 0 0 18px;padding:0;font-size:15px}
+.alert .tel{font-size:14px;opacity:.95;margin-top:6px}
+.chk{display:flex;gap:10px;align-items:flex-start;margin:8px 0;cursor:pointer}
+.chk input{width:20px;height:20px;margin-top:3px;accent-color:var(--pri2)}
+.radios{display:flex;flex-wrap:wrap;gap:8px}
+.tag{display:inline-block;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700}
+/* resultado */
+.res-h{text-align:center;padding:10px 0 6px}
+.res-h .big{font-size:30px;font-weight:800;letter-spacing:-.5px}
+.lvl0{color:var(--ok)} .lvl1{color:var(--warn)} .lvl2{color:var(--bad)} .lvlx{color:var(--mut)}
+.bg0{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.bg1{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.bg2{background:color-mix(in srgb,var(--bad) 20%,transparent);color:var(--bad)}
+.bgx{background:var(--card2);color:var(--mut)}
+.bars{margin:10px 0}
+.bar{display:grid;grid-template-columns:190px 1fr 92px;gap:10px;align-items:center;margin:7px 0;font-size:15px}
+@media (max-width:600px){.bar{grid-template-columns:120px 1fr 70px;font-size:13px}}
+.bar .t{height:16px;border-radius:9px;background:var(--card2);border:1px solid var(--line);overflow:hidden;position:relative}
+.bar .t i{display:block;height:100%}
+.bar .t s{position:absolute;top:0;bottom:0;width:1px;background:var(--mut);opacity:.6}
+.rc{border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0;background:var(--card2)}
+.rc .hd{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.rc .hd b{font-size:18px}
+.rc .pt{font-size:14px;color:var(--mut)}
+.rc .ind{margin:8px 0 2px;font-weight:700}
+.rc .enc{font-size:15px;color:var(--mut)}
+.subs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.subs span{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px 10px;font-size:13px}
+.legend{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0}
+.legend td,.legend th{padding:8px;border-bottom:1px solid var(--line);text-align:left}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:12px;display:none;z-index:50}
+#print{display:none}
+.priv{font-size:13px;color:var(--mut);text-align:center;margin:0 0 30px}
+/* ---------- impressão ---------- */
+@page{size:A4;margin:11mm 11mm 12mm}
+@media print{
+  body{background:#fff;color:#000;font-size:11.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body > *:not(#print){display:none!important}
+  #print{display:block!important}
+}
+#print{font-family:Arial,Helvetica,sans-serif;color:#000;line-height:1.35}
+#print .ph{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0e7490;padding-bottom:6px;margin-bottom:8px}
+#print .ph h1{font-size:19pt;margin:0;color:#0e3a5a}
+#print .ph .sub{font-size:11pt;color:#333}
+#print .disc{font-size:10pt;font-style:italic;color:#333;margin:4px 0 8px}
+#print h2{font-size:14pt;margin:14px 0 4px;color:#fff;background:#0e7490;padding:4px 8px;border-radius:4px;break-after:avoid}
+#print h3{font-size:12pt;margin:10px 0 3px;color:#0e3a5a;break-after:avoid}
+#print .pref{font-size:10pt;font-weight:bold;color:#333;margin:2px 0}
+#print .pn{font-size:10pt;color:#222;border-left:3px solid #0e7490;padding:2px 8px;margin:4px 0;break-inside:avoid}
+#print .pn.b{border-color:#b91c1c}
+#print .pq{break-inside:avoid;padding:5px 0;border-bottom:1px solid #ccc}
+#print .pq .qt{font-size:11.5pt}
+#print .pq .qt b{color:#0e3a5a;margin-right:6px}
+#print .po{margin:3px 0 0 30px;font-size:10.5pt}
+#print .po span{margin-right:14px;white-space:nowrap}
+#print .bx{display:inline-block;width:12px;height:12px;border:1.3px solid #000;vertical-align:-1px;margin-right:4px;text-align:center;line-height:10px;font-size:10pt;font-weight:bold}
+#print .bx.x{background:#0e3a5a;color:#fff;border-color:#0e3a5a}
+#print .pf{break-inside:avoid;margin:6px 0}
+#print .pf .lb{font-size:11pt;font-weight:bold}
+#print .pf .val{border:1px solid #999;border-radius:4px;padding:4px 7px;min-height:20px;white-space:pre-wrap;font-size:11pt;margin-top:2px}
+#print .ln{border-bottom:1px solid #777;height:22px}
+#print .idt{width:100%;border-collapse:collapse;font-size:11pt}
+#print .idt td{border:1px solid #999;padding:5px 7px;vertical-align:top}
+#print .idt td.l{width:30%;font-weight:bold;background:#eef6f8}
+#print .pbar{display:grid;grid-template-columns:50mm 1fr 46mm;gap:6px;align-items:center;font-size:10.5pt;margin:3px 0}
+#print .pbar .t{height:11px;border:1px solid #888;border-radius:5px;overflow:hidden}
+#print .pbar .t i{display:block;height:100%}
+#print .prc{border:1px solid #999;border-radius:5px;padding:5px 8px;margin:5px 0;break-inside:avoid;font-size:10.5pt}
+#print .prc b.h{font-size:11.5pt}
+#print .pg{break-before:page}
+#print .sig{display:flex;gap:20mm;margin-top:16mm}
+#print .sig div{flex:1;border-top:1px solid #000;text-align:center;font-size:10pt;padding-top:3px}
+#print .foot{font-size:9pt;color:#444;margin-top:10px;border-top:1px solid #aaa;padding-top:4px}
+#print .alertp{border:2px solid #b91c1c;padding:6px 8px;border-radius:5px;margin:6px 0;font-size:11pt;break-inside:avoid}
+.qe{display:block;font-size:14.5px;font-style:italic;color:var(--mut);margin-top:3px}
+.conc{border:2px solid var(--line);border-radius:18px;padding:18px;margin:4px 0 14px;background:var(--card2)}
+.conc.b0{border-color:var(--ok)} .conc.b1{border-color:var(--warn)} .conc.b2{border-color:var(--bad)}
+.conc .ck{text-transform:uppercase;letter-spacing:.08em;font-size:13px;color:var(--mut);font-weight:700;text-align:center}
+.conc .ct{font-size:28px;font-weight:800;text-align:center;letter-spacing:-.4px;margin:2px 0 6px}
+.conc .cw{text-align:center;margin-bottom:10px}
+.cchips{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:8px 0 12px}
+.cc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 18px;text-align:center;min-width:150px}
+.cc .cn{font-weight:800;font-size:16px}.cc .cv{font-size:34px;font-weight:800;line-height:1.1}.cc .cv small{font-size:16px;color:var(--mut)}
+.conc .cd{margin:8px 0}.conc .cd ul{margin:4px 0 0 20px;padding:0}.conc .cd li{margin:3px 0}
+.conc .cf{font-size:13px;color:var(--mut);margin-top:8px}
+#print .qe{font-size:10pt;font-style:italic;color:#444;margin-top:1px}
+#print .conc{border:2px solid #0e7490;border-radius:6px;padding:8px 10px;margin:6px 0;background:#fff;break-inside:avoid}
+#print .conc.b1{border-color:#b45309}#print .conc.b2{border-color:#b91c1c}
+#print .conc .ck{font-size:9pt;color:#444;text-align:center;text-transform:uppercase}
+#print .conc .ct{font-size:16pt;font-weight:bold;text-align:center;color:#000}
+#print .conc .cw{font-size:10.5pt;text-align:center}
+#print .cchips{display:flex;gap:8mm;justify-content:center;margin:4px 0}
+#print .cc{border:1px solid #999;border-radius:5px;padding:3px 10px;text-align:center;background:#fff;color:#000}#print .cc .cv small{color:#444}
+#print .cc .cv{font-size:16pt;font-weight:bold}#print .cc .cv small{font-size:10pt}
+#print .cc .tag{font-size:9pt;color:#000;background:none;padding:0}
+#print .conc .cd{font-size:10.5pt;margin:4px 0}#print .conc .cd ul{margin:2px 0 0 16px}
+#print .conc .cf{font-size:9pt;color:#444}
+</style>
+</head>
+<body>
+<div class="alert" id="alert"><div class="in"><div><b>Sinal de alerta — avaliar antes de continuar</b><ul id="alertList"></ul>
+<div class="tel">Urgência: SAMU 192 · Bombeiros 193 · Polícia 190 · CVV 188 (24h) · Violência: Disque 100 / Ligue 180 · Adolescente: Conselho Tutelar</div></div>
+<button class="tb" data-go="seg">Ver perguntas de segurança</button></div></div>
+<header class="top"><div class="in">
+  <div class="brand"><div class="logo"><svg width="30" height="30" viewBox="0 0 64 64"><path d="M32 52s-18-10.5-18-23.5a10 10 0 0 1 18-6.2A10 10 0 0 1 50 28.5C50 41.5 32 52 32 52z" fill="#0e7490"/><path d="M21 33h7l3-6 4 11 3-5h5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <div><h1>Avaliação TEA e TDAH</h1><p>Adolescentes a partir de 12 anos e pessoas adultas · entrevista com pontuação final</p></div></div>
+  <div class="tbtns">
+    <button class="tb" id="bPrint">Imprimir preenchido</button>
+    <button class="tb" id="bBlank">Imprimir em branco</button>
+    <button class="tb" id="bSave">Salvar arquivo</button>
+    <button class="tb" id="bOpen">Abrir arquivo</button>
+    <button class="tb" id="bNew">Nova entrevista</button>
+    <button class="tb" id="bTheme" title="Tema claro/escuro">Claro/Escuro</button>
+    <input type="file" id="fOpen" accept=".json,application/json" hidden />
+  </div></div></header>
+<div class="wrap"><nav class="side" id="side"></nav><main class="main"><div class="prog"><i id="prog"></i></div><div id="view"></div>
+<p class="priv">As respostas ficam salvas somente neste navegador/aparelho. Nada é enviado pela internet. Use "Salvar arquivo" para guardar uma cópia e "Nova entrevista" para apagar ao terminar.</p></main></div>
+<div class="toast" id="toast"></div>
+<div id="print"></div>
+<script>
+"use strict";
+const FREQ=[["0","0 Nunca"],["1","1 Raramente"],["2","2 Frequentemente"],["3","3 Quase sempre"],["NO","N/O"]];
+const SIM=[["sim","Sim"],["nao","Não"],["ns","Não sei"],["pnr","Prefere não responder"]];
+const VERSAO="Versão 3 (TEA e TDAH) • 2 de novembro de 2026";
+const DISCLAIMER="Material próprio, não validado. O resultado é indicativo (hipótese para investigar) e não substitui avaliação clínica; o diagnóstico só pode ser dado por médico(a) ou psicólogo(a) após avaliação completa.";
+
+/* Cada passo: blocos {t:'note',c:'w|b',x}, {t:'h',x}, {t:'q',s:'f|s',k,x}, {t:'f',k,x,lines}, {t:'ident'}, {t:'checks'}, {t:'result'}, {t:'devol'} */
+const N=(x,c)=>({t:"note",x,c}), H=x=>({t:"h",x}), F=(k,x,lines=2)=>({t:"f",k,x,lines});
+const QF=(k,x,e)=>({t:"q",s:"f",k,x,e}), QS=(k,x,e)=>({t:"q",s:"s",k,x,e});
+const ALL_STEPS=[
+ {id:"ident",title:"Identificação",b:[
+   N("Formulário exploratório por áreas para acolhimento e organização de informações. "+DISCLAIMER),
+   {t:"ident"}]},
+ {id:"aplic",title:"Aplicação e privacidade",b:[
+   N("Aplicação mediada por profissional de saúde com capacitação em entrevista e manejo de sinais de alerta. Não utilizar como autoteste. Explique o objetivo, a possibilidade de não responder e os limites da confidencialidade diante de risco."),
+   N("Dos 12 aos 17 anos, obtenha assentimento e siga as regras aplicáveis de consentimento. Ofereça parte da conversa em particular. Ouça responsáveis e escola quando pertinente e seguro; não some respostas de pessoas diferentes. Para adultos, envolva terceiros com autorização, salvo situações previstas de proteção."),
+   H("Como registrar as respostas"),
+   N("Use o período indicado em cada bloco. N/O significa não observado, desconhecido ou não aplicável (não conta pontos). Os números de 0 a 3 são os pontos de cada resposta. O sistema soma os pontos de TEA (máximo 24) e de TDAH (máximo 27) e mostra no final a pontuação, o resultado e a explicação."),
+   N("Cada pergunta tem embaixo uma explicação em linguagem simples, para ler junto com a pessoa. As duas perguntas finais de TDAH (antes dos 12 anos e em dois ambientes) são Sim/Não e não somam pontos, mas entram no resultado. Se houver cansaço, divida a entrevista em encontros (as respostas ficam salvas). Se surgir qualquer sinal de risco (pensamentos de morte, autoagressão ou violência), interrompa e siga o fluxo de urgência."),
+   {t:"checks"}]},
+ {id:"seg",title:"Contexto e segurança",b:[
+   N("Pergunte diretamente, com acolhimento. Esta parte deve ser verificada no início; não depende de completar o restante do formulário."),
+   {t:"abrev"},
+   F("H1","H1 Qual foi o motivo da procura e o que você gostaria de compreender ou mudar?"),
+   F("H2","H2 Há diagnósticos prévios, tratamentos, internações ou familiares com dificuldades semelhantes?"),
+   F("H3","H3 Quais medicamentos, suplementos, energéticos ou substâncias utiliza e houve mudanças recentes?"),
+   F("H4","H4 Como estão sono, saúde física, escola ou trabalho, relações e rede de apoio?"),
+   H("Perguntas de segurança"),
+   QS("S1","Nas últimas semanas, desejou morrer, desaparecer ou não acordar?"),
+   QS("S2","Pensou em se machucar ou tirar a própria vida? Isso está acontecendo agora?"),
+   QS("S3","Fez algum plano, teve intenção de agir, preparou algo ou tem acesso ao que usaria?"),
+   QS("S4","Houve tentativa de suicídio ou ferimento intencional recente? Quando?"),
+   QS("S5","Há violência, abuso, ameaça ou alguém que faz você se sentir em perigo?"),
+   QS("S6","Há risco imediato de machucar outra pessoa, confusão intensa ou incapacidade de cuidar das necessidades básicas?"),
+   F("Sobs","Observações sobre segurança (quando, contexto, conduta tomada)"),
+   N("Conduta: qualquer resposta positiva sobre morte ou autoagressão exige investigação clínica direta, sem pontuação de risco. Intenção ou plano atual, tentativa recente ou perigo imediato exigem interromper o formulário e providenciar atendimento de urgência; mantenha acompanhamento seguro até a transferência do cuidado. Suspeita de violência exige proteção e o fluxo local aplicável. Não classificar risco como baixo, médio ou alto por soma de itens.","b")]},
+ {id:"dep",title:"Depressão",ref:"Referência: últimas duas semanas.",b:[
+   QF("D1","Sentiu tristeza, vazio ou, especialmente na adolescência, irritação persistente diferente do habitual?"),
+   QF("D2","Perdeu o interesse ou o prazer em atividades de que costumava gostar?"),
+   QF("D3","Percebeu mudança importante no sono, apetite ou energia?"),
+   QF("D4","Sentiu culpa excessiva, desvalor ou falta de esperança?"),
+   QF("D5","Teve dificuldade para pensar, decidir ou manter suas atividades habituais?"),
+   F("Dobs","Impacto, mudanças recentes, luto ou outros acontecimentos relevantes")]},
+ {id:"bip",title:"Humor elevado (bipolaridade)",ref:"Referência: história de vida; registrar episódios definidos. Sem pontos — indicativo por regra.",b:[
+   N("Mudanças de humor ao longo do dia, isoladamente, não estabelecem bipolaridade. Em adolescentes o resultado deste bloco indica apenas necessidade de avaliação em serviço especializado.","w"),
+   QS("B1","Houve um período claramente diferente do seu habitual, com humor muito elevado ou irritável e aumento de energia ou atividade?"),
+   QS("B2","Nesse mesmo período, dormia muito menos e continuava sem sentir cansaço, em vez de querer dormir e não conseguir?"),
+   QS("B3","No mesmo período, falou muito mais, teve pensamentos acelerados ou confiança muito acima do habitual?"),
+   QS("B4","No mesmo período, fez gastos, assumiu riscos ou tomou decisões fora do seu padrão, com consequências?"),
+   QS("B5","Outras pessoas perceberam a mudança ou houve prejuízo importante, atendimento de urgência ou internação?"),
+   F("Bobs1","Datas, duração exata, simultaneidade dos sinais e retorno ao padrão habitual"),
+   F("Bobs2","Relação com medicamentos, substâncias, privação de sono ou condições físicas")]},
+ {id:"tea",title:"TEA e desenvolvimento",ref:"Referência: padrão habitual atual e presença desde a infância.",b:[
+   N("Diferenças de comunicação, interesses e movimentos não são por si só doença ou prejuízo. Investigue o contexto, a necessidade de adaptações e a perspectiva da pessoa. Este bloco não estima nível de suporte."),
+   H("Comunicação e interação social"),
+   QF("A1","Tem dificuldade para iniciar ou manter uma conversa quando gostaria de participar?","Você sente vontade de conversar, mas não sabe como começar, o que falar depois ou como manter o assunto?"),
+   QF("A2","Tem dificuldade para compreender indiretas, expressões faciais, gestos ou regras sociais implícitas?","Você costuma não perceber ironias, piadas, \"indiretas\", o que a expressão do rosto das pessoas quer dizer ou regras que ninguém explica?"),
+   QF("A3","Tem dificuldade para construir ou manter relações que deseja ter?","Você tem dificuldade para fazer amizades ou namorar e manter essas relações, mesmo querendo?"),
+   QF("A4","Precisa ensaiar ou imitar comportamentos sociais e sente grande esforço ou exaustão com isso?","Você observa e copia o jeito dos outros para parecer \"normal\" e fica muito cansado(a) depois de estar com pessoas?"),
+   H("Padrões repetitivos, interesses e sensorialidade"),
+   QF("A5","Mudanças inesperadas ou interrupções da rotina provocam sofrimento importante?","Quando o plano muda de repente (horário, caminho, local), você fica muito nervoso(a), irritado(a) ou travado(a)?"),
+   QF("A6","Repete movimentos, falas ou ações com objetos para se organizar ou expressar emoções?","Você balança o corpo, mexe as mãos, repete palavras ou frases, ou mexe em objetos do mesmo jeito para se acalmar?"),
+   QF("A7","Tem interesses muito intensos ou restritos que são difíceis de interromper?","Você tem um assunto preferido que ocupa muito tempo e fica difícil parar, mesmo quando precisa fazer outra coisa?"),
+   QF("A8","Sons, luzes, cheiros, toque ou texturas causam desconforto, ou busca sensações específicas?","Barulho, luz forte, cheiros, etiquetas de roupa ou texturas de comida incomodam muito? Ou você procura muito certas sensações?"),
+   F("Aobs1","Sinais presentes na infância e fontes de informação disponíveis",3),
+   F("Aobs2","Impacto em casa, escola ou trabalho e relações; registrar exemplos",3),
+   F("Aobs3","Habilidades, interesses, adaptações e formas de comunicação que ajudam",3)]},
+ {id:"tdah",title:"TDAH",ref:"Referência: últimos seis meses; comparar com pessoas de idade e contexto semelhantes.",b:[
+   N("Não é reprodução da ASRS ou SNAP-IV. Para o indicativo de TDAH é preciso também que as dificuldades existam desde antes dos 12 anos e apareçam em pelo menos dois ambientes — registre abaixo."),
+   H("Desatenção e organização"),
+   QF("T1","Perde detalhes ou comete erros por distração em tarefas que compreende?","Você erra contas, pula palavras ou esquece detalhes por distração, mesmo sabendo fazer a tarefa?"),
+   QF("T2","Tem dificuldade para sustentar a atenção em atividades necessárias?","Você não consegue ficar concentrado(a) em aulas, leituras, filmes ou trabalhos até o fim?"),
+   QF("T3","Perde o fio de conversas ou parece não acompanhar o que está sendo dito?","Quando alguém fala com você, a cabeça \"viaja\" e você perde parte do que foi dito?"),
+   QF("T4","Começa tarefas e não consegue concluí-las mesmo querendo terminar?","Você começa várias coisas e larga no meio, mesmo querendo terminar?"),
+   QF("T5","Tem dificuldade para organizar etapas, materiais, prazos e compromissos?","Você se atrapalha com prazos, compromissos, bagunça de materiais ou em planejar as etapas de uma tarefa?"),
+   QF("T6","Adia esforço mental prolongado, perde objetos ou esquece tarefas importantes?","Você deixa para depois tarefas que exigem pensar muito, perde chaves, celular ou documentos, ou esquece compromissos?"),
+   QF("T7","Distrai-se facilmente com acontecimentos ao redor ou com os próprios pensamentos?","Qualquer barulho, movimento ou pensamento tira a sua atenção do que está fazendo?"),
+   H("Hiperatividade e impulsividade"),
+   QF("T8","Tem inquietação corporal ou interna e dificuldade para permanecer parado(a) quando necessário?","Você mexe pernas e mãos, levanta muito ou sente um \"motor ligado\" por dentro, sem conseguir ficar parado(a)?"),
+   QF("T9","Interrompe, responde antes do fim da pergunta, tem dificuldade para esperar ou age por impulso?","Você corta a fala dos outros, responde antes de terminarem a pergunta, não aguenta esperar a vez ou faz coisas sem pensar?"),
+   QS("T10","Há evidências de dificuldades antes dos 12 anos?","Essas dificuldades já existiam na infância? Exemplo: reclamações da escola, boletins, relatos de pais ou professores."),
+   QS("T11","As dificuldades aparecem em pelo menos dois ambientes (casa, escola, trabalho, social)?","As dificuldades aparecem em mais de um lugar? Exemplo: em casa e na escola, ou em casa e no trabalho."),
+   F("Tobs1","Quais dificuldades antes dos 12 anos e segundo quem?"),
+   F("Tobs2","Aparecem em quais ambientes? Exemplos em pelo menos dois, se houver"),
+   F("Tobs3","O que impede de fazer e como variam com sono, ansiedade e exigência da tarefa?"),
+   F("Tobs4","Informações de familiar e escola ou trabalho disponíveis com autorização")]},
+ {id:"ans",title:"Ansiedade e pânico",ref:"Referência: últimas duas semanas; detalhar crises e duração na história.",b:[
+   QF("N1","Preocupações são difíceis de controlar e ocupam boa parte do seu tempo?"),
+   QF("N2","Sente tensão, medo ou inquietação que atrapalham descansar ou se concentrar?"),
+   QF("N3","Evita situações sociais por medo de julgamento ou humilhação?"),
+   QF("N4","Evita lugares, situações ou afastamento de pessoas de apoio por medo intenso?"),
+   QF("N5","Teve crises súbitas de medo intenso com sintomas físicos e depois passou a temer novas crises?"),
+   F("Nobs","Duração, gatilhos, situações evitadas e impacto; investigar causas físicas quando indicado")]},
+ {id:"toc",title:"Obsessões e compulsões",ref:"Referência: último mês.",b:[
+   N("Diferenciar rituais para neutralizar medo de hábitos, preferências e rotinas de autorregulação. A forma parecida de um comportamento não define a sua causa."),
+   QF("O1","Tem pensamentos, imagens ou impulsos intrusivos, indesejados e difíceis de afastar?"),
+   QF("O2","Sente necessidade de repetir ações ou rituais mentais para reduzir medo ou impedir algo ruim?"),
+   QF("O3","Faz verificações, lavagens, contagens ou pedidos de confirmação além do que deseja?"),
+   QF("O4","Sente sofrimento ou dificuldade para seguir a rotina quando tenta não realizar esses rituais?"),
+   F("Oobs1","Tempo gasto por dia, o que teme que aconteça e impacto nas atividades"),
+   F("Oobs2","Impacto nas atividades e apoios que ajudam")]},
+ {id:"trau",title:"Trauma e estresse",ref:"Referência: último mês, se houver experiência traumática relevante.",b:[
+   N("Não exija descrição detalhada do trauma. Permita pausar ou não responder. Investigue segurança atual e não pressione a pessoa a reviver o acontecimento.","w"),
+   QF("R1","Depois de uma experiência ameaçadora ou traumática, teve lembranças involuntárias, pesadelos ou sensação de reviver o ocorrido?"),
+   QF("R2","Passou a evitar lembranças, conversas, lugares ou pessoas relacionados ao ocorrido?"),
+   QF("R3","Ficou em alerta constante, assusta-se facilmente ou tem dificuldade para se sentir segura?"),
+   QF("R4","Sentiu distanciamento, culpa persistente ou mudanças importantes na forma de ver a si e aos outros?"),
+   F("Robs","Início, duração, impacto e apoios; registrar apenas o necessário")]},
+ {id:"psi",title:"Percepções incomuns",ref:"Referência: atual e história recente. Sem pontos — indicativo por regra.",b:[
+   N("Perguntar sem julgamento. Considerar contexto cultural, religioso, sono, medicamentos, substâncias e condições físicas."),
+   QS("P1","Quando estava acordada, percebeu vozes, imagens ou outras sensações que as pessoas ao redor não percebiam?"),
+   QS("P2","Sentiu que estava sendo perseguida, controlada ou recebendo mensagens especiais, sem conseguir verificar isso com outras pessoas?"),
+   QS("P3","Teve dificuldade nova e importante para organizar pensamentos, falar de forma compreensível ou distinguir o que é real?"),
+   QS("P4","Essas experiências deram ordens, causaram medo intenso, prejudicaram o autocuidado ou criaram risco?"),
+   F("Pobs","Quando começou, frequência, contexto, sofrimento e mudanças no funcionamento"),
+   N("Experiências novas ou persistentes requerem avaliação clínica. Confusão aguda, comandos para ferir alguém, incapacidade de autocuidado ou perigo atual exigem avaliação de urgência; não aguardar completar o formulário.","b")]},
+ {id:"ali",title:"Alimentação e imagem corporal",ref:"Referência: últimos três meses; investigar mudanças recentes.",b:[
+   QF("E1","Restringe a alimentação por medo de ganhar peso ou preocupação intensa com o corpo?"),
+   QF("E2","Tem episódios em que come com sensação de perda de controle?"),
+   QF("E3","Provoca vômitos, usa laxantes ou outros métodos, jejua ou faz exercício para compensar o que comeu?"),
+   QF("E4","Evita alimentos por textura, medo de engasgar ou pouco interesse, com impacto na nutrição ou convivência?"),
+   F("Eobs","Mudança de peso, desmaios, fraqueza, hidratação e consequências físicas"),
+   N("Desmaio, desidratação, fraqueza importante ou suspeita de instabilidade física exigem avaliação médica rápida, independentemente do peso ou dos pontos.","b")]},
+ {id:"sub",title:"Álcool e substâncias",ref:"Referência: últimos 12 meses; registrar separadamente cada substância.",b:[
+   QF("U1","Usou álcool, nicotina, cannabis, outras drogas ou medicamentos fora da orientação recebida?"),
+   QF("U2","Teve dificuldade para reduzir ou controlar o uso quando tentou?"),
+   QF("U3","O uso trouxe problemas em casa, escola, trabalho, relações ou situações de risco?"),
+   QF("U4","Precisou aumentar a quantidade para obter o mesmo efeito ou teve mal-estar ao reduzir?"),
+   F("Uobs1","Substâncias, quantidade, frequência, última utilização e consequências"),
+   N("Para adolescentes, qualquer uso deve ser contextualizado com acolhimento e proteção, sem concluir dependência. Suspeita de intoxicação ou abstinência grave exige atendimento médico.","w"),
+   F("Uobs2","Impacto nas atividades e apoios que ajudam")]},
+ {id:"sono",title:"Sono e cognição",ref:"Referência: último mês; comparar com funcionamento anterior.",b:[
+   QF("C1","Tem dificuldade para iniciar ou manter o sono, ou sente sono excessivo durante o dia?"),
+   QF("C2","Ronca alto, tem pausas respiratórias observadas ou acorda sem descanso?"),
+   QF("C3","Percebeu perda recente ou progressiva de memória, orientação ou habilidades antes dominadas?"),
+   QF("C4","Essas mudanças passaram a prejudicar segurança, autocuidado ou tarefas habituais?"),
+   F("Cobs","Início, evolução, horário de sono e mudanças em saúde física e medicamentos"),
+   N("Dificuldades cognitivas novas não devem ser atribuídas automaticamente a TEA ou TDAH. Confusão de início súbito ou perda neurológica aguda exige avaliação de urgência.","b")]},
+ {id:"apr",title:"Aprendizagem e autonomia",ref:"Referência: história escolar e funcionamento atual.",b:[
+   N("Diferenciar falta de acesso ou ensino, barreiras de linguagem e limitações sensoriais ou motoras. Não estimar QI, idade mental ou deficiência intelectual com este roteiro."),
+   QF("L1","Teve dificuldade persistente para aprender leitura, escrita ou matemática, apesar de oportunidades e apoio?"),
+   QF("L2","Precisa de apoio para compreender informações práticas ou resolver problemas cotidianos?"),
+   QF("L3","Precisa de ajuda com dinheiro, transporte, higiene, alimentação ou organização da rotina?"),
+   QF("L4","As dificuldades estavam presentes durante o desenvolvimento e continuam afetando a autonomia?"),
+   F("Lobs1","História escolar, oportunidades, avaliações anteriores e apoios necessários"),
+   F("Lobs2","Pontos fortes, preferências e objetivos escolhidos pela própria pessoa")]},
+ {id:"res",title:"Resultado",b:[{t:"result"}]},
+ {id:"sin",title:"Síntese e encaminhamento",b:[
+   N("Uma única resposta pode exigir atenção clínica, mesmo com poucos pontos nos demais itens. Use o resultado indicativo como ponto de partida e complete com o conteúdo da entrevista."),
+   F("Z1","Áreas com dificuldades relatadas e exemplos"),
+   F("Z2","Início e duração e relação com a infância ou episódios definidos"),
+   F("Z3","Impacto em casa, escola, trabalho, relações e autocuidado"),
+   F("Z4","Outras explicações a investigar e condições que podem coexistir"),
+   F("Z5","Recursos pessoais, adaptações e rede de apoio"),
+   F("Z6","Encaminhamento, responsável, prazo e plano de acompanhamento"),
+   N("Encaminhamento: UBS/atenção primária e equipe de saúde mental (CAPS, ambulatório) conforme necessidade e rede local. Adolescentes: preferir serviço especializado em saúde mental infantojuvenil (CAPSij). Situações de perigo atual seguem fluxo de urgência. Não alterar medicamentos com base neste formulário."),
+   {t:"devol"},
+   {t:"prof"}]},
+ {id:"base",title:"Base e limites",b:[{t:"base"}]}
+];
+const ATIVOS=["ident","aplic","tea","tdah","res","sin","base"];
+const STEPS=ALL_STEPS.filter(s=>ATIVOS.includes(s.id));
+const REFS=[
+ "NICE CG142 — Autism spectrum disorder in adults. nice.org.uk/guidance/cg142/chapter/recommendations",
+ "NICE NG87 — Attention deficit hyperactivity disorder. nice.org.uk/guidance/ng87/chapter/recommendations"];
+const BASE_TXT="Perguntas de autoria própria. Organização informada pelas diretrizes abaixo; não se trata de reprodução, validação ou endosso institucional. Os módulos não abrangem todos os transtornos. Os pontos e níveis por área são critérios internos deste roteiro (não validados) e servem para organizar hipóteses e encaminhamentos. Instrumentos padronizados, quando indicados, devem ser escolhidos para idade, idioma, capacidade de compreensão e contexto e aplicados conforme manual e licença.";
+const CHECKS=[["c1","Objetivo da entrevista explicado"],["c2","Informado que pode não responder qualquer pergunta"],["c3","Explicados os limites do sigilo diante de risco"],["c4","12 a 17 anos: assentimento obtido e consentimento do responsável conforme regras"],["c5","Oferecida parte da conversa em particular"],["c6","Terceiros (família/escola/trabalho) ouvidos somente com autorização"]];
+/* ---------- áreas do resultado ---------- */
+const ALL_AREAS=[
+ {id:"dep",nome:"Depressão",codes:["D1","D2","D3","D4","D5"],cid:"F32/F33 (CID-10) · 6A70/6A71 (CID-11)",hip:"sintomas depressivos (episódio depressivo)",enc:"Psicologia (psicoterapia) e avaliação médica/psiquiátrica; UBS ou CAPS conforme gravidade."},
+ {id:"tea",nome:"TEA",codes:["A1","A2","A3","A4","A5","A6","A7","A8"],cid:"F84.0 (CID-10) · 6A02 (CID-11)",hip:"características do Transtorno do Espectro Autista (TEA)",enc:"Avaliação diagnóstica multiprofissional (psiquiatria/neurologia + psicologia/neuropsicologia), com história do desenvolvimento e informantes.",
+  subs:[["Comunicação social","A1 A2 A3 A4"],["Padrões repetitivos/sensoriais","A5 A6 A7 A8"]]},
+ {id:"tdah",nome:"TDAH",codes:["T1","T2","T3","T4","T5","T6","T7","T8","T9"],cid:"F90 (CID-10) · 6A05 (CID-11)",hip:"Transtorno de Déficit de Atenção e Hiperatividade (TDAH)",enc:"Avaliação psiquiátrica/neurológica e avaliação neuropsicológica com testes padronizados de atenção e funções executivas; informações da escola/trabalho.",
+  subs:[["Desatenção","T1 T2 T3 T4 T5 T6 T7"],["Hiperatividade/impulsividade","T8 T9"]]},
+ {id:"ans",nome:"Ansiedade",codes:["N1","N2","N3","N4","N5"],cid:"F41.1 TAG · F40.1 ansiedade social · F41.0 pânico · F93.0 separação",hip:"transtorno de ansiedade",enc:"Psicologia (psicoterapia) e avaliação médica; investigar causas físicas quando indicado."},
+ {id:"toc",nome:"Obsessões e compulsões",codes:["O1","O2","O3","O4"],cid:"F42 (CID-10) · 6B20 (CID-11)",hip:"Transtorno Obsessivo-Compulsivo (TOC)",enc:"Psicologia e psiquiatria."},
+ {id:"trau",nome:"Trauma e estresse",codes:["R1","R2","R3","R4"],cid:"F43.1 (CID-10) · 6B40 (CID-11)",hip:"Transtorno de Estresse Pós-Traumático (TEPT) / reação ao estresse",enc:"Psicologia com abordagem para trauma e avaliação psiquiátrica; verificar proteção e segurança atual."},
+ {id:"ali",nome:"Alimentação",codes:["E1","E2","E3","E4"],cid:"F50 (CID-10) · 6B80–6B83 (CID-11)",hip:"transtorno alimentar",enc:"Avaliação médica (estado físico), Nutrição e Psicologia/Psiquiatria."},
+ {id:"sub",nome:"Substâncias",codes:["U1","U2","U3","U4"],cid:"F10–F19 (CID-10) · 6C40–6C4H (CID-11)",hip:"uso problemático de álcool/outras substâncias",enc:"UBS e CAPS AD (adultos) / CAPSij (adolescentes); avaliação médica se intoxicação ou abstinência."},
+ {id:"sono",nome:"Sono e cognição",codes:["C1","C2","C3","C4"],cid:"G47 / F51 (sono) · F06.7 / F03 (cognição)",hip:"alteração do sono e/ou declínio cognitivo",enc:"Avaliação médica (clínico/neurologista); investigar apneia do sono; avaliação neuropsicológica se houver perda cognitiva."},
+ {id:"apr",nome:"Aprendizagem e autonomia",codes:["L1","L2","L3","L4"],cid:"F81 aprendizagem · F70–F79 (só com testes padronizados)",hip:"transtorno de aprendizagem e/ou necessidade de investigar o funcionamento intelectual/adaptativo",enc:"Avaliação neuropsicológica com testes padronizados (inteligência, aprendizagem e comportamento adaptativo) e Psicopedagogia/Fonoaudiologia."}
+];
+const AREAS=ALL_AREAS.filter(a=>ATIVOS.includes(a.id));
+const NIVEIS=[
+ {k:0,nome:"Poucos sinais",cls:"0",cor:"#22c55e",desc:"Sem indicativo nesta área no momento."},
+ {k:1,nome:"Sinais moderados",cls:"1",cor:"#f59e0b",desc:"Investigar: aprofundar na entrevista e acompanhar."},
+ {k:2,nome:"Muitos sinais",cls:"2",cor:"#ef4444",desc:"Indicativo: encaminhar para avaliação diagnóstica."}
+];
+let S=load();
+function blank(){return{r:{},f:{},step:0,v:2}}
+function load(){try{const x=JSON.parse(localStorage.getItem("tea_tdah_v1")||"null");if(x&&x.r){if(!(x.step>=0&&x.step<STEPS.length))x.step=0;return x}}catch(e){}return blank()}
+function save(){localStorage.setItem("tea_tdah_v1",JSON.stringify(S))}
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const R=k=>S.r[k], Fv=k=>(S.f[k]||"").trim();
+const isSim=k=>R(k)==="sim";
+const num=k=>{const v=R(k);return v&&v!=="NO"?+v:null};
+function idade(){const n=S.f.nasc,d=S.f.data||hoje();if(!n)return S.f.idade?+S.f.idade:null;const a=new Date(n),b=new Date(d);if(isNaN(a)||isNaN(b))return null;let y=b.getFullYear()-a.getFullYear();const m=b.getMonth()-a.getMonth();if(m<0||(m===0&&b.getDate()<a.getDate()))y--;return y}
+function hoje(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function br(d){if(!d)return"";const p=d.split("-");return p.length===3?p[2]+"/"+p[1]+"/"+p[0]:d}
+const adol=()=>{const i=idade();return i!=null&&i<18};
+
+function sc(codes){let pts=0,ans=0,no=0,max3=false;for(const c of codes){const v=R(c);if(v==null)continue;if(v==="NO"){no++;continue}ans++;pts+=+v;if(+v===3)max3=true}return{pts,ans,no,max:ans*3,mean:ans?pts/ans:null,max3}}
+function lvlOf(s){if(!s.ans)return null;let l=s.mean>=2?2:s.mean>=1?1:0;if(l===0&&s.max3)l=1;return l}
+function avalia(a){
+  const s=sc(a.codes);let l=lvlOf(s);const extra=[];let hip=a.hip;
+  if(l==null)return{...a,s,l:null,extra,hip};
+  const ge=(k,n)=>(num(k)||0)>=n;
+  const subs=(a.subs||[]).map(([n,c])=>{const x=sc(c.split(" "));return{n,x,l:lvlOf(x)}});
+  if(a.id==="dep"){if(l===2&&!(ge("D1",2)||ge("D2",2))){l=1;extra.push("Pontos altos, mas sem humor deprimido/irritável nem perda de interesse frequentes (D1/D2).")}
+    if(ge("D1",2)||ge("D2",2))extra.push("Sintoma central presente (humor deprimido/irritável ou perda de prazer).")}
+  if(a.id==="tea"){const[c,r]=subs;if(l===2&&!((c.l||0)>=1&&(r.l||0)>=1)){l=1;extra.push("Sinais concentrados em um só domínio; para TEA são esperados os dois (comunicação social E padrões repetitivos/sensoriais).")}
+    if(l>=1)extra.push("Confirmar presença desde a infância e prejuízo funcional; considerar diagnósticos diferenciais (ansiedade social, TDAH, trauma, deficiência intelectual).")}
+  if(a.id==="tdah"){const[d,h]=subs;const pd=d.x.mean!=null&&d.x.mean>=2,ph=h.x.mean!=null&&h.x.mean>=2;
+    if(l>=1){if(pd&&ph)hip+=" — apresentação combinada";else if(pd)hip+=" — predomínio desatento";else if(ph)hip+=" — predomínio hiperativo/impulsivo"}
+    if(l===2&&(R("T10")==="nao"||R("T11")==="nao")){l=1;extra.push("Sem início antes dos 12 anos ou sem presença em 2 ambientes: considerar outras causas (ansiedade, depressão, sono, substâncias).")}
+    else if(l>=1&&(R("T10")!=="sim"||R("T11")!=="sim"))extra.push("Confirmar início antes dos 12 anos e presença em pelo menos dois ambientes.")}
+  if(a.id==="ans"){const t=[];if(ge("N1",2)||ge("N2",2))t.push("ansiedade generalizada (F41.1)");if(ge("N3",2))t.push("ansiedade social (F40.1)");if(ge("N4",2))t.push("agorafobia/ansiedade de separação (F40.0/F93.0)");if(ge("N5",2))t.push("transtorno de pânico (F41.0)");if(t.length&&l>=1)hip="transtorno de ansiedade — investigar "+t.join(", ")}
+  if(a.id==="toc"){if(l===2&&!((ge("O1",2)||ge("O2",2))&&ge("O4",2))){l=1;extra.push("Para TOC são esperados obsessões ou compulsões com sofrimento/prejuízo (O4).")}}
+  if(a.id==="trau"){if(l===2&&!ge("R1",2)){l=1;extra.push("Sem revivência frequente (R1), necessária para o indicativo de TEPT.")}}
+  if(a.id==="ali"){const t=[];if(ge("E1",2))t.push("anorexia/restrição (F50.0)");if(ge("E2",2)&&ge("E3",2))t.push("bulimia (F50.2)");else if(ge("E2",2))t.push("compulsão alimentar (F50.8)");if(ge("E4",2))t.push("TARE — restrição alimentar evitativa (F50.8)");if(t.length){hip="transtorno alimentar — investigar "+t.join(", ");if(l<1)l=1}
+    if(ge("E3",1))extra.push("Comportamento compensatório presente: avaliação médica rápida (risco físico).")}
+  if(a.id==="sub"){if(ge("U1",1)&&!(ge("U2",1)||ge("U3",1)||ge("U4",1))){extra.push("Uso relatado sem sinais de perda de controle ou prejuízo.");if(adol()&&l<1)l=1}
+    if(adol()&&ge("U1",1))extra.push("Adolescente: contextualizar com acolhimento e proteção, sem concluir dependência.")}
+  if(a.id==="sono"){if(ge("C3",2)||ge("C4",2)){extra.push("Perda cognitiva relatada: avaliação médica e neuropsicológica; não atribuir a TEA ou TDAH.");if(l<1)l=1}if(ge("C2",2))extra.push("Ronco/pausas respiratórias: investigar apneia do sono.")}
+  if(a.id==="apr"){if(l>=1)extra.push("Deficiência intelectual e QI só podem ser estimados com testes padronizados — este roteiro não estima.")}
+  return{...a,s,l,extra,hip,subs}
+}
+function regras(){
+  const out=[];
+  const bOk=isSim("B1"),bn=["B2","B3","B4"].filter(isSim).length;
+  if(ATIVOS.includes("bip")&&R("B1")!=null){let l=0,t="Sem episódio definido de humor elevado relatado.";
+    if(bOk&&bn>=2){l=isSim("B5")?2:1;t=isSim("B5")?"Episódio de humor elevado com sintomas associados e prejuízo — compatível com episódio maníaco.":"Episódio de humor elevado com sintomas associados, sem prejuízo grave relatado — compatível com hipomania."}
+    else if(bOk){l=1;t="Período de humor elevado relatado, com poucos sintomas associados: detalhar duração e simultaneidade."}
+    const enc=adol()?"Serviço especializado em saúde mental infantojuvenil (CAPSij / psiquiatria da infância e adolescência).":"Avaliação psiquiátrica (CAPS ou ambulatório de psiquiatria).";
+    const ex=[];if(l>=1&&((num("D1")||0)>=2||(num("D2")||0)>=2))ex.push("Há também sintomas depressivos: prioridade de avaliação psiquiátrica antes de qualquer tratamento antidepressivo.");
+    if(l>=1)ex.push("Descartar efeito de medicamentos, substâncias, privação de sono ou condição física.");
+    out.push({id:"bip",nome:"Bipolaridade",cid:"F31 (CID-10) · 6A60/6A61 (CID-11)",hip:"Transtorno Afetivo Bipolar",l,txt:t,enc,extra:ex,regra:`B1 ${bOk?"Sim":"Não/NS"} · sintomas associados (B2–B4): ${bn} de 3 · prejuízo (B5): ${isSim("B5")?"Sim":"Não/NS"}`})}
+  if(ATIVOS.includes("psi")&&["P1","P2","P3","P4"].some(k=>R(k)!=null)){const n=["P1","P2","P3"].filter(isSim).length;let l=n>=2||isSim("P4")?2:n===1?1:0;
+    out.push({id:"psi",nome:"Percepções incomuns",cid:"F20–F29 (CID-10) · 6A20–6A2Z (CID-11)",hip:"sintomas psicóticos (espectro da esquizofrenia/psicoses)",l,txt:l===0?"Sem experiências incomuns relatadas.":n+" de 3 experiências relatadas"+(isSim("P4")?", com ordens, medo intenso, prejuízo ou risco (P4)":""),enc:isSim("P4")?"Avaliação psiquiátrica de URGÊNCIA.":"Avaliação psiquiátrica (CAPS); considerar contexto cultural/religioso, sono, substâncias e causas físicas.",extra:[],regra:`P1–P3 positivos: ${n} · P4: ${isSim("P4")?"Sim":"Não/NS"}`})}
+  return out
+}
+function alertas(){const a=[];if(!ATIVOS.includes("seg"))return a;
+  if(isSim("S1")||isSim("S2"))a.push(["w","Pensamentos de morte ou autoagressão (S1/S2): investigar clinicamente de forma direta agora."]);
+  if(isSim("S3"))a.push(["b","Plano, intenção ou acesso a meios (S3): INTERROMPER o formulário e providenciar atendimento de urgência."]);
+  if(isSim("S4"))a.push(["b","Tentativa ou ferimento intencional recente (S4): atendimento de urgência e acompanhamento até a transferência do cuidado."]);
+  if(isSim("S5"))a.push(["b","Violência, abuso ou ameaça (S5): medidas de proteção e fluxo local"+(adol()?" — notificar o Conselho Tutelar.":".")]);
+  if(isSim("S6"))a.push(["b","Risco imediato a outra pessoa, confusão intensa ou incapacidade de autocuidado (S6): avaliação de urgência."]);
+  if(isSim("P4"))a.push(["b","Experiências incomuns com ordens, medo intenso ou risco (P4): avaliação psiquiátrica de urgência."]);
+  if(["S1","S2","S3","S4"].some(k=>R(k)==="ns"||R(k)==="pnr"))a.push(["w","Resposta 'Não sei' ou 'Prefere não responder' em segurança: retomar com acolhimento antes de encerrar."]);
+  if((num("E3")||0)>=2)a.push(["w","Comportamentos compensatórios frequentes (E3): avaliação médica rápida."]);
+  if((num("C3")||0)>=2&&(num("C4")||0)>=2)a.push(["w","Perda cognitiva com prejuízo de segurança/autocuidado (C3/C4): avaliação médica."]);
+  return a}
+function stepAlert(id){const m={seg:["S1","S2","S3","S4","S5","S6"],psi:["P4"]};return(m[id]||[]).some(isSim)}
+
+/* ---------- render ---------- */
+const $=id=>document.getElementById(id);
+function stepCodes(st){return st.b.filter(b=>b.t==="q").map(b=>b.k)}
+function renderSide(){let h="";let tot=0,done=0;STEPS.forEach((st,i)=>{const c=stepCodes(st);const d=c.filter(k=>R(k)!=null).length;tot+=c.length;done+=d;
+  h+=`<button class="st ${i===S.step?"on":""}" data-step="${i}"><span class="n">${i+1}</span><span>${esc(st.title)}</span>${stepAlert(st.id)?'<span class="dot" title="alerta"></span>':""}<span class="c">${c.length?d+"/"+c.length:""}</span></button>`});
+  $("side").innerHTML=h;$("prog").style.width=(tot?Math.round(done/tot*100):0)+"%"}
+function renderAlert(){const a=alertas().filter(x=>x[0]==="b"||/S1|S2|Não sei/.test(x[1]));const el=$("alert");if(!a.length){el.style.display="none";return}
+  el.style.display="block";$("alertList").innerHTML=a.map(x=>`<li>${esc(x[1])}</li>`).join("")}
+function qHtml(b){const v=R(b.k);const opts=b.s==="f"?FREQ:SIM;
+  return `<div class="q ${v!=null?"done":""}" id="q_${b.k}"><div class="qh"><span class="code">${b.k}</span><span>${esc(b.x)}${b.e?`<span class="qe">(${esc(b.e)})</span>`:""}</span></div><div class="opts">${opts.map(([val,lab])=>`<button class="op ${v===val?"on":""} ${b.s==="s"&&val==="sim"?"sim":""}" data-q="${b.k}" data-v="${val}">${lab}</button>`).join("")}</div></div>`}
+function inp(k,lab,type="text",extra=""){return `<div><label class="f" for="i_${k}">${lab}</label><input type="${type}" id="i_${k}" data-f="${k}" value="${esc(S.f[k]||"")}" ${extra}></div>`}
+function ta(k,lab,lines){return `<label class="f" for="i_${k}">${esc(lab)}</label><textarea id="i_${k}" data-f="${k}" rows="${Math.max(2,lines)}">${esc(S.f[k]||"")}</textarea>`}
+function identHtml(){const i=idade();let w="";if(i!=null&&i<12)w=N("Formulário destinado a partir de 12 anos. Para crianças menores use instrumentos próprios da faixa etária.","b");else if(i!=null&&i<18)w=N("Adolescente (12 a 17 anos): obter assentimento, consentimento do responsável conforme regras e oferecer parte da conversa em particular.","w");
+  const resp=["Própria pessoa","Familiar","Escola","Outro"];
+  return `${inp("nome","Nome ou identificação")}<div class="g3">${inp("nasc","Nascimento","date")}${inp("idade","Idade","number",S.f.nasc?'readonly placeholder="automática"':'min="0" max="120"')}${inp("data","Data","date")}</div>
+  ${inp("prof","Profissional e registro quando aplicável")}
+  <label class="f">Respondente</label><div class="radios">${resp.map(r=>`<button class="op ${S.f.resp===r?"on":""}" data-fset="resp" data-v="${r}">${r}</button>`).join("")}</div>
+  ${S.f.resp==="Outro"?inp("respOutro","Outro — qual?"):""}
+  ${inp("comun","Forma de comunicação e adaptações necessárias")}${inp("contato","Contato de apoio autorizado")}<div id="ageNote">${w?blockHtml(w):""}</div>`}
+function checksHtml(){return `<h3>Checklist de aplicação</h3>`+CHECKS.map(([k,t])=>`<label class="chk"><input type="checkbox" data-chk="${k}" ${S.f[k]?"checked":""}><span>${esc(t)}</span></label>`).join("")}
+function barHtml(nome,l,pct,pts){const n=l==null?null:NIVEIS[l];return `<div class="bar"><span>${esc(nome)}</span><div class="t"><i style="width:${pct}%;background:${n?n.cor:"transparent"}"></i><s style="left:33.3%"></s><s style="left:66.6%"></s></div><span class="tag bg${n?n.cls:"x"}">${pts}</span></div>`}
+const LAB={A1:"iniciar/manter conversa",A2:"entender indiretas, expressões e regras sociais",A3:"fazer e manter relações",A4:"imitar/ensaiar o social com exaustão",A5:"sofrimento com mudanças de rotina",A6:"movimentos ou falas repetitivas",A7:"interesses intensos e restritos",A8:"sensibilidade sensorial",
+ T1:"erros por distração",T2:"manter a atenção",T3:"perder o fio da conversa",T4:"não concluir tarefas",T5:"organização e prazos",T6:"adiar, perder objetos, esquecer",T7:"distrair-se facilmente",T8:"inquietação",T9:"impulsividade e dificuldade de esperar"};
+const SIMTXT={sim:"Sim",nao:"Não",ns:"Não sei",pnr:"Prefere não responder"};
+function conclusao(){const areas=AREAS.map(avalia).filter(a=>a.id==="tea"||a.id==="tdah");if(!areas.some(a=>a.l!=null))return null;
+  const nm={tea:"TEA",tdah:"TDAH"};
+  const det=areas.map(a=>{const tot=a.codes.length*3,L=[];
+    if(a.l==null)return{id:a.id,nome:nm[a.id],l:null,score:"—",tot,L:["Bloco não respondido — sem resultado."]};
+    const n=NIVEIS[a.l];
+    L.push(`Pontuação final: ${a.s.pts} de ${tot} pontos (média ${a.s.mean.toFixed(1).replace(".",",")} por pergunta respondida${a.s.no?"; "+a.s.no+" pergunta(s) N/O não contam":""}) — ${n.nome.toLowerCase()}.`);
+    const orig=ALL_AREAS.find(x=>x.id===a.id);
+    if(a.subs&&a.subs.length)L.push(a.subs.map((sb,i)=>`${sb.n}: ${sb.x.pts} de ${orig.subs[i][1].split(" ").length*3}`).join(" · ")+".");
+    const hi=a.codes.filter(c=>(num(c)||0)>=2);
+    if(hi.length)L.push(`Respostas que mais pesaram (Frequentemente/Quase sempre): `+hi.map(c=>`${LAB[c]} (${c}: ${num(c)===3?"quase sempre":"frequentemente"})`).join("; ")+".");
+    else L.push("Nenhuma resposta \"Frequentemente\" ou \"Quase sempre\" neste bloco.");
+    if(a.id==="tdah")L.push(`Início antes dos 12 anos: ${SIMTXT[R("T10")]||"não respondido"} · Em 2 ou mais ambientes: ${SIMTXT[R("T11")]||"não respondido"}.`);
+    (a.extra||[]).forEach(e=>L.push(e));
+    L.push(a.l===2?`Por isso o resultado é INDICATIVO de ${a.hip} (${a.cid.split(" (")[0]}). Encaminhar: ${a.enc}`:a.l===1?`Por isso o resultado é de SINAIS MODERADOS: não fecha indicativo de ${nm[a.id]}, mas vale investigar e acompanhar.`:`Por isso o resultado NÃO indica ${nm[a.id]} no momento.`);
+    return{id:a.id,nome:nm[a.id],l:a.l,score:a.s.pts,tot,L}});
+  const by=id=>det.find(d=>d.id===id),te=by("tea"),td=by("tdah");
+  const ind=det.filter(d=>d.l===2).map(d=>d.nome),mod=det.filter(d=>d.l===1).map(d=>d.nome),nv=det.filter(d=>d.l==null).map(d=>d.nome);
+  let t;if(ind.length===2)t="Indicativo de TEA e TDAH";else if(ind.length)t="Indicativo de "+ind[0]+(mod.length?" — investigar também "+mod[0]:"");else if(mod.length)t="Sinais moderados de "+mod.join(" e ")+" — investigar";else t="Sem indicativo de "+det.filter(d=>d.l!=null).map(d=>d.nome).join(" ou ");
+  if(nv.length)t+=` (${nv.join(", ")} não respondido)`;
+  const cls=Math.max(...det.map(d=>d.l??0));
+  let why;if(ind.length===2)why="Os dois blocos tiveram muitos sinais: as características de TEA e de TDAH podem existir juntas e precisam ser avaliadas em conjunto.";
+  else if(ind.length)why=`O bloco de ${ind[0]} teve muitos sinais${mod.length?` e o de ${mod[0]} teve sinais moderados`:det.some(d=>d.l===0)?` e o de ${det.find(d=>d.l===0).nome} teve poucos sinais`:""}.`;
+  else if(mod.length)why="Houve sinais, mas não o suficiente para indicativo. Vale aprofundar a história e reavaliar.";
+  else why="As respostas mostraram poucos sinais nos blocos respondidos.";
+  return{t,cls,why,det,te,td}}
+function concHtml(pr){const c=conclusao();if(!c)return"";
+  const chip=d=>`<div class="cc"><div class="cn">${d.nome}</div><div class="cv">${d.score}<small> / ${d.tot}</small></div><span class="tag bg${d.l==null?"x":d.l}">${d.l==null?"Não respondido":NIVEIS[d.l].nome}</span></div>`;
+  return `<div class="conc b${c.cls}"><div class="ck">Resultado final</div><div class="ct lvl${c.cls}">${esc(c.t)}</div><div class="cw">${esc(c.why)}</div>
+  <div class="cchips">${c.det.map(chip).join("")}</div>
+  ${c.det.map(d=>`<div class="cd"><b>Explicação — ${d.nome}</b><ul>${d.L.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`).join("")}
+  <div class="cf">Critério: média por pergunta respondida menor que 1 = poucos sinais · 1 a 1,9 = sinais moderados · 2 ou mais = muitos sinais (indicativo). TEA exige sinais nos dois domínios; TDAH exige início antes dos 12 anos e presença em 2 ambientes.</div></div>`}
+function resultData(){const areas=AREAS.map(avalia),rg=regras();return{areas,rg,al:alertas()}}
+function resultHtml(){const{areas,rg,al}=resultData();const av=areas.filter(a=>a.l!=null);
+  if(!av.length&&!rg.length)return `<div class="note w">Ainda não há respostas suficientes. Responda os blocos e volte aqui para ver o resultado.</div>`;
+  const ind=[...areas.filter(a=>a.l===2),...rg.filter(r=>r.l===2)],inv=[...areas.filter(a=>a.l===1),...rg.filter(r=>r.l===1)];
+  let h=concHtml(false)+`<div style="color:var(--mut);margin:6px 0 4px">${esc(DISCLAIMER)}</div>`;
+  if(al.length)h+=al.map(x=>`<div class="note ${x[0]}"><b>Alerta:</b> ${esc(x[1])}</div>`).join("");
+  h+=`<h3>Perfil por área</h3><div class="bars">`+areas.map(a=>barHtml(a.nome,a.l,a.s.mean==null?0:a.s.mean/3*100,a.l==null?"—":a.s.pts+"/"+a.s.max)).join("")+`</div>`;
+  h+=`<table class="legend"><tr><th>Média por item respondido</th><th>Nível</th><th>Significado</th></tr>${NIVEIS.map((n,i)=>`<tr><td>${["menor que 1","de 1 a 1,9","2 ou mais"][i]}</td><td><span class="tag bg${n.cls}">${n.nome}</span></td><td>${n.desc}</td></tr>`).join("")}</table>`;
+  h+=`<h3>Hipóteses diagnósticas para investigação</h3>`;
+  const card=(x,isR)=>{const n=x.l==null?null:NIVEIS[x.l];const pts=isR?x.regra:`${x.s.pts} de ${x.s.max} pontos · ${x.s.ans} respondida(s)${x.s.no?" · "+x.s.no+" N/O":""}`;
+    const frase=x.l===2?`Indicativo de ${x.hip}.`:x.l===1?`Investigar ${x.hip}.`:x.l===0?(isR?x.txt:"Sem indicativo nesta área."):"Área não avaliada.";
+    return `<div class="rc"><div class="hd"><b>${esc(x.nome)}</b><span class="tag bg${n?n.cls:"x"}">${n?n.nome:"Não avaliado"}</span></div><div class="pt">${esc(pts)} · ${esc(x.cid)}</div><div class="ind lvl${n?n.cls:"x"}">${esc(frase)}</div>${isR&&x.l>0?`<div>${esc(x.txt)}</div>`:""}
+    ${x.subs&&x.subs.length&&x.l!=null?`<div class="subs">${x.subs.map(s=>`<span>${esc(s.n)}: ${s.x.ans?s.x.pts+"/"+s.x.max:"—"}</span>`).join("")}</div>`:""}
+    ${(x.extra||[]).map(e=>`<div class="enc">• ${esc(e)}</div>`).join("")}${x.l>=1?`<div class="enc"><b>Encaminhar:</b> ${esc(x.enc)}</div>`:""}</div>`};
+  const order=[...areas.filter(a=>a.l!=null).map(a=>[a,0]),...rg.map(r=>[r,1])].sort((p,q)=>(q[0].l??-1)-(p[0].l??-1));
+  h+=order.map(([x,isR])=>card(x,isR)).join("");
+  const nao=areas.filter(a=>a.l==null).map(a=>a.nome);if(nao.length)h+=`<p class="pt" style="color:var(--mut)">Não avaliadas: ${esc(nao.join(", "))}.</p>`;
+  h+=`<div class="nav" style="margin-top:12px"><span></span><button class="btn v" id="bFill">Usar o resultado na síntese e devolutiva</button></div>`;
+  return h}
+function devolHtml(){const k=["dv1","dv2","dv3","dv4","dv5"],lab=["Áreas com dificuldades","Presentes desde","Com impacto em","Recomenda-se avaliação de","Apoios imediatos"];
+  return `<h3>Devolutiva</h3><div class="g2">${k.map((x,i)=>inp(x,lab[i])).join("")}</div><label class="f">Texto da devolutiva</label><div class="note" id="devTxt">${esc(devolTxt())}</div><button class="btn s" id="bCopy">Copiar texto</button>`}
+function devolTxt(){const v=k=>Fv(k)||"__________";return `Foram relatadas dificuldades nas áreas de ${v("dv1")}, presentes desde ${v("dv2")}, com impacto em ${v("dv3")}. Este roteiro levanta hipóteses e não estabelece diagnóstico. Recomenda-se avaliação de ${v("dv4")} e os seguintes apoios imediatos: ${v("dv5")}.`}
+function profHtml(){return `<h3>Profissional</h3><div class="g2">${inp("profNome","Profissional")}${inp("profReg","Registro")}</div>${inp("retorno","Data e retorno combinado")}`}
+function baseHtml(){return `<div class="note">${esc(BASE_TXT)}</div><ul>${REFS.map(r=>`<li style="margin:6px 0">${esc(r)}</li>`).join("")}</ul><p style="color:var(--mut)">${VERSAO}</p>`}
+function blockHtml(b){switch(b.t){
+  case"note":return `<div class="note ${b.c||""}">${esc(b.x)}</div>`;
+  case"h":return `<h3>${esc(b.x)}</h3>`;
+  case"q":return qHtml(b);
+  case"f":return ta(b.k,b.x,b.lines);
+  case"ident":return identHtml();
+  case"checks":return checksHtml();
+  case"abrev":return `<div class="g2">${inp("abrev","Nome abreviado ou identificação")}<div><label class="f">Data</label><input type="text" readonly value="${esc(br(S.f.data||hoje()))}"></div></div>`;
+  case"result":return resultHtml();
+  case"devol":return devolHtml();
+  case"prof":return profHtml();
+  case"base":return baseHtml();}return""}
+function render(){const st=STEPS[S.step];
+  $("view").innerHTML=`<div class="card"><h2>${S.step+1}. ${esc(st.title)}</h2>${st.ref?`<span class="ref">${esc(st.ref)}</span>`:""}${st.b.map(blockHtml).join("")}</div>
+  <div class="nav"><button class="btn s" data-step="${S.step-1}" ${S.step===0?"disabled style=visibility:hidden":""}>Anterior</button>${S.step<STEPS.length-1?`<button class="btn p" data-step="${S.step+1}">${STEPS[S.step+1].id==="res"?"Ver resultado":"Próximo"}</button>`:`<button class="btn p" id="bPrint2">Imprimir relatório</button>`}</div>`;
+  renderSide();renderAlert()}
+function toast(t){const e=$("toast");e.textContent=t;e.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display="none",2200)}
+function go(i){if(i<0||i>=STEPS.length)return;S.step=i;save();render();window.scrollTo({top:0,behavior:"smooth"})}
+
+document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;
+  if(t.dataset.step!=null){go(+t.dataset.step);return}
+  if(t.dataset.go){go(STEPS.findIndex(s=>s.id===t.dataset.go));return}
+  if(t.dataset.q){const k=t.dataset.q;S.r[k]=S.r[k]===t.dataset.v?undefined:t.dataset.v;if(S.r[k]===undefined)delete S.r[k];save();
+    const st=STEPS[S.step],b=st.b.find(x=>x.k===k);const el=$("q_"+k);el.outerHTML=qHtml(b);renderSide();renderAlert();return}
+  if(t.dataset.fset){S.f[t.dataset.fset]=S.f[t.dataset.fset]===t.dataset.v?"":t.dataset.v;save();render();return}
+  if(t.id==="bFill"){fillFromResult();return}
+  if(t.id==="bCopy"){navigator.clipboard&&navigator.clipboard.writeText(devolTxt()).then(()=>toast("Texto copiado"));return}
+  if(t.id==="bPrint"||t.id==="bPrint2"){doPrint(false);return}
+  if(t.id==="bBlank"){doPrint(true);return}
+  if(t.id==="bSave"){const nm=(Fv("abrev")||Fv("nome")||"entrevista").replace(/[^\wÀ-ú -]/g,"").trim().replace(/\s+/g,"_");const blob=new Blob([JSON.stringify(S,null,1)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`entrevista_${nm}_${S.f.data||hoje()}.json`;a.click();toast("Arquivo salvo");return}
+  if(t.id==="bOpen"){$("fOpen").click();return}
+  if(t.id==="bNew"){if(confirm("Apagar todas as respostas desta entrevista e começar uma nova?")){S=blank();S.f.data=hoje();save();render();toast("Nova entrevista iniciada")}return}
+  if(t.id==="bTheme"){document.documentElement.classList.toggle("light");localStorage.setItem("esm_theme",document.documentElement.classList.contains("light")?"light":"dark");return}
+});
+document.addEventListener("input",e=>{const t=e.target;
+  if(t.dataset.f){S.f[t.dataset.f]=t.value;
+    if(t.dataset.f==="nasc"||t.dataset.f==="data"){const i=idade();if(S.f.nasc){S.f.idade=i==null?"":String(i);const ie=$("i_idade");if(ie)ie.value=S.f.idade}}
+    save();if(/^dv/.test(t.dataset.f)&&$("devTxt"))$("devTxt").textContent=devolTxt();
+    if(t.dataset.f==="nasc"||t.dataset.f==="data"){const w=$("ageNote");if(w){const tmp=document.createElement("div");tmp.innerHTML=identHtml();w.innerHTML=tmp.querySelector("#ageNote").innerHTML}}
+    return}
+  if(t.dataset.chk){S.f[t.dataset.chk]=t.checked;save()}});
+document.addEventListener("change",e=>{if(e.target.id==="i_nasc"){render()}});
+$("fOpen").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const x=JSON.parse(rd.result);if(!x.r||!x.f)throw 0;S=x;if(!(S.step>=0&&S.step<STEPS.length))S.step=0;save();render();toast("Entrevista aberta")}catch(err){alert("Arquivo inválido.")}};rd.readAsText(f);e.target.value=""});
+
+function fillFromResult(){const{areas,rg}=resultData();const all=[...areas,...rg];
+  const ind=all.filter(x=>x.l===2),inv=all.filter(x=>x.l===1);
+  const nomes=[...ind,...inv].map(x=>x.nome.toLowerCase());
+  S.f.dv1=nomes.join(", ");
+  S.f.Z1=[...ind.map(x=>`Indicativo — ${x.nome}: ${x.hip} (${x.cid})`),...inv.map(x=>`Investigar — ${x.nome}: ${x.hip}`)].join("\n");
+  const encs=[...new Set([...ind,...inv].map(x=>x.enc))];S.f.dv4=[...ind,...inv].map(x=>x.nome).join(", ");
+  S.f.Z6=(S.f.Z6?S.f.Z6+"\n":"")+encs.map(e=>"• "+e).join("\n");
+  save();go(STEPS.findIndex(s=>s.id==="sin"));toast("Síntese preenchida com o resultado — revise e complete")}
+
+/* ---------- impressão ---------- */
+function pbx(on){return `<span class="bx ${on?"x":""}">${on?"X":""}</span>`}
+function pBlock(b,blank){switch(b.t){
+  case"note":return `<div class="pn ${b.c==="b"?"b":""}">${esc(b.x)}</div>`;
+  case"h":return `<h3>${esc(b.x)}</h3>`;
+  case"q":{const v=blank?null:R(b.k);const o=b.s==="f"?FREQ:SIM;return `<div class="pq"><div class="qt"><b>${b.k}</b>${esc(b.x)}${b.e?`<div class="qe">(${esc(b.e)})</div>`:""}</div><div class="po">${o.map(([val,l])=>`<span>${pbx(v===val)}${l}</span>`).join("")}</div></div>`}
+  case"f":return pField(b.x,blank?"":Fv(b.k),b.lines);
+  case"abrev":return `<table class="idt"><tr><td class="l">Nome abreviado ou identificação</td><td>${blank?"":esc(Fv("abrev"))}</td><td class="l" style="width:12%">Data</td><td style="width:20%">${blank?"":esc(br(S.f.data))}</td></tr></table>`;
+  case"checks":return `<h3>Checklist de aplicação</h3>`+CHECKS.map(([k,t])=>`<div>${pbx(!blank&&S.f[k])} ${esc(t)}</div>`).join("");
+  default:return""}}
+function pField(lab,val,lines=2){return `<div class="pf"><div class="lb">${esc(lab)}</div>${val?`<div class="val">${esc(val)}</div>`:Array.from({length:Math.max(1,lines)},()=>'<div class="ln"></div>').join("")}</div>`}
+function pIdent(blank){const v=k=>blank?"":esc(Fv(k));const i=idade();const resp=["Própria pessoa","Familiar","Escola","Outro"];
+  return `<table class="idt"><tr><td class="l">Nome ou identificação</td><td colspan="3">${v("nome")}</td></tr>
+  <tr><td class="l">Nascimento</td><td>${blank?"":esc(br(S.f.nasc))}</td><td class="l" style="width:12%">Idade</td><td style="width:20%">${blank?"":(i!=null?i+" anos":"")}</td></tr>
+  <tr><td class="l">Data da entrevista</td><td colspan="3">${blank?"":esc(br(S.f.data))}</td></tr>
+  <tr><td class="l">Profissional e registro</td><td colspan="3">${v("prof")}</td></tr>
+  <tr><td class="l">Respondente</td><td colspan="3">${resp.map(r=>`${pbx(!blank&&S.f.resp===r)} ${r}`).join(" &nbsp; ")}${!blank&&S.f.resp==="Outro"?": "+v("respOutro"):""}</td></tr>
+  <tr><td class="l">Comunicação e adaptações</td><td colspan="3">${v("comun")}</td></tr>
+  <tr><td class="l">Contato de apoio autorizado</td><td colspan="3">${v("contato")}</td></tr></table>`}
+function pResult(){const{areas,rg,al}=resultData();let h=`<h2>Resultado final — TEA e TDAH</h2>`+concHtml(true)+`<div class="disc">${esc(DISCLAIMER)}</div>`;
+  if(al.length)h+=al.map(x=>`<div class="alertp"><b>Alerta:</b> ${esc(x[1])}</div>`).join("");
+  h+=areas.map(a=>{const n=a.l==null?null:NIVEIS[a.l];const pct=a.s.mean==null?0:a.s.mean/3*100;return `<div class="pbar"><span>${esc(a.nome)}</span><div class="t"><i style="width:${pct}%;background:${n?n.cor:"#fff"}"></i></div><span>${a.l==null?"não avaliado":a.s.pts+"/"+a.s.max+" · "+n.nome}</span></div>`}).join("");
+  h+=`<div class="disc">Nível pela média por item respondido (0–3): menor que 1 = poucos sinais · 1 a 1,9 = sinais moderados (investigar) · 2 ou mais = muitos sinais (indicativo). N/O não conta.</div>`;
+  const list=[...areas.filter(a=>a.l!=null&&a.l>=1).map(a=>[a,0]),...rg.filter(r=>r.l>=1).map(r=>[r,1])].sort((p,q)=>q[0].l-p[0].l);
+  h+=`<h3>Hipóteses diagnósticas para investigação</h3>`;
+  if(!list.length)h+=`<div class="pn">Nenhuma área com sinais moderados ou muitos sinais nas respostas registradas.</div>`;
+  h+=list.map(([x,isR])=>`<div class="prc"><b class="h">${x.l===2?"Indicativo":"Investigar"}: ${esc(x.hip)}</b> — ${esc(x.nome)} · ${esc(x.cid)}<br>${isR?esc(x.regra)+". "+esc(x.txt):`${x.s.pts} de ${x.s.max} pontos${x.subs&&x.subs.length?" ("+x.subs.map(s=>s.n+": "+(s.x.ans?s.x.pts+"/"+s.x.max:"—")).join("; ")+")":""}`}
+   ${(x.extra||[]).map(e=>`<br>• ${esc(e)}`).join("")}<br><b>Encaminhar:</b> ${esc(x.enc)}</div>`).join("");
+  const r0=[...areas.filter(a=>a.l===0).map(a=>a.nome),...rg.filter(r=>r.l===0).map(r=>r.nome)],nv=areas.filter(a=>a.l==null).map(a=>a.nome);
+  if(r0.length)h+=`<div class="pn">Poucos sinais: ${esc(r0.join(", "))}.</div>`;if(nv.length)h+=`<div class="pn">Não avaliadas: ${esc(nv.join(", "))}.</div>`;
+  return h}
+function printHtml(blank){let h=`<div class="ph"><div><h1>Avaliação TEA e TDAH</h1><div class="sub">Adolescentes a partir de 12 anos e pessoas adultas</div></div><div class="sub">${VERSAO}</div></div>
+  <div class="disc">Formulário exploratório por áreas para acolhimento e organização de informações. ${esc(DISCLAIMER)}</div>`;
+  h+=`<h2>Identificação</h2>`+pIdent(blank);
+  if(!blank)h+=pResult();
+  STEPS.forEach(st=>{if(["ident","res","sin","base"].includes(st.id))return;
+    if(!blank&&st.id!=="aplic"&&st.id!=="seg"&&!st.b.some(b=>(b.t==="q"&&R(b.k)!=null)||(b.t==="f"&&Fv(b.k))))return;
+    h+=`<h2${st.id==="seg"&&!blank?' class="pg"':""}>${esc(st.title)}</h2>${st.ref?`<div class="pref">${esc(st.ref)}</div>`:""}`+st.b.map(b=>pBlock(b,blank)).join("")});
+  const sin=STEPS.find(s=>s.id==="sin");h+=`<h2>Síntese e encaminhamento</h2>`+sin.b.filter(b=>b.t==="f"||b.t==="note").map(b=>pBlock(b,blank)).join("");
+  h+=`<h3>Devolutiva</h3><div class="pn">${blank?"Foram relatadas dificuldades nas áreas de __________, presentes desde __________, com impacto em __________. Este roteiro levanta hipóteses e não estabelece diagnóstico. Recomenda-se avaliação de __________ e os seguintes apoios imediatos: __________.":esc(devolTxt())}</div>`;
+  h+=`<table class="idt" style="margin-top:8px"><tr><td class="l">Profissional</td><td>${blank?"":esc(Fv("profNome"))}</td><td class="l" style="width:14%">Registro</td><td style="width:22%">${blank?"":esc(Fv("profReg"))}</td></tr><tr><td class="l">Data e retorno combinado</td><td colspan="3">${blank?"":esc(Fv("retorno"))}</td></tr></table>`;
+  h+=`<div class="sig"><div>Assinatura e carimbo do(a) profissional</div><div>Pessoa atendida / responsável</div></div>`;
+  h+=`<div class="foot"><b>Base de orientação e limites.</b> ${esc(BASE_TXT)}<br>${REFS.map(esc).join("<br>")}<br>${VERSAO}</div>`;
+  return h}
+function doPrint(blank){$("print").innerHTML=printHtml(blank);setTimeout(()=>window.print(),50)}
+window.__printHtml=printHtml;
+
+if(localStorage.getItem("esm_theme")==="light")document.documentElement.classList.add("light");
+if(!S.f.data){S.f.data=hoje();save()}
+render();
+</script>
+</body>
+</html>
