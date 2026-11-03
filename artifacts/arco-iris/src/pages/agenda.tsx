@@ -484,6 +484,11 @@ export type AgendaPortalMode = {
   onProfessionalChange?: (id: string) => void;
 };
 
+const STATUS_FORA_DA_AGENDA = new Set([
+  "desmarcado", "cancelado", "alta", "falta", "falta_justificada",
+  "falta_nao_justificada", "ausente", "desistência", "desistencia", "óbito",
+]);
+
 export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   useDocumentTitle(portal ? "Agenda do Profissional" : "Agenda Geral");
   // No portal, o profissional tem as mesmas opções da Administração.
@@ -1309,6 +1314,33 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       );
       if (jaExiste) {
         setEncErro("Este paciente já possui um encaminhamento ativo/está na fila para esta especialidade.");
+        setEncSending(false);
+        return;
+      }
+      // A fila tira automaticamente quem já tem horário futuro na mesma especialidade;
+      // avisa aqui em vez de "encaminhar" e o paciente sumir da fila logo depois.
+      const espAlvo = encEspecialidade.trim().toLowerCase();
+      const espDoProf = new Map(professionals.map((p) => [p.id, (p.specialty ?? "").trim().toLowerCase()]));
+      const futuros = await listAppointments({
+        patientId: encApt.patientId,
+        dateFrom: todayBR(),
+        dateTo: format(addDays(new Date(), 180), "yyyy-MM-dd"),
+      });
+      const vaiSairDaAgenda = (a: { id: number; recurrenceGroupId?: string | null }) =>
+        !encManterAgenda &&
+        (encApt.recurrenceGroupId ? a.recurrenceGroupId === encApt.recurrenceGroupId : a.id === encApt.id);
+      const jaAgendado = futuros.find(
+        (a) =>
+          espDoProf.get(a.professionalId) === espAlvo &&
+          !STATUS_FORA_DA_AGENDA.has((a.status ?? "agendado").toLowerCase()) &&
+          !(a.notes ?? "").includes("[PILATES — Mãe/Responsável]") &&
+          !vaiSairDaAgenda(a)
+      );
+      if (jaAgendado) {
+        const [y, m, d] = jaAgendado.date.split("-");
+        setEncErro(
+          `Este paciente já está agendado em ${encEspecialidade} com ${jaAgendado.professionalName} (${d}/${m}/${y}), por isso não entra na fila. Se for trocar de profissional, desmarque "Manter na agenda".`
+        );
         setEncSending(false);
         return;
       }
