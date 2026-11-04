@@ -8,7 +8,7 @@ import {
 import { AgendaClaudiaAlarme } from "@/components/AgendaClaudiaAlarme";
 import * as api from "@/lib/agenda-exec-rpc";
 import { CATEGORIAS, categoria, type AgxCompromisso, type AgxInput, type AgxSessao, type Categoria, type Pessoa } from "@/lib/agenda-exec-rpc";
-import { interpretarFrase, comandoVoz, type Interpretacao } from "@/lib/agenda-exec-voz";
+import { interpretarFrase, comandoVoz, intencaoLocal, type Interpretacao } from "@/lib/agenda-exec-voz";
 import { entenderVoz, gravar, gravadorSuportado, liberarMicrofone, type Gravacao, type VozIA } from "@/lib/agenda-exec-ia";
 import { ativarAvisos, assinaturaAtual, desativarAvisos, ehAndroid, ehIOS, instalado, pushSuportado } from "@/lib/agenda-exec-push";
 import { APARENCIA_PADRAO, OPCOES_FUNDO, arquivoParaFoto, estiloFundo, useAparencia, type Aparencia } from "@/lib/agenda-exec-aparencia";
@@ -977,13 +977,17 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     setTxt(t);setOutra(null);setRes(null);setDica("");setPensando(true);
     entenderVoz({ texto: t }, lista).then(aplicarIA).catch((e) => {
       if (api.sessaoInvalida(e)) { onSair(); return; }
+      const l = intencaoLocal(t, lista);
+      if (l) { aplicarIA({ transcricao: t, comando: null, titulo: null, data: null, hora: null, diaTodo: false, local: null, observacao: null, categoria: "outro", antecedenciaMin: null, ...l }); return; }
       const resultado=interpretarFrase(t);setRes(resultado);setExtra({ observacao: null, antecedenciaMin: null });
       setDica(resultado.falta.length ? "Faltou o dia ou o horário. Diga o compromisso completo ou toque em Corrigir." : "Confira os dados. Diga salvar, corrigir ou cancelar.");
     }).finally(() => setPensando(false));
     return true;
   };
-  const aplicarIA = (r: VozIA) => {
+  const aplicarIA = (ia: VozIA) => {
+    let r = ia;
     if (r.transcricao) setTxt(r.transcricao);
+    if (r.acao === "criar" || r.acao === "nada") { const l = intencaoLocal(r.transcricao, lista); if (l) r = { ...r, ...l }; }
     if (r.acao === "comando" && r.comando) { entender(r.comando); return; }
     if (r.acao === "criar") {
       const falta = [...(r.data ? [] : ["data" as const]), ...(r.hora || r.diaTodo ? [] : ["hora" as const])];
@@ -994,7 +998,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     }
     if (r.acao === "desmarcar" || r.acao === "remarcar" || r.acao === "concluir") {
       const alvo = lista.find((c) => c.id === r.alvoId);
-      if (!alvo) { setDica("Não achei esse compromisso na agenda. Fale o nome e o dia dele."); return; }
+      if (!alvo) { setRes(null); setOutra(null); setDica("Não achei esse compromisso na agenda. Fale o nome e o dia dele, por exemplo: “desmarca a reunião de quinta”."); return; }
       if (r.acao === "remarcar" && !r.novaData && !r.novaHora) { setDica("Para remarcar, diga o novo dia ou horário."); return; }
       setRes(null); setOutra({ acao: r.acao, alvo, data: r.novaData ?? alvo.data, hora: r.novaHora ?? alvo.hora });
       setDica("Confira e toque em Confirmar (ou diga “salvar”).");
