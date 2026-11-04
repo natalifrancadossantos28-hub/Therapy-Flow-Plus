@@ -74,6 +74,12 @@ const CSS = `
 
 function Fundo({ children, ap = APARENCIA_PADRAO, foto = null }: { children: React.ReactNode; ap?: Aparencia; foto?: string | null }) {
   const { imagem, veu } = estiloFundo(ap, foto);
+  const letra = ap.letra ?? APARENCIA_PADRAO.letra;
+  useEffect(() => {
+    const html = document.documentElement, antes = html.style.fontSize;
+    html.style.fontSize = `${letra}%`;
+    return () => { html.style.fontSize = antes; };
+  }, [letra]);
   return (
     <div className="agenda-executiva isolate relative min-h-dvh text-white text-base" style={{ ["--agx-op" as string]: String(ap.cartoes / 100) }}>
       <div aria-hidden className="fixed inset-0 -z-10 overflow-hidden bg-[#050b24]">
@@ -92,7 +98,7 @@ function Titulo({ nome }: { nome: string }) {
       <span className="grid place-items-center w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-violet-600 agx-brilho shrink-0"><CalendarCheck size={24} /></span>
       <span className="min-w-0">
         <span className="block text-xl font-bold tracking-tight leading-tight">Minha Agenda</span>
-        <span className="block text-sm text-violet-200/90 leading-tight">{nome}</span>
+        <span className="block text-base text-violet-200/90 leading-tight">{nome}</span>
       </span>
     </div>
   );
@@ -294,7 +300,8 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
 
       {aba === "inicio" && <Inicio sessao={sessao} dona={dona} hoje={hoje} deHoje={deHoje} restantesHoje={restantesHoje} proximo={proximo}
         mes={mes} setMes={setMes} doDia={doDia} lista={lista}
-        onAba={setAba} onNovo={() => setForm(novo(hoje))} onCategorias={() => setFolha("categorias")} onAbrir={setForm} onDia={abrirDia} onFalar={irFalar} />}
+        onAba={setAba} onNovo={() => setForm(novo(hoje))} onCategorias={() => setFolha("categorias")} onAbrir={setForm} onDia={abrirDia} onFalar={irFalar} letra={aparencia.ap.letra ?? APARENCIA_PADRAO.letra}
+        onLetra={() => { const l = aparencia.ap.letra ?? APARENCIA_PADRAO.letra; aparencia.mudar({ letra: l < 112 ? 112 : l < 125 ? 125 : l < 140 ? 140 : 100 }); }} />}
 
       {aba === "agenda" && (
         <div className="space-y-4">
@@ -383,7 +390,8 @@ function CabecalhoAba({ titulo, acao }: { titulo: string; acao?: React.ReactNode
   return <div className="flex items-center justify-between gap-3 pt-1"><h2 className="text-2xl font-bold tracking-tight">{titulo}</h2>{acao}</div>;
 }
 
-function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMes, doDia, lista, onAba, onNovo, onCategorias, onAbrir, onDia, onFalar }: {
+function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMes, doDia, lista, onAba, onNovo, onCategorias, onAbrir, onDia, onFalar, letra, onLetra }: {
+  letra: number; onLetra: () => void;
   sessao: AgxSessao; dona: string; hoje: string; deHoje: AgxCompromisso[]; restantesHoje: number; proximo: AgxCompromisso | null;
   mes: Date; setMes: (d: Date) => void; doDia: (d: string) => AgxCompromisso[]; lista: AgxCompromisso[];
   onAba: (a: Aba) => void; onNovo: () => void; onCategorias: () => void; onAbrir: (c: AgxCompromisso) => void; onDia: (d: string) => void; onFalar: () => void;
@@ -403,8 +411,11 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
       <header className="flex items-center justify-between gap-3">
         <Titulo nome={dona} />
         <div className="flex items-center gap-2 shrink-0">
+          <button onClick={onLetra} aria-label={`Tamanho das letras: ${letra}%. Toque para mudar`} className="grid place-items-center w-11 h-11 rounded-full agx-card border border-white/15 font-bold leading-none">
+            <span><span className="text-sm">A</span><span className="text-lg">A</span></span>
+          </button>
           <button onClick={() => onAba("alarmes")} aria-label={`Alarmes${restantesHoje ? `: ${restantesHoje} hoje` : ""}`} className="relative grid place-items-center w-11 h-11 rounded-full agx-card border border-white/15">
-            <Bell size={19} />{restantesHoje > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-[11px] font-bold grid place-items-center">{restantesHoje}</span>}
+            <Bell size={19} />{restantesHoje > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-[0.8rem] font-bold grid place-items-center">{restantesHoje}</span>}
           </button>
           <button onClick={() => onAba("perfil")} aria-label="Configurações" className="grid place-items-center w-11 h-11 rounded-full agx-card border border-white/15"><Settings size={19} /></button>
         </div>
@@ -412,20 +423,20 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
 
       <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
         <div className="min-w-0 border-l-2 border-sky-400/80 pl-3">
-          <p className="text-[1.45rem] sm:text-3xl font-bold leading-tight tracking-tight">{saudacao}</p>
-          <p className="text-sm text-white/75 mt-1">{restantesHoje > 0 ? `Você ainda tem ${restantesHoje} ${restantesHoje === 1 ? "compromisso" : "compromissos"} hoje.` : "Sua agenda está organizada e pronta para o seu dia."}</p>
+          <p className="text-[1.9rem] sm:text-4xl font-bold leading-tight tracking-tight">{saudacao}</p>
+          <p className="text-base text-white/80 mt-1">{restantesHoje > 0 ? `Você ainda tem ${restantesHoje} ${restantesHoje === 1 ? "compromisso" : "compromissos"} hoje.` : "Sua agenda está organizada e pronta para o seu dia."}</p>
         </div>
         <div className={`${glass} !p-3 min-w-[6.5rem] text-center agx-brilho whitespace-nowrap`}>
-          <p className="text-[10px] font-semibold tracking-wider uppercase text-white/80">{format(d, "EEEE", { locale: ptBR })}</p>
+          <p className="text-xs font-semibold tracking-wider uppercase text-white/80">{format(d, "EEEE", { locale: ptBR })}</p>
           <p className="text-4xl font-bold leading-none my-1 tabular-nums">{format(d, "dd")}</p>
-          <p className="text-[11px] font-medium uppercase text-violet-200">{format(d, "MMM", { locale: ptBR })} | {format(d, "yyyy")}</p>
+          <p className="text-[0.8rem] font-medium uppercase text-violet-200">{format(d, "MMM", { locale: ptBR })} | {format(d, "yyyy")}</p>
         </div>
       </section>
 
       <button onClick={() => (proximo ? onAbrir(proximo) : onNovo())} className={`${glass} agx-brilho w-full flex items-center gap-3 text-left !bg-gradient-to-r from-violet-600/45 to-sky-600/25`}>
         <span className="grid place-items-center w-12 h-12 rounded-2xl bg-white/10 shrink-0"><CalendarCheck size={24} /></span>
         <span className="flex-1 min-w-0">
-          <span className="block text-xs text-white/75">Próximo compromisso</span>
+          <span className="block text-sm text-white/75">Próximo compromisso</span>
           {proximo ? <>
             <span className="block text-lg font-semibold leading-snug break-words">{proximo.titulo}</span>
             <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/80">
@@ -441,7 +452,7 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
       <nav className="grid grid-cols-4 gap-2" aria-label="Acesso rápido">
         {atalhos.map(([ic, t, f], i) => (
           <button key={t} onClick={f} className={`${glass} !p-2 !rounded-2xl min-h-[5.25rem] flex flex-col items-center justify-center gap-1.5 text-center ${i === 0 ? "!bg-gradient-to-br from-sky-500/60 to-violet-600/50 agx-brilho" : ""}`}>
-            {ic}<span className="text-[11px] sm:text-xs font-medium leading-tight">{t}</span>
+            {ic}<span className="text-[0.8rem] sm:text-xs font-medium leading-tight">{t}</span>
           </button>
         ))}
       </nav>
@@ -449,19 +460,19 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
       <section className="grid grid-cols-1 min-[380px]:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] gap-3">
         <div className={`${glass} !p-3`}><Mes compacto mes={mes} setMes={setMes} diaSel={hoje} onDia={onDia} doDia={doDia} hoje={hoje} /></div>
         <div className={`${glass} !p-3 flex flex-col`}>
-          <p className="flex items-center gap-1.5 text-sm font-semibold"><CalendarCheck size={16} /> Hoje</p>
-          <p className="text-xs text-sky-300 mb-2 whitespace-nowrap">{pendHoje.length} {pendHoje.length === 1 ? "compromisso" : "compromissos"}</p>
+          <p className="flex items-center gap-1.5 text-base font-semibold"><CalendarCheck size={16} /> Hoje</p>
+          <p className="text-sm text-sky-300 mb-2 whitespace-nowrap">{pendHoje.length} {pendHoje.length === 1 ? "compromisso" : "compromissos"}</p>
           {pendHoje.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-2">
               <span className="grid place-items-center w-12 h-12 rounded-full border border-violet-300/60 agx-brilho"><Check size={22} /></span>
-              <p className="text-xs text-white/80 leading-snug">Você está livre hoje! Aproveite seu tempo.</p>
+              <p className="text-sm text-white/80 leading-snug">Você está livre hoje! Aproveite seu tempo.</p>
             </div>
           ) : (
             <div className="space-y-1.5">
               {pendHoje.slice(0, 4).map((c) => (
                 <button key={c.id} onClick={() => onAbrir(c)} className="w-full text-left rounded-xl bg-white/[0.06] px-2 py-1.5 border-l-2" style={{ borderColor: categoria(c.categoria).cor }}>
-                  <span className="block text-[11px] text-white/70 tabular-nums">{horaTxt(c.hora)}</span>
-                  <span className="block text-xs font-semibold leading-snug line-clamp-2">{c.titulo}</span>
+                  <span className="block text-[0.8rem] text-white/70 tabular-nums">{horaTxt(c.hora)}</span>
+                  <span className="block text-sm font-semibold leading-snug line-clamp-2">{c.titulo}</span>
                 </button>
               ))}
               {pendHoje.length > 4 && <button onClick={() => onDia(hoje)} className="text-xs text-sky-300 underline">+ {pendHoje.length - 4} no dia</button>}
@@ -470,7 +481,7 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
         </div>
       </section>
 
-      <div className={`${glass} !py-2.5 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px] text-white/80`}>
+      <div className={`${glass} !py-2.5 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[0.8rem] text-white/80`}>
         {CATEGORIAS.filter((c) => c.id !== "outro").map((c) => <span key={c.id} className="inline-flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-full" style={{ background: c.cor }} />{c.nome}</span>)}
       </div>
 
@@ -489,7 +500,7 @@ function BarraMicrofone({ onClick }: { onClick: () => void }) {
         <span className="grid place-items-center w-14 h-14 rounded-full bg-gradient-to-br from-sky-400 to-violet-600 shadow-[0_0_0_6px_rgba(99,102,241,.18),0_0_24px_rgba(139,92,246,.55)]"><Mic size={24} /></span>
         <span className="text-violet-300 hidden min-[360px]:flex">{onda(9)}</span>
       </span>
-      <span className="text-sm text-white/85">Toque e fale para organizar sua agenda</span>
+      <span className="text-base text-white/85">Toque e fale para organizar sua agenda</span>
     </button>
   );
 }
@@ -504,7 +515,7 @@ function MenuInferior({ aba, setAba }: { aba: Aba; setAba: (a: Aba) => void }) {
       <div className="agx-card mx-auto max-w-xl grid grid-cols-5 gap-1 rounded-3xl border border-white/10 p-1.5 shadow-[0_-6px_30px_rgba(0,0,0,.4)]" style={{ background: "rgba(10,16,48,.88)" }}>
         {itens.map(([id, t, ic]) => (
           <button key={id} onClick={() => setAba(id)} aria-current={aba === id ? "page" : undefined}
-            className={`h-14 rounded-2xl flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition ${aba === id ? "bg-gradient-to-br from-sky-500 to-violet-600 text-white shadow-lg" : "text-white/70"}`}>
+            className={`h-14 rounded-2xl flex flex-col items-center justify-center gap-1 text-[0.8rem] font-medium transition ${aba === id ? "bg-gradient-to-br from-sky-500 to-violet-600 text-white shadow-lg" : "text-white/70"}`}>
             {ic}{t}
           </button>
         ))}
@@ -605,7 +616,7 @@ function AvisosProgramados({ lista, hoje }: { lista: AgxCompromisso[]; hoje: str
       {prox.length === 0 ? <p className="text-sm text-white/60 py-1">Nenhum aviso nos próximos dias.</p> : prox.map((a, i) => (
         <div key={i} className="flex items-center gap-3 rounded-xl bg-white/[0.05] px-3 py-2">
           <span className="text-xs tabular-nums text-sky-200 w-24 shrink-0">{rotuloDia(ISO(new Date(a.em)), hoje)} {format(new Date(a.em), "HH:mm")}</span>
-          <span className="min-w-0 flex-1"><span className="block text-sm font-medium leading-snug break-words">{a.c.titulo}</span><span className="block text-[11px] text-white/60">{a.tipo}</span></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium leading-snug break-words">{a.c.titulo}</span><span className="block text-[0.8rem] text-white/60">{a.tipo}</span></span>
         </div>
       ))}
     </div>
@@ -656,7 +667,7 @@ function PainelAparencia({ ctl, onFechar }: { ctl: AparenciaCtl; onFechar: () =>
     <button key={id} onClick={() => mudar({ fundo: id })} aria-pressed={ap.fundo === id} title={nome}
       className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 ${ap.fundo === id ? "border-sky-300 agx-brilho" : "border-white/10"}`}>
       <span className="absolute inset-0" style={estilo} />
-      <span className="absolute inset-x-0 bottom-0 bg-black/45 text-[10px] leading-tight px-1 py-0.5 truncate">{nome}</span>
+      <span className="absolute inset-x-0 bottom-0 bg-black/45 text-xs leading-tight px-1 py-0.5 truncate">{nome}</span>
       {ap.fundo === id && <Check size={16} className="absolute top-1 right-1 bg-sky-500 rounded-full p-0.5" />}
     </button>
   );
@@ -697,6 +708,7 @@ function PainelAparencia({ ctl, onFechar }: { ctl: AparenciaCtl; onFechar: () =>
           <Deslizar rotulo="Desfoque" valor={ap.desfoque} min={0} max={20} onChange={(v) => mudar({ desfoque: v })} />
           <Deslizar rotulo={ap.veu >= 0 ? "Escurecer" : "Clarear"} valor={ap.veu} min={-60} max={80} onChange={(v) => mudar({ veu: v })} />
           <Deslizar rotulo="Cartões (transparência)" valor={ap.cartoes} min={20} max={95} onChange={(v) => mudar({ cartoes: v })} sufixo="%" />
+          <Deslizar rotulo="Tamanho das letras" valor={ap.letra ?? APARENCIA_PADRAO.letra} min={100} max={140} onChange={(v) => mudar({ letra: v })} sufixo="%" />
         </div>
         <p className="text-xs text-white/60">{sync === "salvando" ? "Salvando…" : sync === "ok" ? "Salvo automaticamente nos seus aparelhos." : "Salvo neste aparelho."}</p>
       </div>
@@ -735,20 +747,20 @@ function Mes({ mes, setMes, diaSel, onDia, doDia, hoje, compacto = false }: {
     <div>
       <div className="flex items-center justify-between mb-2">
         <button aria-label="Mês anterior" onClick={() => setMes(subMonths(mes, 1))} className={navBtn}><ChevronLeft size={16} /></button>
-        <p className={`${compacto ? "text-sm" : "text-base"} font-semibold`}>{cap1(format(mes, compacto ? "MMM yyyy" : "MMMM 'de' yyyy", { locale: ptBR }))}</p>
+        <p className={`${compacto ? "text-base" : "text-lg"} font-semibold`}>{cap1(format(mes, compacto ? "MMM yyyy" : "MMMM 'de' yyyy", { locale: ptBR }))}</p>
         <button aria-label="Próximo mês" onClick={() => setMes(addMonths(mes, 1))} className={navBtn}><ChevronRight size={16} /></button>
       </div>
       <div className={`grid grid-cols-7 ${compacto ? "gap-1" : "gap-1.5"}`}>
-        {["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => <div key={i} className="text-center text-[10px] font-semibold text-white/60 pb-0.5">{d}</div>)}
+        {["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => <div key={i} className="text-center text-xs font-semibold text-white/60 pb-0.5">{d}</div>)}
         {dias.map((d) => {
           const iso = ISO(d), evs = doDia(iso), noMes = isSameMonth(d, mes);
           if (compacto && !noMes) return <span key={iso} />;
           const sel = iso === diaSel, eHoje = iso === hoje;
           return (
             <button key={iso} onClick={() => onDia(iso)} aria-label={`${format(d, "d 'de' MMMM", { locale: ptBR })}: ${evs.length} compromissos`} aria-current={eHoje ? "date" : undefined}
-              className={`relative ${compacto ? "h-8" : "h-11"} rounded-lg flex flex-col items-center justify-center border transition
+              className={`relative ${compacto ? "h-9" : "h-12"} rounded-lg flex flex-col items-center justify-center border transition
                 ${sel ? "bg-gradient-to-br from-sky-500/70 to-violet-600/70 border-sky-300 agx-brilho" : eHoje ? "border-sky-300/80 bg-sky-400/10" : "border-white/[0.06] bg-white/[0.06]"} ${noMes ? "" : "opacity-35"}`}>
-              <span className={`${compacto ? "text-xs" : "text-sm"} font-semibold tabular-nums leading-none`}>{format(d, "d")}</span>
+              <span className={`${compacto ? "text-sm" : "text-base"} font-bold tabular-nums leading-none`}>{format(d, "d")}</span>
               {evs.length > 0 && <span className="absolute bottom-0.5 flex gap-0.5">{evs.slice(0, 3).map((c) => <i key={c.id} className="w-1 h-1 rounded-full" style={{ background: categoria(c.categoria).cor }} />)}</span>}
             </button>
           );
@@ -771,7 +783,7 @@ function Semana({ base, setBase, onDia, doDia, hoje }: { base: string; setBase: 
         const iso = ISO(d), evs = doDia(iso);
         return (
           <button key={iso} onClick={() => onDia(iso)} className={`w-full text-left flex gap-3 rounded-2xl p-3 bg-white/[0.05] border ${iso === hoje ? "border-sky-300/70" : "border-white/10"}`}>
-            <span className="w-11 shrink-0 text-center"><span className="block text-[10px] uppercase text-white/60">{format(d, "EEE", { locale: ptBR })}</span><span className="block text-lg font-bold leading-none tabular-nums">{format(d, "d")}</span></span>
+            <span className="w-11 shrink-0 text-center"><span className="block text-xs uppercase text-white/60">{format(d, "EEE", { locale: ptBR })}</span><span className="block text-lg font-bold leading-none tabular-nums">{format(d, "d")}</span></span>
             <span className="flex-1 min-w-0 space-y-0.5">
               {evs.length === 0 ? <span className="text-sm text-white/45">Livre</span>
                 : evs.map((c) => <span key={c.id} className={`flex items-center gap-2 text-sm ${c.concluido ? "line-through text-white/45" : ""}`}><i className="w-2 h-2 rounded-full shrink-0" style={{ background: categoria(c.categoria).cor }} /><span className="tabular-nums text-white/70 shrink-0">{horaTxt(c.hora)}</span><span className="truncate">{c.titulo}</span></span>)}
@@ -1036,6 +1048,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
       continuarEscuta.current=false;
       r.onresult = (e) => {
         const t = Array.from(e.results).map((x) => x[0].transcript).join(" ");
+        setTxt(t);
         if (e.results[e.results.length - 1].isFinal) continuarEscuta.current=receber.current(t);
       };
       r.onerror = (e) => {
@@ -1067,11 +1080,17 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
         <a href="/agenda-claudia" className={`${btnBase} px-4 py-3 text-sm bg-white/10 border border-white/20`}>📅 Ver agenda</a>
       </div>
       <button data-native-recognition="react" disabled={pensando} onClick={usarGravador ? () => void ouvirGravando() : ouvindo ? pararEscuta : ouvir} aria-label={ouvindo ? "Parar de ouvir" : "Tocar e falar"}
-        className={`mx-auto flex flex-col items-center justify-center w-44 h-44 rounded-full text-6xl shadow-2xl transition active:scale-95 ${ouvindo ? "bg-red-500 animate-pulse" : ""}`}
-        style={ouvindo ? undefined : { background: "linear-gradient(135deg,#38bdf8,#8b5cf6)", boxShadow: "0 0 0 14px rgba(56,189,248,.18),0 20px 40px rgba(0,0,0,.45)" }}>
-        🎙️<span className="text-lg font-bold mt-2">{pensando ? "Entendendo…" : ouvindo ? (usarGravador ? "Toque p/ terminar" : "Ouvindo…") : res || outra ? "Diga sua opção" : "Toque e fale"}</span>
+        className={`mx-auto flex flex-col items-center justify-center w-32 h-32 rounded-full text-5xl shadow-2xl transition active:scale-95 ${ouvindo ? "bg-red-500 animate-pulse" : ""}`}
+        style={ouvindo ? undefined : { background: "linear-gradient(135deg,#38bdf8,#8b5cf6)", boxShadow: "0 0 0 10px rgba(56,189,248,.18),0 16px 32px rgba(0,0,0,.45)" }}>
+        🎙️<span className="text-sm font-bold mt-1 px-2 text-center leading-tight">{pensando ? "Entendendo…" : ouvindo ? (usarGravador ? "Toque p/ terminar" : "Ouvindo…") : res || outra ? "Diga sua opção" : "Toque e fale"}</span>
       </button>
-      <p className="text-center text-sm text-white/75">Fale do seu jeito: marcar, desmarcar, remarcar ou “já fiz”. Ex.: “festa de aniversário da Ana sábado às 8 da noite” ou “desmarca a reunião de amanhã”.</p>
+      {txt.trim() && (ouvindo || pensando || res || outra) && (
+        <div className={`${glass} !p-3 text-center`} aria-live="polite">
+          <p className="text-sm text-white/65">{ouvindo ? "Ouvindo…" : pensando ? "Entendendo…" : "Você falou:"}</p>
+          <p className="text-xl font-semibold leading-snug">“{txt}”</p>
+        </div>
+      )}
+      {!txt.trim() && !res && !outra && <p className="text-center text-base text-white/80">Fale do seu jeito: marcar, desmarcar, remarcar ou “já fiz”. Ex.: “festa de aniversário da Ana sábado às 8 da noite” ou “desmarca a reunião de amanhã”.</p>}
       {dica && <p className="text-base text-rose-300 text-center" role="alert">{dica}</p>}
       {salvo && <div className="rounded-2xl bg-green-500/20 border border-green-400/50 p-4 text-base" role="status"><b>✅ Pronto:</b> <span className="capitalize">{salvo}</span></div>}
       {outra && (
@@ -1088,7 +1107,8 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
       )}
       {res && input && (
         <div className="rounded-2xl bg-sky-400/10 border border-sky-300/40 p-4 space-y-2 text-base">
-          <p className="text-lg font-bold">{res.titulo}</p>
+          <p className="text-sm text-white/70">Vai ficar assim na agenda:</p>
+          <p className="text-xl font-bold">{res.titulo}</p>
           <p>📅 {res.data ? <span className="capitalize">{dataLonga(res.data)}</span> : <b className="text-rose-300">faltou o dia</b>}</p>
           <p>⏰ {res.diaTodo ? "Dia todo" : res.hora ? horaTxt(res.hora) : <b className="text-rose-300">faltou o horário</b>}</p>
           {res.local && <p>📍 {res.local}</p>}

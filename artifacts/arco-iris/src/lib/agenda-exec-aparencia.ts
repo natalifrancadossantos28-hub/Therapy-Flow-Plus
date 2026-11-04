@@ -15,9 +15,10 @@ export type Aparencia = {
   desfoque: number; // 0-20 px
   veu: number;      // -60 (clarear) … 80 (escurecer)
   cartoes: number;  // opacidade dos cartões 20-95
+  letra: number;    // tamanho das letras 100-140 (%)
 };
 
-export const APARENCIA_PADRAO: Aparencia = { fundo: "padrao", posX: 50, posY: 50, zoom: 100, brilho: 100, desfoque: 0, veu: 35, cartoes: 55 };
+export const APARENCIA_PADRAO: Aparencia = { fundo: "padrao", posX: 50, posY: 50, zoom: 100, brilho: 100, desfoque: 0, veu: 35, cartoes: 55, letra: 112 };
 
 export type OpcaoFundo = { id: string; nome: string; grupo: "Degradês" | "Abstratos" | "Florais" | "Paisagens" | "Cores"; thumb: string; css?: string };
 
@@ -50,6 +51,7 @@ export function normalizar(raw: unknown): Aparencia {
   return {
     fundo, posX: lim(r.posX, 0, 100, d.posX), posY: lim(r.posY, 0, 100, d.posY), zoom: lim(r.zoom, 100, 200, d.zoom),
     brilho: lim(r.brilho, 50, 150, d.brilho), desfoque: lim(r.desfoque, 0, 20, d.desfoque), veu: lim(r.veu, -60, 80, d.veu), cartoes: lim(r.cartoes, 20, 95, d.cartoes),
+    letra: lim(r.letra, 100, 140, d.letra),
   };
 }
 

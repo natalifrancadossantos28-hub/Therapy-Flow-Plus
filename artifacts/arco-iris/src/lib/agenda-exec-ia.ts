@@ -22,6 +22,30 @@ export function liberarMicrofone() { microfone?.getTracks().forEach((t) => t.sto
 
 export type Gravacao = { parar: () => Promise<Blob>; cancelar: () => void };
 
+// Para sozinho quando a pessoa termina de falar (≈1,2 s de silêncio depois da fala), sem precisar tocar de novo.
+function vigiarSilencio(stream: MediaStream, aoCalar: () => void): () => void {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    const an = ctx.createAnalyser(); an.fftSize = 1024;
+    ctx.createMediaStreamSource(stream).connect(an);
+    const buf = new Float32Array(an.fftSize);
+    let falou = false, calado = 0, base = 0.01;
+    const t0 = Date.now();
+    const id = window.setInterval(() => {
+      an.getFloatTimeDomainData(buf);
+      let soma = 0; for (const v of buf) soma += v * v;
+      const rms = Math.sqrt(soma / buf.length);
+      if (Date.now() - t0 < 300) { base = Math.max(base, rms * 1.5); return; }
+      if (rms > Math.max(0.02, base * 2)) { falou = true; calado = 0; }
+      else if (falou && (calado += 100) >= 1200) { parar(); aoCalar(); }
+      else if (!falou && Date.now() - t0 > 7000) { parar(); aoCalar(); }
+    }, 100);
+    const parar = () => { window.clearInterval(id); void ctx.close().catch(() => {}); };
+    return parar;
+  } catch { return () => {}; }
+}
+
 export async function gravar(maxSeg = 25, aoAcabar?: () => void): Promise<Gravacao> {
   if (!microfone || microfone.getAudioTracks().every((t) => t.readyState === "ended"))
     microfone = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
@@ -32,10 +56,13 @@ export async function gravar(maxSeg = 25, aoAcabar?: () => void): Promise<Gravac
   rec.ondataavailable = (e) => { if (e.data.size) partes.push(e.data); };
   const fim = new Promise<Blob>((ok) => { rec.onstop = () => { ok(new Blob(partes, { type: rec.mimeType || tipo || "audio/mp4" })); }; });
   rec.start(250);
-  const limite = setTimeout(() => { if (rec.state !== "inactive") { rec.stop(); aoAcabar?.(); } }, maxSeg * 1000);
+  const acabar = () => { if (rec.state !== "inactive") { rec.stop(); aoAcabar?.(); } };
+  const limite = setTimeout(acabar, maxSeg * 1000);
+  const silencio = vigiarSilencio(stream, acabar);
+  const soltar = () => { clearTimeout(limite); silencio(); };
   return {
-    parar: () => { clearTimeout(limite); if (rec.state !== "inactive") rec.stop(); return fim; },
-    cancelar: () => { clearTimeout(limite); if (rec.state !== "inactive") rec.stop(); },
+    parar: () => { soltar(); if (rec.state !== "inactive") rec.stop(); return fim; },
+    cancelar: () => { soltar(); if (rec.state !== "inactive") rec.stop(); },
   };
 }
 
