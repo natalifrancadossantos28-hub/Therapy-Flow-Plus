@@ -53,22 +53,22 @@ export function AgendaClaudiaAlarme({ donaId, compromissos }: { donaId: number; 
     return ()=>{som.pause();som.currentTime=0;som.loop=false;};
   },[tocando,ligado,obterAudio]);
   return <>
-    <section className="rounded-3xl border border-amber-300/30 bg-gradient-to-br from-amber-500/10 to-indigo-500/10 p-5 space-y-3">
+    <section className="rounded-3xl border border-violet-300/30 bg-gradient-to-br from-violet-500/15 to-sky-500/10 p-5 space-y-3">
       <h2 className="text-2xl font-black">⏰ Som e vibração da agenda</h2>
       <p className="text-lg text-white/80">A mesma melodia do app Android. Com a agenda aberta, a música repete e o aviso fica na tela até você tocar em Parar aviso · Já vi.</p>
       <div className="flex flex-wrap gap-3">
-        <button onClick={testar} className="rounded-2xl px-5 py-3 bg-amber-300 text-slate-950 font-extrabold text-lg">{ligado?"♪ Testar som":"♪ Ativar e testar som"}</button>
+        <button onClick={testar} className="rounded-2xl px-5 py-3 bg-gradient-to-r from-sky-500 to-violet-600 text-white font-semibold text-base">{ligado?"♪ Testar som":"♪ Ativar e testar som"}</button>
         {ligado&&<button onClick={()=>{parar();setLigado(false);try{localStorage.setItem(pref,"nao");}catch{/* opcional */}}} className="rounded-2xl px-5 py-3 border border-white/20 font-bold">Desligar som</button>}
       </div>
       <p role="status" className="font-semibold">{ligado?(pronto?"✅ Som liberado nesta sessão":"Toque em Testar som para liberar o áudio"):"Som ainda não ativado neste aparelho"}</p>
-      {erro&&<p role="alert" className="text-amber-200">{erro}</p>}
+      {erro&&<p role="alert" className="text-rose-200">{erro}</p>}
       <p className="text-base text-white/65">No iPhone, toque em Testar som ao abrir a agenda e ajuste o volume de mídia. Com a agenda fechada ou a tela bloqueada, os lembretes usam o som de notificação permitido pelo iOS; esta música não toca como despertador em segundo plano.</p>
     </section>
     {tocando.length>0&&<div className="fixed inset-0 z-[80] bg-slate-950 flex items-center justify-center p-3 sm:p-6 overflow-y-auto" role="alertdialog" aria-modal="true" aria-labelledby="agenda-alarme-titulo" aria-describedby="agenda-alarme-eventos">
-      <div className="w-full max-w-4xl rounded-3xl border-4 border-amber-300 bg-slate-900 text-white p-5 sm:p-10 shadow-2xl space-y-6 max-h-[95dvh] overflow-y-auto">
+      <div className="w-full max-w-4xl rounded-3xl border-2 border-violet-400 bg-[#0c1234] text-white p-5 sm:p-10 shadow-2xl space-y-6 max-h-[95dvh] overflow-y-auto">
         <div className="text-7xl sm:text-8xl" aria-hidden="true">⏰</div><h2 id="agenda-alarme-titulo" className="text-4xl sm:text-6xl font-black leading-tight">{tocando.some(a=>a.naHora)?"Hora do compromisso!":"Lembrete da agenda!"}</h2>
         <div id="agenda-alarme-eventos" className="space-y-6">{tocando.map(a=><div key={a.chave} className="border-t border-white/15 pt-3"><p className="text-3xl sm:text-5xl font-extrabold leading-tight break-words">{a.naHora?"Agora: ":"Lembrete: "}{a.compromisso.titulo}</p><p className="text-3xl sm:text-4xl font-bold text-white mt-3 break-words">{a.compromisso.hora}{a.compromisso.local?` · ${a.compromisso.local}`:""}</p></div>)}</div>
-        <button onClick={parar} autoFocus className="w-full rounded-2xl bg-amber-300 text-slate-950 text-3xl sm:text-4xl font-black px-4 py-6 min-h-24 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-white">Parar aviso · Já vi</button>
+        <button onClick={parar} autoFocus className="w-full rounded-2xl bg-gradient-to-r from-sky-500 to-violet-600 text-white text-2xl sm:text-3xl font-bold px-4 py-6 min-h-24 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-white">Parar aviso · Já vi</button>
       </div>
     </div>}
   </>;
