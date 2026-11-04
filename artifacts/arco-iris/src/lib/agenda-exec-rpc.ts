@@ -7,7 +7,8 @@ import { getCompanySession, getDeviceCompanySlug } from "./portal-session";
 const KEY = "nfs_agenda_exec";
 export const SLUG_PADRAO = (import.meta.env.VITE_DEFAULT_COMPANY_SLUG as string | undefined) || "clinica-nfs";
 
-export type Categoria = "reuniao" | "evento" | "visita" | "palestra" | "urgente" | "pessoal" | "outro";
+export type Categoria = "reuniao" | "evento" | "visita" | "palestra" | "urgente" | "pessoal" | "outro"
+  | "aniversario" | "saude" | "viagem" | "familia" | "contas" | "escola" | "lazer";
 export const CATEGORIAS: { id: Categoria; nome: string; cor: string }[] = [
   { id: "reuniao", nome: "Reunião", cor: "#3b82f6" },
   { id: "evento", nome: "Evento", cor: "#8b5cf6" },
@@ -15,6 +16,13 @@ export const CATEGORIAS: { id: Categoria; nome: string; cor: string }[] = [
   { id: "palestra", nome: "Palestra", cor: "#f59e0b" },
   { id: "urgente", nome: "Urgente", cor: "#ef4444" },
   { id: "pessoal", nome: "Pessoal", cor: "#ec4899" },
+  { id: "aniversario", nome: "Aniversário / Festa", cor: "#f472b6" },
+  { id: "saude", nome: "Saúde", cor: "#14b8a6" },
+  { id: "viagem", nome: "Viagem", cor: "#06b6d4" },
+  { id: "familia", nome: "Família", cor: "#a855f7" },
+  { id: "contas", nome: "Contas / Pagamento", cor: "#84cc16" },
+  { id: "escola", nome: "Escola", cor: "#6366f1" },
+  { id: "lazer", nome: "Lazer", cor: "#10b981" },
   { id: "outro", nome: "Outro", cor: "#94a3b8" },
 ];
 export const categoria = (id: string) => CATEGORIAS.find((c) => c.id === id) ?? CATEGORIAS[CATEGORIAS.length - 1];

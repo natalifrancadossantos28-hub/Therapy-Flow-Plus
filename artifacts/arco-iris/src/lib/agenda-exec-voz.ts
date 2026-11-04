@@ -114,8 +114,15 @@ function categoriaDe(t: string): Categoria {
   if (/urgente/.test(t)) return "urgente";
   if (/palestra|capacita|curso|treinamento|oficina/.test(t)) return "palestra";
   if (/visita/.test(t)) return "visita";
-  if (/evento|conferencia|inaugura|audiencia|cerimonia|festa/.test(t)) return "evento";
-  if (/medico|dentista|exame|consulta|pessoal|aniversario/.test(t)) return "pessoal";
+  if (/aniversario|festa|casamento|cha de (?:bebe|panela|fralda)|comemora/.test(t)) return "aniversario";
+  if (/medic|dentista|exame|consulta|academia|remedio|fisioterapia|terapia/.test(t)) return "saude";
+  if (/viagem|viajar|voo|aeroporto|hotel/.test(t)) return "viagem";
+  if (/pagar|pagamento|boleto|conta de|banco|imposto|fatura/.test(t)) return "contas";
+  if (/escola|reuniao de pais|faculdade|aula/.test(t)) return "escola";
+  if (/cinema|show|passeio|almoco com|jantar com|happy hour/.test(t)) return "lazer";
+  if (/filho|filha|marido|esposo|mae|pai|familia|sogra/.test(t)) return "familia";
+  if (/evento|conferencia|congresso|inaugura|audiencia|cerimonia/.test(t)) return "evento";
+  if (/pessoal/.test(t)) return "pessoal";
   if (/reuniao|encontro|conversa|alinhamento/.test(t)) return "reuniao";
   return "outro";
 }

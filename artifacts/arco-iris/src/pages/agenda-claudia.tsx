@@ -9,6 +9,7 @@ import { AgendaClaudiaAlarme } from "@/components/AgendaClaudiaAlarme";
 import * as api from "@/lib/agenda-exec-rpc";
 import { CATEGORIAS, categoria, type AgxCompromisso, type AgxInput, type AgxSessao, type Categoria, type Pessoa } from "@/lib/agenda-exec-rpc";
 import { interpretarFrase, comandoVoz, type Interpretacao } from "@/lib/agenda-exec-voz";
+import { entenderVoz, gravar, gravadorSuportado, type Gravacao, type VozIA } from "@/lib/agenda-exec-ia";
 import { ativarAvisos, assinaturaAtual, desativarAvisos, ehAndroid, ehIOS, instalado, pushSuportado } from "@/lib/agenda-exec-push";
 import { APARENCIA_PADRAO, OPCOES_FUNDO, arquivoParaFoto, estiloFundo, useAparencia, type Aparencia } from "@/lib/agenda-exec-aparencia";
 import { getCompanySession } from "@/lib/portal-session";
@@ -887,6 +888,16 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
   const [salvo, setSalvo] = useState("");
   const [podeInstalar, setPodeInstalar] = useState(() => Boolean(installEvt));
   const rec = useRef<Reconhecedor | null>(null);
+  const [lista, setLista] = useState<AgxCompromisso[]>([]);
+  const [outra, setOutra] = useState<{ acao: "desmarcar" | "remarcar" | "concluir"; alvo: AgxCompromisso; data: string; hora: string | null } | null>(null);
+  const [extra, setExtra] = useState<{ observacao: string | null; antecedenciaMin: number | null }>({ observacao: null, antecedenciaMin: null });
+  const [pensando, setPensando] = useState(false);
+  const grav = useRef<Gravacao | null>(null);
+  const recarregar = useCallback(() => {
+    const d = (n: number) => { const x = new Date(); x.setDate(x.getDate() + n); return ISO(x); };
+    api.listar(d(-7), d(180)).then(setLista).catch(() => {});
+  }, []);
+  useEffect(recarregar, [recarregar]);
   const w = window as unknown as { SpeechRecognition?: new () => Reconhecedor; webkitSpeechRecognition?: new () => Reconhecedor };
   const Rec = w.SpeechRecognition ?? w.webkitSpeechRecognition;
   useEffect(() => () => rec.current?.stop(), []);
@@ -903,14 +914,12 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
   const iniciar = useRef<() => void>(() => {});
   const receber = useRef<(t: string) => boolean>(() => false);
   const falarResultado = (t: string) => {
-    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
-    window.speechSynthesis.cancel();
-    const frase = new SpeechSynthesisUtterance(t); frase.lang="pt-BR";
-    window.speechSynthesis.speak(frase);
+    void t;
   };
   const pararEscuta = () => {
     continuarEscuta.current=false;
     if(repeticao.current)clearTimeout(repeticao.current);
+    grav.current?.cancelar();grav.current=null;
     rec.current?.stop();setOuvindo(false);
   };
   useEffect(()=>()=>{
@@ -924,7 +933,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     try {
       await api.salvar(c);
       setSalvo(`${c.titulo} · ${dataLonga(c.data)} · ${horaTxt(c.hora)}`);
-      setRes(null); setTxt(""); setForm(null);setDica("");
+      setRes(null); setTxt(""); setForm(null);setDica("");setExtra({ observacao: null, antecedenciaMin: null });recarregar();
       falarResultado("Compromisso salvo na agenda.");
       window.history.replaceState(null, "", "/agenda-claudia/falar");
     } catch (e) {
@@ -936,23 +945,84 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     if(!res?.data || (!res.hora && !res.diaTodo)) {
       setDica("Ainda falta o dia ou o horário. Diga o compromisso completo, por exemplo: reunião hoje à meia-noite e quarenta. Ou toque em Corrigir.");return;
     }
-    void salvar(novoCompromisso(res.data,{titulo:res.titulo,hora:res.diaTodo?null:res.hora,local:res.local,categoria:res.categoria}));
+    void salvar(novoCompromisso(res.data,{titulo:res.titulo,hora:res.diaTodo?null:res.hora,local:res.local,categoria:res.categoria,
+      observacao:extra.observacao,...(extra.antecedenciaMin?{antecedenciaMin:extra.antecedenciaMin}:{})}));
   };
-  const cancelar = () => {pararEscuta();setRes(null);setTxt("");setForm(null);setSalvo("");setDica("Cancelado. Nenhum novo compromisso foi salvo.");falarResultado("Cancelado.");};
+  const executarOutra = async () => {
+    if (!outra || trava.current) return;
+    trava.current = true; setGravando(true); pararEscuta();
+    try {
+      const { acao, alvo } = outra;
+      if (acao === "desmarcar") await api.excluir(alvo.id);
+      else if (acao === "concluir") await api.concluir(alvo.id, true);
+      else await api.salvar({ ...alvo, data: outra.data, hora: outra.hora });
+      setSalvo(acao === "desmarcar" ? `Desmarcado: ${alvo.titulo}` : acao === "concluir" ? `Feito: ${alvo.titulo}`
+        : `Remarcado: ${alvo.titulo} · ${dataLonga(outra.data)} · ${horaTxt(outra.hora)}`);
+      setOutra(null); setTxt(""); setDica(""); recarregar();
+    } catch (e) { if (api.sessaoInvalida(e)) onSair(); else setDica(erroTxt(e)); }
+    finally { trava.current = false; setGravando(false); }
+  };
+  const cancelar = () => {pararEscuta();setOutra(null);setRes(null);setTxt("");setForm(null);setSalvo("");setDica("Cancelado. Nenhum novo compromisso foi salvo.");falarResultado("Cancelado.");};
   const entender = (t = txt): boolean => {
     if(trava.current)return false;
     const comando=comandoVoz(t);
     if(comando) {
       if(comando==="cancelar"){cancelar();return false;}
-      if(!res){setDica("Primeiro diga o compromisso, o dia e o horário.");return true;}
-      if(comando==="salvar"){confirmar();return false;}
+      if(!res && !outra){setDica("Primeiro diga o compromisso, o dia e o horário.");return true;}
+      if(comando==="salvar"){if(outra)void executarOutra();else confirmar();return false;}
+      setOutra(null);
       setRes(null);setSalvo("");setDica("Diga novamente o compromisso completo com o dia e o horário.");return true;
     }
     setSalvo("");
     if(!t.trim())return false;
-    setTxt(t);const resultado=interpretarFrase(t);setRes(resultado);
-    setDica(resultado.falta.length ? "Faltou o dia ou o horário. Diga o compromisso completo ou toque em Corrigir." : "Confira os dados. Diga salvar, corrigir ou cancelar.");
+    setTxt(t);setOutra(null);setRes(null);setDica("");setPensando(true);
+    entenderVoz({ texto: t }, lista).then(aplicarIA).catch((e) => {
+      if (api.sessaoInvalida(e)) { onSair(); return; }
+      const resultado=interpretarFrase(t);setRes(resultado);setExtra({ observacao: null, antecedenciaMin: null });
+      setDica(resultado.falta.length ? "Faltou o dia ou o horário. Diga o compromisso completo ou toque em Corrigir." : "Confira os dados. Diga salvar, corrigir ou cancelar.");
+    }).finally(() => setPensando(false));
     return true;
+  };
+  const aplicarIA = (r: VozIA) => {
+    if (r.transcricao) setTxt(r.transcricao);
+    if (r.acao === "comando" && r.comando) { entender(r.comando); return; }
+    if (r.acao === "criar") {
+      const falta = [...(r.data ? [] : ["data" as const]), ...(r.hora || r.diaTodo ? [] : ["hora" as const])];
+      setOutra(null); setExtra({ observacao: r.observacao, antecedenciaMin: r.antecedenciaMin });
+      setRes({ titulo: r.titulo ?? "Compromisso", data: r.data, hora: r.hora, diaTodo: r.diaTodo, local: r.local, categoria: r.categoria, falta });
+      setDica(falta.length ? "Faltou o dia ou o horário. Fale de novo ou toque em Corrigir." : "Confira e toque em Salvar (ou diga “salvar”).");
+      return;
+    }
+    if (r.acao === "desmarcar" || r.acao === "remarcar" || r.acao === "concluir") {
+      const alvo = lista.find((c) => c.id === r.alvoId);
+      if (!alvo) { setDica("Não achei esse compromisso na agenda. Fale o nome e o dia dele."); return; }
+      if (r.acao === "remarcar" && !r.novaData && !r.novaHora) { setDica("Para remarcar, diga o novo dia ou horário."); return; }
+      setRes(null); setOutra({ acao: r.acao, alvo, data: r.novaData ?? alvo.data, hora: r.novaHora ?? alvo.hora });
+      setDica("Confira e toque em Confirmar (ou diga “salvar”).");
+      return;
+    }
+    setDica("Não entendi. Fale de novo, por exemplo: “festa de aniversário da Ana sábado às 8 da noite”.");
+  };
+  const usarGravador = gravadorSuportado() && (ehIOS() || !Rec);
+  const mandarAudio = async (blob: Blob) => {
+    if (blob.size < 1500) { setDica("Não ouvi nada. Toque e fale de novo."); return; }
+    setPensando(true); setDica("");
+    try { aplicarIA(await entenderVoz({ audio: blob }, lista)); }
+    catch (e) { if (api.sessaoInvalida(e)) onSair(); else setDica("Não consegui entender o áudio agora. Tente de novo ou escreva abaixo."); }
+    finally { setPensando(false); }
+  };
+  const ouvirGravando = async () => {
+    if (trava.current || pensando) return;
+    if (grav.current) { const g = grav.current; grav.current = null; setOuvindo(false); await mandarAudio(await g.parar()); return; }
+    try {
+      setDica(""); setSalvo("");
+      grav.current = await gravar(25, () => { const g = grav.current; grav.current = null; setOuvindo(false); if (g) void g.parar().then(mandarAudio); });
+      setOuvindo(true);
+    } catch (e) {
+      setDica((e as Error)?.name === "NotAllowedError"
+        ? "O microfone está bloqueado. No iPhone: Ajustes → Safari → Microfone → Permitir. Depois toque de novo."
+        : "Não consegui usar o microfone. Escreva o compromisso abaixo.");
+    }
   };
   receber.current=entender;
   const ouvir = () => {
@@ -995,20 +1065,34 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
         <p className="text-2xl font-bold">Olá, {nome}!</p>
         <a href="/agenda-claudia" className={`${btnBase} px-4 py-3 text-sm bg-white/10 border border-white/20`}>📅 Ver agenda</a>
       </div>
-      <button data-native-recognition="react" onClick={ouvindo ? pararEscuta : ouvir} aria-label={ouvindo ? "Parar de ouvir" : "Tocar e falar"}
+      <button data-native-recognition="react" disabled={pensando} onClick={usarGravador ? () => void ouvirGravando() : ouvindo ? pararEscuta : ouvir} aria-label={ouvindo ? "Parar de ouvir" : "Tocar e falar"}
         className={`mx-auto flex flex-col items-center justify-center w-44 h-44 rounded-full text-6xl shadow-2xl transition active:scale-95 ${ouvindo ? "bg-red-500 animate-pulse" : ""}`}
         style={ouvindo ? undefined : { background: "linear-gradient(135deg,#38bdf8,#8b5cf6)", boxShadow: "0 0 0 14px rgba(56,189,248,.18),0 20px 40px rgba(0,0,0,.45)" }}>
-        🎙️<span className="text-lg font-bold mt-2">{ouvindo ? "Ouvindo…" : res ? "Diga sua opção" : "Toque e fale"}</span>
+        🎙️<span className="text-lg font-bold mt-2">{pensando ? "Entendendo…" : ouvindo ? (usarGravador ? "Toque p/ terminar" : "Ouvindo…") : res || outra ? "Diga sua opção" : "Toque e fale"}</span>
       </button>
-      <p className="text-center text-sm text-white/75">Diga o compromisso com o dia e o horário. Depois diga “salvar”, “corrigir” ou “cancelar”.</p>
+      <p className="text-center text-sm text-white/75">Fale do seu jeito: marcar, desmarcar, remarcar ou “já fiz”. Ex.: “festa de aniversário da Ana sábado às 8 da noite” ou “desmarca a reunião de amanhã”.</p>
       {dica && <p className="text-base text-rose-300 text-center" role="alert">{dica}</p>}
-      {salvo && <div className="rounded-2xl bg-green-500/20 border border-green-400/50 p-4 text-base" role="status"><b>✅ Salvo na agenda:</b> <span className="capitalize">{salvo}</span></div>}
+      {salvo && <div className="rounded-2xl bg-green-500/20 border border-green-400/50 p-4 text-base" role="status"><b>✅ Pronto:</b> <span className="capitalize">{salvo}</span></div>}
+      {outra && (
+        <div className="rounded-2xl bg-violet-400/10 border border-violet-300/40 p-4 space-y-2 text-base">
+          <p className="text-sm text-white/70">{outra.acao === "desmarcar" ? "Desmarcar este compromisso?" : outra.acao === "concluir" ? "Marcar como feito?" : "Remarcar para:"}</p>
+          <p className="text-lg font-bold">{outra.alvo.titulo}</p>
+          <p>📅 <span className="capitalize">{dataLonga(outra.acao === "remarcar" ? outra.data : outra.alvo.data)}</span> · ⏰ {horaTxt(outra.acao === "remarcar" ? outra.hora : outra.alvo.hora)}</p>
+          {outra.acao === "remarcar" && <p className="text-sm text-white/60">Antes: <span className="capitalize">{dataLonga(outra.alvo.data)}</span> · {horaTxt(outra.alvo.hora)}</p>}
+          <div className="grid grid-cols-2 gap-2 pt-2">
+            <button disabled={gravando} onClick={() => void executarOutra()} className={`${btnBase} h-12 text-base ${outra.acao === "desmarcar" ? "bg-rose-500 text-white" : "bg-green-500 text-green-950"}`}>{gravando ? "Salvando…" : "Confirmar"}</button>
+            <button disabled={gravando} onClick={cancelar} className={`${btnBase} h-12 text-base bg-white/15`}>Cancelar</button>
+          </div>
+        </div>
+      )}
       {res && input && (
         <div className="rounded-2xl bg-sky-400/10 border border-sky-300/40 p-4 space-y-2 text-base">
           <p className="text-lg font-bold">{res.titulo}</p>
           <p>📅 {res.data ? <span className="capitalize">{dataLonga(res.data)}</span> : <b className="text-rose-300">faltou o dia</b>}</p>
           <p>⏰ {res.diaTodo ? "Dia todo" : res.hora ? horaTxt(res.hora) : <b className="text-rose-300">faltou o horário</b>}</p>
           {res.local && <p>📍 {res.local}</p>}
+          <p>🏷️ {categoria(res.categoria).nome}{extra.antecedenciaMin ? ` · aviso ${extra.antecedenciaMin} min antes` : ""}</p>
+          {extra.observacao && <p className="text-sm text-white/70">📝 {extra.observacao}</p>}
           {!pronto && <p className="text-sm text-rose-200">Fale de novo com {res.falta.map((x) => (x === "data" ? "o dia" : "o horário")).join(" e ")}, ou toque em Corrigir.</p>}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
             <button disabled={gravando} onClick={confirmar} aria-busy={gravando} className={`${btnBase} min-h-12 py-3 text-base bg-green-500 text-green-950`}>{gravando ? "Salvando…" : "Salvar"}</button>
