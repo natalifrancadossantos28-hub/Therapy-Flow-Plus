@@ -96,3 +96,8 @@ export const statusPush = (endpoint: string | null) => rpc<{
   configurado: boolean; aparelhos: number; esteAparelho: { ultimoOk: string | null; ultimoErro: string | null } | null;
 }>("agenda_exec_push_status", { p_token: tk(), p_endpoint: endpoint });
 export const testarPush = (atrasoSeg = 0) => rpc<number>("agenda_exec_push_testar", { p_token: tk(), p_atraso_seg: atrasoSeg });
+
+export type AgxAparenciaServidor = { prefs: Record<string, unknown>; foto: string | null; updatedAt: string } | null;
+export const lerAparencia = () => rpc<AgxAparenciaServidor>("agenda_exec_aparencia_ler", { p_token: tk() });
+export const salvarAparencia = (prefs: Record<string, unknown>, foto: string | null) =>
+  rpc<void>("agenda_exec_aparencia_salvar", { p_token: tk(), p_prefs: prefs, p_foto: foto });
