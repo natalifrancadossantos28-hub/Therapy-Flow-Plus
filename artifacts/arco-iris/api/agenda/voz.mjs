@@ -49,7 +49,7 @@ async function perguntar(chave, partes) {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${chave}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig: { temperature: 0, responseMimeType: "application/json" } }),
+      body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig: { temperature: 0, responseMimeType: "application/json", ...(modelo.startsWith("gemini-2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}) } }),
     });
     const j = await r.json().catch(() => ({}));
     if (r.ok) {
