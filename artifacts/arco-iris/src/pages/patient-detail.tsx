@@ -1558,15 +1558,6 @@ export default function PatientDetail() {
                   <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/5 p-3 space-y-2">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <Label className="text-sm font-semibold">Data de entrada em cada fila de espera</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-7 text-xs"
-                        disabled={!editEntryDate}
-                        onClick={() => setFilaDates(Object.fromEntries(filaRows.map(r => [r.id, editEntryDate])))}
-                      >
-                        Usar a data de entrada em todas as filas
-                      </Button>
                     </div>
                     {filaRows.map(r => (
                       <div key={r.id} className="grid grid-cols-[1fr_auto] items-center gap-3">

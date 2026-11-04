@@ -16,15 +16,21 @@ export type VozIA = {
 export const gravadorSuportado = () =>
   typeof window !== "undefined" && "MediaRecorder" in window && !!navigator.mediaDevices?.getUserMedia;
 
+// O microfone fica aberto enquanto a tela de falar estiver aberta: a 2ª fala já começa a gravar na hora.
+let microfone: MediaStream | null = null;
+export function liberarMicrofone() { microfone?.getTracks().forEach((t) => t.stop()); microfone = null; }
+
 export type Gravacao = { parar: () => Promise<Blob>; cancelar: () => void };
 
 export async function gravar(maxSeg = 25, aoAcabar?: () => void): Promise<Gravacao> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  if (!microfone || microfone.getAudioTracks().every((t) => t.readyState === "ended"))
+    microfone = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  const stream = microfone;
   const tipo = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find((t) => MediaRecorder.isTypeSupported?.(t));
   const rec = new MediaRecorder(stream, tipo ? { mimeType: tipo } : undefined);
   const partes: Blob[] = [];
   rec.ondataavailable = (e) => { if (e.data.size) partes.push(e.data); };
-  const fim = new Promise<Blob>((ok) => { rec.onstop = () => { stream.getTracks().forEach((t) => t.stop()); ok(new Blob(partes, { type: rec.mimeType || tipo || "audio/mp4" })); }; });
+  const fim = new Promise<Blob>((ok) => { rec.onstop = () => { ok(new Blob(partes, { type: rec.mimeType || tipo || "audio/mp4" })); }; });
   rec.start(250);
   const limite = setTimeout(() => { if (rec.state !== "inactive") { rec.stop(); aoAcabar?.(); } }, maxSeg * 1000);
   return {

@@ -9,7 +9,7 @@ import { AgendaClaudiaAlarme } from "@/components/AgendaClaudiaAlarme";
 import * as api from "@/lib/agenda-exec-rpc";
 import { CATEGORIAS, categoria, type AgxCompromisso, type AgxInput, type AgxSessao, type Categoria, type Pessoa } from "@/lib/agenda-exec-rpc";
 import { interpretarFrase, comandoVoz, type Interpretacao } from "@/lib/agenda-exec-voz";
-import { entenderVoz, gravar, gravadorSuportado, type Gravacao, type VozIA } from "@/lib/agenda-exec-ia";
+import { entenderVoz, gravar, gravadorSuportado, liberarMicrofone, type Gravacao, type VozIA } from "@/lib/agenda-exec-ia";
 import { ativarAvisos, assinaturaAtual, desativarAvisos, ehAndroid, ehIOS, instalado, pushSuportado } from "@/lib/agenda-exec-push";
 import { APARENCIA_PADRAO, OPCOES_FUNDO, arquivoParaFoto, estiloFundo, useAparencia, type Aparencia } from "@/lib/agenda-exec-aparencia";
 import { getCompanySession } from "@/lib/portal-session";
@@ -61,7 +61,7 @@ function useManifestAgenda(nome: string, falar: boolean) {
 
 const CSS = `
   .agenda-executiva { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; overflow-wrap: break-word; hyphens: manual; -webkit-tap-highlight-color: transparent; }
-  .agenda-executiva .agx-card { background: rgba(13,20,56,var(--agx-op,.55)); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); }
+  .agenda-executiva .agx-card { background: rgba(13,20,56,var(--agx-op,.55)); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); } .agenda-executiva .agx-card .agx-card { backdrop-filter: none; -webkit-backdrop-filter: none; }
   .agenda-executiva .agx-brilho { box-shadow: 0 0 0 1px rgba(139,92,246,.35), 0 8px 28px rgba(76,29,149,.35); }
   .agenda-executiva input[type=range] { accent-color: #8b5cf6; }
   .agenda-executiva .agx-onda span { width: 3px; border-radius: 3px; background: currentColor; opacity: .75; }
@@ -898,6 +898,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     api.listar(d(-7), d(180)).then(setLista).catch(() => {});
   }, []);
   useEffect(recarregar, [recarregar]);
+  useEffect(() => () => liberarMicrofone(), []);
   const w = window as unknown as { SpeechRecognition?: new () => Reconhecedor; webkitSpeechRecognition?: new () => Reconhecedor };
   const Rec = w.SpeechRecognition ?? w.webkitSpeechRecognition;
   useEffect(() => () => rec.current?.stop(), []);
