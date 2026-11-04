@@ -1,0 +1,14 @@
+{
+  "appId": "br.com.nfsgestao.minhaagenda",
+  "appName": "Minha Agenda",
+  "webDir": "www",
+  "server": {
+    "url": "https://nfs-gestao-oficial.vercel.app/minha-agenda",
+    "errorPath": "offline.html",
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#0b1530",
+    "appendUserAgent": "MinhaAgendaApp"
+  }
+}
