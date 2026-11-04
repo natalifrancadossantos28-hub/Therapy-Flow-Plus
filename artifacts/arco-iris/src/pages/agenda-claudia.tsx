@@ -47,13 +47,16 @@ function useManifestAgenda(nome: string, falar: boolean) {
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     const meta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
-    const antes = { href: link?.getAttribute("href"), titulo: meta?.content, doc: document.title };
+    const icone = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+    const antes = { href: link?.getAttribute("href"), titulo: meta?.content, doc: document.title, icone: icone?.getAttribute("href") };
+    icone?.setAttribute("href", "/icons/agenda-apple-touch.png");
     link?.setAttribute("href", falar ? "/manifest-falar.webmanifest" : "/manifest-agenda.webmanifest");
     if (meta) meta.content = falar ? "Falar" : "Minha Agenda";
     document.title = "Minha Agenda";
     return () => {
       if (link && antes.href) link.setAttribute("href", antes.href);
       if (meta && antes.titulo) meta.content = antes.titulo;
+      if (icone && antes.icone) icone.setAttribute("href", antes.icone);
       document.title = antes.doc;
     };
   }, [nome, falar]);
@@ -400,12 +403,6 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
   const saudacao = `${h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"}, ${primeiroNome(sessao.usuario.nome)}!`;
   const d = new Date();
   const pendHoje = deHoje.filter((c) => !c.concluido);
-  const atalhos: [React.ReactNode, string, () => void][] = [
-    [<CalendarCheck size={22} />, "Agenda", () => onAba("agenda")],
-    [<Plus size={22} />, "Novo", onNovo],
-    [<AlarmClock size={22} />, "Alarmes e lembretes", () => onAba("alarmes")],
-    [<Layers size={22} />, "Categorias", onCategorias],
-  ];
   return (
     <>
       <header className="flex items-center justify-between gap-3">
@@ -449,16 +446,8 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
         <ChevronRight size={20} className="text-white/60 shrink-0" />
       </button>
 
-      <nav className="grid grid-cols-4 gap-2" aria-label="Acesso rápido">
-        {atalhos.map(([ic, t, f], i) => (
-          <button key={t} onClick={f} className={`${glass} !p-2 !rounded-2xl min-h-[5.25rem] flex flex-col items-center justify-center gap-1.5 text-center ${i === 0 ? "!bg-gradient-to-br from-sky-500/60 to-violet-600/50 agx-brilho" : ""}`}>
-            {ic}<span className="text-[0.8rem] sm:text-xs font-medium leading-tight">{t}</span>
-          </button>
-        ))}
-      </nav>
-
-      <section className="grid grid-cols-1 min-[380px]:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] gap-3">
-        <div className={`${glass} !p-3`}><Mes compacto mes={mes} setMes={setMes} diaSel={hoje} onDia={onDia} doDia={doDia} hoje={hoje} /></div>
+      <section className="grid grid-cols-1 gap-3">
+        <div className={`${glass} !p-3`}><Mes mes={mes} setMes={setMes} diaSel={hoje} onDia={onDia} doDia={doDia} hoje={hoje} /></div>
         <div className={`${glass} !p-3 flex flex-col`}>
           <p className="flex items-center gap-1.5 text-base font-semibold"><CalendarCheck size={16} /> Hoje</p>
           <p className="text-sm text-sky-300 mb-2 whitespace-nowrap">{pendHoje.length} {pendHoje.length === 1 ? "compromisso" : "compromissos"}</p>
@@ -470,9 +459,9 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
           ) : (
             <div className="space-y-1.5">
               {pendHoje.slice(0, 4).map((c) => (
-                <button key={c.id} onClick={() => onAbrir(c)} className="w-full text-left rounded-xl bg-white/[0.06] px-2 py-1.5 border-l-2" style={{ borderColor: categoria(c.categoria).cor }}>
-                  <span className="block text-[0.8rem] text-white/70 tabular-nums">{horaTxt(c.hora)}</span>
-                  <span className="block text-sm font-semibold leading-snug line-clamp-2">{c.titulo}</span>
+                <button key={c.id} onClick={() => onAbrir(c)} className="w-full text-left rounded-xl bg-white/[0.06] px-3 py-2 border-l-4 flex items-baseline gap-3" style={{ borderColor: categoria(c.categoria).cor }}>
+                  <span className="text-base font-semibold text-sky-200 tabular-nums shrink-0">{horaTxt(c.hora)}</span>
+                  <span className="text-base font-semibold leading-snug line-clamp-2">{c.titulo}</span>
                 </button>
               ))}
               {pendHoje.length > 4 && <button onClick={() => onDia(hoje)} className="text-xs text-sky-300 underline">+ {pendHoje.length - 4} no dia</button>}
@@ -481,10 +470,7 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
         </div>
       </section>
 
-      <div className={`${glass} !py-2.5 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[0.8rem] text-white/80`}>
-        {CATEGORIAS.filter((c) => c.id !== "outro").map((c) => <span key={c.id} className="inline-flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-full" style={{ background: c.cor }} />{c.nome}</span>)}
-      </div>
-
+      <button onClick={onNovo} className={`${glass} w-full !py-3 flex items-center justify-center gap-2 text-lg font-semibold`}><Plus size={22} /> Novo compromisso</button>
       <BarraMicrofone onClick={onFalar} />
       {lista.length === 0 && <p className="text-center text-xs text-white/50">Carregando sua agenda…</p>}
     </>
