@@ -23,7 +23,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
 function getModel() {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY não configurada");
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  return genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  return genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-flash-latest" });
 }
 
 // ── Helper: calcular idade a partir de data de nascimento ──────────────────

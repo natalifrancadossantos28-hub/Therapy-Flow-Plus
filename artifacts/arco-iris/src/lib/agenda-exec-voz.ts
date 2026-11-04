@@ -159,3 +159,38 @@ export function interpretarFrase(frase: string, hoje = new Date()): Interpretaca
   if (!hora && !diaTodo) falta.push("hora");
   return { titulo, data: data ? ISO(data) : null, hora, diaTodo, local, categoria: categoriaDe(t), falta };
 }
+
+/** Desmarcar / remarcar / concluir sem depender da IA: acha o compromisso pelo nome e pelo dia falados. */
+export type IntencaoLocal = { acao: "desmarcar" | "remarcar" | "concluir"; alvoId: number | null; novaData: string | null; novaHora: string | null };
+const PRE = String.raw`^(?:(?:eu|pode|quero|preciso|por favor|favor|voce pode|tem como)\s+)*`;
+const RE_DESMARCAR = new RegExp(PRE + String.raw`(?:desmarc\w*|cancel\w*|apag\w*|exclu\w*|tir[ae]r?|remov\w*|delet\w*)\b`);
+const RE_REMARCAR = new RegExp(PRE + String.raw`(?:remarc\w*|reagend\w*|adi[ae]\w*|mud[ae]\w*|pass[ae]\w*|transfer\w*|troc[ae]\w*)\b`);
+const RE_CONCLUIR = new RegExp(PRE + String.raw`(?:ja fiz|ja foi|conclu\w*|terminei|finalizei|marca como feito|marcar como feito)\b`);
+const VAZIAS = new Set("a o as os de da do das dos na no nas nos em para pra pro com e um uma uns umas minha meu minhas meus que dia hoje amanha compromisso agenda horario hora".split(" "));
+
+export function intencaoLocal(frase: string, lista: { id: number; titulo: string; data: string; hora: string | null; concluido?: boolean }[], hoje = new Date()): IntencaoLocal | null {
+  const t = sem(frase).replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ").trim();
+  const re = RE_DESMARCAR.test(t) ? RE_DESMARCAR : RE_REMARCAR.test(t) ? RE_REMARCAR : RE_CONCLUIR.test(t) ? RE_CONCLUIR : null;
+  if (!re) return null;
+  const acao = re === RE_DESMARCAR ? "desmarcar" : re === RE_REMARCAR ? "remarcar" : "concluir";
+  const base = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  let alvoTxt = t.replace(re, "").trim(), novoTxt = "";
+  if (acao === "remarcar") {
+    const m = alvoTxt.match(/^(.*?)\s*\b(?:para|pra|pro)\s+(.+)$/);
+    if (m) { alvoTxt = m[1]; novoTxt = m[2]; }
+  }
+  const dAlvo = acharData(alvoTxt, base), dIso = dAlvo ? ISO(dAlvo) : null, hAlvo = acharHora(alvoTxt), hojeIso = ISO(base);
+  const palavras = alvoTxt.split(" ").filter((p) => p.length >= 3 && !VAZIAS.has(p) && !/^\d/.test(p));
+  let melhor: number | null = null, nota = 0;
+  for (const c of lista) {
+    if (c.concluido) continue;
+    const tt = sem(c.titulo);
+    let n = palavras.filter((p) => tt.includes(p.slice(0, Math.max(4, p.length - 1)))).length * 2;
+    if (dIso) n += c.data === dIso ? 3 : -3;
+    if (hAlvo && c.hora?.slice(0, 5) === hAlvo) n += 2;
+    if (c.data < hojeIso) n -= 1;
+    if (n > nota) { nota = n; melhor = c.id; }
+  }
+  const novaD = novoTxt ? acharData(novoTxt, base) : null;
+  return { acao, alvoId: nota >= 2 ? melhor : null, novaData: novaD ? ISO(novaD) : null, novaHora: novoTxt ? acharHora(novoTxt) : null };
+}

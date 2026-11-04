@@ -4,7 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 
 const CATEGORIAS = ["reuniao", "evento", "visita", "palestra", "urgente", "pessoal", "outro",
   "aniversario", "saude", "viagem", "familia", "contas", "escola", "lazer"];
-const MODELOS = ["gemini-2.5-flash", "gemini-2.0-flash"];
+// "gemini-2.0-flash" foi desligado pelo Google (404); os apelidos "-latest" acompanham a versão atual.
+const MODELOS = [process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite"].filter(Boolean);
 const SEMANA = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 
 function hojeSP() {
@@ -38,7 +39,8 @@ Regras:
 - "criar": marcar/agendar/anotar/lembrar algo novo. Datas relativas ("amanhã", "sexta que vem", "dia 15", "daqui a 2 semanas") viram data real a partir de hoje. "3 da tarde" = 15:00, "meio-dia" = 12:00, "meia-noite" = 00:00.
 - Se não falar o horário, deixe "hora" null; se for o dia todo (aniversário, feriado, viagem sem hora), "diaTodo": true. Nunca invente data ou horário que não foi dito.
 - "desmarcar": cancelar/desmarcar/apagar/tirar um compromisso marcado. "remarcar": mudar/adiar/passar para outro dia ou horário (preencha novaData e/ou novaHora; o que não mudar fica null). "concluir": já fiz/terminei. Para esses três, escolha alvoId na lista acima pelo título e data mais parecidos. Se não achar, alvoId null.
-- "comando": a pessoa só disse salvar/confirmar/pode salvar, cancelar ou corrigir.
+- "cancelar a reunião", "cancela o dentista de amanhã", "desmarca a palestra", "apaga o compromisso de sexta" = SEMPRE "desmarcar" de um compromisso já marcado, NUNCA "criar". Nunca crie compromisso com título começando por cancelar/desmarcar/remarcar.
+- "comando": só quando a frase inteira for apenas "salvar"/"confirmar"/"pode salvar", "cancelar" ou "corrigir" (sem dizer qual compromisso).
 - Categoria: reuniao (reunião, encontro, alinhamento), evento (evento, inauguração, cerimônia, audiência, congresso), visita (visita externa), palestra (palestra, curso, treinamento), urgente (se disser urgente/importantíssimo), pessoal, aniversario (aniversário, festa, chá de bebê, casamento, comemoração), saude (médico, dentista, exame, consulta, academia, remédio), viagem (viagem, voo, aeroporto, hotel), familia (filhos, marido, mãe, família), contas (pagar, boleto, conta, banco, imposto), escola (escola, reunião de pais, faculdade), lazer (cinema, almoço com amigas, show, passeio), outro.
 - Se não entender nada, "acao": "nada".`;
 }
@@ -46,18 +48,22 @@ Regras:
 async function perguntar(chave, partes) {
   let ultimo = "";
   for (const modelo of MODELOS) {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${chave}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig: { temperature: 0, responseMimeType: "application/json", ...(modelo.startsWith("gemini-2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}) } }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (r.ok) {
-      const txt = j?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-      return JSON.parse(txt.replace(/^```(?:json)?|```$/g, "").trim());
+    // 1ª tentativa sem "pensar" (bem mais rápida); se o modelo não aceitar a opção (400), tenta de novo sem ela.
+    for (const rapido of [true, false]) {
+      const generationConfig = { temperature: 0, responseMimeType: "application/json", ...(rapido ? { thinkingConfig: { thinkingBudget: 0 } } : {}) };
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${chave}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) {
+        const txt = j?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+        return JSON.parse(txt.replace(/^```(?:json)?|```$/g, "").trim());
+      }
+      ultimo = `${modelo}: ${j?.error?.message ?? `HTTP ${r.status}`}`;
+      if (!(rapido && r.status === 400)) break;
     }
-    ultimo = j?.error?.message ?? `HTTP ${r.status}`;
-    if (r.status !== 404 && r.status !== 400 && r.status !== 429 && r.status < 500) break;
   }
   throw new Error(ultimo || "IA indisponível");
 }
