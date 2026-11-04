@@ -20,10 +20,21 @@ function getCompanyId(req: any): number | null {
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
 
+// Tenta os modelos em ordem: o Google desliga versões antigas (404) e às vezes um modelo fica sem vaga (503/429).
+const MODELOS_GEMINI = [process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean);
 function getModel() {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY não configurada");
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  return genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-flash-latest" });
+  return {
+    async generateContent(prompt: string) {
+      let erro: unknown;
+      for (const model of MODELOS_GEMINI) {
+        try { return await genAI.getGenerativeModel({ model: model as string }).generateContent(prompt); }
+        catch (e) { erro = e; if (!/\b(404|429|500|503)\b/.test(String((e as Error)?.message ?? e))) throw e; }
+      }
+      throw erro;
+    },
+  };
 }
 
 // ── Helper: calcular idade a partir de data de nascimento ──────────────────

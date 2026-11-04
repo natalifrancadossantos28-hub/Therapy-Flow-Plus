@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 const CATEGORIAS = ["reuniao", "evento", "visita", "palestra", "urgente", "pessoal", "outro",
   "aniversario", "saude", "viagem", "familia", "contas", "escola", "lazer"];
 // "gemini-2.0-flash" foi desligado pelo Google (404); os apelidos "-latest" acompanham a versão atual.
-const MODELOS = [process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite"].filter(Boolean);
+const MODELOS = [process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean);
 const SEMANA = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 
 function hojeSP() {

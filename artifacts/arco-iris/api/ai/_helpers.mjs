@@ -15,11 +15,22 @@ export function getSupabase() {
   return createClient(url, key);
 }
 
+// Tenta os modelos em ordem: o Google desliga versões antigas (404) e às vezes um modelo fica sem vaga (503/429).
+const MODELOS_GEMINI = [process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean);
 export function getModel() {
   const apiKey = process.env.GEMINI_API_KEY ?? "";
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
   const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-flash-latest" });
+  return {
+    async generateContent(prompt) {
+      let erro;
+      for (const model of MODELOS_GEMINI) {
+        try { return await genAI.getGenerativeModel({ model }).generateContent(prompt); }
+        catch (e) { erro = e; if (!/\b(404|429|500|503)\b/.test(String(e?.message ?? e))) throw e; }
+      }
+      throw erro;
+    },
+  };
 }
 
 export function calcAge(dob) {
