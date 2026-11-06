@@ -1267,7 +1267,22 @@ function PainelAvisos({ sessao, avisar }: { sessao: AgxSessao; avisar: (t: strin
               className="w-full text-base text-white/60 underline py-2">Desligar avisos neste celular</button>
           </>}
           {!pushSuportado() && !iosSemApp && <p className="text-sm text-rose-300">Este navegador não recebe avisos. No Android, use o Chrome.</p>}
-          {status && <p className="text-base text-white/60">Aparelhos que recebem seus avisos: {status.aparelhos}</p>}
+          {status && !status.lista?.length && <p className="text-base text-white/60">Aparelhos que recebem seus avisos: {status.aparelhos}</p>}
+          {!!status?.lista?.length && (
+            <div className="space-y-2">
+              <p className="text-base font-semibold">Aparelhos que recebem os avisos</p>
+              {status.lista.map((a, i) => (
+                <div key={i} className="rounded-xl bg-white/[0.06] px-3 py-2 text-base">
+                  <p className="font-semibold">{a.aparelho}{a.esteAparelho ? " (este)" : ""}</p>
+                  {a.ultimoErro
+                    ? <p className="text-rose-300">⚠️ O último aviso não chegou ({a.ultimoErro.slice(0, 60)}). Desligue e ligue os avisos de novo neste aparelho.</p>
+                    : a.ultimoOk
+                      ? <p className="text-green-300">✅ Último aviso entregue em {format(parseISO(a.ultimoOk), "dd/MM 'às' HH:mm")}</p>
+                      : <p className="text-white/60">Ainda não recebeu nenhum aviso. Toque em “Testar aviso”.</p>}
+                </div>
+              ))}
+            </div>
+          )}
           {msg && <p className="text-sm text-rose-300" role="alert">{msg}</p>}
         </div>
       )}

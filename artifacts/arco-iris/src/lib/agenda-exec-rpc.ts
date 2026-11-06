@@ -102,6 +102,7 @@ export const registrarPush = (endpoint: string, p256dh: string, auth: string, ap
 export const removerPush = (endpoint: string) => rpc<void>("agenda_exec_push_remover", { p_token: tk(), p_endpoint: endpoint });
 export const statusPush = (endpoint: string | null) => rpc<{
   configurado: boolean; aparelhos: number; esteAparelho: { ultimoOk: string | null; ultimoErro: string | null } | null;
+  lista?: { aparelho: string; desde: string; ultimoOk: string | null; ultimoErro: string | null; esteAparelho: boolean }[];
 }>("agenda_exec_push_status", { p_token: tk(), p_endpoint: endpoint });
 export const testarPush = (atrasoSeg = 0) => rpc<number>("agenda_exec_push_testar", { p_token: tk(), p_atraso_seg: atrasoSeg });
 
