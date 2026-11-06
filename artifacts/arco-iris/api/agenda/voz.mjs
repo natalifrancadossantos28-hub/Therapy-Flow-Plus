@@ -47,15 +47,24 @@ Regras:
 
 async function perguntar(chave, partes) {
   let ultimo = "";
+  // Às vezes um modelo trava sem responder: cada tentativa tem no máximo 8 s e o total fica em ~25 s.
+  const fim = Date.now() + 25_000;
   for (const modelo of MODELOS) {
+    if (Date.now() > fim - 2_000) break;
     // 1ª tentativa sem "pensar" (bem mais rápida); se o modelo não aceitar a opção (400), tenta de novo sem ela.
     for (const rapido of [true, false]) {
       const generationConfig = { temperature: 0, responseMimeType: "application/json", ...(rapido ? { thinkingConfig: { thinkingBudget: 0 } } : {}) };
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${chave}`, {
+      const espera = Math.min(8_000, fim - Date.now());
+      if (espera < 1_500) break;
+      let r;
+      try {
+        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${chave}`, {
+        signal: AbortSignal.timeout(espera),
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig }),
       });
+      } catch (e) { ultimo = `${modelo}: ${e?.name === "TimeoutError" ? "demorou demais" : String(e?.message ?? e)}`; break; }
       const j = await r.json().catch(() => ({}));
       if (r.ok) {
         const txt = j?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
