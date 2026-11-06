@@ -13,6 +13,7 @@ import { entenderVoz, gravar, gravadorSuportado, liberarMicrofone, type Gravacao
 import { ativarAvisos, assinaturaAtual, desativarAvisos, ehAndroid, ehIOS, instalado, pushSuportado } from "@/lib/agenda-exec-push";
 import { APARENCIA_PADRAO, OPCOES_FUNDO, arquivoParaFoto, estiloFundo, useAparencia, type Aparencia } from "@/lib/agenda-exec-aparencia";
 import { getCompanySession } from "@/lib/portal-session";
+import { abrirAjusteNativo, ehAppNativo, pedirNotificacoesNativo, sairNativo, sincronizarNativo, statusNativo, testarAlarmeNativo, type StatusNativo } from "@/lib/agenda-exec-nativo";
 
 // Minha Agenda: app executivo próprio (sem o menu do sistema), com menu inferior e papel de parede por pessoa.
 
@@ -111,7 +112,7 @@ export default function AgendaClaudia() {
   const [sessao, setSessao] = useState<AgxSessao | null>(() => api.getSessao());
   const falar = window.location.pathname.replace(/\/+$/, "").endsWith("/falar");
   useManifestAgenda(sessao ? primeiroNome(sessao.dona.nome) : "Cláudia", falar);
-  const sair = useCallback(() => { void api.sair(); setSessao(null); }, []);
+  const sair = useCallback(() => { void api.sair(); void sairNativo(); setSessao(null); }, []);
   if (!sessao) return <Fundo><Entrada onEntrou={setSessao} /></Fundo>;
   return <Logada key={sessao.usuario.id} sessao={sessao} falar={falar} onSair={sair} />;
 }
@@ -262,8 +263,11 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
   const carregar = useCallback(() => {
     const de = [ISO(addDays(startOfMonth(mes), -7)), ISO(addDays(new Date(), -30))].sort()[0];
     const ate = [ISO(addDays(endOfMonth(mes), 40)), ISO(addDays(new Date(), 14))].sort()[1];
-    api.listar(de, ate).then((l) => { setLista(l); setErroGeral(""); }).catch((e) => { if (api.sessaoInvalida(e)) onSair(); else setErroGeral(erroTxt(e)); });
-  }, [mes, onSair]);
+    api.listar(de, ate).then((l) => {
+      setLista(l); setErroGeral("");
+      if (isSameMonth(mes, new Date())) void sincronizarNativo(sessao.token, l).catch(() => {});
+    }).catch((e) => { if (api.sessaoInvalida(e)) onSair(); else setErroGeral(erroTxt(e)); });
+  }, [mes, onSair, sessao.token]);
   useEffect(carregar, [carregar]);
   useEffect(() => { const t = window.setInterval(carregar, 60_000); return () => window.clearInterval(t); }, [carregar]);
 
@@ -347,8 +351,11 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
       {aba === "alarmes" && (
         <div className="space-y-4">
           <CabecalhoAba titulo="Alarmes e lembretes" />
-          <PainelAvisos sessao={sessao} avisar={avisar} />
-          {souDona && <AgendaClaudiaAlarme donaId={sessao.dona.id} compromissos={lista} />}
+          {ehAppNativo() ? <PainelNativo avisar={avisar} lista={lista} /> : <>
+            {ehAndroid() && <BaixarAppAndroid />}
+            <PainelAvisos sessao={sessao} avisar={avisar} />
+            {souDona && <AgendaClaudiaAlarme donaId={sessao.dona.id} compromissos={lista} />}
+          </>}
           <AvisosProgramados lista={lista} hoje={hoje} />
         </div>
       )}
@@ -605,6 +612,58 @@ function AvisosProgramados({ lista, hoje }: { lista: AgxCompromisso[]; hoje: str
           <span className="min-w-0 flex-1"><span className="block text-sm font-medium leading-snug break-words">{a.c.titulo}</span><span className="block text-[0.8rem] text-white/60">{a.tipo}</span></span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function BaixarAppAndroid() {
+  return (
+    <a href="/minha-agenda.apk" download className={`${glass} agx-brilho flex items-center gap-3 !bg-gradient-to-r from-sky-600/40 to-violet-600/40`}>
+      <span className="grid place-items-center w-11 h-11 rounded-2xl bg-white/10 shrink-0"><AlarmClock size={22} /></span>
+      <span className="flex-1 min-w-0">
+        <span className="block font-semibold">Baixar o app para Android</span>
+        <span className="block text-xs text-white/75">Alarme de verdade: toca com o celular bloqueado, sem internet, com Adiar e Dispensar.</span>
+      </span>
+      <ChevronRight size={18} className="text-white/60 shrink-0" />
+    </a>
+  );
+}
+
+function PainelNativo({ avisar, lista }: { avisar: (t: string) => void; lista: AgxCompromisso[] }) {
+  const [st, setSt] = useState<StatusNativo | null>(null);
+  const ler = useCallback(() => { statusNativo().then(setSt).catch(() => setSt(null)); }, []);
+  useEffect(() => {
+    ler();
+    const volta = () => { if (document.visibilityState === "visible") ler(); };
+    document.addEventListener("visibilitychange", volta);
+    return () => document.removeEventListener("visibilitychange", volta);
+  }, [ler, lista]);
+  const itens: [keyof StatusNativo, string, string, () => void][] = [
+    ["notificacoes", "Notificações", "Permite mostrar os avisos", () => { void pedirNotificacoesNativo().then(setSt).then(() => abrirSeNegado()); }],
+    ["exatos", "Alarmes na hora exata", "Toca no minuto certo, mesmo com o celular parado", () => void abrirAjusteNativo("exatos")],
+    ["telaCheia", "Tela cheia", "Abre o alarme por cima da tela bloqueada", () => void abrirAjusteNativo("telaCheia")],
+    ["bateria", "Sem economia de bateria", "Evita que o Android atrase os alarmes", () => void abrirAjusteNativo("bateria")],
+  ];
+  const abrirSeNegado = () => statusNativo().then((s) => { setSt(s); if (!s.notificacoes) void abrirAjusteNativo("notificacoes"); });
+  const tudoOk = !!st && st.notificacoes && st.exatos && st.telaCheia && st.bateria;
+  return (
+    <div className={`${glass} space-y-3`}>
+      <div className="flex items-center gap-3">
+        <span className={`grid place-items-center w-11 h-11 rounded-2xl shrink-0 ${tudoOk ? "bg-emerald-500/25" : "bg-rose-500/25"}`}><AlarmClock size={22} /></span>
+        <div className="min-w-0">
+          <p className="font-semibold">{tudoOk ? "Alarmes ativos neste celular" : "Falta liberar o alarme"}</p>
+          <p className="text-xs text-white/65">{st ? `${st.agendados} programados${st.proximo ? ` · próximo ${format(new Date(st.proximo), "dd/MM HH:mm")}` : ""}` : "Verificando…"}</p>
+        </div>
+      </div>
+      {st && itens.map(([k, t, d, f]) => (
+        <div key={k} className="flex items-center gap-3 rounded-2xl bg-white/[0.05] border border-white/10 p-3">
+          {st[k] ? <CheckCircle2 size={22} className="text-emerald-300 shrink-0" /> : <Circle size={22} className="text-rose-300 shrink-0" />}
+          <span className="flex-1 min-w-0"><span className="block text-sm font-semibold">{t}</span><span className="block text-xs text-white/60">{d}</span></span>
+          {!st[k] && <button onClick={f} className={`${btnPrimario} h-9 px-3 text-xs shrink-0`}>Permitir</button>}
+        </div>
+      ))}
+      <button onClick={() => { void testarAlarmeNativo().then(() => avisar("O alarme de teste toca em 5 segundos")); }} className={`${btnSuave} w-full h-11 text-sm`}>Testar alarme</button>
+      <p className="text-xs text-white/55">Os alarmes ficam guardados no celular e tocam mesmo sem internet. Mudanças feitas em outro aparelho chegam em até 15 minutos.</p>
     </div>
   );
 }
