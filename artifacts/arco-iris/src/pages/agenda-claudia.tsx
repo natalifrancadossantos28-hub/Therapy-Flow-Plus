@@ -1139,7 +1139,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
           <p className="text-xl font-semibold leading-snug">“{txt}”</p>
         </div>
       )}
-      {!txt.trim() && !res && !outra && <p className="text-center text-base text-white/80">Fale do seu jeito: marcar, desmarcar, remarcar ou “já fiz”. Ex.: “festa de aniversário da Ana sábado às 8 da noite” ou “desmarca a reunião de amanhã”.</p>}
+      {!txt.trim() && !res && !outra && <p className="text-center text-base text-white/80">Fale do seu jeito: marcar, desmarcar, remarcar ou “já fiz”. Ex.: “festa de aniversário da Ana sábado às 8 da noite” ou “desmarcar compromisso dia 15 de novembro às 9 horas”.</p>}
       {dica && <p className="text-base text-rose-300 text-center" role="alert">{dica}</p>}
       {salvo && <div className="rounded-2xl bg-green-500/20 border border-green-400/50 p-4 text-base" role="status"><b>✅ Pronto:</b> <span className="capitalize">{salvo}</span></div>}
       {outra && (
