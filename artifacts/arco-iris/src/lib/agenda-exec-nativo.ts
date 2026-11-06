@@ -5,10 +5,19 @@ export type StatusNativo = {
   notificacoes: boolean; exatos: boolean; telaCheia: boolean; bateria: boolean;
   agendados: number; proximo: string | null; sincronizadoEm: number;
 };
-type Ponte = { nativePromise?: (p: string, m: string, o?: object) => Promise<unknown>; Plugins?: Record<string, Record<string, (o?: object) => Promise<unknown>>> };
+type Ponte = {
+  nativePromise?: (p: string, m: string, o?: object) => Promise<unknown>; Plugins?: Record<string, Record<string, (o?: object) => Promise<unknown>>>;
+  getPlatform?: () => string; isPluginAvailable?: (nome: string) => boolean;
+};
 
 const ponte = () => (window as unknown as { Capacitor?: Ponte }).Capacitor;
-export const ehAppNativo = () => typeof navigator !== "undefined" && /MinhaAgendaApp/.test(navigator.userAgent) && !!ponte();
+// O APK publicado não manda "MinhaAgendaApp" no User-Agent; a ponte do Capacitor com o plugin é o sinal confiável.
+export const ehAppNativo = () => {
+  const c = ponte();
+  if (!c) return false;
+  if (typeof navigator !== "undefined" && /MinhaAgendaApp/.test(navigator.userAgent)) return true;
+  return c.getPlatform?.() === "android" && (c.isPluginAvailable?.("AlarmeNativo") ?? true);
+};
 
 function chamar<T>(metodo: string, opcoes: object = {}): Promise<T> {
   const c = ponte();
