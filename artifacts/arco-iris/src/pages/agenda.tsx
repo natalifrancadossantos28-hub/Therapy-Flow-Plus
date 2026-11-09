@@ -8,7 +8,8 @@ import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Check, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck, ClipboardList
+  ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck, ClipboardList,
+  ShieldAlert,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
@@ -65,9 +66,10 @@ import {
   pausePatientFromAgenda,
   pausePatientKeepAgenda,
   resumePatientAgendaPause,
-  type PausedOverviewItem,
+  type BuscaAtivaCaso,
 } from "@/lib/arco-rpc";
-import { listBuscaAtivaAtual, groupBuscaByPatient, retornarDaBuscaAtiva } from "@/lib/busca-ativa";
+import { listBuscaAtivaAtual, groupBuscaByPatient } from "@/lib/busca-ativa";
+import { EncaminharBuscaAtivaModal } from "@/components/EncaminharBuscaAtivaModal";
 import { AvaliacaoFuncionalForm } from "@/components/AvaliacaoFuncionalForm";
 import { avfFaixa, AVF_MAX, isParentalSpecialty } from "@/lib/avaliacao-funcional";
 import { buildMultiGuestAppointments } from "@/lib/multi-agenda";
@@ -558,13 +560,14 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [pauseReturnDate, setPauseReturnDate] = useState("");
   const [pauseKeepAgenda, setPauseKeepAgenda] = useState<boolean | null>(null);
   const [pauseSending, setPauseSending] = useState(false);
-  const [buscaByPatient, setBuscaByPatient] = useState<Map<number, PausedOverviewItem[]>>(new Map());
+  const [buscaByPatient, setBuscaByPatient] = useState<Map<number, BuscaAtivaCaso[]>>(new Map());
+  const [encaminharApt, setEncaminharApt] = useState<Appointment | null>(null);
   const refreshBusca = () => {
     listBuscaAtivaAtual().then(l => setBuscaByPatient(groupBuscaByPatient(l))).catch(() => { /* sem acesso */ });
   };
   useEffect(() => { refreshBusca(); }, []);
   const buscaTitle = (patientId: number) =>
-    (buscaByPatient.get(patientId) ?? []).map(i => `Busca Ativa (${i.specialty || i.professionalName}): ${i.pausedReason}`).join("\n") || "Busca Ativa";
+    (buscaByPatient.get(patientId) ?? []).map(i => `Busca Ativa: ${i.motivo}`).join("\n") || "Busca Ativa";
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
@@ -1043,7 +1046,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         // Fica na agenda: horários continuam reservados, só marcados como pausados.
         await pausePatientKeepAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
       } else {
-        // Sai da agenda do profissional (horário fica livre) e vai para "Pausados / Busca Ativa".
+        // Sai da agenda do profissional (horário fica livre) e vai para "Pausados".
         await pausePatientFromAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
       }
 
@@ -1053,8 +1056,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       toast({
         title: "⏸ Pausado",
         description: pauseKeepAgenda
-          ? `${pauseModal.patientName} continua na agenda (horário reservado) e aparece em Pausados / Busca Ativa.`
-          : `${pauseModal.patientName} saiu da agenda (horário livre) e está em Pausados / Busca Ativa.`,
+          ? `${pauseModal.patientName} continua na agenda (horário reservado) e aparece em Pausados.`
+          : `${pauseModal.patientName} saiu da agenda (horário livre) e está em Pausados.`,
       });
       refreshBusca();
       setPauseModal(null);
@@ -1073,27 +1076,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       await logNotificacao(apt, "Retorno de Pausa");
       fetchAppointments();
       refreshBusca();
-      toast({ title: "▶ Retornou aos atendimentos", description: `${apt.patientName} saiu da Busca Ativa e voltou para a agenda com status "Agendado".` });
+      toast({ title: "▶ Retornou aos atendimentos", description: `${apt.patientName} voltou para a agenda com status "Agendado".` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível retomar.", variant: "destructive" });
     }
   };
 
-  const handleReturnBusca = async (apt: Appointment) => {
-    setActionMenuId(null);
-    const items = buscaByPatient.get(apt.patientId) ?? [];
-    if (!items.length) return;
-    const lista = items.map(i => `• ${i.specialty || i.professionalName}: ${i.pausedReason}`).join("\n");
-    if (!confirm(`${apt.patientName} está em Busca Ativa:\n${lista}\n\nRetornar aos atendimentos? Ele sai da Busca Ativa (fica registrado no histórico).`)) return;
-    try {
-      for (const i of items) await retornarDaBuscaAtiva(i);
-      fetchAppointments();
-      refreshBusca();
-      toast({ title: "▶ Retornou aos atendimentos", description: `${apt.patientName} saiu da Busca Ativa.` });
-    } catch (err: any) {
-      toast({ title: "Erro", description: err?.message || "Não foi possível retornar.", variant: "destructive" });
-    }
-  };
 
   // ── Exclusão administrativa (sem vínculo clínico) ──
   const handleExcluirAdmin = (apt: Appointment) => {
@@ -2111,9 +2099,14 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
                                       {getStatusLabel(apptStatus(apt))}
                                     </span>
-                                    {(apt.paused || buscaByPatient.has(apt.patientId)) && (
-                                      <span title={buscaTitle(apt.patientId)} className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5 w-max">
-                                        <Snowflake className="w-2.5 h-2.5" /> Busca Ativa
+                                    {apt.paused && (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5 w-max">
+                                        <Snowflake className="w-2.5 h-2.5" /> Pausado
+                                      </span>
+                                    )}
+                                    {buscaByPatient.has(apt.patientId) && (
+                                      <span title={buscaTitle(apt.patientId)} className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-0.5 w-max">
+                                        <ShieldAlert className="w-2.5 h-2.5" /> Busca Ativa
                                       </span>
                                     )}
                                     {isDesmarcado && (
@@ -2319,16 +2312,14 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                           <Play className="w-3.5 h-3.5" /> Retornar aos atendimentos
                                         </button>
                                       ) : (
-                                        <>
-                                          {buscaByPatient.has(apt.patientId) && (
-                                            <button style={NEON.green} onClick={() => handleReturnBusca(apt)}>
-                                              <Play className="w-3.5 h-3.5" /> Retornar aos atendimentos
-                                            </button>
-                                          )}
-                                          <button style={NEON.cyan} onClick={() => handleOpenPauseModal(apt)}>
-                                            <Snowflake className="w-3.5 h-3.5" /> Pausar / Busca Ativa
-                                          </button>
-                                        </>
+                                        <button style={NEON.cyan} onClick={() => handleOpenPauseModal(apt)}>
+                                          <Snowflake className="w-3.5 h-3.5" /> Pausar atendimento
+                                        </button>
+                                      )}
+                                      {!buscaByPatient.has(apt.patientId) && (
+                                        <button style={NEON.red} onClick={() => { setActionMenuId(null); setEncaminharApt(apt); }}>
+                                          <ShieldAlert className="w-3.5 h-3.5" /> Encaminhar p/ Busca Ativa
+                                        </button>
                                       )}
 
                                       <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
@@ -2508,6 +2499,16 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       )}
 
       {/* ── Modal de Pausa Temporária ── */}
+      {encaminharApt && (
+        <EncaminharBuscaAtivaModal
+          patientId={encaminharApt.patientId}
+          patientName={encaminharApt.patientName || `#${encaminharApt.patientId}`}
+          specialty={professionals.find(p => p.id === encaminharApt.professionalId)?.specialty ?? selectedProf?.specialty ?? null}
+          professionalId={encaminharApt.professionalId}
+          onClose={() => setEncaminharApt(null)}
+          onDone={refreshBusca}
+        />
+      )}
       {pauseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,20,0.97)", border: "1px solid rgba(56,189,248,0.3)" }}>
@@ -2517,8 +2518,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   <Snowflake className="w-5 h-5" style={{ color: "#7dd3fc" }} />
                 </div>
                 <div>
-                  <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar / Busca Ativa</p>
-                  <p className="text-xs text-white/50">Vai para a lista Pausados / Busca Ativa</p>
+                  <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar atendimento</p>
+                  <p className="text-xs text-white/50">Vai para a lista Pausados</p>
                 </div>
               </div>
               <p className="text-sm text-white/80 mb-3">
@@ -2536,7 +2537,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                       style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #ef4444" }}
                     >
                       <span className="block text-sm font-bold" style={{ color: "#fca5a5" }}>Sai da agenda</span>
-                      <span className="block text-[11px] text-white/60">Libera o horário e vai para a Busca Ativa</span>
+                      <span className="block text-[11px] text-white/60">Libera o horário e vai para Pausados</span>
                     </button>
                     <button
                       type="button"
@@ -2562,7 +2563,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                     }}
                   >
                     <span className="text-sm font-bold" style={{ color: pauseKeepAgenda ? "#6ee7b7" : "#fca5a5" }}>
-                      {pauseKeepAgenda ? "Fica na agenda (horário reservado)" : "Sai da agenda → Busca Ativa"}
+                      {pauseKeepAgenda ? "Fica na agenda (horário reservado)" : "Sai da agenda → Pausados"}
                     </span>
                     <button type="button" className="text-[11px] text-white/60 underline hover:text-white" onClick={() => setPauseKeepAgenda(null)}>
                       trocar
