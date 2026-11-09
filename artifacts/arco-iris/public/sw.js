@@ -1,8 +1,38 @@
 // Service worker do NFs: deixa o sistema instalável e recebe os avisos da Agenda da Cláudia.
-// Não guarda nada em cache: tudo continua vindo da internet como hoje.
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
-self.addEventListener("fetch", () => {});
+// Só a Minha Agenda funciona sem internet: guarda a tela dela e os arquivos do app; o resto do sistema continua vindo da internet.
+const CACHE = "nfs-agenda-v1";
+const TELAS = ["/minha-agenda", "/agenda-claudia"];
+const ehTelaAgenda = (u) => TELAS.some((t) => u.pathname === t || u.pathname.startsWith(t + "/"));
+self.addEventListener("install", (e) => {
+  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then((c) => c.add("/minha-agenda")).catch(() => {}));
+});
+self.addEventListener("activate", (e) => e.waitUntil((async () => {
+  for (const k of await caches.keys()) if (k.startsWith("nfs-agenda-") && k !== CACHE) await caches.delete(k);
+  await self.clients.claim();
+})()));
+self.addEventListener("fetch", (e) => {
+  const req = e.request;
+  if (req.method !== "GET") return;
+  const u = new URL(req.url);
+  if (u.origin !== self.location.origin) return;
+  if (req.mode === "navigate") {
+    if (!ehTelaAgenda(u)) return;
+    // Com internet: sempre a versão nova (e guarda). Sem internet: a última guardada.
+    e.respondWith(fetch(req).then((r) => {
+      if (r.ok) { const c = r.clone(); void caches.open(CACHE).then((k) => k.put("/minha-agenda", c)); }
+      return r;
+    }).catch(async () => (await caches.match("/minha-agenda")) || Response.error()));
+    return;
+  }
+  // Arquivos do app (têm nome com versão): usa o guardado, se não tiver busca e guarda.
+  if (u.pathname.startsWith("/assets/") || u.pathname.startsWith("/icons/") || u.pathname.endsWith(".webmanifest")) {
+    e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((r) => {
+      if (r.ok) { const c = r.clone(); void caches.open(CACHE).then((k) => k.put(req, c)); }
+      return r;
+    })));
+  }
+});
 
 self.addEventListener("push", (e) => {
   let d = {};
