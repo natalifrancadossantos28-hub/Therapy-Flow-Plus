@@ -412,7 +412,7 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
   const pendHoje = deHoje.filter((c) => !c.concluido);
   return (
     <>
-      <header className="flex items-center justify-between gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <Titulo nome={dona} />
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={onLetra} aria-label={`Tamanho das letras: ${letra}%. Toque para mudar`} className="grid place-items-center w-11 h-11 rounded-full agx-card border border-white/15 font-bold leading-none">
@@ -425,12 +425,12 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
         </div>
       </header>
 
-      <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-        <div className="min-w-0 border-l-2 border-sky-400/80 pl-3">
+      <section className="flex flex-wrap items-center gap-3">
+        <div className="min-w-[14rem] flex-1 border-l-2 border-sky-400/80 pl-3">
           <p className="text-[1.9rem] sm:text-4xl font-bold leading-tight tracking-tight">{saudacao}</p>
           <p className="text-base text-white/80 mt-1">{restantesHoje > 0 ? `Você ainda tem ${restantesHoje} ${restantesHoje === 1 ? "compromisso" : "compromissos"} hoje.` : "Sua agenda está organizada e pronta para o seu dia."}</p>
         </div>
-        <div className={`${glass} !p-3 min-w-[6.5rem] text-center agx-brilho whitespace-nowrap`}>
+        <div className={`${glass} !p-3 min-w-[6.5rem] shrink-0 text-center agx-brilho whitespace-nowrap`}>
           <p className="text-xs font-semibold tracking-wider uppercase text-white/80">{format(d, "EEEE", { locale: ptBR })}</p>
           <p className="text-4xl font-bold leading-none my-1 tabular-nums">{format(d, "dd")}</p>
           <p className="text-[0.8rem] font-medium uppercase text-violet-200">{format(d, "MMM", { locale: ptBR })} | {format(d, "yyyy")}</p>
@@ -508,8 +508,8 @@ function MenuInferior({ aba, setAba }: { aba: Aba; setAba: (a: Aba) => void }) {
       <div className="agx-card mx-auto max-w-xl grid grid-cols-5 gap-1 rounded-3xl border border-white/10 p-1.5 shadow-[0_-6px_30px_rgba(0,0,0,.4)]" style={{ background: "rgba(10,16,48,.88)" }}>
         {itens.map(([id, t, ic]) => (
           <button key={id} onClick={() => setAba(id)} aria-current={aba === id ? "page" : undefined}
-            className={`h-14 rounded-2xl flex flex-col items-center justify-center gap-1 text-[0.8rem] font-medium transition ${aba === id ? "bg-gradient-to-br from-sky-500 to-violet-600 text-white shadow-lg" : "text-white/70"}`}>
-            {ic}{t}
+            className={`h-14 min-w-0 px-0.5 rounded-2xl flex flex-col items-center justify-center gap-1 text-[12px] leading-none font-medium transition ${aba === id ? "bg-gradient-to-br from-sky-500 to-violet-600 text-white shadow-lg" : "text-white/70"}`}>
+            {ic}<span className="max-w-full truncate">{t}</span>
           </button>
         ))}
       </div>
@@ -1065,7 +1065,8 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     }
     setDica("Não entendi. Fale de novo, por exemplo: “festa de aniversário da Ana sábado às 8 da noite”.");
   };
-  const usarGravador = gravadorSuportado() && (ehIOS() || !Rec);
+  // No app Android (WebView) o reconhecimento do navegador não funciona: grava e manda para a IA.
+  const usarGravador = gravadorSuportado() && (ehIOS() || ehAppNativo() || !Rec);
   const mandarAudio = async (blob: Blob) => {
     if (blob.size < 1500) { setDica("Não ouvi nada. Toque e fale de novo."); return; }
     setPensando(true); setDica("");
