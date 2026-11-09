@@ -73,15 +73,15 @@ async function chamar(modelo, chave, partes, ate) {
 
 // Para não deixar a pessoa esperando: começa no modelo principal e, se ele não responder em 2,5 s
 // (ou der erro), já dispara o próximo em paralelo. Vale a primeira resposta boa.
-function perguntar(chave, partes) {
+function perguntar(chave, partes, modelos = MODELOS) {
   const ate = Date.now() + 25_000;
   return new Promise((ok, falha) => {
     let i = 0, rodando = 0, acabou = false, ultimo = "", timer = null;
     const proximo = () => {
       if (acabou) return;
       clearTimeout(timer);
-      if (i >= MODELOS.length || Date.now() > ate - 2_000) { if (!rodando) { acabou = true; falha(new Error(ultimo || "IA indisponível")); } return; }
-      const modelo = MODELOS[i++]; rodando++;
+      if (i >= modelos.length || Date.now() > ate - 2_000) { if (!rodando) { acabou = true; falha(new Error(ultimo || "IA indisponível")); } return; }
+      const modelo = modelos[i++]; rodando++;
       chamar(modelo, chave, partes, ate).then((r) => { if (!acabou) { acabou = true; clearTimeout(timer); ok(r); } })
         .catch((e) => { ultimo = String(e?.message ?? e); rodando--; proximo(); });
       timer = setTimeout(proximo, 2_500);
@@ -96,7 +96,7 @@ const txtOk = (s, n) => (typeof s === "string" && s.trim() ? s.trim().slice(0, n
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "use POST" });
-  const { token, audio, mime, texto, compromissos } = req.body ?? {};
+  const { token, audio, mime, texto, compromissos, confirmando } = req.body ?? {};
   if (typeof token !== "string" || token.length < 20) return res.status(401).json({ error: "sessão inválida" });
   if (!audio && !txtOk(texto, 600)) return res.status(400).json({ error: "nada para entender" });
   if (audio && (typeof audio !== "string" || audio.length > 4_000_000)) return res.status(413).json({ error: "áudio grande demais" });
@@ -113,10 +113,14 @@ export default async function handler(req, res) {
   const lista = (Array.isArray(compromissos) ? compromissos : []).slice(0, 150).map((c) => ({
     id: Number(c?.id), data: dataOk(c?.data), hora: horaOk(c?.hora?.slice?.(0, 5)), titulo: txtOk(c?.titulo, 80) ?? "",
   })).filter((c) => Number.isFinite(c.id) && c.data);
-  const partes = [{ text: instrucoes(lista, Boolean(audio), txtOk(texto, 600)) }];
+  const aviso = confirmando === true
+    ? "\nATENÇÃO: já existe um compromisso na tela esperando confirmação. Se a pessoa só disser algo como \"salvar\", \"sim\", \"pode\", \"confirma\", \"isso\", \"tá certo\", responda acao \"comando\" com comando \"salvar\" (\"cancelar\"/\"não\" → \"cancelar\"; \"corrigir\"/\"errado\" → \"corrigir\"). Se falar um compromisso novo, interprete normalmente.\n"
+    : "";
+  const partes = [{ text: instrucoes(lista, Boolean(audio), txtOk(texto, 600)) + aviso }];
   if (audio) partes.push({ inline_data: { mime_type: (typeof mime === "string" && mime.split(";")[0]) || "audio/mp4", data: audio } });
 
-  const ia = perguntar(chave, partes);
+  // Na confirmação a frase é curta ("salvar"): começa pelo modelo mais leve, que responde bem mais rápido.
+  const ia = perguntar(chave, partes, confirmando === true ? [...new Set(["gemini-2.5-flash-lite", ...MODELOS])] : MODELOS);
   ia.catch(() => {});
   if (!(await sessaoOk)) return res.status(401).json({ error: "sessão inválida" });
   try {

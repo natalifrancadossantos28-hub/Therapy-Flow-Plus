@@ -95,7 +95,7 @@ function proximos(lista: AgxCompromisso[]) {
   return lista.filter((c) => !c.concluido && c.data >= de && c.data <= ate).slice(0, 80);
 }
 
-export async function entenderVoz(entrada: { texto?: string; audio?: Blob }, lista: AgxCompromisso[]): Promise<VozIA> {
+export async function entenderVoz(entrada: { texto?: string; audio?: Blob; confirmando?: boolean }, lista: AgxCompromisso[]): Promise<VozIA> {
   const token = getSessao()?.token;
   if (!token) throw Object.assign(new Error("Entre com seu PIN."), { code: "28P01" });
   const audio = entrada.audio ? await paraWav(entrada.audio) : undefined;
@@ -103,7 +103,7 @@ export async function entenderVoz(entrada: { texto?: string; audio?: Blob }, lis
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      token, texto: entrada.texto, audio, mime: audio ? "audio/wav" : undefined,
+      token, texto: entrada.texto, audio, confirmando: entrada.confirmando === true, mime: audio ? "audio/wav" : undefined,
       compromissos: proximos(lista).map((c) => ({ id: c.id, data: c.data, hora: c.hora, titulo: c.titulo })),
     }),
   });
