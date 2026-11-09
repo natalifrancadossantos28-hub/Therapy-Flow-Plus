@@ -264,9 +264,14 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
     const de = [ISO(addDays(startOfMonth(mes), -7)), ISO(addDays(new Date(), -30))].sort()[0];
     const ate = [ISO(addDays(endOfMonth(mes), 40)), ISO(addDays(new Date(), 14))].sort()[1];
     api.listar(de, ate).then((l) => {
-      setLista(l); setErroGeral("");
+      setLista(l); setErroGeral(""); api.guardarOffline(sessao.dona.id, l);
       if (isSameMonth(mes, new Date())) void sincronizarNativo(sessao.token, l).catch(() => {});
-    }).catch((e) => { if (api.sessaoInvalida(e)) onSair(); else setErroGeral(erroTxt(e)); });
+    }).catch((e) => {
+      if (api.sessaoInvalida(e)) { onSair(); return; }
+      const off = api.lerOffline(sessao.dona.id);
+      if (off) { setLista((atual) => (atual.length ? atual : off.lista)); setErroGeral(`Sem internet. Mostrando a agenda salva no celular (${format(new Date(off.em), "dd/MM 'às' HH:mm")}).`); }
+      else setErroGeral(erroTxt(e));
+    });
   }, [mes, onSair, sessao.token]);
   useEffect(carregar, [carregar]);
   useEffect(() => { const t = window.setInterval(carregar, 60_000); return () => window.clearInterval(t); }, [carregar]);
@@ -307,7 +312,7 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
 
       {aba === "inicio" && <Inicio sessao={sessao} dona={dona} hoje={hoje} deHoje={deHoje} restantesHoje={restantesHoje} proximo={proximo}
         mes={mes} setMes={setMes} doDia={doDia} lista={lista}
-        onAba={setAba} onNovo={() => setForm(novo(hoje))} onCategorias={() => setFolha("categorias")} onAbrir={setForm} onDia={abrirDia} onFalar={irFalar} letra={aparencia.ap.letra ?? APARENCIA_PADRAO.letra}
+        onAba={setAba} onNovo={(dt?: string) => setForm(novo(dt ?? hoje))} onCategorias={() => setFolha("categorias")} onAbrir={setForm} onDia={abrirDia} onFalar={irFalar} letra={aparencia.ap.letra ?? APARENCIA_PADRAO.letra}
         onLetra={() => { const l = aparencia.ap.letra ?? APARENCIA_PADRAO.letra; aparencia.mudar({ letra: l < 112 ? 112 : l < 125 ? 125 : l < 140 ? 140 : 100 }); }} />}
 
       {aba === "agenda" && (
@@ -404,12 +409,22 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
   letra: number; onLetra: () => void;
   sessao: AgxSessao; dona: string; hoje: string; deHoje: AgxCompromisso[]; restantesHoje: number; proximo: AgxCompromisso | null;
   mes: Date; setMes: (d: Date) => void; doDia: (d: string) => AgxCompromisso[]; lista: AgxCompromisso[];
-  onAba: (a: Aba) => void; onNovo: () => void; onCategorias: () => void; onAbrir: (c: AgxCompromisso) => void; onDia: (d: string) => void; onFalar: () => void;
+  onAba: (a: Aba) => void; onNovo: (data?: string) => void; onCategorias: () => void; onAbrir: (c: AgxCompromisso) => void; onDia: (d: string) => void; onFalar: () => void;
 }) {
   const h = new Date().getHours();
   const saudacao = `${h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"}, ${primeiroNome(sessao.usuario.nome)}!`;
   const d = new Date();
-  const pendHoje = deHoje.filter((c) => !c.concluido);
+  void deHoje; void proximo;
+  // Tocar num dia do calendário mostra os compromissos desse dia no quadro roxo de cima.
+  const [sel, setSel] = useState(hoje);
+  const quadro = useRef<HTMLElement | null>(null);
+  const escolherDia = (dia: string) => {
+    setSel(dia);
+    const r = quadro.current?.getBoundingClientRect();
+    if (r && r.top < 0) quadro.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const doSel = doDia(sel).slice().sort((a, b) => Number(a.concluido) - Number(b.concluido) || (a.hora ?? "99").localeCompare(b.hora ?? "99"));
+  const titSel = sel === hoje ? "Hoje" : rotuloDia(sel, hoje);
   return (
     <>
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -437,47 +452,37 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
         </div>
       </section>
 
-      <button onClick={() => (proximo ? onAbrir(proximo) : onNovo())} className={`${glass} agx-brilho w-full flex items-center gap-3 text-left !bg-gradient-to-r from-violet-600/45 to-sky-600/25`}>
-        <span className="grid place-items-center w-12 h-12 rounded-2xl bg-white/10 shrink-0"><CalendarCheck size={24} /></span>
-        <span className="flex-1 min-w-0">
-          <span className="block text-sm text-white/75">Próximo compromisso</span>
-          {proximo ? <>
-            <span className="block text-lg font-semibold leading-snug break-words">{proximo.titulo}</span>
-            <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/80">
-              <span className="inline-flex items-center gap-1"><Clock size={14} />{rotuloDia(proximo.data, hoje)}, {horaTxt(proximo.hora)}</span>
-              {proximo.local && <span className="inline-flex items-center gap-1 min-w-0"><MapPin size={14} className="shrink-0" />{proximo.local}</span>}
-              {proximo.categoria === "urgente" && <span className="rounded-full px-2 py-0.5 text-xs bg-rose-500/35">Urgente</span>}
-            </span>
-          </> : <span className="block text-base font-semibold">Nenhum compromisso marcado. Toque para criar.</span>}
-        </span>
-        <ChevronRight size={20} className="text-white/60 shrink-0" />
-      </button>
-
-      <section className="grid grid-cols-1 gap-3">
-        <div className={`${glass} !p-3`}><Mes mes={mes} setMes={setMes} diaSel={hoje} onDia={onDia} doDia={doDia} hoje={hoje} /></div>
-        <div className={`${glass} !p-3 flex flex-col`}>
-          <p className="flex items-center gap-1.5 text-base font-semibold"><CalendarCheck size={16} /> Hoje</p>
-          <p className="text-sm text-sky-300 mb-2 whitespace-nowrap">{pendHoje.length} {pendHoje.length === 1 ? "compromisso" : "compromissos"}</p>
-          {pendHoje.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-2">
-              <span className="grid place-items-center w-12 h-12 rounded-full border border-violet-300/60 agx-brilho"><Check size={22} /></span>
-              <p className="text-sm text-white/80 leading-snug">Você está livre hoje! Aproveite seu tempo.</p>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {pendHoje.slice(0, 4).map((c) => (
-                <button key={c.id} onClick={() => onAbrir(c)} className="w-full text-left rounded-xl bg-white/[0.06] px-3 py-2 border-l-4 flex items-baseline gap-3" style={{ borderColor: categoria(c.categoria).cor }}>
-                  <span className="text-base font-semibold text-sky-200 tabular-nums shrink-0">{horaTxt(c.hora)}</span>
-                  <span className="text-base font-semibold leading-snug line-clamp-2">{c.titulo}</span>
-                </button>
-              ))}
-              {pendHoje.length > 4 && <button onClick={() => onDia(hoje)} className="text-xs text-sky-300 underline">+ {pendHoje.length - 4} no dia</button>}
-            </div>
-          )}
+      <section ref={quadro} aria-live="polite" className={`${glass} agx-brilho w-full !bg-gradient-to-r from-violet-600/45 to-sky-600/25 scroll-mt-4`}>
+        <div className="flex items-center gap-3">
+          <span className="grid place-items-center w-12 h-12 rounded-2xl bg-white/10 shrink-0"><CalendarCheck size={24} /></span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-xl font-bold leading-tight">{titSel}</span>
+            <span className="block text-base text-white/80 first-letter:uppercase">{dataLonga(sel)}</span>
+          </span>
         </div>
+        {doSel.length === 0 ? (
+          <button onClick={() => onNovo(sel)} className="mt-3 w-full rounded-2xl bg-white/10 border border-white/15 px-4 py-3 text-left text-lg font-semibold flex items-center gap-2">
+            <Plus size={22} className="shrink-0" /> Nada marcado neste dia. Toque para marcar.
+          </button>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {doSel.map((c) => (
+              <button key={c.id} onClick={() => onAbrir(c)} className={`w-full text-left rounded-2xl bg-white/10 px-3 py-2.5 border-l-4 flex items-baseline gap-3 ${c.concluido ? "opacity-60" : ""}`} style={{ borderColor: categoria(c.categoria).cor }}>
+                <span className="text-lg font-bold text-sky-200 tabular-nums shrink-0">{horaTxt(c.hora)}</span>
+                <span className="min-w-0 text-lg font-semibold leading-snug break-words">{c.concluido && <Check size={16} className="inline mr-1" />}{c.titulo}{c.local && <span className="block text-sm font-normal text-white/75">{c.local}</span>}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {sel !== hoje && <button onClick={() => setSel(hoje)} className="mt-3 text-base font-semibold text-sky-200 underline">Voltar para hoje</button>}
       </section>
 
-      <button onClick={onNovo} className={`${glass} w-full !py-3 flex items-center justify-center gap-2 text-lg font-semibold`}><Plus size={22} /> Novo compromisso</button>
+      <div className={`${glass} !p-3`}>
+        <p className="text-base text-white/80 mb-2 text-center">Toque num dia para ver os compromissos</p>
+        <Mes mes={mes} setMes={setMes} diaSel={sel} onDia={escolherDia} doDia={doDia} hoje={hoje} />
+      </div>
+
+      <button onClick={() => onNovo(sel)} className={`${glass} w-full !py-3 flex items-center justify-center gap-2 text-lg font-semibold`}><Plus size={22} /> Novo compromisso</button>
       <BarraMicrofone onClick={onFalar} />
       {lista.length === 0 && <p className="text-center text-xs text-white/50">Carregando sua agenda…</p>}
     </>
@@ -945,7 +950,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
   const [salvo, setSalvo] = useState("");
   const [podeInstalar, setPodeInstalar] = useState(() => Boolean(installEvt));
   const rec = useRef<Reconhecedor | null>(null);
-  const [lista, setLista] = useState<AgxCompromisso[]>([]);
+  const [lista, setLista] = useState<AgxCompromisso[]>(() => api.lerOffline(sessao.dona.id)?.lista ?? []);
   const [outra, setOutra] = useState<{ acao: "desmarcar" | "remarcar" | "concluir"; alvo: AgxCompromisso; data: string; hora: string | null } | null>(null);
   const [extra, setExtra] = useState<{ observacao: string | null; antecedenciaMin: number | null }>({ observacao: null, antecedenciaMin: null });
   const [pensando, setPensando] = useState(false);
