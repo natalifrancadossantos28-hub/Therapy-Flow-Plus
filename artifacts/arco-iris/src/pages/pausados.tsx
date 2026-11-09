@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Snowflake, Clock, Play, Search, RefreshCw, Phone, CircleDot, Loader2, CheckCircle2, XCircle, MessageSquare, Printer, History } from "lucide-react";
-import { printBuscaAtivaReport } from "@/lib/print-busca-ativa";
 import { buscaStatusLabel } from "@/lib/busca-ativa";
 import { Card, Button, Badge, Input } from "@/components/ui-custom";
 import { useToast } from "@/hooks/use-toast";
@@ -70,9 +69,8 @@ export default function PausadosPage() {
     const q = search.trim().toLowerCase();
     return items
       .filter(i => !specFilter || i.specialty === specFilter)
-      .filter(i => !buscaFilter || buscaOf(i) === buscaFilter)
       .filter(i => !q || i.patientName.toLowerCase().includes(q) || (i.prontuario || "").toLowerCase().includes(q))
-      // Igual à fila de espera: 1º é quem entrou primeiro na busca ativa.
+      // Igual à fila de espera: 1º é quem pausou primeiro.
       .sort((a, b) => (a.pausedAt || "").localeCompare(b.pausedAt || ""));
   }, [items, search, specFilter, buscaFilter]);
 
@@ -135,19 +133,16 @@ export default function PausadosPage() {
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold font-display flex items-center gap-2">
-            <Snowflake className="w-7 h-7 text-sky-400" /> Pausados / Busca Ativa
+            <Snowflake className="w-7 h-7 text-sky-400" /> Pausados
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Pacientes pausados pela fila ou pela agenda. Aqui fica o motivo, se saiu ou ficou na agenda, a previsão de retorno e o acompanhamento da busca ativa (Pendente, Em andamento, Resolvido, Não resolvido).
+            Pacientes com o atendimento pausado pelo profissional ou pela fila (ex.: mãe vai ganhar bebê, internação). Aqui fica o motivo, se ficou na agenda e a previsão de retorno. Casos para a assistente social ficam em <Link href="/busca-ativa" className="underline font-semibold">Busca Ativa</Link>.
             Vencido o prazo, o paciente volta sozinho para a Fila de Espera da especialidade.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => printBuscaAtivaReport(filtered, [specFilter, buscaFilter && buscaStatusLabel(buscaFilter)].filter(Boolean).join(" · "))} className="gap-2">
-            <Printer className="w-4 h-4" /> Imprimir relatório
-          </Button>
           <Button variant="outline" onClick={() => setShowHist(v => !v)} className="gap-2">
-            <History className="w-4 h-4" /> Já passaram ({hist.length})
+            <History className="w-4 h-4" /> Já retornaram ({hist.length})
           </Button>
           <Button variant="outline" onClick={load} disabled={loading} className="gap-2">
             <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} /> Atualizar
@@ -161,15 +156,6 @@ export default function PausadosPage() {
         <Card className="p-4 border-red-500/30"><p className="text-xs uppercase text-muted-foreground">Prazo vencido</p><p className="text-3xl font-bold text-red-400">{overdueCount}</p></Card>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        <span className="text-xs uppercase text-muted-foreground font-bold self-center mr-1">Busca ativa:</span>
-        <Button size="sm" variant={buscaFilter ? "outline" : "default"} onClick={() => setBuscaFilter("")}>Todos ({items.length})</Button>
-        {BUSCA_STATUS.map(b => (
-          <Button key={b.v} size="sm" variant={buscaFilter === b.v ? "default" : "outline"} onClick={() => setBuscaFilter(b.v)}>
-            {b.label} ({items.filter(i => buscaOf(i) === b.v).length})
-          </Button>
-        ))}
-      </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -199,15 +185,14 @@ export default function PausadosPage() {
                 <th className="px-5 py-3">Motivo</th>
                 <th className="px-5 py-3">Pausado em</th>
                 <th className="px-5 py-3">Retorno previsto</th>
-                <th className="px-5 py-3">Busca ativa</th>
                 <th className="px-5 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading && items.length === 0 ? (
-                <tr><td colSpan={10} className="px-5 py-10 text-center text-muted-foreground">Carregando…</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-muted-foreground">Carregando…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={10} className="px-5 py-10 text-center text-muted-foreground">Nenhum paciente pausado{search || specFilter ? " com esse filtro" : ""}.</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-muted-foreground">Nenhum paciente pausado{search || specFilter ? " com esse filtro" : ""}.</td></tr>
               ) : filtered.map((item, idx) => {
                 const d = daysUntil(item.pausedReturnDate);
                 const overdue = item.returnOverdue || (d !== null && d < 0);
@@ -247,29 +232,6 @@ export default function PausadosPage() {
                         </span>
                       ) : <span className="text-muted-foreground">sem prazo</span>}
                     </td>
-                    <td className="px-5 py-3 min-w-[260px]">
-                      <div className="inline-flex flex-wrap rounded-lg border border-border overflow-hidden text-xs">
-                        {BUSCA_STATUS.map((b, idx) => {
-                          const Icon = b.icon;
-                          const active = buscaOf(item) === b.v;
-                          return (
-                            <button key={b.v} type="button" title={`Marcar como ${b.label.toLowerCase()}`}
-                              disabled={savingKey === keyOf(item)}
-                              onClick={() => !active && updateBusca(item, b.v, item.buscaObs ?? null)}
-                              className={cn("inline-flex items-center gap-1 px-2 py-1.5 font-semibold transition-colors", idx > 0 && "border-l border-border", active ? b.on : "hover:bg-secondary/70 text-muted-foreground")}>
-                              <Icon className="w-3.5 h-3.5" /> {b.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <button type="button" onClick={() => editObs(item)} className="mt-1.5 flex items-start gap-1 text-xs text-left text-muted-foreground hover:text-foreground">
-                        <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                        <span>{item.buscaObs || "Adicionar observação"}</span>
-                      </button>
-                      {item.buscaUpdatedAt && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">Atualizado em {formatDate(item.buscaUpdatedAt)}</p>
-                      )}
-                    </td>
                     <td className="px-5 py-3 text-right">
                       <Button size="sm" variant="outline" className="gap-1 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
                         disabled={busyId === item.id} onClick={() => handleResume(item)}>
@@ -287,8 +249,8 @@ export default function PausadosPage() {
       {showHist && (
         <Card className="overflow-hidden">
           <div className="px-5 py-3 border-b border-border">
-            <h2 className="font-bold flex items-center gap-2"><History className="w-4 h-4" /> Já passaram pela Busca Ativa</h2>
-            <p className="text-xs text-muted-foreground">Pacientes que retornaram ou saíram, com o motivo da busca ativa.</p>
+            <h2 className="font-bold flex items-center gap-2"><History className="w-4 h-4" /> Já retornaram da pausa</h2>
+            <p className="text-xs text-muted-foreground">Pacientes que retornaram ou saíram, com o motivo da pausa.</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -296,7 +258,7 @@ export default function PausadosPage() {
                 <tr>
                   <th className="px-5 py-3">Paciente</th>
                   <th className="px-5 py-3">Especialidade</th>
-                  <th className="px-5 py-3">Motivo da busca ativa</th>
+                  <th className="px-5 py-3">Motivo da pausa</th>
                   <th className="px-5 py-3">Período</th>
                   <th className="px-5 py-3">Situação</th>
                   <th className="px-5 py-3">Como saiu</th>

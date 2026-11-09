@@ -44,6 +44,7 @@ import { ABC_AREAS, ABC_AREA_MAX, ABC_TOTAL_MAX, ABC_NIVEL_INFO, printAbcCheckli
 import { getProfessionalSession } from "@/lib/portal-session";
 import { useBuscaAtivaPaciente } from "@/lib/busca-ativa";
 import { BuscaAtivaPacienteCard } from "@/components/BuscaAtivaPacienteCard";
+import { EncaminharBuscaAtivaModal } from "@/components/EncaminharBuscaAtivaModal";
 import { AvaliacaoSociofamiliarCard, AvaliacaoSociofamiliarForm } from "@/components/AvaliacaoSociofamiliar";
 import { PrioridadeClinicaCard, PrioridadeClinicaForm } from "@/components/PrioridadeClinica";
 import { TriagemValidacaoPanel } from "@/components/TriagemValidacao";
@@ -357,6 +358,7 @@ export default function PatientDetail() {
   };
 
   const busca = useBuscaAtivaPaciente(patientId);
+  const [encaminharBusca, setEncaminharBusca] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -661,7 +663,7 @@ export default function PatientDetail() {
             </h1>
             <Badge className={getStatusColor(patient.status)}>{patient.status}</Badge>
             {busca.current.length > 0 && (
-              <Badge className="bg-sky-500/20 text-sky-400 border border-sky-500/40">❄ Em Busca Ativa</Badge>
+              <Badge className="bg-rose-500/20 text-rose-400 border border-rose-500/40">Em Busca Ativa</Badge>
             )}
             {isCensoMunicipal && (
               <Badge className="bg-violet-100 text-violet-800 border-violet-300">🏛️ Censo Municipal PCD</Badge>
@@ -1182,6 +1184,19 @@ export default function PatientDetail() {
 
         <div className="space-y-6">
           <BuscaAtivaPacienteCard current={busca.current} history={busca.history} />
+          {busca.current.length === 0 && (
+            <Button variant="outline" onClick={() => setEncaminharBusca(true)} className="w-full gap-2 border-rose-500/40 text-rose-400 hover:bg-rose-500/10">
+              <ShieldOff className="w-4 h-4" /> Encaminhar para Busca Ativa
+            </Button>
+          )}
+          {encaminharBusca && (
+            <EncaminharBuscaAtivaModal
+              patientId={patientId}
+              patientName={patient.name}
+              onClose={() => setEncaminharBusca(false)}
+              onDone={busca.reload}
+            />
+          )}
           <Card className={cn("p-6 border-2 transition-colors", hasWarning ? "border-rose-400 bg-rose-50/10" : "border-transparent")}>
             <div className="flex items-center gap-3 mb-6">
               <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", hasWarning ? "bg-rose-200 text-rose-600" : "bg-secondary text-foreground")}>

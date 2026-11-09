@@ -2316,7 +2316,7 @@ export async function resumePatientAgendaPause(
   return data as { ok: boolean; appointmentsResumed: number };
 }
 
-export type BuscaAtivaStatus = 'pendente' | 'em_andamento' | 'resolvido' | 'nao_resolvido';
+export type BuscaAtivaStatus = 'pendente' | 'em_andamento' | 'resolvido' | 'nao_resolvido' | 'finalizado';
 
 export async function setBuscaAtivaStatus(
   source: 'fila' | 'agenda',
@@ -2403,6 +2403,81 @@ export async function listPausedOverview(): Promise<{ fila: PausedOverviewItem[]
   if (error) throw error;
   const result = data as { fila: PausedOverviewItem[]; agenda: PausedOverviewItem[] };
   return result;
+}
+
+export type BuscaAtivaCaso = {
+  id: number;
+  patientId: number;
+  patientName: string;
+  prontuario: string | null;
+  patientPhone: string | null;
+  address: string | null;
+  guardianName: string | null;
+  specialty: string | null;
+  professionalId: number | null;
+  professionalName: string | null;
+  motivo: string;
+  encaminhadoPor: string | null;
+  origem: 'encaminhamento' | 'pausa';
+  status: BuscaAtivaStatus;
+  obs: string | null;
+  createdAt: string;
+  updatedAt: string;
+  finalizadoAt: string | null;
+  saida: string | null;
+};
+
+export async function listBuscaAtivaCasos(patientId?: number | null): Promise<BuscaAtivaCaso[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_busca_ativa_casos", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: patientId ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as BuscaAtivaCaso[];
+}
+
+export async function openBuscaAtivaCaso(params: {
+  patientId: number;
+  motivo: string;
+  specialty?: string | null;
+  professionalId?: number | null;
+  encaminhadoPor?: string | null;
+}): Promise<{ ok: boolean; id: number }> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("open_busca_ativa_caso", {
+    p_slug: slug,
+    p_password: password,
+    p_patient_id: params.patientId,
+    p_motivo: params.motivo,
+    p_specialty: params.specialty ?? null,
+    p_professional_id: params.professionalId ?? null,
+    p_encaminhado_por: params.encaminhadoPor ?? null,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; id: number };
+}
+
+export async function updateBuscaAtivaCaso(
+  id: number,
+  status: BuscaAtivaStatus,
+  obs?: string | null,
+  saida?: string | null
+): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("update_busca_ativa_caso", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_status: status,
+    p_obs: obs ?? null,
+    p_saida: saida ?? null,
+  });
+  if (error) throw error;
 }
 
 // ── Salas (Gestão Inteligente de Salas) ─────────────────────────────────────
