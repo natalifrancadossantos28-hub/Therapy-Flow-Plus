@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { Snowflake, Clock, Play, Search, RefreshCw, Phone, CircleDot, Loader2, CheckCircle2, XCircle, MessageSquare, Printer, History } from "lucide-react";
+import { Snowflake, Clock, Play, Search, RefreshCw, Phone, CircleDot, Loader2, CheckCircle2, XCircle, MessageSquare, Printer, History, Archive, RotateCcw } from "lucide-react";
 import { printBuscaAtivaReport } from "@/lib/print-busca-ativa";
 import { buscaStatusLabel } from "@/lib/busca-ativa";
 import { Card, Button, Badge, Input } from "@/components/ui-custom";
@@ -66,15 +66,29 @@ export default function PausadosPage() {
     [items]
   );
 
+  const finalizados = useMemo(() => items.filter(i => buscaOf(i) === "finalizado"), [items]);
+  const ativos = useMemo(() => items.filter(i => buscaOf(i) !== "finalizado"), [items]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return items
+    return (buscaFilter === "finalizado" ? finalizados : ativos)
       .filter(i => !specFilter || i.specialty === specFilter)
       .filter(i => !buscaFilter || buscaOf(i) === buscaFilter)
       .filter(i => !q || i.patientName.toLowerCase().includes(q) || (i.prontuario || "").toLowerCase().includes(q))
       // Igual à fila de espera: 1º é quem entrou primeiro na busca ativa.
       .sort((a, b) => (a.pausedAt || "").localeCompare(b.pausedAt || ""));
-  }, [items, search, specFilter, buscaFilter]);
+  }, [ativos, finalizados, search, specFilter, buscaFilter]);
+
+  const finalizar = (item: PausedOverviewItem) => {
+    const obs = prompt(
+      `Finalizar a busca ativa de ${item.patientName} (${item.specialty || "—"})?\n\nEle sai desta lista, mas a fila e a agenda NÃO mudam.\nObservação final (opcional):`,
+      item.buscaObs || ""
+    );
+    if (obs === null) return;
+    updateBusca(item, "finalizado", obs.trim() || null).then(() =>
+      listBuscaAtivaHistorico().then(setHist).catch(() => {})
+    );
+  };
 
   const overdueCount = items.filter(i => i.returnOverdue).length;
   const nearCount = items.filter(i => { const d = daysUntil(i.pausedReturnDate); return d !== null && d >= 0 && d <= 7; }).length;
@@ -163,12 +177,15 @@ export default function PausadosPage() {
 
       <div className="flex flex-wrap gap-1.5">
         <span className="text-xs uppercase text-muted-foreground font-bold self-center mr-1">Busca ativa:</span>
-        <Button size="sm" variant={buscaFilter ? "outline" : "default"} onClick={() => setBuscaFilter("")}>Todos ({items.length})</Button>
+        <Button size="sm" variant={buscaFilter ? "outline" : "default"} onClick={() => setBuscaFilter("")}>Todos ({ativos.length})</Button>
         {BUSCA_STATUS.map(b => (
           <Button key={b.v} size="sm" variant={buscaFilter === b.v ? "default" : "outline"} onClick={() => setBuscaFilter(b.v)}>
-            {b.label} ({items.filter(i => buscaOf(i) === b.v).length})
+            {b.label} ({ativos.filter(i => buscaOf(i) === b.v).length})
           </Button>
         ))}
+        <Button size="sm" variant={buscaFilter === "finalizado" ? "default" : "outline"} onClick={() => setBuscaFilter("finalizado")} className="gap-1">
+          <Archive className="w-3.5 h-3.5" /> Finalizadas ({finalizados.length})
+        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -270,8 +287,19 @@ export default function PausadosPage() {
                         <p className="text-[10px] text-muted-foreground mt-0.5">Atualizado em {formatDate(item.buscaUpdatedAt)}</p>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-right">
-                      <Button size="sm" variant="outline" className="gap-1 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                    <td className="px-5 py-3 text-right space-y-1.5">
+                      {buscaOf(item) === "finalizado" ? (
+                        <Button size="sm" variant="outline" className="gap-1 w-full"
+                          disabled={savingKey === keyOf(item)} onClick={() => updateBusca(item, "pendente", item.buscaObs ?? null)}>
+                          <RotateCcw className="w-3.5 h-3.5" /> Reabrir busca
+                        </Button>
+                      ) : (
+                        <Button size="sm" className="gap-1 w-full bg-sky-600 hover:bg-sky-500 text-white"
+                          disabled={savingKey === keyOf(item)} onClick={() => finalizar(item)}>
+                          <Archive className="w-3.5 h-3.5" /> Finalizar e tirar da lista
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" className="gap-1 w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
                         disabled={busyId === item.id} onClick={() => handleResume(item)}>
                         <Play className="w-3.5 h-3.5" /> Retornar aos atendimentos
                       </Button>

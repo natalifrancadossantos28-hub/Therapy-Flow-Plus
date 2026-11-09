@@ -14,6 +14,7 @@ export const BUSCA_STATUS_LABEL: Record<BuscaAtivaStatus, string> = {
   em_andamento: "Em andamento",
   resolvido: "Resolvido",
   nao_resolvido: "Não resolvido",
+  finalizado: "Finalizada",
 };
 
 export const buscaStatusLabel = (s?: string | null) =>
@@ -21,7 +22,7 @@ export const buscaStatusLabel = (s?: string | null) =>
 
 export async function listBuscaAtivaAtual(): Promise<PausedOverviewItem[]> {
   const r = await listPausedOverview();
-  return [...r.fila, ...r.agenda];
+  return [...r.fila, ...r.agenda].filter(i => i.buscaStatus !== "finalizado");
 }
 
 export function groupBuscaByPatient(items: PausedOverviewItem[]): Map<number, PausedOverviewItem[]> {

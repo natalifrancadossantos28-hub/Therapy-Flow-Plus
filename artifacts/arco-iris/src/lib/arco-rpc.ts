@@ -2316,7 +2316,7 @@ export async function resumePatientAgendaPause(
   return data as { ok: boolean; appointmentsResumed: number };
 }
 
-export type BuscaAtivaStatus = 'pendente' | 'em_andamento' | 'resolvido' | 'nao_resolvido';
+export type BuscaAtivaStatus = 'pendente' | 'em_andamento' | 'resolvido' | 'nao_resolvido' | 'finalizado';
 
 export async function setBuscaAtivaStatus(
   source: 'fila' | 'agenda',
