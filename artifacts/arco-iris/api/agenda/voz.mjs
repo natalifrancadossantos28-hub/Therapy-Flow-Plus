@@ -17,7 +17,7 @@ function hojeSP() {
 
 function instrucoes(lista, temAudio, texto) {
   const h = hojeSP();
-  return `Você organiza a agenda pessoal de uma executiva brasileira. Hoje é ${h.semana}, ${h.iso}, agora são ${h.hora} (horário de Brasília).
+  return `Você organiza a agenda pessoal de uma pessoa brasileira (trabalho e vida pessoal). Ela pode pedir qualquer coisa: reunião, consulta, remédio, ligar para alguém, pagar conta, buscar filho, aniversário, viagem, lembrete simples. Hoje é ${h.semana}, ${h.iso}, agora são ${h.hora} (horário de Brasília).
 ${temAudio ? "Transcreva o áudio em português do Brasil e entenda o pedido." : `Pedido: "${texto}"`}
 
 Compromissos já marcados (id | data | hora | título):
@@ -42,6 +42,9 @@ Regras:
 - "cancelar a reunião", "cancela o dentista de amanhã", "desmarca a palestra", "apaga o compromisso de sexta" = SEMPRE "desmarcar" de um compromisso já marcado, NUNCA "criar". Nunca crie compromisso com título começando por cancelar/desmarcar/remarcar.
 - "comando": só quando a frase inteira for apenas "salvar"/"confirmar"/"pode salvar", "cancelar" ou "corrigir" (sem dizer qual compromisso).
 - Categoria: reuniao (reunião, encontro, alinhamento), evento (evento, inauguração, cerimônia, audiência, congresso), visita (visita externa), palestra (palestra, curso, treinamento), urgente (se disser urgente/importantíssimo), pessoal, aniversario (aniversário, festa, chá de bebê, casamento, comemoração), saude (médico, dentista, exame, consulta, academia, remédio), viagem (viagem, voo, aeroporto, hotel), familia (filhos, marido, mãe, família), contas (pagar, boleto, conta, banco, imposto), escola (escola, reunião de pais, faculdade), lazer (cinema, almoço com amigas, show, passeio), outro.
+- Hora sem "da manhã/tarde/noite": "às 3", "às 4 e meia" de 1 a 6 = tarde (15:00, 16:30); 7 a 11 = manhã, salvo se o contexto indicar noite (jantar, festa, show). "e meia" = :30, "e quinze" = :15, "quinze para as 5" = 16:45, "meio-dia e meia" = 12:30.
+- "me lembra de…", "não posso esquecer de…", "anota aí…" = "criar". O título é a coisa a fazer, sem "me lembra de" (ex.: "me lembra de tomar o remédio às 8" → "Tomar o remédio"). "daqui a 20 minutos"/"daqui a 2 horas" = hoje com a hora somada a agora.
+- Fala com erro de reconhecimento ou palavras repetidas: entenda pela intenção, corrija o português do título e ignore "é…", "tipo", "né".
 - Se não entender nada, "acao": "nada".`;
 }
 

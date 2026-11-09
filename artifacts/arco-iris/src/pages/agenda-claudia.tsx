@@ -508,8 +508,8 @@ function MenuInferior({ aba, setAba }: { aba: Aba; setAba: (a: Aba) => void }) {
       <div className="agx-card mx-auto max-w-xl grid grid-cols-5 gap-1 rounded-3xl border border-white/10 p-1.5 shadow-[0_-6px_30px_rgba(0,0,0,.4)]" style={{ background: "rgba(10,16,48,.88)" }}>
         {itens.map(([id, t, ic]) => (
           <button key={id} onClick={() => setAba(id)} aria-current={aba === id ? "page" : undefined}
-            className={`h-14 rounded-2xl flex flex-col items-center justify-center gap-1 text-[0.8rem] font-medium transition ${aba === id ? "bg-gradient-to-br from-sky-500 to-violet-600 text-white shadow-lg" : "text-white/70"}`}>
-            {ic}{t}
+            className={`h-14 min-w-0 px-0.5 rounded-2xl flex flex-col items-center justify-center gap-1 text-[12px] leading-none font-medium transition ${aba === id ? "bg-gradient-to-br from-sky-500 to-violet-600 text-white shadow-lg" : "text-white/70"}`}>
+            {ic}<span className="max-w-full truncate">{t}</span>
           </button>
         ))}
       </div>
@@ -1065,7 +1065,8 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     }
     setDica("Não entendi. Fale de novo, por exemplo: “festa de aniversário da Ana sábado às 8 da noite”.");
   };
-  const usarGravador = gravadorSuportado() && (ehIOS() || !Rec);
+  // No app Android (WebView) o reconhecimento do navegador não funciona: grava e manda para a IA.
+  const usarGravador = gravadorSuportado() && (ehIOS() || ehAppNativo() || !Rec);
   const mandarAudio = async (blob: Blob) => {
     if (blob.size < 1500) { setDica("Não ouvi nada. Toque e fale de novo."); return; }
     setPensando(true); setDica("");
