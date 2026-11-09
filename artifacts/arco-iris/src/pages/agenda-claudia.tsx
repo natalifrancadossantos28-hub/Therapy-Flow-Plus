@@ -1075,7 +1075,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
   const mandarAudio = async (blob: Blob) => {
     if (blob.size < 1500) { setDica("Não ouvi nada. Toque e fale de novo."); return; }
     setPensando(true); setDica("");
-    try { aplicarIA(await entenderVoz({ audio: blob }, lista)); }
+    try { aplicarIA(await entenderVoz({ audio: blob, confirmando: Boolean(res || outra) }, lista)); }
     catch (e) { if (api.sessaoInvalida(e)) onSair(); else setDica("Não consegui entender o áudio agora. Tente de novo ou escreva abaixo."); }
     finally { setPensando(false); }
   };

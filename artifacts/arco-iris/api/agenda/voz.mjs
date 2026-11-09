@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 const CATEGORIAS = ["reuniao", "evento", "visita", "palestra", "urgente", "pessoal", "outro",
   "aniversario", "saude", "viagem", "familia", "contas", "escola", "lazer"];
 // "gemini-2.0-flash" foi desligado pelo Google (404); os apelidos "-latest" acompanham a versão atual.
-const MODELOS = [process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean);
+const MODELOS = [...new Set([process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-flash-lite-latest"].filter(Boolean))];
 const SEMANA = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 
 function hojeSP() {
@@ -48,36 +48,46 @@ Regras:
 - Se não entender nada, "acao": "nada".`;
 }
 
-async function perguntar(chave, partes) {
-  let ultimo = "";
-  // Às vezes um modelo trava sem responder: cada tentativa tem no máximo 8 s e o total fica em ~25 s.
-  const fim = Date.now() + 25_000;
-  for (const modelo of MODELOS) {
-    if (Date.now() > fim - 2_000) break;
-    // 1ª tentativa sem "pensar" (bem mais rápida); se o modelo não aceitar a opção (400), tenta de novo sem ela.
-    for (const rapido of [true, false]) {
-      const generationConfig = { temperature: 0, responseMimeType: "application/json", ...(rapido ? { thinkingConfig: { thinkingBudget: 0 } } : {}) };
-      const espera = Math.min(8_000, fim - Date.now());
-      if (espera < 1_500) break;
-      let r;
-      try {
-        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${chave}`, {
-        signal: AbortSignal.timeout(espera),
-        method: "POST",
-        headers: { "content-type": "application/json" },
+// Uma chamada ao Gemini, sem "pensar" (bem mais rápida); se o modelo não aceitar a opção (400), repete sem ela.
+async function chamar(modelo, chave, partes, ate) {
+  for (const rapido of [true, false]) {
+    const espera = Math.min(9_000, ate - Date.now());
+    if (espera < 1_500) throw new Error(`${modelo}: demorou demais`);
+    const generationConfig = { temperature: 0, responseMimeType: "application/json", ...(rapido ? { thinkingConfig: { thinkingBudget: 0 } } : {}) };
+    let r;
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${chave}`, {
+        signal: AbortSignal.timeout(espera), method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig }),
       });
-      } catch (e) { ultimo = `${modelo}: ${e?.name === "TimeoutError" ? "demorou demais" : String(e?.message ?? e)}`; break; }
-      const j = await r.json().catch(() => ({}));
-      if (r.ok) {
-        const txt = j?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-        return JSON.parse(txt.replace(/^```(?:json)?|```$/g, "").trim());
-      }
-      ultimo = `${modelo}: ${j?.error?.message ?? `HTTP ${r.status}`}`;
-      if (!(rapido && r.status === 400)) break;
+    } catch (e) { throw new Error(`${modelo}: ${e?.name === "TimeoutError" ? "demorou demais" : String(e?.message ?? e)}`); }
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) {
+      const txt = j?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+      return JSON.parse(txt.replace(/^```(?:json)?|```$/g, "").trim());
     }
+    if (!(rapido && r.status === 400)) throw new Error(`${modelo}: ${j?.error?.message ?? `HTTP ${r.status}`}`);
   }
-  throw new Error(ultimo || "IA indisponível");
+  throw new Error(`${modelo}: sem resposta`);
+}
+
+// Para não deixar a pessoa esperando: começa no modelo principal e, se ele não responder em 2,5 s
+// (ou der erro), já dispara o próximo em paralelo. Vale a primeira resposta boa.
+function perguntar(chave, partes, modelos = MODELOS) {
+  const ate = Date.now() + 25_000;
+  return new Promise((ok, falha) => {
+    let i = 0, rodando = 0, acabou = false, ultimo = "", timer = null;
+    const proximo = () => {
+      if (acabou) return;
+      clearTimeout(timer);
+      if (i >= modelos.length || Date.now() > ate - 2_000) { if (!rodando) { acabou = true; falha(new Error(ultimo || "IA indisponível")); } return; }
+      const modelo = modelos[i++]; rodando++;
+      chamar(modelo, chave, partes, ate).then((r) => { if (!acabou) { acabou = true; clearTimeout(timer); ok(r); } })
+        .catch((e) => { ultimo = String(e?.message ?? e); rodando--; proximo(); });
+      timer = setTimeout(proximo, 2_500);
+    };
+    proximo();
+  });
 }
 
 const dataOk = (s) => (typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null);
@@ -86,7 +96,7 @@ const txtOk = (s, n) => (typeof s === "string" && s.trim() ? s.trim().slice(0, n
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "use POST" });
-  const { token, audio, mime, texto, compromissos } = req.body ?? {};
+  const { token, audio, mime, texto, compromissos, confirmando } = req.body ?? {};
   if (typeof token !== "string" || token.length < 20) return res.status(401).json({ error: "sessão inválida" });
   if (!audio && !txtOk(texto, 600)) return res.status(400).json({ error: "nada para entender" });
   if (audio && (typeof audio !== "string" || audio.length > 4_000_000)) return res.status(413).json({ error: "áudio grande demais" });
@@ -95,20 +105,26 @@ export default async function handler(req, res) {
   const key = process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? "";
   const chave = process.env.GEMINI_API_KEY ?? "";
   if (!chave) return res.status(503).json({ error: "sem-ia" });
-  if (url && key) {
-    const sb = createClient(url, key, { auth: { persistSession: false } });
-    const { error } = await sb.rpc("agenda_exec_eu", { p_token: token });
-    if (error) return res.status(401).json({ error: "sessão inválida" });
-  }
+  // Confere o PIN ao mesmo tempo que a IA trabalha (não espera um pelo outro).
+  const sessaoOk = url && key
+    ? createClient(url, key, { auth: { persistSession: false } }).rpc("agenda_exec_eu", { p_token: token }).then(({ error }) => !error, () => false)
+    : Promise.resolve(true);
 
   const lista = (Array.isArray(compromissos) ? compromissos : []).slice(0, 150).map((c) => ({
     id: Number(c?.id), data: dataOk(c?.data), hora: horaOk(c?.hora?.slice?.(0, 5)), titulo: txtOk(c?.titulo, 80) ?? "",
   })).filter((c) => Number.isFinite(c.id) && c.data);
-  const partes = [{ text: instrucoes(lista, Boolean(audio), txtOk(texto, 600)) }];
+  const aviso = confirmando === true
+    ? "\nATENÇÃO: já existe um compromisso na tela esperando confirmação. Se a pessoa só disser algo como \"salvar\", \"sim\", \"pode\", \"confirma\", \"isso\", \"tá certo\", responda acao \"comando\" com comando \"salvar\" (\"cancelar\"/\"não\" → \"cancelar\"; \"corrigir\"/\"errado\" → \"corrigir\"). Se falar um compromisso novo, interprete normalmente.\n"
+    : "";
+  const partes = [{ text: instrucoes(lista, Boolean(audio), txtOk(texto, 600)) + aviso }];
   if (audio) partes.push({ inline_data: { mime_type: (typeof mime === "string" && mime.split(";")[0]) || "audio/mp4", data: audio } });
 
+  // Na confirmação a frase é curta ("salvar"): começa pelo modelo mais leve, que responde bem mais rápido.
+  const ia = perguntar(chave, partes, confirmando === true ? [...new Set(["gemini-2.5-flash-lite", ...MODELOS])] : MODELOS);
+  ia.catch(() => {});
+  if (!(await sessaoOk)) return res.status(401).json({ error: "sessão inválida" });
   try {
-    const r = await perguntar(chave, partes);
+    const r = await ia;
     const acoes = ["criar", "desmarcar", "remarcar", "concluir", "comando", "nada"];
     const ids = new Set(lista.map((c) => c.id));
     return res.status(200).json({
