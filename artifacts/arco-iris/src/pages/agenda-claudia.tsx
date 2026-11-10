@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addDays, addMonths, endOfMonth, endOfWeek, format, isSameMonth, parseISO, startOfMonth, startOfWeek, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  BarChart3, BookOpen, ClipboardCheck, Square, CheckSquare, Car, Coffee, Flag, FolderOpen, Heart, Laptop, Moon, Pencil, Phone, Pill, Sun, Target, Trash2, Users, Utensils,
   AlarmClock, Bell, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, Home, ImagePlus, Layers,
   ListChecks, LogOut, MapPin, Mic, Palette, Plus, RotateCcw, Search, Settings, User, X,
 } from "lucide-react";
@@ -11,14 +12,14 @@ import { CATEGORIAS, categoria, type AgxCompromisso, type AgxInput, type AgxSess
 import { interpretarFrase, comandoVoz, intencaoLocal, type Interpretacao } from "@/lib/agenda-exec-voz";
 import { entenderVoz, gravar, gravadorSuportado, liberarMicrofone, type Gravacao, type VozIA } from "@/lib/agenda-exec-ia";
 import { ativarAvisos, assinaturaAtual, desativarAvisos, ehAndroid, ehIOS, instalado, pushSuportado } from "@/lib/agenda-exec-push";
-import { APARENCIA_PADRAO, OPCOES_FUNDO, arquivoParaFoto, estiloFundo, useAparencia, type Aparencia } from "@/lib/agenda-exec-aparencia";
+import { APARENCIA_PADRAO, OPCOES_FUNDO, ROTINA_MAX, arquivoParaFoto, estiloFundo, useAparencia, type Aparencia, type AtividadeRotina } from "@/lib/agenda-exec-aparencia";
 import { getCompanySession } from "@/lib/portal-session";
 import { abrirAjusteNativo, ehAppNativo, pedirNotificacoesNativo, sairNativo, sincronizarNativo, statusNativo, testarAlarmeNativo, type StatusNativo } from "@/lib/agenda-exec-nativo";
 
 // Minha Agenda: app executivo próprio (sem o menu do sistema), com menu inferior e papel de parede por pessoa.
 
 const ISO = (d: Date) => format(d, "yyyy-MM-dd");
-const horaTxt = (h: string | null) => h ?? "Dia todo";
+const horaTxt = (h: string | null) => (h ? h.slice(0, 5) : "Dia todo");
 const dataLonga = (iso: string) => format(parseISO(iso), "EEEE, d 'de' MMMM", { locale: ptBR });
 const primeiroNome = (n: string) => n.trim().split(/\s+/)[0];
 const cap1 = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -73,6 +74,11 @@ const CSS = `
   @keyframes agx-onda { 0%,100% { transform: scaleY(.45); } 50% { transform: scaleY(1); } }
   @keyframes agx-entrar { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   .agenda-executiva .agx-entrar { animation: agx-entrar .25s ease-out; }
+  @keyframes agx-lado-e { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+  @keyframes agx-lado-d { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+  .agenda-executiva .agx-lado-e { animation: agx-lado-e .28s ease-out; } .agenda-executiva .agx-lado-d { animation: agx-lado-d .28s ease-out; }
+  .agenda-executiva .agx-neon-txt { background: linear-gradient(90deg,#7dd3fc,#c084fc 55%,#f0abfc); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 10px rgba(168,85,247,.45)); }
+  .agenda-executiva .agx-mic { box-shadow: 0 0 0 5px rgba(139,92,246,.25), 0 0 22px rgba(168,85,247,.85), 0 0 46px rgba(56,189,248,.45); }
   @media (prefers-reduced-motion: reduce) { .agenda-executiva * { animation: none !important; transition: none !important; } }
 `;
 
@@ -243,6 +249,7 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
   const souDona = sessao.usuario.papel === "dona";
   const hoje = ISO(new Date());
   const [aba, setAbaSt] = useState<Aba>("inicio");
+  const [pagina, setPaginaSt] = useState(0);
   const [lista, setLista] = useState<AgxCompromisso[]>([]);
   const [mes, setMes] = useState(() => startOfMonth(new Date()));
   const [diaSel, setDiaSel] = useState(hoje);
@@ -257,6 +264,9 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
   const trava = useRef(false);
 
   const setAba = (a: Aba) => { setAbaSt(a); window.scrollTo({ top: 0 }); };
+  const irPagina = (n: number) => { setPaginaSt(n); setAba("inicio"); };
+  const letraAtual = aparencia.ap.letra ?? APARENCIA_PADRAO.letra;
+  const mudarLetra = () => aparencia.mudar({ letra: letraAtual < 112 ? 112 : letraAtual < 125 ? 125 : letraAtual < 140 ? 140 : 100 });
   const avisar = useCallback((t: string) => { setAviso(t); window.setTimeout(() => setAviso(""), 4000); }, []);
   const falhou = useCallback((e: unknown) => { if (api.sessaoInvalida(e)) onSair(); else avisar(erroTxt(e)); }, [onSair, avisar]);
 
@@ -310,10 +320,18 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
     <div className="space-y-4 agx-entrar" key={aba}>
       {erroGeral && <div className={`${glass} text-sm text-rose-200`} role="alert">{erroGeral}</div>}
 
-      {aba === "inicio" && <Inicio sessao={sessao} dona={dona} hoje={hoje} deHoje={deHoje} restantesHoje={restantesHoje} proximo={proximo}
-        mes={mes} setMes={setMes} doDia={doDia} lista={lista}
-        onAba={setAba} onNovo={(dt?: string) => setForm(novo(dt ?? hoje))} onCategorias={() => setFolha("categorias")} onAbrir={setForm} onDia={abrirDia} onFalar={irFalar} letra={aparencia.ap.letra ?? APARENCIA_PADRAO.letra}
-        onLetra={() => { const l = aparencia.ap.letra ?? APARENCIA_PADRAO.letra; aparencia.mudar({ letra: l < 112 ? 112 : l < 125 ? 125 : l < 140 ? 140 : 100 }); }} />}
+      {aba === "inicio" && (
+        <Telas pagina={pagina} setPagina={irPagina}
+          topo={<Topo letra={letraAtual} onLetra={mudarLetra} restantesHoje={restantesHoje} onSino={() => setAba("alarmes")} onConfig={() => setAba("perfil")} />}>
+          {pagina === 0 && <Inicio sessao={sessao} dona={dona} hoje={hoje} deHoje={deHoje} restantesHoje={restantesHoje} proximo={proximo}
+            mes={mes} setMes={setMes} doDia={doDia} lista={lista}
+            onAba={setAba} onNovo={(dt?: string) => setForm(novo(dt ?? hoje))} onCategorias={() => setFolha("categorias")} onAbrir={setForm} onDia={abrirDia} onFalar={irFalar} letra={letraAtual}
+            onLetra={mudarLetra} />}
+          {pagina === 1 && <Proximos lista={lista} hoje={hoje} onAbrir={setForm} onNovo={() => setForm(novo(hoje))} />}
+          {pagina === 2 && <TarefasDia lista={lista} hoje={hoje} onAbrir={setForm} onConcluir={concluir} onNovo={() => setForm(novo(hoje))} onTodas={() => setAba("tarefas")} />}
+          {pagina === 3 && <Rotina ctl={aparencia} />}
+        </Telas>
+      )}
 
       {aba === "agenda" && (
         <div className="space-y-4">
@@ -389,7 +407,7 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
         </div>
       )}
 
-      <MenuInferior aba={aba} setAba={setAba} />
+      <MenuInferior ativo={aba === "inicio" ? (pagina === 2 ? "tarefas" : "inicio") : aba} onItem={(a) => (a === "inicio" ? irPagina(0) : a === "tarefas" ? irPagina(2) : setAba(a))} onFalar={irFalar} />
 
       {folha === "categorias" && <FolhaCategorias lista={lista} hoje={hoje} onFechar={() => setFolha(null)}
         onEscolher={(c) => { setFiltro(c); setBusca(""); setVista("mes"); setFolha(null); setAba("agenda"); }} />}
@@ -412,7 +430,7 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
   onAba: (a: Aba) => void; onNovo: (data?: string) => void; onCategorias: () => void; onAbrir: (c: AgxCompromisso) => void; onDia: (d: string) => void; onFalar: () => void;
 }) {
   const h = new Date().getHours();
-  const saudacao = `${h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"}, ${primeiroNome(sessao.usuario.nome)}!`;
+  const saudacao = `${h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"},`;
   const d = new Date();
   void deHoje; void proximo;
   // Tocar num dia do calendário mostra os compromissos desse dia no quadro roxo de cima.
@@ -427,32 +445,30 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
   const titSel = sel === hoje ? "Hoje" : rotuloDia(sel, hoje);
   return (
     <>
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <Titulo nome={dona} />
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={onLetra} aria-label={`Tamanho das letras: ${letra}%. Toque para mudar`} className="grid place-items-center w-11 h-11 rounded-full agx-card border border-white/15 font-bold leading-none">
-            <span><span className="text-sm">A</span><span className="text-lg">A</span></span>
-          </button>
-          <button onClick={() => onAba("alarmes")} aria-label={`Alarmes${restantesHoje ? `: ${restantesHoje} hoje` : ""}`} className="relative grid place-items-center w-11 h-11 rounded-full agx-card border border-white/15">
-            <Bell size={19} />{restantesHoje > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-[0.8rem] font-bold grid place-items-center">{restantesHoje}</span>}
-          </button>
-          <button onClick={() => onAba("perfil")} aria-label="Configurações" className="grid place-items-center w-11 h-11 rounded-full agx-card border border-white/15"><Settings size={19} /></button>
+      <section className="flex flex-wrap items-start gap-3">
+        <div className="min-w-[12rem] flex-1">
+          <p className="text-[2rem] sm:text-4xl font-extrabold leading-tight tracking-tight">{saudacao}</p>
+          <p className="text-[2.3rem] sm:text-5xl font-extrabold leading-tight tracking-tight agx-neon-txt">{primeiroNome(sessao.usuario.nome)}!</p>
         </div>
-      </header>
-
-      <section className="flex flex-wrap items-center gap-3">
-        <div className="min-w-[14rem] flex-1 border-l-2 border-sky-400/80 pl-3">
-          <p className="text-[1.9rem] sm:text-4xl font-bold leading-tight tracking-tight">{saudacao}</p>
-          <p className="text-base text-white/80 mt-1">{restantesHoje > 0 ? `Você ainda tem ${restantesHoje} ${restantesHoje === 1 ? "compromisso" : "compromissos"} hoje.` : "Sua agenda está organizada e pronta para o seu dia."}</p>
-        </div>
-        <div className={`${glass} !p-3 min-w-[6.5rem] shrink-0 text-center agx-brilho whitespace-nowrap`}>
-          <p className="text-xs font-semibold tracking-wider uppercase text-white/80">{format(d, "EEEE", { locale: ptBR })}</p>
+        <div className={`${glass} !p-3 min-w-[6.8rem] shrink-0 text-center whitespace-nowrap`} style={neon("#a855f7")}>
+          <p className="text-xs font-semibold tracking-wider uppercase text-white/85">{format(d, "EEEE", { locale: ptBR })}</p>
           <p className="text-4xl font-bold leading-none my-1 tabular-nums">{format(d, "dd")}</p>
           <p className="text-[0.8rem] font-medium uppercase text-violet-200">{format(d, "MMM", { locale: ptBR })} | {format(d, "yyyy")}</p>
         </div>
       </section>
 
-      <section ref={quadro} aria-live="polite" className={`${glass} agx-brilho w-full !bg-gradient-to-r from-violet-600/45 to-sky-600/25 scroll-mt-4`}>
+
+      <section className="rounded-3xl p-[2px] bg-gradient-to-r from-sky-400 via-violet-500 to-pink-500 shadow-[0_0_24px_rgba(168,85,247,.45)]">
+        <div className="rounded-[calc(1.5rem-2px)] bg-[#0d1438]/85 p-4 flex items-start gap-3">
+          <span className="grid place-items-center w-11 h-11 rounded-2xl bg-gradient-to-br from-pink-500 to-violet-600 shrink-0"><Heart size={20} /></span>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold uppercase tracking-wider text-pink-200">Mensagem do dia</span>
+            <span className="block text-lg font-medium leading-snug">“{fraseDoDia()}”</span>
+          </span>
+        </div>
+      </section>
+
+      <section ref={quadro} aria-live="polite" className={`${glass} w-full scroll-mt-4`} style={neon("#a855f7")}>
         <div className="flex items-center gap-3">
           <span className="grid place-items-center w-12 h-12 rounded-2xl bg-white/10 shrink-0"><CalendarCheck size={24} /></span>
           <span className="flex-1 min-w-0">
@@ -466,9 +482,9 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
           </button>
         ) : (
           <div className="mt-3 space-y-2">
-            {doSel.map((c) => (
-              <button key={c.id} onClick={() => onAbrir(c)} className={`w-full text-left rounded-2xl bg-white/10 px-3 py-2.5 border-l-4 flex items-baseline gap-3 ${c.concluido ? "opacity-60" : ""}`} style={{ borderColor: categoria(c.categoria).cor }}>
-                <span className="text-lg font-bold text-sky-200 tabular-nums shrink-0">{horaTxt(c.hora)}</span>
+            {doSel.map((c, i) => (
+              <button key={c.id} onClick={() => onAbrir(c)} className={`w-full text-left rounded-2xl bg-white/[0.07] px-2.5 py-2 border flex items-center gap-3 ${c.concluido ? "opacity-60" : ""}`} style={{ borderColor: `${categoria(c.categoria).cor}99` }}>
+                <span className="rounded-xl px-2.5 py-1 text-lg font-bold tabular-nums shrink-0 self-center" style={{ background: `linear-gradient(135deg, ${CORES_NEON[i % 2 ? 1 : 0]}, ${CORES_NEON[i % 2 ? 3 : 5]})`, boxShadow: `0 0 12px ${CORES_NEON[i % 2 ? 1 : 0]}88` }}>{horaTxt(c.hora)}</span>
                 <span className="min-w-0 text-lg font-semibold leading-snug break-words">{c.concluido && <Check size={16} className="inline mr-1" />}{c.titulo}{c.local && <span className="block text-sm font-normal text-white/75">{c.local}</span>}</span>
               </button>
             ))}
@@ -477,48 +493,254 @@ function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMe
         {sel !== hoje && <button onClick={() => setSel(hoje)} className="mt-3 text-base font-semibold text-sky-200 underline">Voltar para hoje</button>}
       </section>
 
-      <div className={`${glass} !p-3`}>
+      <div className={`${glass} !p-3`} style={neon("#8b5cf6")}>
         <p className="text-base text-white/80 mb-2 text-center">Toque num dia para ver os compromissos</p>
         <Mes mes={mes} setMes={setMes} diaSel={sel} onDia={escolherDia} doDia={doDia} hoje={hoje} />
       </div>
 
       <button onClick={() => onNovo(sel)} className={`${glass} w-full !py-3 flex items-center justify-center gap-2 text-lg font-semibold`}><Plus size={22} /> Novo compromisso</button>
-      <BarraMicrofone onClick={onFalar} />
       {lista.length === 0 && <p className="text-center text-xs text-white/50">Carregando sua agenda…</p>}
     </>
   );
 }
 
-function BarraMicrofone({ onClick }: { onClick: () => void }) {
-  const onda = (n: number) => <span className="agx-onda flex items-center gap-[3px] h-8" aria-hidden>{Array.from({ length: n }, (_, i) => <span key={i} style={{ height: `${30 + ((i * 37) % 70)}%`, animationDelay: `${i * 0.08}s` }} />)}</span>;
-  return (
-    <button onClick={onClick} aria-label="Falar para organizar a agenda" className={`${glass} w-full !rounded-[2rem] !py-3 flex flex-col items-center gap-1.5`}>
-      <span className="flex items-center justify-center gap-4">
-        <span className="text-sky-300 hidden min-[360px]:flex">{onda(9)}</span>
-        <span className="grid place-items-center w-14 h-14 rounded-full bg-gradient-to-br from-sky-400 to-violet-600 shadow-[0_0_0_6px_rgba(99,102,241,.18),0_0_24px_rgba(139,92,246,.55)]"><Mic size={24} /></span>
-        <span className="text-violet-300 hidden min-[360px]:flex">{onda(9)}</span>
-      </span>
-      <span className="text-base text-white/85">Toque e fale para organizar sua agenda</span>
+function MenuInferior({ ativo, onItem, onFalar }: { ativo: Aba; onItem: (a: Aba) => void; onFalar: () => void }) {
+  const item = (id: Aba, t: string, ic: React.ReactNode) => (
+    <button key={id} onClick={() => onItem(id)} aria-current={ativo === id ? "page" : undefined}
+      className={`h-14 min-w-0 px-0.5 rounded-2xl flex flex-col items-center justify-center gap-1 text-[12px] leading-none font-medium transition ${ativo === id ? "text-white bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-[0_0_16px_rgba(192,38,211,.6)]" : "text-white/75"}`}>
+      {ic}<span className="max-w-full truncate">{t}</span>
     </button>
+  );
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(.6rem,env(safe-area-inset-bottom))]" aria-label="Menu">
+      <div className="agx-card mx-auto max-w-xl grid grid-cols-5 items-end gap-1 rounded-3xl border border-violet-400/30 p-1.5 shadow-[0_-6px_30px_rgba(0,0,0,.4),0_0_18px_rgba(139,92,246,.25)]" style={{ background: "rgba(10,16,48,.9)" }}>
+        {item("inicio", "Início", <Home size={21} />)}
+        {item("agenda", "Agenda", <CalendarCheck size={21} />)}
+        <button onClick={onFalar} aria-label="Microfone: falar para organizar a agenda" className="flex flex-col items-center gap-1 -mt-8 text-[12px] font-semibold text-white">
+          <span className="grid place-items-center w-[4.25rem] h-[4.25rem] rounded-full bg-gradient-to-br from-sky-400 via-violet-500 to-pink-500 agx-mic"><Mic size={30} /></span>
+          <span>Falar</span>
+        </button>
+        {item("tarefas", "Tarefas", <ListChecks size={21} />)}
+        {item("perfil", "Perfil", <User size={21} />)}
+      </div>
+    </nav>
   );
 }
 
-function MenuInferior({ aba, setAba }: { aba: Aba; setAba: (a: Aba) => void }) {
-  const itens: [Aba, string, React.ReactNode][] = [
-    ["inicio", "Início", <Home size={20} />], ["agenda", "Agenda", <CalendarCheck size={20} />], ["tarefas", "Tarefas", <ListChecks size={20} />],
-    ["alarmes", "Alarmes", <AlarmClock size={20} />], ["perfil", "Perfil", <User size={20} />],
-  ];
+const neon = (cor: string): React.CSSProperties => ({ border: `1px solid ${cor}b0`, boxShadow: `0 0 16px ${cor}59, inset 0 0 22px ${cor}1f` });
+const CORES_NEON = ["#38bdf8", "#ec4899", "#22c55e", "#a855f7", "#f97316", "#3b82f6"];
+const FRASES = [
+  "Um passo de cada vez também é progresso.", "Você é mais forte do que imagina.", "Hoje é um ótimo dia para começar algo novo.",
+  "Cuide de você com o mesmo carinho que cuida dos outros.", "Pequenas vitórias também merecem comemoração.", "Respire fundo: você está no caminho certo.",
+  "Organizar o dia é um presente para a sua tranquilidade.", "Acredite no seu ritmo.", "Gentileza com você mesma faz o dia render.",
+  "O importante é seguir em frente, mesmo devagar.", "Cada dia traz uma nova chance de sorrir.", "Você já venceu muitos desafios. Este é só mais um.",
+  "Faça o que puder hoje. Amanhã é outro dia.", "A sua dedicação faz diferença.", "Comece pelo mais simples e o resto vem.",
+  "Descansar também faz parte da rotina.", "Seu esforço de hoje é a sua conquista de amanhã.", "Sorria: você está fazendo um bom trabalho.",
+  "Confie em você e no seu tempo.", "Um dia organizado é um dia mais leve.", "Valorize cada pequena conquista.",
+];
+const fraseDoDia = () => { const d = new Date(); const n = Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86_400_000) + d.getFullYear(); return FRASES[n % FRASES.length]; };
+
+function Topo({ letra, onLetra, restantesHoje, onSino, onConfig }: { letra: number; onLetra: () => void; restantesHoje: number; onSino: () => void; onConfig: () => void }) {
+  const bt = "grid place-items-center w-11 h-11 rounded-full agx-card border border-violet-300/30 shadow-[0_0_12px_rgba(139,92,246,.35)]";
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(.6rem,env(safe-area-inset-bottom))]" aria-label="Menu">
-      <div className="agx-card mx-auto max-w-xl grid grid-cols-5 gap-1 rounded-3xl border border-white/10 p-1.5 shadow-[0_-6px_30px_rgba(0,0,0,.4)]" style={{ background: "rgba(10,16,48,.88)" }}>
-        {itens.map(([id, t, ic]) => (
-          <button key={id} onClick={() => setAba(id)} aria-current={aba === id ? "page" : undefined}
-            className={`h-14 min-w-0 px-0.5 rounded-2xl flex flex-col items-center justify-center gap-1 text-[12px] leading-none font-medium transition ${aba === id ? "bg-gradient-to-br from-sky-500 to-violet-600 text-white shadow-lg" : "text-white/70"}`}>
-            {ic}<span className="max-w-full truncate">{t}</span>
-          </button>
-        ))}
+    <div className="flex items-center justify-end gap-2">
+      <button onClick={onLetra} aria-label={`Tamanho das letras: ${letra}%. Toque para mudar`} className={`${bt} font-bold leading-none`}><span><span className="text-sm">A</span><span className="text-lg">a</span></span></button>
+      <button onClick={onSino} aria-label={`Notificações e lembretes${restantesHoje ? `: ${restantesHoje} hoje` : ""}`} className={`relative ${bt}`}>
+        <Bell size={19} />{restantesHoje > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-[0.8rem] font-bold grid place-items-center">{restantesHoje}</span>}
+      </button>
+      <button onClick={onConfig} aria-label="Configurações" className={bt}><Settings size={19} /></button>
+    </div>
+  );
+}
+
+const PAGINAS = ["Início", "Próximos Compromissos", "Tarefas do Dia", "Minha Rotina"];
+// As 4 telas principais: troca deslizando o dedo para os lados (ou tocando nas bolinhas).
+function Telas({ pagina, setPagina, topo, children }: { pagina: number; setPagina: (n: number) => void; topo: React.ReactNode; children: React.ReactNode }) {
+  const toque = useRef<{ x: number; y: number; ok: boolean } | null>(null);
+  const [lado, setLado] = useState<"e" | "d">("e");
+  const ir = (n: number) => { if (n < 0 || n >= PAGINAS.length || n === pagina) return; setLado(n > pagina ? "e" : "d"); setPagina(n); };
+  return (
+    <div
+      onTouchStart={(e) => { const t = e.touches[0]; const alvo = e.target as HTMLElement; toque.current = { x: t.clientX, y: t.clientY, ok: !alvo.closest("input,textarea,select,[data-sem-deslizar]") }; }}
+      onTouchEnd={(e) => {
+        const ini = toque.current; toque.current = null; if (!ini?.ok) return;
+        const t = e.changedTouches[0], dx = t.clientX - ini.x, dy = t.clientY - ini.y;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) ir(pagina + (dx < 0 ? 1 : -1));
+      }}
+      className="space-y-4 min-h-[70dvh] pb-8">
+      {topo}
+      {pagina > 0 && (
+        <div className={`${glass} !py-5 flex items-center gap-4`} style={neon(["", "#38bdf8", "#22c55e", "#a855f7"][pagina])}>
+          <span className="grid place-items-center w-14 h-14 rounded-2xl bg-white/[0.07] border border-white/15 shrink-0">{[null, <CalendarCheck size={34} />, <ClipboardCheck size={34} />, <Target size={34} />][pagina]}</span>
+          <h2 className="min-w-0 text-[min(1.75rem,7vw)] font-extrabold leading-tight tracking-tight">{PAGINAS[pagina]}</h2>
+        </div>
+      )}
+      <div key={pagina} className={`space-y-4 agx-lado-${lado}`}>{children}</div>
+      <div className="flex flex-col items-center gap-1 pt-2">
+        <div className="flex items-center gap-1.5" role="tablist" aria-label="Telas">
+          {PAGINAS.map((t, i) => (
+            <button key={t} role="tab" aria-selected={i === pagina} aria-label={t} onClick={() => ir(i)} className="h-6 grid place-items-center px-0.5">
+              <span className={`block h-2.5 rounded-full transition-all ${i === pagina ? "w-7 bg-gradient-to-r from-sky-400 to-pink-400 shadow-[0_0_10px_rgba(236,72,153,.7)]" : "w-2.5 bg-white/35"}`} />
+            </button>
+          ))}
+        </div>
+        <p className="text-center text-sm text-white/55">Deslize para o lado para ver as outras telas</p>
       </div>
-    </nav>
+    </div>
+  );
+}
+
+function Proximos({ lista, hoje, onAbrir, onNovo }: { lista: AgxCompromisso[]; hoje: string; onAbrir: (c: AgxCompromisso) => void; onNovo: () => void }) {
+  const agora = Date.now();
+  const itens = lista.filter((c) => !c.concluido && (c.data > hoje || (c.data === hoje && (c.hora == null || inicioMs(c) >= agora))))
+    .sort((a, b) => a.data.localeCompare(b.data) || (a.hora ?? "99").localeCompare(b.hora ?? "99")).slice(0, 60);
+  if (itens.length === 0) return (
+    <button onClick={onNovo} className={`${glass} w-full text-left text-lg font-semibold flex items-center gap-2`} style={neon("#38bdf8")}><Plus size={22} /> Nenhum compromisso pela frente. Toque para marcar.</button>
+  );
+  return (
+    <div className="space-y-3">
+      {itens.map((c, i) => {
+        const cor = CORES_NEON[i % CORES_NEON.length], dt = parseISO(c.data);
+        return (
+          <button key={c.id} onClick={() => onAbrir(c)} className={`${glass} !p-3 w-full text-left flex items-center gap-3`} style={neon(cor)}>
+            <span className="grid place-items-center w-16 shrink-0 rounded-2xl py-2 text-center" style={{ background: `linear-gradient(135deg, ${cor}, ${cor}66)`, boxShadow: `0 0 14px ${cor}88` }}>
+              <span className="block text-[1.9rem] font-extrabold leading-none tabular-nums">{format(dt, "dd")}</span>
+              <span className="block text-sm font-bold uppercase">{format(dt, "MMM", { locale: ptBR }).replace(".", "")}</span>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-lg font-bold leading-snug break-words">{c.titulo}</span>
+              <span className="block text-lg font-medium text-white/90 tabular-nums">{horaTxt(c.hora)}{c.data <= ISO(addDays(parseISO(hoje), 1)) && <span className="ml-2 text-sm text-sky-200">{rotuloDia(c.data, hoje)}</span>}</span>
+              {c.local && <span className="block text-sm text-white/70"><MapPin size={13} className="inline -mt-0.5 mr-1" />{c.local}</span>}
+            </span>
+            <ChevronRight size={20} className="text-white/60 shrink-0" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TarefasDia({ lista, hoje, onAbrir, onConcluir, onNovo, onTodas }: {
+  lista: AgxCompromisso[]; hoje: string; onAbrir: (c: AgxCompromisso) => void; onConcluir: (id: number, v: boolean) => void; onNovo: () => void; onTodas: () => void;
+}) {
+  const ord = (a: AgxCompromisso, b: AgxCompromisso) => (a.hora ?? "99").localeCompare(b.hora ?? "99");
+  const doDia = lista.filter((c) => c.data === hoje).sort(ord);
+  const atrasadas = lista.filter((c) => c.data < hoje && !c.concluido).sort((a, b) => inicioMs(a) - inicioMs(b));
+  const feitas = doDia.filter((c) => c.concluido).length;
+  const pct = doDia.length ? Math.round((feitas / doDia.length) * 100) : 0;
+  const linha = (c: AgxCompromisso, i: number) => {
+    const cor = c.concluido ? "#22c55e" : ["#6366f1", "#8b5cf6"][i % 2];
+    return (
+      <div key={c.id} className="agx-card flex items-center gap-2 rounded-2xl p-2.5" style={neon(cor)}>
+        <button onClick={() => onConcluir(c.id, !c.concluido)} aria-label={c.concluido ? "Desmarcar tarefa" : "Marcar como feita"} className="grid place-items-center w-11 h-11 shrink-0">
+          {c.concluido ? <CheckSquare size={30} className="text-emerald-300 drop-shadow-[0_0_6px_rgba(34,197,94,.9)]" /> : <Square size={30} className="text-white/85" />}
+        </button>
+        <button onClick={() => onAbrir(c)} className="flex-1 min-w-0 text-left">
+          <span className={`block text-lg font-semibold leading-snug break-words ${c.concluido ? "line-through text-white/55" : ""}`}>{c.titulo}</span>
+          <span className="block text-sm text-white/70">{c.data < hoje && <b className="text-rose-300">Atrasada · {rotuloDia(c.data, hoje)} · </b>}{horaTxt(c.hora)}{c.local ? ` · ${c.local}` : ""}</span>
+        </button>
+        <Pencil size={16} className="text-white/45 shrink-0 mr-1" aria-hidden />
+      </div>
+    );
+  };
+  return (
+    <>
+      <div className="space-y-2">
+        {doDia.length === 0 ? <p className={`${glass} text-base text-white/75`}>Nenhuma tarefa para hoje.</p> : doDia.map(linha)}
+      </div>
+      <div className={glass} style={neon("#22c55e")}>
+        <div className="flex items-center gap-3">
+          <span className="grid place-items-center w-12 h-12 rounded-full bg-white/[0.07] shrink-0"><Target size={26} className="text-emerald-300" /></span>
+          <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-lg font-bold">Progresso do dia</p>
+          <p className="text-xl font-extrabold text-emerald-300 tabular-nums">{pct}%</p>
+        </div>
+        <p className="text-sm text-white/70">{feitas} de {doDia.length} feitas</p>
+        <div className="mt-1.5 h-3.5 rounded-full bg-white/10 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso das tarefas de hoje">
+          <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-lime-300 shadow-[0_0_10px_rgba(34,197,94,.9)] transition-all duration-500" style={{ width: `${pct}%` }} />
+        </div>
+          </div>
+        </div>
+      </div>
+      {atrasadas.length > 0 && <div className="space-y-2"><p className="text-base font-bold text-rose-200">Ficaram pendentes ({atrasadas.length})</p>{atrasadas.slice(0, 20).map(linha)}</div>}
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={onNovo} className={`${btnPrimario} h-12 text-base inline-flex items-center justify-center gap-2`}><Plus size={18} /> Nova tarefa</button>
+        <button onClick={onTodas} className={`${btnSuave} h-12 text-base`}>Ver todas</button>
+      </div>
+    </>
+  );
+}
+
+const ICONES_ROTINA: [string, string, React.ComponentType<{ size?: number }>][] = [
+  ["sol", "Acordar", Sun], ["cafe", "Café", Coffee], ["comida", "Refeição", Utensils], ["remedio", "Remédio", Pill], ["laptop", "Trabalho", Laptop],
+  ["reuniao", "Reunião", Users], ["pasta", "Documentos", FolderOpen], ["grafico", "Relatórios", BarChart3], ["telefone", "Ligações", Phone],
+  ["carro", "Trânsito", Car], ["livro", "Leitura", BookOpen], ["coracao", "Cuidar de mim", Heart], ["bandeira", "Encerrar", Flag], ["lua", "Dormir", Moon], ["alvo", "Outro", Target],
+];
+const iconeRotina = (id: string) => (ICONES_ROTINA.find((x) => x[0] === id) ?? ICONES_ROTINA[ICONES_ROTINA.length - 1])[2];
+
+// "Minha Rotina": atividades que a própria pessoa cadastra (guardadas junto com a aparência dela, no aparelho e no servidor).
+function Rotina({ ctl }: { ctl: AparenciaCtl }) {
+  const itens = ctl.ap.rotina ?? [];
+  const [ed, setEd] = useState<AtividadeRotina | null>(null);
+  const agoraHm = format(new Date(), "HH:mm");
+  const atual = [...itens].reverse().find((a) => a.hora <= agoraHm)?.id;
+  const gravar = (lista: AtividadeRotina[]) => ctl.mudar({ rotina: [...lista].sort((a, b) => a.hora.localeCompare(b.hora)) });
+  const salvar = (a: AtividadeRotina) => { gravar(itens.some((x) => x.id === a.id) ? itens.map((x) => (x.id === a.id ? a : x)) : [...itens, a]); setEd(null); };
+  const excluir = (id: string) => { if (window.confirm("Excluir esta atividade da rotina?")) { gravar(itens.filter((x) => x.id !== id)); setEd(null); } };
+  const nova = (): AtividadeRotina => ({ id: Math.random().toString(36).slice(2, 8), hora: "08:00", titulo: "", icone: "alvo", cor: CORES_NEON[itens.length % CORES_NEON.length] });
+  return (
+    <>
+      {itens.length === 0 ? (
+        <p className={`${glass} text-base text-white/80`} style={neon("#a855f7")}>Sua rotina ainda está vazia. Toque em <b>Adicionar atividade</b> e coloque o horário e o que você faz.</p>
+      ) : (
+        <div className="space-y-3">
+          {itens.map((a) => {
+            const Ic = iconeRotina(a.icone);
+            return (
+              <button key={a.id} onClick={() => setEd(a)} className={`${glass} !p-3 w-full text-left flex items-center gap-3 ${a.id === atual ? "ring-2 ring-white/70" : ""}`} style={neon(a.cor)}>
+                <span className="rounded-2xl px-2.5 py-1.5 text-lg font-extrabold tabular-nums shrink-0" style={{ background: `linear-gradient(135deg, ${a.cor}, ${a.cor}66)`, boxShadow: `0 0 14px ${a.cor}88` }}>{a.hora}</span>
+                <span className="grid place-items-center w-7 shrink-0" style={{ color: a.cor }}><Ic size={24} /></span>
+                <span className="flex-1 min-w-0 text-lg font-semibold leading-snug break-words">{a.titulo}{a.id === atual && <span className="block text-sm font-normal text-white/75">Agora</span>}</span>
+                <Pencil size={16} className="text-white/50 shrink-0" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <button onClick={() => setEd(nova())} disabled={itens.length >= ROTINA_MAX} className={`${btnPrimario} w-full h-12 text-base inline-flex items-center justify-center gap-2`}><Plus size={18} /> Adicionar atividade</button>
+      {ctl.sync === "so-aparelho" && <p className="text-center text-sm text-amber-200">Sem internet: a rotina ficou salva só neste celular por enquanto.</p>}
+      {ed && <FormRotina inicial={ed} existe={itens.some((x) => x.id === ed.id)} onFechar={() => setEd(null)} onSalvar={salvar} onExcluir={() => excluir(ed.id)} />}
+    </>
+  );
+}
+
+function FormRotina({ inicial, existe, onFechar, onSalvar, onExcluir }: { inicial: AtividadeRotina; existe: boolean; onFechar: () => void; onSalvar: (a: AtividadeRotina) => void; onExcluir: () => void }) {
+  const [a, setA] = useState(inicial);
+  const ok = a.titulo.trim().length > 0 && /^\d{2}:\d{2}$/.test(a.hora);
+  return (
+    <Folha titulo={existe ? "Editar atividade" : "Nova atividade"} onFechar={onFechar}>
+      <div className="space-y-4">
+        <label className="block"><span className="block text-sm text-white/75 mb-1">Horário</span>
+          <input type="time" className={campo} value={a.hora} onChange={(e) => setA({ ...a, hora: e.target.value })} /></label>
+        <p className="text-sm text-white/60 -mt-2">A rotina fica sempre organizada pelo horário. Para mudar a ordem, mude o horário.</p>
+        <label className="block"><span className="block text-sm text-white/75 mb-1">Atividade</span>
+          <input className={campo} maxLength={40} value={a.titulo} onChange={(e) => setA({ ...a, titulo: e.target.value })} placeholder="Ex.: Tomar o remédio" /></label>
+        <div><span className="block text-sm text-white/75 mb-1">Ícone</span>
+          <div className="grid grid-cols-5 gap-2">
+            {ICONES_ROTINA.map(([id, nome, Ic]) => (
+              <button key={id} type="button" onClick={() => setA({ ...a, icone: id })} aria-label={nome} aria-pressed={a.icone === id}
+                className={`h-12 rounded-xl grid place-items-center border ${a.icone === id ? "border-sky-300 bg-sky-400/20" : "border-white/10 bg-white/[0.06]"}`}><Ic size={20} /></button>
+            ))}
+          </div>
+        </div>
+        <div><span className="block text-sm text-white/75 mb-1">Cor</span>
+          <div className="flex gap-2">{CORES_NEON.map((c) => <button key={c} type="button" onClick={() => setA({ ...a, cor: c })} aria-label={`Cor ${c}`} aria-pressed={a.cor === c} className={`w-10 h-10 rounded-full ${a.cor === c ? "ring-2 ring-white" : ""}`} style={{ background: c, boxShadow: `0 0 12px ${c}` }} />)}</div>
+        </div>
+        <button disabled={!ok} onClick={() => onSalvar({ ...a, titulo: a.titulo.trim() })} className={`${btnPrimario} w-full h-12 text-base`}>Salvar</button>
+        {existe && <button onClick={onExcluir} className={`${btnSuave} w-full h-12 text-base text-rose-200 inline-flex items-center justify-center gap-2`}><Trash2 size={18} /> Excluir atividade</button>}
+      </div>
+    </Folha>
   );
 }
 
