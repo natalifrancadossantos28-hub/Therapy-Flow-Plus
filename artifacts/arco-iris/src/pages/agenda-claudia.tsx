@@ -1214,6 +1214,8 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
 
   const [gravando, setGravando] = useState(false);
   const trava = useRef(false);
+  const montado = useRef(true);
+  useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
   const repeticao = useRef<ReturnType<typeof setTimeout> | null>(null);
   const continuarEscuta = useRef(false);
   const iniciar = useRef<() => void>(() => {});
@@ -1326,7 +1328,9 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
     if (grav.current) { const g = grav.current; grav.current = null; setOuvindo(false); await mandarAudio(await g.parar()); return; }
     try {
       setDica(""); setSalvo("");
-      grav.current = await gravar(25, () => { const g = grav.current; grav.current = null; setOuvindo(false); if (g) void g.parar().then(mandarAudio); });
+      const g = await gravar(25, () => { const g = grav.current; grav.current = null; setOuvindo(false); if (g) void g.parar().then(mandarAudio); });
+      if (!montado.current) { g.cancelar(); liberarMicrofone(); return; }
+      grav.current = g;
       setOuvindo(true);
     } catch (e) {
       setDica((e as Error)?.name === "NotAllowedError"
@@ -1371,12 +1375,14 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
   });
   const pronto = Boolean(res && res.data && (res.hora || res.diaTodo));
   const auto = useRef(Boolean(onFechar));
+  const autoTimer = useRef<number | null>(null);
   useEffect(() => {
     if (!auto.current) return;
     auto.current = false;
     bip();
-    window.setTimeout(() => { if (usarGravador) void ouvirGravando(); else ouvir(); }, 250);
+    autoTimer.current = window.setTimeout(() => { autoTimer.current = null; if (usarGravador) void ouvirGravando(); else ouvir(); }, 250);
   });
+  useEffect(() => () => { if (autoTimer.current) window.clearTimeout(autoTimer.current); }, []);
   return (
     <div className="space-y-5 max-w-xl mx-auto">
       <div className="flex items-center justify-between gap-3">
