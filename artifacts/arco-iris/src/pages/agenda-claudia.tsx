@@ -10,7 +10,7 @@ import { AgendaClaudiaAlarme } from "@/components/AgendaClaudiaAlarme";
 import * as api from "@/lib/agenda-exec-rpc";
 import { CATEGORIAS, categoria, type AgxCompromisso, type AgxInput, type AgxSessao, type Categoria, type Pessoa } from "@/lib/agenda-exec-rpc";
 import { interpretarFrase, comandoVoz, intencaoLocal, type Interpretacao } from "@/lib/agenda-exec-voz";
-import { entenderVoz, gravar, gravadorSuportado, liberarMicrofone, type Gravacao, type VozIA } from "@/lib/agenda-exec-ia";
+import { acordarIA, entenderVoz, gravar, gravadorSuportado, liberarMicrofone, type Gravacao, type VozIA } from "@/lib/agenda-exec-ia";
 import { ativarAvisos, assinaturaAtual, desativarAvisos, ehAndroid, ehIOS, instalado, pushSuportado } from "@/lib/agenda-exec-push";
 import { APARENCIA_PADRAO, OPCOES_FUNDO, ROTINA_MAX, arquivoParaFoto, estiloFundo, useAparencia, type Aparencia, type AtividadeRotina } from "@/lib/agenda-exec-aparencia";
 import { getCompanySession } from "@/lib/portal-session";
@@ -67,6 +67,7 @@ function useManifestAgenda(nome: string, falar: boolean) {
 const CSS = `
   .agenda-executiva { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; overflow-wrap: break-word; hyphens: manual; -webkit-tap-highlight-color: transparent; }
   .agenda-executiva .agx-card { background: rgba(13,20,56,var(--agx-op,.55)); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); } .agenda-executiva .agx-card .agx-card { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .agenda-executiva .agx-card.rounded-3xl { border-color: rgba(168,85,247,.42); box-shadow: 0 0 16px rgba(139,92,246,.28), 0 10px 30px rgba(0,0,0,.35); }
   .agenda-executiva .agx-brilho { box-shadow: 0 0 0 1px rgba(139,92,246,.35), 0 8px 28px rgba(76,29,149,.35); }
   .agenda-executiva input[type=range] { accent-color: #8b5cf6; }
   .agenda-executiva .agx-onda span { width: 3px; border-radius: 3px; background: currentColor; opacity: .75; }
@@ -313,7 +314,8 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
   const excluir = async (id: number) => {
     try { await api.excluir(id); setForm(null); carregar(); avisar("Compromisso excluído"); } catch (e) { falhou(e); }
   };
-  const irFalar = () => { window.location.href = "/agenda-claudia/falar"; };
+  const [falando, setFalando] = useState(false);
+  const irFalar = () => setFalando(true);
   const abrirDia = (d: string) => { setDiaSel(d); setVista("dia"); setAba("agenda"); };
 
   return (
@@ -335,7 +337,7 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
 
       {aba === "agenda" && (
         <div className="space-y-4">
-          <CabecalhoAba titulo="Agenda" acao={<button onClick={() => setForm(novo(diaSel))} className={`${btnPrimario} h-10 px-4 text-sm inline-flex items-center gap-1.5`}><Plus size={16} /> Novo</button>} />
+          <CabecalhoAba titulo="Agenda" icone={<CalendarCheck size={28} />} cor="#38bdf8" acao={<button onClick={() => setForm(novo(diaSel))} className={`${btnPrimario} h-10 px-4 text-sm inline-flex items-center gap-1.5`}><Plus size={16} /> Novo</button>} />
           <div className={`${glass} space-y-3`}>
             <label className="relative block">
               <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" />
@@ -373,7 +375,7 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
 
       {aba === "alarmes" && (
         <div className="space-y-4">
-          <CabecalhoAba titulo="Alarmes e lembretes" />
+          <CabecalhoAba titulo="Alarmes e lembretes" icone={<Bell size={28} />} cor="#f97316" />
           {ehAppNativo() ? <PainelNativo avisar={avisar} lista={lista} /> : <>
             {ehAndroid() && <BaixarAppAndroid />}
             <PainelAvisos sessao={sessao} avisar={avisar} />
@@ -385,7 +387,7 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
 
       {aba === "perfil" && (
         <div className="space-y-4">
-          <CabecalhoAba titulo="Perfil e configurações" />
+          <CabecalhoAba titulo="Perfil e configurações" icone={<Settings size={28} />} cor="#a855f7" />
           <div className={`${glass} flex items-center gap-4`}>
             <span className="grid place-items-center w-14 h-14 rounded-full bg-gradient-to-br from-sky-500 to-violet-600 text-xl font-bold shrink-0">{primeiroNome(sessao.usuario.nome).charAt(0)}</span>
             <div className="min-w-0">
@@ -414,13 +416,24 @@ function Agenda({ sessao, onSair, aparencia }: { sessao: AgxSessao; onSair: () =
       {folha === "aparencia" && <PainelAparencia ctl={aparencia} onFechar={() => setFolha(null)} />}
       {form && <Formulario salvando={gravando} erroSalvar={erroGeral} inicial={form} lista={lista} onFechar={() => setForm(null)} onSalvar={salvar}
         onConcluir={concluir} onExcluir={excluir} />}
+      {falando && (
+        <div className="fixed inset-0 z-40 overflow-y-auto overscroll-contain px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-10" style={{ background: "rgba(5,8,30,.9)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}>
+          <TelaFalar sessao={sessao} onSair={onSair} onFechar={() => { setFalando(false); carregar(); }} />
+        </div>
+      )}
       {aviso && <div role="status" className="fixed left-1/2 -translate-x-1/2 bottom-28 z-50 inline-flex items-center gap-2 rounded-2xl bg-[#111a46]/95 border border-white/15 px-5 py-3 text-sm font-semibold shadow-2xl"><Check size={16} className="text-emerald-300" />{aviso}</div>}
     </div>
   );
 }
 
-function CabecalhoAba({ titulo, acao }: { titulo: string; acao?: React.ReactNode }) {
-  return <div className="flex items-center justify-between gap-3 pt-1"><h2 className="text-2xl font-bold tracking-tight">{titulo}</h2>{acao}</div>;
+function CabecalhoAba({ titulo, acao, icone, cor = "#a855f7" }: { titulo: string; acao?: React.ReactNode; icone?: React.ReactNode; cor?: string }) {
+  return (
+    <div className={`${glass} !py-4 flex flex-wrap items-center gap-3`} style={neon(cor)}>
+      {icone && <span className="grid place-items-center w-12 h-12 rounded-2xl bg-white/[0.07] border border-white/15 shrink-0" style={{ color: cor }}>{icone}</span>}
+      <h2 className="flex-1 min-w-[8rem] text-[min(1.6rem,6.5vw)] font-extrabold leading-tight tracking-tight">{titulo}</h2>
+      {acao}
+    </div>
+  );
 }
 
 function Inicio({ sessao, dona, hoje, deHoje, restantesHoje, proximo, mes, setMes, doDia, lista, onAba, onNovo, onCategorias, onAbrir, onDia, onFalar, letra, onLetra }: {
@@ -639,7 +652,7 @@ function TarefasDia({ lista, hoje, onAbrir, onConcluir, onNovo, onTodas }: {
           <span className={`block text-lg font-semibold leading-snug break-words ${c.concluido ? "line-through text-white/55" : ""}`}>{c.titulo}</span>
           <span className="block text-sm text-white/70">{c.data < hoje && <b className="text-rose-300">Atrasada · {rotuloDia(c.data, hoje)} · </b>}{horaTxt(c.hora)}{c.local ? ` · ${c.local}` : ""}</span>
         </button>
-        <Pencil size={16} className="text-white/45 shrink-0 mr-1" aria-hidden />
+        <button onClick={() => onAbrir(c)} aria-label={`Editar ${c.titulo}`} className="grid place-items-center w-9 h-9 shrink-0 rounded-xl bg-white/[0.08] border border-white/15"><Pencil size={18} className="text-sky-200" /></button>
       </div>
     );
   };
@@ -800,7 +813,7 @@ function Tarefas({ lista, hoje, onAbrir, onConcluir, onNovo }: { lista: AgxCompr
   );
   return (
     <div className="space-y-4">
-      <CabecalhoAba titulo="Tarefas" acao={<button onClick={onNovo} className={`${btnPrimario} h-10 px-4 text-sm inline-flex items-center gap-1.5`}><Plus size={16} /> Nova</button>} />
+      <CabecalhoAba titulo="Tarefas" icone={<ListChecks size={28} />} cor="#22c55e" acao={<button onClick={onNovo} className={`${btnPrimario} h-10 px-4 text-sm inline-flex items-center gap-1.5`}><Plus size={16} /> Nova</button>} />
       <div className={`${glass} space-y-2`}>
         <p className="text-sm text-white/70">{pend.length} pendentes</p>
         {pend.length === 0 ? <p className="text-sm text-white/60 py-2">Tudo em dia.</p> : pend.map(linha)}
@@ -991,9 +1004,8 @@ function PainelAparencia({ ctl, onFechar }: { ctl: AparenciaCtl; onFechar: () =>
 function Item({ c, onClick, conflito = false }: { c: AgxCompromisso; onClick: () => void; conflito?: boolean }) {
   const cat = categoria(c.categoria);
   return (
-    <button onClick={onClick} className="w-full text-left flex items-stretch gap-3 rounded-2xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 p-3 transition">
-      <span className="w-1 rounded-full shrink-0" style={{ background: cat.cor }} />
-      <span className="w-12 shrink-0 text-sm font-semibold tabular-nums pt-0.5">{horaTxt(c.hora)}</span>
+    <button onClick={onClick} className="agx-card w-full text-left flex items-center gap-3 rounded-2xl p-2.5 transition" style={neon(cat.cor)}>
+      <span className="shrink-0 rounded-xl px-2 py-1 text-sm font-extrabold tabular-nums text-white" style={{ background: `linear-gradient(135deg, ${cat.cor}, ${cat.cor}99)`, boxShadow: `0 0 10px ${cat.cor}80` }}>{horaTxt(c.hora)}</span>
       <span className="min-w-0 flex-1">
         <span className={`block font-semibold leading-snug break-words ${c.concluido ? "line-through text-white/50" : ""}`}>{c.titulo}</span>
         <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/65">
@@ -1072,8 +1084,8 @@ function Folha({ titulo, onFechar, children, leve = false }: { titulo: string; o
   return (
     <div className={`fixed inset-0 z-40 flex items-end md:items-center justify-center ${leve ? "bg-black/20" : "bg-black/60 backdrop-blur-sm"}`} onClick={onFechar}>
       <div role="dialog" aria-label={titulo} onClick={(e) => e.stopPropagation()}
-        className={`agx-entrar w-full md:max-w-xl ${leve ? "max-h-[68dvh]" : "max-h-[92dvh]"} overflow-y-auto overscroll-contain rounded-t-3xl md:rounded-3xl border border-white/15 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white text-base shadow-2xl`}
-        style={{ background: "rgba(12,18,52,.96)", backdropFilter: "blur(20px)" }}>
+        className={`agx-entrar w-full md:max-w-xl ${leve ? "max-h-[68dvh]" : "max-h-[92dvh]"} overflow-y-auto overscroll-contain rounded-t-3xl md:rounded-3xl border border-violet-400/50 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white text-base shadow-2xl`}
+        style={{ background: "rgba(12,18,52,.96)", backdropFilter: "blur(20px)", boxShadow: "0 0 30px rgba(139,92,246,.35)" }}>
         <div className="flex items-center justify-between mb-4">
           <p className="text-lg font-semibold">{titulo}</p>
           <button onClick={onFechar} aria-label="Fechar" className="grid place-items-center w-10 h-10 rounded-full bg-white/10"><X size={18} /></button>
@@ -1152,6 +1164,14 @@ const toMin = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
 
 
 // ---------------------------------------------------------------- falar (microfone grande)
+function bip() {
+  try {
+    const C = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const c = new C(), o = c.createOscillator(), g = c.createGain();
+    o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(c.destination);
+    o.start(); o.stop(c.currentTime + 0.15); window.setTimeout(() => void c.close(), 400);
+  } catch { /* sem som */ }
+}
 type Reconhecedor = { lang: string; interimResults: boolean; continuous: boolean; start: () => void; stop: () => void;
   onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
   onerror: ((e: { error: string }) => void) | null; onend: (() => void) | null };
@@ -1161,7 +1181,7 @@ const novoCompromisso = (data: string, extra: Partial<AgxInput> = {}): AgxInput 
   avisarVespera: true, avisarDia: true, antecedenciaMin: 60, ...extra,
 });
 
-function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }) {
+function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: () => void; onFechar?: () => void }) {
   const nome = primeiroNome(sessao.usuario.nome);
   const inicial = new URLSearchParams(window.location.search).get("texto") ?? "";
   const [txt, setTxt] = useState(inicial);
@@ -1182,7 +1202,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     api.listar(d(-7), d(180)).then(setLista).catch(() => {});
   }, []);
   useEffect(recarregar, [recarregar]);
-  useEffect(() => () => liberarMicrofone(), []);
+  useEffect(() => { acordarIA(); return () => liberarMicrofone(); }, []);
   const w = window as unknown as { SpeechRecognition?: new () => Reconhecedor; webkitSpeechRecognition?: new () => Reconhecedor };
   const Rec = w.SpeechRecognition ?? w.webkitSpeechRecognition;
   useEffect(() => () => rec.current?.stop(), []);
@@ -1194,6 +1214,8 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
 
   const [gravando, setGravando] = useState(false);
   const trava = useRef(false);
+  const montado = useRef(true);
+  useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
   const repeticao = useRef<ReturnType<typeof setTimeout> | null>(null);
   const continuarEscuta = useRef(false);
   const iniciar = useRef<() => void>(() => {});
@@ -1220,7 +1242,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
       setSalvo(`${c.titulo} · ${dataLonga(c.data)} · ${horaTxt(c.hora)}`);
       setRes(null); setTxt(""); setForm(null);setDica("");setExtra({ observacao: null, antecedenciaMin: null });recarregar();
       falarResultado("Compromisso salvo na agenda.");
-      window.history.replaceState(null, "", "/agenda-claudia/falar");
+      if (!onFechar) window.history.replaceState(null, "", "/agenda-claudia/falar");
     } catch (e) {
       if (api.sessaoInvalida(e)) onSair();
       else {setDica(erroTxt(e));falarResultado("Não foi possível confirmar a gravação. Confira o aviso na tela.");}
@@ -1306,7 +1328,9 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     if (grav.current) { const g = grav.current; grav.current = null; setOuvindo(false); await mandarAudio(await g.parar()); return; }
     try {
       setDica(""); setSalvo("");
-      grav.current = await gravar(25, () => { const g = grav.current; grav.current = null; setOuvindo(false); if (g) void g.parar().then(mandarAudio); });
+      const g = await gravar(25, () => { const g = grav.current; grav.current = null; setOuvindo(false); if (g) void g.parar().then(mandarAudio); });
+      if (!montado.current) { g.cancelar(); liberarMicrofone(); return; }
+      grav.current = g;
       setOuvindo(true);
     } catch (e) {
       setDica((e as Error)?.name === "NotAllowedError"
@@ -1350,28 +1374,45 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
     titulo: res.titulo, hora: res.diaTodo ? null : res.hora ?? "09:00", local: res.local, categoria: res.categoria,
   });
   const pronto = Boolean(res && res.data && (res.hora || res.diaTodo));
+  const auto = useRef(Boolean(onFechar));
+  const autoTimer = useRef<number | null>(null);
+  useEffect(() => {
+    if (!auto.current) return;
+    auto.current = false;
+    bip();
+    autoTimer.current = window.setTimeout(() => { autoTimer.current = null; if (usarGravador) void ouvirGravando(); else ouvir(); }, 250);
+  });
+  useEffect(() => () => { if (autoTimer.current) window.clearTimeout(autoTimer.current); }, []);
   return (
     <div className="space-y-5 max-w-xl mx-auto">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-2xl font-bold">Olá, {nome}!</p>
-        <a href="/agenda-claudia" className={`${btnBase} px-4 py-3 text-sm bg-white/10 border border-white/20`}>📅 Ver agenda</a>
+        <div className="min-w-0"><p className="text-lg text-white/80 leading-tight">Olá, {nome}!</p><p className="text-[min(2rem,8vw)] font-extrabold leading-tight agx-neon-txt">O que vamos marcar?</p></div>
+        {onFechar
+          ? <button onClick={() => { pararEscuta(); onFechar(); }} aria-label="Fechar e voltar para a agenda" className="grid place-items-center w-12 h-12 shrink-0 rounded-full agx-card border border-violet-400/50 shadow-[0_0_14px_rgba(139,92,246,.45)]"><X size={22} /></button>
+          : <a href="/agenda-claudia" className={`${btnBase} inline-flex items-center gap-2 px-4 py-3 text-sm agx-card border border-violet-400/50 shadow-[0_0_14px_rgba(139,92,246,.45)]`}><CalendarCheck size={18} /> Ver agenda</a>}
       </div>
       <button data-native-recognition="react" disabled={pensando} onClick={usarGravador ? () => void ouvirGravando() : ouvindo ? pararEscuta : ouvir} aria-label={ouvindo ? "Parar de ouvir" : "Tocar e falar"}
-        className={`mx-auto flex flex-col items-center justify-center w-32 h-32 rounded-full text-5xl shadow-2xl transition active:scale-95 ${ouvindo ? "bg-red-500 animate-pulse" : ""}`}
-        style={ouvindo ? undefined : { background: "linear-gradient(135deg,#38bdf8,#8b5cf6)", boxShadow: "0 0 0 10px rgba(56,189,248,.18),0 16px 32px rgba(0,0,0,.45)" }}>
-        🎙️<span className="text-sm font-bold mt-1 px-2 text-center leading-tight">{pensando ? "Entendendo…" : ouvindo ? (usarGravador ? "Toque p/ terminar" : "Ouvindo…") : res || outra ? "Diga sua opção" : "Toque e fale"}</span>
+        className={`mx-auto mt-4 flex flex-col items-center justify-center w-44 h-44 rounded-full transition active:scale-95 ${ouvindo ? "bg-gradient-to-br from-rose-500 to-pink-600 animate-pulse shadow-[0_0_40px_rgba(244,63,94,.8)]" : "bg-gradient-to-br from-sky-400 via-violet-500 to-pink-500 agx-mic"}`}>
+        <Mic size={64} /><span className="text-base font-bold mt-2 px-3 text-center leading-tight">{pensando ? "Entendendo…" : ouvindo ? (usarGravador ? "Toque p/ terminar" : "Ouvindo…") : res || outra ? "Diga sua opção" : "Toque e fale"}</span>
       </button>
       {txt.trim() && (ouvindo || pensando || res || outra) && (
-        <div className={`${glass} !p-3 text-center`} aria-live="polite">
+        <div className={`${glass} !p-3 text-center`} style={neon("#38bdf8")} aria-live="polite">
           <p className="text-sm text-white/65">{ouvindo ? "Ouvindo…" : pensando ? "Entendendo…" : "Você falou:"}</p>
           <p className="text-xl font-semibold leading-snug">“{txt}”</p>
         </div>
       )}
-      {!txt.trim() && !res && !outra && <p className="text-center text-base text-white/80">Fale do seu jeito: marcar, desmarcar, remarcar ou “já fiz”. Ex.: “festa de aniversário da Ana sábado às 8 da noite” ou “desmarcar compromisso dia 15 de novembro às 9 horas”.</p>}
+      {!txt.trim() && !res && !outra && (
+        <div className={`${glass} space-y-2`} style={neon("#a855f7")}>
+          <p className="text-base font-bold">Fale do seu jeito</p>
+          <p className="text-base text-white/80">Marcar, desmarcar, remarcar ou “já fiz”. Por exemplo:</p>
+          <p className="rounded-2xl bg-white/[0.06] border border-white/10 px-3 py-2 text-base">“Reunião no Núcleo amanhã às 9”</p>
+          <p className="rounded-2xl bg-white/[0.06] border border-white/10 px-3 py-2 text-base">“Desmarcar o compromisso do dia 15 às 9 horas”</p>
+        </div>
+      )}
       {dica && <p className="text-base text-rose-300 text-center" role="alert">{dica}</p>}
-      {salvo && <div className="rounded-2xl bg-green-500/20 border border-green-400/50 p-4 text-base" role="status"><b>✅ Pronto:</b> <span className="capitalize">{salvo}</span></div>}
+      {salvo && <div className={`${glass} text-base`} style={neon("#22c55e")} role="status"><b>✅ Pronto:</b> <span className="capitalize">{salvo}</span></div>}
       {outra && (
-        <div className="rounded-2xl bg-violet-400/10 border border-violet-300/40 p-4 space-y-2 text-base">
+        <div className={`${glass} space-y-2 text-base`} style={neon("#a855f7")}>
           <p className="text-sm text-white/70">{outra.acao === "desmarcar" ? "Desmarcar este compromisso?" : outra.acao === "concluir" ? "Marcar como feito?" : "Remarcar para:"}</p>
           <p className="text-lg font-bold">{outra.alvo.titulo}</p>
           <p>📅 <span className="capitalize">{dataLonga(outra.acao === "remarcar" ? outra.data : outra.alvo.data)}</span> · ⏰ {horaTxt(outra.acao === "remarcar" ? outra.hora : outra.alvo.hora)}</p>
@@ -1383,7 +1424,7 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
         </div>
       )}
       {res && input && (
-        <div className="rounded-2xl bg-sky-400/10 border border-sky-300/40 p-4 space-y-2 text-base">
+        <div className={`${glass} space-y-2 text-base`} style={neon("#38bdf8")}>
           <p className="text-sm text-white/70">Vai ficar assim na agenda:</p>
           <p className="text-xl font-bold">{res.titulo}</p>
           <p>📅 {res.data ? <span className="capitalize">{dataLonga(res.data)}</span> : <b className="text-rose-300">faltou o dia</b>}</p>
@@ -1399,13 +1440,13 @@ function TelaFalar({ sessao, onSair }: { sessao: AgxSessao; onSair: () => void }
           </div>
         </div>
       )}
-      <textarea className={`${campo} h-24 py-3`} value={txt} onChange={(e) => { setTxt(e.target.value); setRes(null); }} placeholder="Ou escreva aqui o compromisso…" />
-      {!res && txt.trim() && <button onClick={() => entender()} className={`${btnBase} w-full h-12 text-lg bg-sky-400 text-sky-950`}>Continuar</button>}
+      <textarea className={`${campo} h-24 py-3 !rounded-2xl !border-violet-400/40`} value={txt} onChange={(e) => { setTxt(e.target.value); setRes(null); }} placeholder="Ou escreva aqui o compromisso…" />
+      {!res && txt.trim() && <button onClick={() => entender()} className={`${btnPrimario} w-full h-12 text-lg`}>Continuar</button>}
       {!instalado() && ehAndroid() && podeInstalar && (
         <button onClick={async () => { await installEvt?.prompt(); installEvt = null; setPodeInstalar(false); }}
           className={`${btnBase} w-full h-12 text-base bg-white/10 border border-white/25`}>📲 Colocar o botão “Falar” na tela inicial</button>
       )}
-      {ehIOS() && <AtalhoIphone />}
+      {ehIOS() && !onFechar && <AtalhoIphone />}
       {form && <Formulario erroSalvar={dica} salvando={gravando} inicial={form} lista={[]} onFechar={() => setForm(null)} onSalvar={salvar} onConcluir={() => {}} onExcluir={() => {}} />}
     </div>
   );

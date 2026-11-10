@@ -5,7 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 const CATEGORIAS = ["reuniao", "evento", "visita", "palestra", "urgente", "pessoal", "outro",
   "aniversario", "saude", "viagem", "familia", "contas", "escola", "lazer"];
 // "gemini-2.0-flash" foi desligado pelo Google (404); os apelidos "-latest" acompanham a versão atual.
-const MODELOS = [...new Set([process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-flash-lite-latest"].filter(Boolean))];
+// O "lite" responde bem mais rápido; o "flash" entra em paralelo se ele demorar.
+const MODELOS = [...new Set([process.env.GEMINI_MODEL, "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-flash-latest"].filter(Boolean))];
 const SEMANA = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 
 function hojeSP() {
@@ -71,7 +72,7 @@ async function chamar(modelo, chave, partes, ate) {
   throw new Error(`${modelo}: sem resposta`);
 }
 
-// Para não deixar a pessoa esperando: começa no modelo principal e, se ele não responder em 2,5 s
+// Para não deixar a pessoa esperando: começa no modelo principal e, se ele não responder em 1,5 s
 // (ou der erro), já dispara o próximo em paralelo. Vale a primeira resposta boa.
 function perguntar(chave, partes, modelos = MODELOS) {
   const ate = Date.now() + 25_000;
@@ -84,7 +85,7 @@ function perguntar(chave, partes, modelos = MODELOS) {
       const modelo = modelos[i++]; rodando++;
       chamar(modelo, chave, partes, ate).then((r) => { if (!acabou) { acabou = true; clearTimeout(timer); ok(r); } })
         .catch((e) => { ultimo = String(e?.message ?? e); rodando--; proximo(); });
-      timer = setTimeout(proximo, 2_500);
+      timer = setTimeout(proximo, 1_500);
     };
     proximo();
   });

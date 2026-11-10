@@ -22,7 +22,7 @@ export function liberarMicrofone() { microfone?.getTracks().forEach((t) => t.sto
 
 export type Gravacao = { parar: () => Promise<Blob>; cancelar: () => void };
 
-// Para sozinho quando a pessoa termina de falar (≈0,8 s de silêncio depois da fala), sem precisar tocar de novo.
+// Para sozinho quando a pessoa termina de falar (≈0,6 s de silêncio depois da fala), sem precisar tocar de novo.
 function vigiarSilencio(stream: MediaStream, aoCalar: () => void): () => void {
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -38,7 +38,7 @@ function vigiarSilencio(stream: MediaStream, aoCalar: () => void): () => void {
       const rms = Math.sqrt(soma / buf.length);
       if (Date.now() - t0 < 300) { base = Math.max(base, rms * 1.5); return; }
       if (rms > Math.max(0.02, base * 2)) { falou = true; calado = 0; }
-      else if (falou && (calado += 100) >= 800) { parar(); aoCalar(); }
+      else if (falou && (calado += 100) >= 600) { parar(); aoCalar(); }
       else if (!falou && Date.now() - t0 > 7000) { parar(); aoCalar(); }
     }, 100);
     const parar = () => { window.clearInterval(id); void ctx.close().catch(() => {}); };
@@ -46,7 +46,11 @@ function vigiarSilencio(stream: MediaStream, aoCalar: () => void): () => void {
   } catch { return () => {}; }
 }
 
+// Acorda o servidor da IA enquanto a pessoa fala, para a resposta não esperar a "partida a frio".
+export function acordarIA() { void fetch("/api/agenda/voz", { method: "GET" }).catch(() => {}); }
+
 export async function gravar(maxSeg = 25, aoAcabar?: () => void): Promise<Gravacao> {
+  acordarIA();
   if (!microfone || microfone.getAudioTracks().every((t) => t.readyState === "ended"))
     microfone = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
   const stream = microfone;
@@ -66,6 +70,16 @@ export async function gravar(maxSeg = 25, aoAcabar?: () => void): Promise<Gravac
   };
 }
 
+// Tira o silêncio do começo e do fim: áudio menor sobe e é entendido mais rápido.
+function cortarSilencio(pcm: Float32Array, taxa: number): Float32Array {
+  const bloco = Math.round(taxa / 50), forte = (i: number) => { let m = 0; for (let j = i; j < Math.min(pcm.length, i + bloco); j++) m = Math.max(m, Math.abs(pcm[j])); return m > 0.012; };
+  let ini = 0, fim = pcm.length;
+  while (ini < fim && !forte(ini)) ini += bloco;
+  while (fim > ini && !forte(Math.max(ini, fim - bloco))) fim -= bloco;
+  if (fim - ini < taxa / 4) return pcm;
+  return pcm.subarray(Math.max(0, ini - Math.round(taxa * 0.4)), Math.min(pcm.length, fim + Math.round(taxa * 0.4)));
+}
+
 async function paraWav(blob: Blob): Promise<string> {
   const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const ctx = new Ctx();
@@ -75,7 +89,7 @@ async function paraWav(blob: Blob): Promise<string> {
   const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(audio.duration * taxa)), taxa);
   const src = off.createBufferSource();
   src.buffer = audio; src.connect(off.destination); src.start();
-  const pcm = (await off.startRendering()).getChannelData(0);
+  const pcm = cortarSilencio((await off.startRendering()).getChannelData(0), taxa);
   const buf = new DataView(new ArrayBuffer(44 + pcm.length * 2));
   const txt = (o: number, s: string) => [...s].forEach((c, i) => buf.setUint8(o + i, c.charCodeAt(0)));
   txt(0, "RIFF"); buf.setUint32(4, 36 + pcm.length * 2, true); txt(8, "WAVE"); txt(12, "fmt ");
