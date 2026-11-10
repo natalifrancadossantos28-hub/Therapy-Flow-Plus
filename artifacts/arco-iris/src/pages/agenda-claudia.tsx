@@ -10,7 +10,7 @@ import { AgendaClaudiaAlarme } from "@/components/AgendaClaudiaAlarme";
 import * as api from "@/lib/agenda-exec-rpc";
 import { CATEGORIAS, categoria, type AgxCompromisso, type AgxInput, type AgxSessao, type Categoria, type Pessoa } from "@/lib/agenda-exec-rpc";
 import { interpretarFrase, comandoVoz, intencaoLocal, type Interpretacao } from "@/lib/agenda-exec-voz";
-import { entenderVoz, gravar, gravadorSuportado, liberarMicrofone, type Gravacao, type VozIA } from "@/lib/agenda-exec-ia";
+import { acordarIA, entenderVoz, gravar, gravadorSuportado, liberarMicrofone, type Gravacao, type VozIA } from "@/lib/agenda-exec-ia";
 import { ativarAvisos, assinaturaAtual, desativarAvisos, ehAndroid, ehIOS, instalado, pushSuportado } from "@/lib/agenda-exec-push";
 import { APARENCIA_PADRAO, OPCOES_FUNDO, ROTINA_MAX, arquivoParaFoto, estiloFundo, useAparencia, type Aparencia, type AtividadeRotina } from "@/lib/agenda-exec-aparencia";
 import { getCompanySession } from "@/lib/portal-session";
@@ -1202,7 +1202,7 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
     api.listar(d(-7), d(180)).then(setLista).catch(() => {});
   }, []);
   useEffect(recarregar, [recarregar]);
-  useEffect(() => () => liberarMicrofone(), []);
+  useEffect(() => { acordarIA(); return () => liberarMicrofone(); }, []);
   const w = window as unknown as { SpeechRecognition?: new () => Reconhecedor; webkitSpeechRecognition?: new () => Reconhecedor };
   const Rec = w.SpeechRecognition ?? w.webkitSpeechRecognition;
   useEffect(() => () => rec.current?.stop(), []);
