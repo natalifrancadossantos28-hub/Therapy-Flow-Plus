@@ -1374,7 +1374,11 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
         }
       };
       rec.current = r; r.start(); setOuvindo(true);
-    } catch {continuarEscuta.current=false;setOuvindo(false);setDica("Toque no microfone para tentar de novo, ou use os botões abaixo.");}
+    } catch {
+      continuarEscuta.current=false;setOuvindo(false);rec.current=null;
+      if (gravadorSuportado()) { setRecFalhou(true); void ouvirGravando(); return; }
+      setDica("Toque no microfone para tentar de novo, ou use os botões abaixo.");
+    }
   };
   iniciar.current=ouvir;
   const input = res && novoCompromisso(res.data ?? ISO(new Date()), {
