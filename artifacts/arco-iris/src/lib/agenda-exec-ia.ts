@@ -72,12 +72,12 @@ export async function gravar(maxSeg = 25, aoAcabar?: () => void): Promise<Gravac
 
 // Tira o silêncio do começo e do fim: áudio menor sobe e é entendido mais rápido.
 function cortarSilencio(pcm: Float32Array, taxa: number): Float32Array {
-  const bloco = Math.round(taxa / 50), forte = (i: number) => { let m = 0; for (let j = i; j < Math.min(pcm.length, i + bloco); j++) m = Math.max(m, Math.abs(pcm[j])); return m > 0.04; };
+  const bloco = Math.round(taxa / 50), forte = (i: number) => { let m = 0; for (let j = i; j < Math.min(pcm.length, i + bloco); j++) m = Math.max(m, Math.abs(pcm[j])); return m > 0.012; };
   let ini = 0, fim = pcm.length;
   while (ini < fim && !forte(ini)) ini += bloco;
   while (fim > ini && !forte(Math.max(ini, fim - bloco))) fim -= bloco;
   if (fim - ini < taxa / 4) return pcm;
-  return pcm.subarray(Math.max(0, ini - taxa / 5), Math.min(pcm.length, fim + taxa / 5));
+  return pcm.subarray(Math.max(0, ini - Math.round(taxa * 0.4)), Math.min(pcm.length, fim + Math.round(taxa * 0.4)));
 }
 
 async function paraWav(blob: Blob): Promise<string> {
