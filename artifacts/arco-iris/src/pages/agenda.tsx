@@ -1745,6 +1745,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     expanded
       .filter(a => a.date === date && a.time === time)
       .sort((a, b) => callOrder(a) - callOrder(b));
+  // Sessões marcadas fora dos horários padrão também ganham linha na grade.
+  const withExtraTimes = (times: string[]) =>
+    Array.from(new Set([...TIME_SLOTS, ...times])).sort();
+  const gridTimes = withExtraTimes(
+    expanded.filter(a => weekDates.includes(a.date)).map(a => a.time)
+  );
   const selectedProfIdNum = selectedProfId ? parseInt(selectedProfId) : 0;
   const dayBlock = (date: string): string | null => {
     const h = holidayOn(date, feriados);
@@ -1802,12 +1808,13 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         if (dow >= 1 && dow <= 5) dates.push(format(d, "yyyy-MM-dd"));
       }
     }
+    const printApts = mode === "rascunho" ? [] : buildPrintApts(dates);
     openAgendaPrint({
       mode,
       professionalName: selectedProf?.name,
       specialty: selectedProf?.specialty,
-      timeSlots: TIME_SLOTS,
-      appointments: mode === "rascunho" ? [] : buildPrintApts(dates),
+      timeSlots: withExtraTimes(printApts.map(a => a.time)),
+      appointments: printApts,
       refDate,
       includeLunch: !isPaula,
     });
@@ -2013,7 +2020,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 </tr>
               </thead>
               <tbody>
-                {TIME_SLOTS.map(time => {
+                {gridTimes.map(time => {
                   const isLunch = time === "12:10" && !isPaula;
                   return (
                     <tr key={time} className="border-b border-border hover:bg-secondary/10 transition-colors">
@@ -2415,7 +2422,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
             <Clock className="w-4 h-4 text-primary" /> Resumo de Hoje — {format(new Date(), "dd/MM/yyyy")}
           </h3>
           <div className="space-y-2">
-            {TIME_SLOTS.filter(t => isPaula || t !== "12:10").map(time => {
+            {withExtraTimes(expanded.filter(a => a.date === today).map(a => a.time)).filter(t => isPaula || t !== "12:10").map(time => {
               const apts = getApts(today, time);
               const apt = apts[0] ?? null;
               return (
