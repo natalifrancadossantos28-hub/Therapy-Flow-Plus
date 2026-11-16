@@ -429,9 +429,15 @@ export default function Patients() {
     const body = lista.map(p => {
       const telefone = [p.phone, p.guardianPhone].filter(Boolean).join(" / ");
       const profs = patientProfs.get(p.id)?.names.join(", ") || "";
+      const dob = (p.dateOfBirth || "").trim();
+      const iso = dob.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const nascimento = iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : dob || "—";
+      const idade = calcIdade(dob);
       return `<tr>
         <td style="${td}white-space:nowrap;font-weight:700;color:#059669;">${esc(p.prontuario || "—")}</td>
         <td style="${td}font-weight:600;color:#0f172a;">${esc(p.name)}</td>
+        <td style="${td}white-space:nowrap;">${esc(nascimento)}</td>
+        <td style="${td}white-space:nowrap;">${isNaN(idade) ? "—" : `${idade} ano${idade === 1 ? "" : "s"}`}</td>
         <td style="${td}">${esc(p.motherName || "—")}</td>
         <td style="${td}">${esc(p.address || "—")}</td>
         <td style="${td}">${esc(telefone || "—")}</td>
@@ -453,9 +459,9 @@ export default function Patients() {
     <h1>Pacientes em Atendimento</h1>
     <p class="sub">${todayStr} · ${lista.length} paciente(s) em atendimento</p>
     <table>
-      <colgroup><col style="width:9%"><col style="width:20%"><col style="width:19%"><col style="width:24%"><col style="width:13%"><col style="width:15%"></colgroup>
-      <thead><tr><th>Pront.</th><th>Nome</th><th>Nome da Mãe</th><th>Endereço</th><th>Telefone</th><th>Profissional(is)</th></tr></thead>
-      <tbody>${body || `<tr><td colspan="6" style="padding:16px;color:#94a3b8;font-style:italic;text-align:center;">Nenhum paciente em atendimento.</td></tr>`}</tbody>
+      <colgroup><col style="width:7%"><col style="width:18%"><col style="width:9%"><col style="width:7%"><col style="width:16%"><col style="width:19%"><col style="width:11%"><col style="width:13%"></colgroup>
+      <thead><tr><th>Pront.</th><th>Nome</th><th>Nascimento</th><th>Idade</th><th>Nome da Mãe</th><th>Endereço</th><th>Telefone</th><th>Profissional(is)</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="8" style="padding:16px;color:#94a3b8;font-style:italic;text-align:center;">Nenhum paciente em atendimento.</td></tr>`}</tbody>
     </table>
     <p style="margin-top:24px;font-size:11px;color:#94a3b8;">NFS – Gestão Terapêutica · Telefone: paciente / responsável.</p>
     </body></html>`);
