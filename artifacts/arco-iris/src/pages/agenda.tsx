@@ -524,7 +524,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [pinLoading, setPinLoading] = useState(false);
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
   // Só visual: "Dia" mostra apenas uma coluna da mesma grade semanal.
-  const [diaFoco, setDiaFoco] = useState<number | null>(null);
+  // No celular abre direto no "Dia" (uma coluna larga, letras grandes); a "Semana" continua no botão.
+  const [diaFoco, setDiaFoco] = useState<number | null>(() => {
+    if (typeof window === "undefined" || !window.matchMedia("(max-width: 767px)").matches) return null;
+    const dow = new Date().getDay();
+    return dow >= 1 && dow <= 5 ? dow - 1 : 0;
+  });
   const [novoAberto, setNovoAberto] = useState<{ date: string; time: string } | null>(null);
   // Trocar o horário de uma linha da grade (ex.: 08:00 → 08:10) num dia escolhido.
   const [ajusteHora, setAjusteHora] = useState<{ time: string; date: string; novo: string; definitivo: boolean } | null>(null);
@@ -2304,16 +2309,20 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                   >
                                     <div className="flex items-center gap-1.5 min-w-0">
                                       <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={30} />
-                                      <span className="font-semibold text-foreground text-[13px] leading-tight line-clamp-2 break-words" title={apt.patientName || undefined}>
-                                        {isGroup && <span className="text-cyan-300 font-extrabold mr-1">{ordem + 1}º</span>}
-                                        {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
+                                      {(isGroup || apt.prontuario) && (
+                                        <span className="text-[13px] font-extrabold leading-tight truncate">
+                                          {isGroup && <span className="text-cyan-300 mr-1">{ordem + 1}º</span>}
+                                          {apt.prontuario && <span className="text-cyan-400">[{apt.prontuario}]</span>}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="font-semibold text-foreground text-[13px] leading-tight line-clamp-2 break-words" title={apt.patientName || undefined}>
                                         {isGhost ? (
                                           <span className="text-amber-400">⚠ Sem dados</span>
                                         ) : (
                                           abbreviateName(apt.patientName, 34) || `#${apt.patientId}`
                                         )}
-                                      </span>
-                                    </div>
+                                    </span>
                                     <AbsenceBadge count={absenceCount(apt.patientId)} compact />
                                     <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
                                       {getStatusLabel(apptStatus(apt))}
