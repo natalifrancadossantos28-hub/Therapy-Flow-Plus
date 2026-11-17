@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { HeroTela } from "@/components/HeroTela";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { MotionCard, Button, Input, Label, Select } from "@/components/ui-custom";
 import { DoorOpen, Plus, Trash2, RefreshCw, Clock, CircleDot, Users, Activity, CalendarDays, UserCheck, X } from "lucide-react";
@@ -251,11 +252,10 @@ export default function SalasPage() {
 
   return (
     <div className="space-y-8">
+      <HeroTela img="salas" titulo="Gestão de Salas" subtitulo="Situação das salas em tempo real." />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <DoorOpen className="w-7 h-7 text-primary" /> Gestão de Salas
-          </h1>
+          <span className="sr-only">Gestão de Salas</span>
           <p className="text-muted-foreground mt-1">
             Cada card é uma sala física. 🟢 Livre · 🟡 Aguardando paciente (agendado, sem check-in) · 🔵 Paciente chegou (check-in feito) · 🔴 Em atendimento. Atualiza sozinho a cada 30s.
           </p>

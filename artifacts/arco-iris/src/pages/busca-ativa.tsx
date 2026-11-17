@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { HeroTela } from "@/components/HeroTela";
 import { Link } from "wouter";
 import { ShieldAlert, Search, RefreshCw, Phone, CircleDot, Loader2, CheckCircle2, XCircle, MessageSquare, Printer, Archive, RotateCcw, Snowflake, Plus } from "lucide-react";
 import { printBuscaAtivaReport } from "@/lib/print-busca-ativa";
@@ -108,11 +109,10 @@ export default function BuscaAtivaPage() {
 
   return (
     <div className="space-y-6">
+      <HeroTela img="pacientes" titulo="Busca Ativa" subtitulo="Casos para a assistente social." />
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display flex items-center gap-2">
-            <ShieldAlert className="w-7 h-7 text-rose-400" /> Busca Ativa
-          </h1>
+          <span className="sr-only">Busca Ativa</span>
           <p className="text-muted-foreground mt-1 text-sm">
             Casos para a assistente social (violação de direitos, risco, faltas seguidas...). A criança continua na agenda e na fila normalmente.
             Ao terminar, clique em <strong>Finalizar e tirar da lista</strong> para seguir com o próximo.

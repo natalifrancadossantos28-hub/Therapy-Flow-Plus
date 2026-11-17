@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { HeroTela } from "@/components/HeroTela";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Link } from "wouter";
 import { MotionCard, Button, Input, Label, Select, Badge } from "@/components/ui-custom";
@@ -296,9 +297,10 @@ export default function Professionals() {
 
   return (
     <div className="space-y-8">
+      <HeroTela img="profissionais" titulo="Profissionais" subtitulo="A equipe do núcleo terapêutico." />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Profissionais</h1>
+          <span className="sr-only">Profissionais</span>
           <p className="text-muted-foreground mt-1">
             Profissionais com 30h atendem até 30 pacientes · 20h atendem até 20 pacientes.
           </p>
