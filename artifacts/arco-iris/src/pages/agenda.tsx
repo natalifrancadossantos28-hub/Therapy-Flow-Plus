@@ -1879,12 +1879,15 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const vozListarDia = (data: string) => withExtraTimes(expanded.filter(a => a.date === data).map(a => a.time)).flatMap(t => getApts(data, t))
     .filter(a => apptStatus(a)?.toLowerCase() !== "desmarcado")
     .map(a => ({ time: a.time, nome: a.patientName || `Paciente #${a.patientId}`, status: getStatusLabel(apptStatus(a)) }));
+  // Faixa = do horário padrão da linha até 1 min antes do próximo (vale também para horários já ajustados).
   const limitesFaixa = (time: string) => {
-    const i = TIME_SLOTS.indexOf(time);
+    let i = -1;
+    TIME_SLOTS.forEach((t, k) => { if (t <= time) i = k; });
+    const base = i >= 0 ? TIME_SLOTS[i] : "07:00";
     const prox = i >= 0 && i < TIME_SLOTS.length - 1 ? TIME_SLOTS[i + 1] : "18:00";
     const [h, m] = prox.split(":").map(Number);
     const fim = new Date(2000, 0, 1, h, m - 1);
-    return { min: i >= 0 ? time : "07:00", max: format(fim, "HH:mm") };
+    return { min: base, max: format(fim, "HH:mm") };
   };
   const aptsAjuste = (date: string, time: string) => getApts(date, time)
     .filter(a => !a.multiGuest && !["desmarcado", "cancelado", "remanejado", "remarcado"].includes((a.status || "").toLowerCase()));
@@ -2664,7 +2667,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       {ajusteHora && canView && selectedProfId && (() => {
         const lim = limitesFaixa(ajusteHora.time);
         const lista = aptsAjuste(ajusteHora.date, ajusteHora.time);
-        const valido = ajusteHora.novo >= lim.min && ajusteHora.novo <= lim.max;
+        const valido = ajusteHora.novo >= lim.min && ajusteHora.novo <= lim.max && (isPaula || ajusteHora.novo !== "12:10");
         return (
           <div className="agenda-neon fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-label="Trocar horário" onClick={() => !ajusteSalvando && setAjusteHora(null)}>
             <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl space-y-4 text-[#1e1b4b]" onClick={e => e.stopPropagation()}>
