@@ -204,7 +204,8 @@ export default function Portal() {
   };
 
   const neonCard = (color: string, rgb: string): React.CSSProperties => ({
-    background: "linear-gradient(145deg, rgba(6,14,30,0.92), rgba(2,6,14,0.98))",
+    background: "linear-gradient(160deg, rgba(46,32,110,0.9), rgba(18,13,48,0.96))",
+    backdropFilter: "blur(12px)",
     border: `2px solid ${color}`,
     borderRadius: "1.25rem",
     boxShadow: `0 0 15px ${rgb}, 0 0 40px ${rgb}, inset 0 0 30px rgba(0,0,0,0.5)`,
@@ -221,9 +222,9 @@ export default function Portal() {
     : { background: "radial-gradient(1200px 600px at 15% -10%, rgba(34,211,238,0.14), transparent 60%), radial-gradient(900px 500px at 100% 110%, rgba(168,85,247,0.14), transparent 60%), #050b1f" };
 
   const accessCards: Array<{ key: CardKey; color: string; title: string; text: string; img: string }> = [
-    { key: "reception", color: "#22c55e", title: "Recepção", text: "Agendamentos, presenças e acolhimento de pacientes.", img: "visual/atendimento" },
-    { key: "professional", color: "#22d3ee", title: "Profissional de Saúde", text: "Agenda pessoal e atendimentos.", img: "agenda-icones/calendario" },
-    { key: "admin", color: "#a855f7", title: "Administração", text: "Gestão total, dashboards e configurações do sistema.", img: "visual/config" },
+    { key: "reception", color: "#22c55e", title: "Recepção", text: "Agendamentos, presenças e acolhimento de pacientes.", img: "visual/hero-recepcao" },
+    { key: "professional", color: "#22d3ee", title: "Profissional de Saúde", text: "Agenda pessoal e atendimentos.", img: "visual/hero-profissionais" },
+    { key: "admin", color: "#a855f7", title: "Administração", text: "Gestão total, dashboards e configurações do sistema.", img: "visual/hero-relatorios" },
   ];
   const img3d = (n: string) => `${import.meta.env.BASE_URL.replace(/\/$/, "")}/${n}.webp`;
 
@@ -268,14 +269,19 @@ export default function Portal() {
             <button
               key={key}
               onClick={() => setActive(key)}
-              className="portal-access-card rounded-3xl px-6 pt-8 pb-6 text-center flex flex-col items-center"
+              className="portal-access-card overflow-hidden rounded-3xl text-center flex flex-col items-center"
               style={{ ["--c" as string]: color } as React.CSSProperties}
             >
-              <img src={img3d(img)} alt="" aria-hidden width={88} height={88} className="w-20 h-20 mb-3 object-contain" style={{ filter: `drop-shadow(0 0 14px ${color}99)` }} />
-              <h2 className="font-display text-2xl font-extrabold text-white">{title}</h2>
-              <p className="text-[15px] text-[#e3ecff] mt-2.5 mb-6 min-h-[46px] leading-relaxed">{text}</p>
+              <span className="relative block w-full h-40 md:h-44">
+                <img src={img3d(img)} alt="" aria-hidden width={1024} height={683} className="absolute inset-0 w-full h-full object-cover object-[65%_30%]" />
+                <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#140f38] to-transparent" />
+              </span>
+              <span className="flex flex-col items-center flex-1 w-full px-6 pt-3 pb-6">
+              <h2 className="font-display text-2xl font-extrabold text-white" style={{ textShadow: `0 0 14px ${color}88` }}>{title}</h2>
+              <p className="text-[15px] text-[#e3ecff] mt-2 mb-5 min-h-[46px] leading-relaxed">{text}</p>
               <span className="portal-access-btn mt-auto w-full rounded-full py-3.5 font-bold text-[15px] text-[#04111f] flex items-center justify-center gap-2">
                 Acessar <ArrowRight className="w-4 h-4" />
+              </span>
               </span>
             </button>
           ))}
@@ -302,7 +308,8 @@ export default function Portal() {
     const accentBg = isRecep ? "rgba(139,92,246,0.12)" : "rgba(217,70,239,0.12)";
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={backdropStyle}>
-        <div className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl" style={neonCard(isRecep ? "rgba(34,197,94,0.5)" : "rgba(168,85,247,0.5)", isRecep ? "rgba(34,197,94,0.15)" : "rgba(168,85,247,0.15)")}>
+        <div className="w-full max-w-md rounded-3xl overflow-hidden shadow-2xl" style={neonCard(isRecep ? "rgba(34,197,94,0.5)" : "rgba(168,85,247,0.5)", isRecep ? "rgba(34,197,94,0.15)" : "rgba(168,85,247,0.15)")}>
+          <img src={img3d(isRecep ? "visual/hero-recepcao" : "visual/hero-entrada")} alt="" aria-hidden width={1024} height={683} className="w-full h-44 object-cover" />
           <div className="p-6 text-center" style={{ borderBottom: `1px solid ${accent}33` }}>
             <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3" style={{ background: accentBg, border: `1px solid ${accent}`, boxShadow: `0 0 20px ${accent}40` }}>
               <img src={img3d(isRecep ? "visual/atendimento" : "visual/config")} alt="" aria-hidden width={48} height={48} className="w-12 h-12 object-contain" />
@@ -319,7 +326,7 @@ export default function Portal() {
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 placeholder="ex: clinica-nfs"
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-cyan-400/50"
+                className="w-full bg-[#1a1342]/85 border border-violet-300/25 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-cyan-400/50"
                 disabled={loading}
               />
             </div>
@@ -365,11 +372,11 @@ export default function Portal() {
   // Formulario de PIN para Profissional.
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={backdropStyle}>
-      <div className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl" style={{ ...CARD_STYLE, border: "1px solid rgba(16,185,129,0.35)" }}>
-        <div className="p-6 text-center" style={{ borderBottom: "1px solid rgba(16,185,129,0.25)" }}>
-          <img src={img3d("agenda-icones/calendario")} alt="" aria-hidden width={80} height={80} className="w-20 h-20 mx-auto mb-3 object-contain drop-shadow-[0_0_16px_rgba(139,92,246,.6)]" />
-          <h2 className="text-lg font-bold text-white" style={{ textShadow: "0 0 10px rgba(16,185,129,0.5)" }}>Acesso do Profissional</h2>
-          <p className="text-xs text-white/50 mt-1">Selecione seu nome e informe o PIN</p>
+      <div className="w-full max-w-md rounded-3xl overflow-hidden shadow-2xl" style={{ ...CARD_STYLE, border: "1px solid rgba(139,92,246,0.5)" }}>
+        <img src={img3d("visual/hero-profissionais")} alt="Equipe de terapeutas" width={1024} height={683} className="w-full h-52 object-cover object-top" />
+        <div className="px-6 pt-4 pb-5 text-center" style={{ borderBottom: "1px solid rgba(139,92,246,0.3)" }}>
+          <h2 className="text-2xl font-bold text-white" style={{ textShadow: "0 0 10px rgba(16,185,129,0.5)" }}>Acesso do Profissional</h2>
+          <p className="text-base text-white/75 mt-1">Selecione seu nome e informe o PIN</p>
         </div>
 
         <form onSubmit={(e) => { e.preventDefault(); submitProfessional(); }} className="p-6 space-y-4">
@@ -378,7 +385,7 @@ export default function Portal() {
             <select aria-label="Escolha seu nome"
               value={selectedProfId}
               onChange={(e) => setSelectedProfId(e.target.value)}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-400/50"
+              className="w-full bg-[#1a1342]/85 border border-violet-300/25 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-400/50"
               disabled={loading}
             >
               <option value="">Selecione seu nome...</option>
@@ -394,7 +401,7 @@ export default function Portal() {
               inputMode="numeric"
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white tracking-[0.3em] text-center focus:outline-none focus:border-emerald-400/50"
+              className="w-full bg-[#1a1342]/85 border border-violet-300/25 rounded-xl px-4 py-2.5 text-sm text-white tracking-[0.3em] text-center focus:outline-none focus:border-emerald-400/50"
               disabled={loading || !selectedProfId}
               placeholder="&#9679;&#9679;&#9679;&#9679;"
             />

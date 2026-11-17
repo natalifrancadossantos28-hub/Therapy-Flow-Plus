@@ -407,7 +407,7 @@
 /* Portal: cartões de acesso com borda neon (cor via --c) */
 .portal-access-card {
   border: 2px solid var(--c);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 22%, rgba(6, 14, 40, 0.82)), rgba(6, 14, 40, 0.80));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 18%, rgba(30, 20, 80, 0.9)), rgba(16, 11, 44, 0.94));
   backdrop-filter: blur(6px);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent),
