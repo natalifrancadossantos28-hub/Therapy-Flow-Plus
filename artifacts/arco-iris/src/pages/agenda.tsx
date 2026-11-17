@@ -1768,6 +1768,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     expanded
       .filter(a => a.date === date && a.time === time)
       .sort((a, b) => callOrder(a) - callOrder(b));
+  // Sessões marcadas fora dos horários padrão também ganham linha na grade.
+  const withExtraTimes = (times: string[]) =>
+    Array.from(new Set([...TIME_SLOTS, ...times])).sort();
+  const gridTimes = withExtraTimes(
+    expanded.filter(a => weekDates.includes(a.date)).map(a => a.time)
+  );
   const selectedProfIdNum = selectedProfId ? parseInt(selectedProfId) : 0;
   const dayBlock = (date: string): string | null => {
     const h = holidayOn(date, feriados);
@@ -1825,12 +1831,13 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         if (dow >= 1 && dow <= 5) dates.push(format(d, "yyyy-MM-dd"));
       }
     }
+    const printApts = mode === "rascunho" ? [] : buildPrintApts(dates);
     openAgendaPrint({
       mode,
       professionalName: selectedProf?.name,
       specialty: selectedProf?.specialty,
-      timeSlots: TIME_SLOTS,
-      appointments: mode === "rascunho" ? [] : buildPrintApts(dates),
+      timeSlots: withExtraTimes(printApts.map(a => a.time)),
+      appointments: printApts,
       refDate,
       includeLunch: !isPaula,
     });
@@ -1866,7 +1873,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
   const scopeAtual = getCurrentScope();
   const vozPacientes = Array.from(new Map(expanded.map(a => [a.patientId, { patientId: a.patientId, patientName: a.patientName || "", prontuario: a.prontuario ?? null }])).values());
-  const vozListarDia = (data: string) => TIME_SLOTS.flatMap(t => getApts(data, t))
+  const vozListarDia = (data: string) => withExtraTimes(expanded.filter(a => a.date === data).map(a => a.time)).flatMap(t => getApts(data, t))
     .filter(a => apptStatus(a)?.toLowerCase() !== "desmarcado")
     .map(a => ({ time: a.time, nome: a.patientName || `Paciente #${a.patientId}`, status: getStatusLabel(apptStatus(a)) }));
   // Voz: só chama os mesmos comandos do menu do paciente (cada um com suas confirmações).
@@ -1922,7 +1929,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   );
   const navRedondo = "w-10 h-10 rounded-full border border-violet-200 bg-white hover:bg-violet-50 text-violet-800 transition-colors flex items-center justify-center";
   const agoraHM = format(new Date(), "HH:mm");
-  const hojeApts = TIME_SLOTS.filter(t => isPaula || t !== "12:10")
+  const hojeApts = withExtraTimes(expanded.filter(a => a.date === today).map(a => a.time)).filter(t => isPaula || t !== "12:10")
     .flatMap(t => getApts(today, t))
     .filter(a => apptStatus(a)?.toLowerCase() !== "desmarcado");
   const pacienteDoDia = hojeApts.find(a => a.time >= agoraHM) ?? hojeApts[0] ?? null;
@@ -2130,7 +2137,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 </tr>
               </thead>
               <tbody>
-                {TIME_SLOTS.map(time => {
+                {gridTimes.map(time => {
                   const isLunch = time === "12:10" && !isPaula;
                   return (
                     <tr key={time} className="border-b border-border hover:bg-secondary/10 transition-colors">
