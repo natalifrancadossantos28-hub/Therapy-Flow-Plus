@@ -1,4 +1,5 @@
 import { escHtml, openReportWindow, patientNameHtml } from "@/lib/print-report-shell";
+import { HeroTela } from "@/components/HeroTela";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useVisibleInterval } from "@/hooks/usePageVisible";
@@ -1146,10 +1147,8 @@ export default function Reception() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Recepção</h1>
-          <p className="text-muted-foreground mt-1">
+      <div className="relative">
+        <HeroTela img="recepcao" titulo="Recepção" subtitulo={<>
             Gestão diária de presenças e faltas.
             {atestadoCount > 0 && (
               <span className="ml-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold"
@@ -1157,9 +1156,8 @@ export default function Reception() {
                 ⚠️ {atestadoCount} atestado{atestadoCount > 1 ? "s" : ""} pendente{atestadoCount > 1 ? "s" : ""}
               </span>
             )}
-          </p>
-        </div>
-        <NotificationBell />
+        </>} />
+        <div className="absolute top-3 right-3 z-10"><NotificationBell /></div>
       </div>
 
       {/* ── Aviso de feriado (sem atendimentos hoje) ── */}

@@ -109,15 +109,16 @@ export function Saudacao({ nome, detalhe, pessoaId }: { nome?: string | null; de
     if (prof?.professionalName) { quem = prof.professionalName; sub = sub ?? prof.specialty ?? null; id = id ?? prof.professionalId; }
     else quem = scope === "reception" ? "Equipe da Recepção" : "Equipe de Gestão";
   }
-  const { texto, Icon, cor } = periodo(agora.getHours());
+  const { texto, idx } = periodo(agora.getHours());
+  const img = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/visual/${["sol", "tarde", "lua"][idx]}.webp`;
   const fraseAtual = fraseDoMomento(quem, id, agora);
   const data = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
   return (
-    <div className="mb-6 rounded-2xl border border-primary/20 bg-card/70 backdrop-blur px-5 py-4 flex items-center gap-4 shadow-[0_4px_24px_rgba(0,0,0,0.25)]">
-      <div className="w-12 h-12 shrink-0 rounded-2xl bg-primary/10 flex items-center justify-center">
-        <Icon className={`w-7 h-7 ${cor}`} />
-      </div>
+    <div className="ui-card mb-6 rounded-[24px] border border-primary/30 bg-card/70 backdrop-blur px-4 py-4 flex items-center gap-4">
+      <span className="grid place-items-center w-16 h-16 shrink-0 rounded-full bg-primary/15 shadow-[0_0_24px_-6px_rgba(139,92,246,.8)]">
+        <img src={img} alt="" aria-hidden width={56} height={56} className="w-14 h-14 object-contain" />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="font-display text-xl md:text-2xl font-bold leading-tight text-foreground">
           {texto}, <span className="text-primary">{quem}</span>

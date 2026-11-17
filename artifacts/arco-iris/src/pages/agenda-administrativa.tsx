@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { HeroTela } from "@/components/HeroTela";
 import { format, addDays, subDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarClock, Bell, Check, Pencil, Trash2, MapPin, RotateCcw, Smartphone } from "lucide-react";
@@ -128,8 +129,9 @@ export default function AgendaAdministrativa() {
 
   return (
     <div className="space-y-6">
+      <HeroTela img="agenda-adm" titulo="Agenda Administrativa" subtitulo="Reuniões e compromissos da Administração." />
       <div>
-        <h1 className="text-3xl font-bold text-foreground flex items-center gap-2"><CalendarClock className="w-7 h-7 text-primary" /> Agenda Administrativa</h1>
+        <span className="sr-only">Agenda Administrativa</span>
         <p className="text-muted-foreground mt-1">Reuniões e compromissos da Administração. O sistema avisa na tela antes do horário.</p>
       </div>
 
