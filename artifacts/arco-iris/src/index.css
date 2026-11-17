@@ -655,3 +655,7 @@
 :root:not(.light) .agenda-neon .agenda-grade td .cartao-paciente { background-color: #241c4f !important; box-shadow: 0 4px 14px -6px rgba(0,0,0,.6) !important; }
 :root:not(.light) .agenda-neon .agenda-grade td .cel-cartao .cartao-paciente.bg-card { border-color: rgba(139, 92, 246, .35); }
 
+:root:not(.light) .agenda-neon .bg-white\/60 { background-color: rgba(34, 26, 74, .7); }
+:root:not(.light) .agenda-neon .bg-emerald-50\/80 { background-color: rgba(16, 185, 129, .16); }
+:root:not(.light) .agenda-neon .bg-amber-50\/80 { background-color: rgba(245, 158, 11, .16); }
+:root:not(.light) .agenda-neon .bg-orange-50\/70 { background-color: rgba(249, 115, 22, .16); }
