@@ -9,12 +9,14 @@ import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Check, Activity, RotateCcw, LogOut, AlertTriangle,
   ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck, ClipboardList,
-  ShieldAlert, Plus, User, FileText,
+  ShieldAlert, Plus, User, FileText, Mic,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
 import { Link } from "wouter";
 import { NeonCabecalho, useFonteAgenda } from "@/components/AgendaNeon";
+import { VozClinica } from "@/components/VozClinica";
+import type { ComandoClinico } from "@/lib/agenda-clinica-voz";
 import { getCurrentScope } from "@/lib/portal-session";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -516,6 +518,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [diaFoco, setDiaFoco] = useState<number | null>(null);
   const [novoAberto, setNovoAberto] = useState<{ date: string; time: string } | null>(null);
   const fonte = useFonteAgenda();
+  const [vozAberta, setVozAberta] = useState(false);
+  useEffect(() => {
+    const abrir = () => setVozAberta(true);
+    window.addEventListener("agenda-voz-abrir", abrir);
+    return () => window.removeEventListener("agenda-voz-abrir", abrir);
+  }, []);
   // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
   const [weekRef, setWeekRef] = useState(() => {
     const d = new Date();
@@ -1848,6 +1856,57 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     : availableSlots;
 
   const scopeAtual = getCurrentScope();
+  const vozPacientes = Array.from(new Map(expanded.map(a => [a.patientId, { patientId: a.patientId, patientName: a.patientName || "", prontuario: a.prontuario ?? null }])).values());
+  const vozListarDia = (data: string) => TIME_SLOTS.flatMap(t => getApts(data, t))
+    .filter(a => apptStatus(a)?.toLowerCase() !== "desmarcado")
+    .map(a => ({ time: a.time, nome: a.patientName || `Paciente #${a.patientId}`, status: getStatusLabel(apptStatus(a)) }));
+  // Voz: só chama os mesmos comandos do menu do paciente (cada um com suas confirmações).
+  const executarVoz = (cmd: ComandoClinico) => {
+    setVozAberta(false);
+    const acao = cmd.acao;
+    if (!acao) return;
+    if (acao === "agendar") {
+      const date = cmd.data && weekDates.includes(cmd.data) ? cmd.data : diaNovo;
+      if (cmd.hora && TIME_SLOTS.includes(cmd.hora)) setBookingSlot({ date, time: cmd.hora });
+      else setNovoAberto({ date, time: TIME_SLOTS.find(t => t !== "12:10" || isPaula) ?? TIME_SLOTS[0] });
+      return;
+    }
+    if (!cmd.paciente) return;
+    const doPaciente = expanded.filter(a => a.patientId === cmd.paciente!.patientId && apptStatus(a)?.toLowerCase() !== "desmarcado")
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    const destino = acao === "remanejar" || acao === "remarcar";
+    const apt = (!destino && cmd.data ? doPaciente.find(a => a.date === cmd.data && (!cmd.hora || a.time === cmd.hora)) : null)
+      ?? doPaciente.find(a => a.date === today)
+      ?? doPaciente.find(a => a.date >= today)
+      ?? doPaciente[0];
+    if (!apt) { toast({ title: "Paciente sem atendimento nesta semana", variant: "destructive" }); return; }
+    const soRecepcao = () => toast({ title: "Essa opção fica com a recepção", description: "No acesso do profissional ela não aparece no menu.", variant: "destructive" });
+    switch (acao) {
+      case "em_atendimento": return void handleAtendimento(apt);
+      case "avaliacao_entrada": return setAvfEntradaApt(apt);
+      case "falta_justificada": return void handleFaltaJustificada(apt);
+      case "falta_nao_justificada": return void handleFaltaNaoJustificada(apt);
+      case "desmarcar": return isProfessionalProfile ? soRecepcao() : void handleDesmarcado(apt, selectedProf?.name || "");
+      case "remanejar": case "remarcar": {
+        setActionMenuId(null);
+        const ref = cmd.data ? new Date(cmd.data + "T12:00:00") : (acao === "remarcar" ? new Date(apt.date + "T12:00:00") : weekRef);
+        setRemanejFlow({ apt, kind: acao, step: "slot", weekRef: ref });
+        setRemanejDone(false);
+        if (cmd.data || cmd.hora) toast({ title: "Escolha o novo horário", description: `Toque em ${[cmd.data?.split("-").reverse().slice(0, 2).join("/"), cmd.hora].filter(Boolean).join(" às ")} para confirmar.` });
+        return;
+      }
+      case "semanal": case "quinzenal": case "mensal": return void handleChangeFrequency(apt, acao);
+      case "pausar": return handleOpenPauseModal(apt);
+      case "busca_ativa": return setEncaminharApt(apt);
+      case "alta": return handleSaida(apt, "Alta");
+      case "desistencia": return handleSaida(apt, "Desistência");
+      case "obito": return handleSaida(apt, "Óbito");
+      case "encaminhamento": return handleEncaminhamento(apt);
+      case "multi": return handleMultiAtendimento(apt);
+      case "transporte": return isProfessionalProfile ? soRecepcao() : handleTransporte(apt);
+      case "excluir": return isProfessionalProfile ? soRecepcao() : handleExcluirAdmin(apt);
+    }
+  };
   const visaoBtn = (ativo: boolean) => cn(
     "px-4 py-2 rounded-xl text-base font-semibold transition-all",
     ativo ? "text-white bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_6px_16px_-6px_rgba(109,40,217,.7)]" : "text-[#1e1b4b] bg-white hover:bg-violet-50",
@@ -1963,6 +2022,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                     <Link href="/agenda-mensal"><span role="tab" aria-selected={false} className={cn(visaoBtn(false), "inline-block cursor-pointer")}>Mês</span></Link>
                   )}
                 </div>
+                <Button variant="outline" className="gap-2 text-base rounded-xl bg-white text-violet-800 border-violet-200" onClick={() => setVozAberta(true)}>
+                  <Mic className="w-5 h-5" /> Falar
+                </Button>
                 <div className="relative">
                   <Button className="gap-2 text-base rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white hover:opacity-95" onClick={() => setNovoAberto(o => o ? null : { date: diaNovo, time: TIME_SLOTS.find(t => t !== "12:10" || isPaula) ?? TIME_SLOTS[0] })}>
                     <Plus className="w-5 h-5" /> Novo Atendimento
@@ -2514,6 +2576,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       </div>
 
     </div>
+
+      {vozAberta && canView && selectedProfId && (
+        <VozClinica pacientes={vozPacientes} listarDia={vozListarDia} onConfirmar={executarVoz} onFechar={() => setVozAberta(false)} />
+      )}
 
       {/* ── BookingModal ── */}
       {bookingSlot && selectedProfId && (

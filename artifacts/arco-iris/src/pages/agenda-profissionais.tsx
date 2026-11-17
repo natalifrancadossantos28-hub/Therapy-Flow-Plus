@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Home, CalendarCheck, User, Plus } from "lucide-react";
+import { Home, CalendarCheck, User, Plus, Mic } from "lucide-react";
 import { NeonCabecalho, useFonteAgenda, NeonMes, NeonTelas, NeonMenuInferior, glass, neon, CORES_NEON } from "@/components/AgendaNeon";
 import { Saudacao } from "@/components/Saudacao";
 import { Calendar as CalendarIcon, Lock, LogOut } from "lucide-react";
@@ -233,6 +233,7 @@ export default function AgendaProfissionais() {
 
 const TELAS = ["Início", "Agenda", "Perfil"];
 const MENU_IDS = ["inicio", "agenda", "perfil"];
+const abrirVoz = () => setTimeout(() => window.dispatchEvent(new Event("agenda-voz-abrir")), 50);
 const INATIVOS = new Set(["desmarcado", "cancelado", "remanejado", "remarcado", "alta", "desistência", "desistencia", "óbito", "obito"]);
 const STATUS_TXT: Record<string, string> = {
   agendado: "Agendado", presente: "Presente", atendimento: "Atendido", ausente: "Falta",
@@ -367,10 +368,11 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
       </div>
       <NeonMenuInferior
         ativo={MENU_IDS[pagina]}
-        onItem={(id) => ir(Math.max(0, MENU_IDS.indexOf(id)))}
+        onItem={(id) => { if (id === "falar") { ir(1); abrirVoz(); return; } ir(Math.max(0, MENU_IDS.indexOf(id))); }}
         itens={[
           { id: "inicio", label: "Início", icon: <Home size={21} /> },
           { id: "agenda", label: "Agenda", icon: <CalendarCheck size={21} /> },
+          { id: "falar", label: "Falar", icon: <Mic size={30} />, destaque: true },
           { id: "perfil", label: "Perfil", icon: <User size={21} /> },
         ]}
       />
