@@ -1940,7 +1940,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           });
           realId = mat.id;
         }
-        await updateAppointment(realId, { time: novo });
+        // A ocorrência virtual nasce como "agendado"; mantém o status que aparecia na grade.
+        await updateAppointment(realId, apt.id < 0 && apt.status && apt.status !== "agendado" ? { time: novo, status: apt.status } : { time: novo });
         if (definitivo && apt.recurrenceGroupId) {
           await remanejarRecurrenceForward({
             recurrenceGroupId: apt.recurrenceGroupId,
