@@ -9,12 +9,12 @@ import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Check, Activity, RotateCcw, LogOut, AlertTriangle,
   ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck, ClipboardList,
-  ShieldAlert,
+  ShieldAlert, Plus, User, FileText,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
 import { Link } from "wouter";
-import { NeonSaudacao } from "@/components/AgendaNeon";
+import { NeonCabecalho, useFonteAgenda } from "@/components/AgendaNeon";
 import { getCurrentScope } from "@/lib/portal-session";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -514,6 +514,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
   // Só visual: "Dia" mostra apenas uma coluna da mesma grade semanal.
   const [diaFoco, setDiaFoco] = useState<number | null>(null);
+  const [novoAberto, setNovoAberto] = useState<{ date: string; time: string } | null>(null);
+  const fonte = useFonteAgenda();
   // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
   const [weekRef, setWeekRef] = useState(() => {
     const d = new Date();
@@ -1847,108 +1849,23 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
   const scopeAtual = getCurrentScope();
   const visaoBtn = (ativo: boolean) => cn(
-    "px-4 py-2 rounded-xl text-sm font-bold transition-all",
-    ativo ? "text-white bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-[0_0_14px_rgba(192,38,211,.55)]" : "text-white/75 hover:text-white hover:bg-white/10",
+    "px-4 py-2 rounded-xl text-base font-semibold transition-all",
+    ativo ? "text-white bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_6px_16px_-6px_rgba(109,40,217,.7)]" : "text-[#1e1b4b] bg-white hover:bg-violet-50",
   );
+  const navRedondo = "w-10 h-10 rounded-full border border-violet-200 bg-white hover:bg-violet-50 text-violet-800 transition-colors flex items-center justify-center";
+  const agoraHM = format(new Date(), "HH:mm");
+  const hojeApts = TIME_SLOTS.filter(t => isPaula || t !== "12:10")
+    .flatMap(t => getApts(today, t))
+    .filter(a => apptStatus(a)?.toLowerCase() !== "desmarcado");
+  const pacienteDoDia = hojeApts.find(a => a.time >= agoraHM) ?? hojeApts[0] ?? null;
+  const diaNovo = diaFoco !== null ? weekDates[diaFoco] : (weekDates.includes(today) ? today : weekDates[0]);
   return (
-    <div className={cn("agenda-neon space-y-6", !portal && "agenda-neon-fundo rounded-3xl p-4 sm:p-6 -m-2 sm:m-0")}>
-      {!portal && (
-        <NeonSaudacao nome={scopeAtual === "reception" ? "Recepção" : "Equipe de Gestão"} />
-      )}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-extrabold text-foreground">{diaFoco !== null && weekDays[diaFoco] ? "Agenda do Dia" : "Agenda Semanal"}</h1>
-          <p className="text-muted-foreground mt-1 text-base">
-            {diaFoco !== null && weekDays[diaFoco]
-              ? format(weekDays[diaFoco], "EEEE, dd 'de' MMMM", { locale: ptBR })
-              : <>Grade semanal — {weekDays.length > 0 && `${format(weekDays[0], "dd/MM")} a ${format(weekDays[4], "dd/MM/yyyy")}`}</>}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 rounded-2xl border border-violet-400/40 bg-white/5 p-1" role="tablist" aria-label="Visualização">
-            <button type="button" role="tab" aria-selected={diaFoco !== null} className={visaoBtn(diaFoco !== null)}
-              onClick={() => { const i = weekDates.indexOf(today); setDiaFoco(i >= 0 ? i : 0); }}>Dia</button>
-            <button type="button" role="tab" aria-selected={diaFoco === null} className={visaoBtn(diaFoco === null)} onClick={() => setDiaFoco(null)}>Semana</button>
-            {!portal && scopeAtual !== "reception" && (
-              <Link href="/agenda-mensal"><span role="tab" aria-selected={false} className={cn(visaoBtn(false), "inline-block cursor-pointer")}>Mês</span></Link>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={goPrevWeek}
-            className="w-9 h-9 rounded-xl border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
-            aria-label="Semana anterior"
-            title="Semana anterior"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={goThisWeek}
-            className="text-xs text-primary hover:underline font-semibold px-2"
-            title="Voltar para esta semana"
-          >
-            Hoje
-          </button>
-          <button
-            type="button"
-            onClick={goNextWeek}
-            className="w-9 h-9 rounded-xl border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
-            aria-label="Próxima semana"
-            title="Próxima semana"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          {canView && selectedProfId && (
-            <div className="relative">
-              <Button variant="outline" className="gap-2 text-sm" onClick={() => setPrintMenuOpen(o => !o)}>
-                <Printer className="w-4 h-4" /> Imprimir
-                <ChevronDown className={cn("w-4 h-4 transition-transform", printMenuOpen && "rotate-180")} />
-              </Button>
-              {printMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setPrintMenuOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden py-1">
-                    <button onClick={() => handlePrint("dia")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
-                      <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Dia
-                    </button>
-                    <button onClick={() => handlePrint("semana")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
-                      <CalendarIcon className="w-4 h-4 text-primary" /> Agenda da Semana
-                    </button>
-                    <button onClick={() => handlePrint("mes")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
-                      <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Mês
-                    </button>
-                    <div className="border-t border-border my-1" />
-                    <button onClick={() => handlePrint("rascunho")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
-                      <Printer className="w-4 h-4 text-muted-foreground" /> Agenda em branco (rascunho)
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-          {!portal && (
-            <Link href="/agenda-profissionais">
-              <Button variant="outline" className="gap-2 text-sm">
-                <ExternalLink className="w-4 h-4" /> Portal do Profissional
-              </Button>
-            </Link>
-          )}
-        </div>
-      </div>
-
-      {diaFoco !== null && (
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Dia da semana">
-          {weekDays.map((d, i) => (
-            <button key={i} type="button" role="tab" aria-selected={diaFoco === i} onClick={() => setDiaFoco(i)}
-              className={cn("min-w-[4.5rem] px-3 py-2 rounded-2xl border text-center transition-all",
-                diaFoco === i ? "border-sky-300 bg-gradient-to-br from-sky-500/70 to-violet-600/70 shadow-[0_0_16px_rgba(139,92,246,.55)] text-white" : "border-white/10 bg-white/5 text-white/80 hover:bg-white/10")}>
-              <span className="block text-sm font-bold capitalize">{format(d, "EEE", { locale: ptBR })}</span>
-              <span className="block text-lg font-extrabold tabular-nums leading-tight">{format(d, "dd/MM")}</span>
-            </button>
-          ))}
-        </div>
-      )}
+    <div className={cn("agenda-neon space-y-5", !portal && "agenda-neon-fundo rounded-3xl p-4 sm:p-6 -m-2 sm:m-0")} style={{ zoom: fonte.zoom }}>
+      <NeonCabecalho
+        nome={portal ? (selectedProf?.name ?? "Profissional") : scopeAtual === "reception" ? "Recepção" : "Equipe de Gestão"}
+        pessoaId={portal ? selectedProf?.id ?? null : null}
+        fonte={fonte}
+      />
 
       {selectedProf && !isTransportSpecialty(selectedProf.specialty) && (
         <ResumoSemana appointments={appointments} weekDates={weekDates} />
@@ -1992,7 +1909,17 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
             {isProfessionalProfile ? "Profissional – Acesso Total" : isAdmin ? "Administrador – Acesso Total" : "Acesso liberado"}
           </div>
         )}
+        {!portal && (
+          <Link href="/agenda-profissionais">
+            <Button variant="outline" className="gap-2 text-sm">
+              <ExternalLink className="w-4 h-4" /> Portal do Profissional
+            </Button>
+          </Link>
+        )}
       </Card>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] items-start">
+      <div className="min-w-0 space-y-4">
 
       {!selectedProfId ? (
         <Card className="p-16 text-center">
@@ -2009,13 +1936,94 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           <p className="text-muted-foreground">Digite o PIN de 4 dígitos do profissional para acessar a agenda.</p>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          {selectedProf && (
-            <div className="px-6 py-4 border-b border-border bg-primary/5">
-              <p className="font-bold text-foreground text-lg">{selectedProf.name}</p>
-              <p className="text-sm text-muted-foreground">{selectedProf.specialty} — Agendamento recorrente automático (52 semanas)</p>
+        <Card className="overflow-hidden !rounded-3xl">
+          <div className="px-4 sm:px-6 py-4 border-b border-border space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="grid place-items-center w-11 h-11 rounded-xl bg-violet-100 text-violet-700 shrink-0"><CalendarIcon className="w-6 h-6" /></span>
+              <div className="min-w-[10rem] flex-1">
+                <h2 className="text-2xl font-extrabold text-[#1e1b4b] leading-tight">{diaFoco !== null && weekDays[diaFoco] ? "Agenda do Dia" : "Agenda Semanal"}</h2>
+                <p className="text-sm text-muted-foreground first-letter:uppercase">
+                  {diaFoco !== null && weekDays[diaFoco]
+                    ? format(weekDays[diaFoco], "EEEE, dd 'de' MMMM", { locale: ptBR })
+                    : weekDays.length > 0 && `${format(weekDays[0], "dd/MM")} a ${format(weekDays[4], "dd/MM/yyyy")}`}
+                  {selectedProf && ` · ${selectedProf.name} – ${selectedProf.specialty}`}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={goPrevWeek} className={navRedondo} aria-label="Semana anterior" title="Semana anterior"><ChevronLeft className="w-5 h-5" /></button>
+                <button type="button" onClick={goThisWeek} className="px-3 h-10 rounded-full border border-violet-200 bg-white text-violet-800 font-semibold hover:bg-violet-50" title="Voltar para esta semana">Hoje</button>
+                <button type="button" onClick={goNextWeek} className={navRedondo} aria-label="Próxima semana" title="Próxima semana"><ChevronRight className="w-5 h-5" /></button>
+                <div className="flex items-center gap-1 rounded-2xl bg-violet-50 border border-violet-200 p-1" role="tablist" aria-label="Visualização">
+                  <button type="button" role="tab" aria-selected={diaFoco === null} className={visaoBtn(diaFoco === null)} onClick={() => setDiaFoco(null)}>Semana</button>
+                  <button type="button" role="tab" aria-selected={diaFoco !== null} className={visaoBtn(diaFoco !== null)}
+                    onClick={() => { const i = weekDates.indexOf(today); setDiaFoco(i >= 0 ? i : 0); }}>Dia</button>
+                  {!portal && scopeAtual !== "reception" && (
+                    <Link href="/agenda-mensal"><span role="tab" aria-selected={false} className={cn(visaoBtn(false), "inline-block cursor-pointer")}>Mês</span></Link>
+                  )}
+                </div>
+                <div className="relative">
+                  <Button className="gap-2 text-base rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white hover:opacity-95" onClick={() => setNovoAberto(o => o ? null : { date: diaNovo, time: TIME_SLOTS.find(t => t !== "12:10" || isPaula) ?? TIME_SLOTS[0] })}>
+                    <Plus className="w-5 h-5" /> Novo Atendimento
+                  </Button>
+                  {novoAberto && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setNovoAberto(null)} />
+                      <div className="absolute right-0 mt-2 w-72 bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3">
+                        <p className="font-bold text-foreground">Escolha o dia e o horário</p>
+                        <Select value={novoAberto.date} onChange={e => setNovoAberto({ ...novoAberto, date: e.target.value })}>
+                          {weekDays.map((d, i) => <option key={i} value={weekDates[i]}>{format(d, "EEEE, dd/MM", { locale: ptBR })}</option>)}
+                        </Select>
+                        <Select value={novoAberto.time} onChange={e => setNovoAberto({ ...novoAberto, time: e.target.value })}>
+                          {TIME_SLOTS.filter(t => isPaula || t !== "12:10").map(t => (
+                            <option key={t} value={t}>{t}{getApts(novoAberto.date, t).length ? ` · ${getApts(novoAberto.date, t).length} paciente(s)` : " · livre"}</option>
+                          ))}
+                        </Select>
+                        <Button className="w-full" onClick={() => { setBookingSlot(novoAberto); setNovoAberto(null); }}>Continuar</Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="relative">
+                  <Button variant="outline" className="gap-2 text-base rounded-xl bg-white" onClick={() => setPrintMenuOpen(o => !o)}>
+                    <Printer className="w-4 h-4" /> Imprimir
+                    <ChevronDown className={cn("w-4 h-4 transition-transform", printMenuOpen && "rotate-180")} />
+                  </Button>
+                  {printMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setPrintMenuOpen(false)} />
+                      <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                        <button onClick={() => handlePrint("dia")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Dia
+                        </button>
+                        <button onClick={() => handlePrint("semana")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <CalendarIcon className="w-4 h-4 text-primary" /> Agenda da Semana
+                        </button>
+                        <button onClick={() => handlePrint("mes")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Mês
+                        </button>
+                        <div className="border-t border-border my-1" />
+                        <button onClick={() => handlePrint("rascunho")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <Printer className="w-4 h-4 text-muted-foreground" /> Agenda em branco (rascunho)
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
+            {diaFoco !== null && (
+              <div className="flex flex-wrap gap-2" role="tablist" aria-label="Dia da semana">
+                {weekDays.map((d, i) => (
+                  <button key={i} type="button" role="tab" aria-selected={diaFoco === i} onClick={() => setDiaFoco(i)}
+                    className={cn("min-w-[4.5rem] px-3 py-2 rounded-2xl border text-center transition-all",
+                      diaFoco === i ? "border-violet-600 bg-gradient-to-br from-violet-500 to-violet-700 text-white shadow-md" : "border-violet-200 bg-white text-[#1e1b4b] hover:bg-violet-50")}>
+                    <span className="block text-sm font-bold capitalize">{format(d, "EEE", { locale: ptBR })}</span>
+                    <span className="block text-lg font-extrabold tabular-nums leading-tight">{format(d, "dd/MM")}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="overflow-x-auto agenda-grade">
             {/* min-w: no celular as 5 colunas ficariam com ~55px e os cards se
                 sobrepunham; abaixo desta largura a grade rola na horizontal. */}
@@ -2027,7 +2035,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                     if (diaFoco !== null && diaFoco !== i) return null;
                     const block = dayBlock(weekDates[i]);
                     return (
-                    <th key={i} className="px-1 py-2 text-center">
+                    <th key={i} className={cn("px-1 py-3 text-center", weekDates[i] === today && "dia-hoje")}>
                       <span className="font-bold text-foreground capitalize text-sm">{format(d, "EEE", { locale: ptBR })}</span>
                       <div className="font-normal text-xs">{format(d, "dd/MM")}</div>
                       {block && (
@@ -2420,16 +2428,17 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       onClick={() => setBookingSlot({ date, time })}
                                       className="w-full text-[10px] font-semibold py-1.5 rounded-lg border border-dashed border-cyan-500/30 text-cyan-400/70 hover:text-cyan-300 hover:border-cyan-400/60 hover:bg-cyan-500/5 transition-colors"
                                     >
-                                      + adicionar ao grupo
+                                      + Adicionar paciente
                                     </button>
                                   )}
                                 </div>
                               ) : (
                                 <button
                                   onClick={() => setBookingSlot({ date, time })}
-                                  className="w-full h-full min-h-[54px] flex items-center justify-center border-2 border-dashed border-border/40 rounded-xl text-muted-foreground/40 hover:border-primary/40 hover:text-primary/60 hover:bg-primary/5 transition-colors text-[10px] font-semibold cursor-pointer"
+                                  className="w-full h-full min-h-[58px] flex flex-col items-center justify-center gap-0.5 border-2 border-dashed border-violet-200 rounded-2xl text-violet-500 bg-white/60 hover:border-violet-400 hover:text-violet-700 hover:bg-violet-50 transition-colors text-xs font-semibold cursor-pointer"
                                 >
-                                  + Agendar
+                                  <span className="grid place-items-center w-6 h-6 rounded-full bg-violet-100 text-violet-700"><Plus className="w-4 h-4" /></span>
+                                  Adicionar Paciente
                                 </button>
                               )}
                             </td>
@@ -2445,30 +2454,62 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         </Card>
       )}
 
-      {/* ── Resumo de Hoje ── */}
+      </div>
+
       {canView && selectedProfId && (
-        <Card className="p-6">
-          <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-primary" /> Resumo de Hoje — {format(new Date(), "dd/MM/yyyy")}
-          </h3>
-          <div className="space-y-2">
-            {TIME_SLOTS.filter(t => isPaula || t !== "12:10").map(time => {
-              const apts = getApts(today, time);
-              const apt = apts[0] ?? null;
-              return (
-                <div key={time} className={cn("flex items-center gap-4 px-4 py-3 rounded-xl text-sm", apt ? "bg-primary/10 border border-primary/20" : "bg-secondary/50 border border-border/50")}>
-                  <span className="font-bold text-primary w-14 shrink-0">{time}</span>
-                  <span className={apt ? "font-semibold text-foreground" : "text-muted-foreground italic"}>
-                    {apt ? (apt.patientName || `Paciente #${apt.patientId}`) : "Livre"}
-                  </span>
-                  {apt && <AbsenceBadge count={absenceCount(apt.patientId)} />}
-                  {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>}
+        <aside className="space-y-4 xl:sticky xl:top-4">
+          <Card className="p-5 !rounded-3xl text-center">
+            <h3 className="font-extrabold text-[#1e1b4b] text-xl mb-3 flex items-center justify-center gap-2">
+              <User className="w-5 h-5 text-violet-700" /> Paciente do Dia
+            </h3>
+            {pacienteDoDia ? (
+              <>
+                <div className="mx-auto w-fit rounded-full p-1 bg-gradient-to-br from-violet-400 to-violet-700">
+                  <div className="rounded-full bg-white p-0.5">
+                    <PatientAvatar url={photoById.get(pacienteDoDia.patientId)} name={pacienteDoDia.patientName} size={96} />
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </Card>
+                <p className="mt-3 text-xl font-extrabold text-[#1e1b4b] leading-tight break-words">{pacienteDoDia.patientName || `Paciente #${pacienteDoDia.patientId}`}</p>
+                <span className={cn("inline-block mt-2 px-3 py-0.5 rounded-full text-xs uppercase font-bold", getStatusColor(apptStatus(pacienteDoDia)))}>{getStatusLabel(apptStatus(pacienteDoDia))}</span>
+                <div className="mt-3 space-y-1.5 text-left text-base text-[#3b3561]">
+                  {pacienteDoDia.prontuario && <p className="flex items-center gap-2"><FileText className="w-4 h-4 text-violet-700" /> Prontuário: {pacienteDoDia.prontuario}</p>}
+                  <p className="flex items-center gap-2"><Clock className="w-4 h-4 text-violet-700" /> Atendimento: {format(new Date(today + "T12:00:00"), "dd/MM")} - {pacienteDoDia.time}</p>
+                </div>
+                {!portal && (
+                  <Link href={`/patients/${pacienteDoDia.patientId}`}>
+                    <Button className="mt-4 w-full rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white">Ver Detalhes →</Button>
+                  </Link>
+                )}
+              </>
+            ) : (
+              <p className="text-muted-foreground">Nenhum atendimento hoje.</p>
+            )}
+          </Card>
+
+          <Card className="p-5 !rounded-3xl">
+            <h3 className="font-extrabold text-[#1e1b4b] text-lg mb-3 flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-violet-700" /> Atendimentos de Hoje
+            </h3>
+            {hojeApts.length === 0 ? (
+              <p className="text-muted-foreground">Nenhum atendimento hoje.</p>
+            ) : (
+              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                {hojeApts.map(apt => (
+                  <div key={`${apt.id}-${apt.time}`} className={cn("flex items-center gap-3 rounded-2xl px-2 py-2", apt.time >= agoraHM ? "bg-violet-50" : "bg-white")}>
+                    <span className="rounded-xl bg-violet-100 text-violet-800 font-bold tabular-nums px-2.5 py-1.5 shrink-0">{apt.time}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-[#1e1b4b] leading-snug break-words">{apt.patientName || `Paciente #${apt.patientId}`}</span>
+                      <span className={cn("inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>
+                    </span>
+                    <AbsenceBadge count={absenceCount(apt.patientId)} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </aside>
       )}
+      </div>
 
       {/* ── BookingModal ── */}
       {bookingSlot && selectedProfId && (
