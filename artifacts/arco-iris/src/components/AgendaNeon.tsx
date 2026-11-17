@@ -17,6 +17,7 @@ function useAgora() {
 }
 
 const FONTE_KEY = "agenda_fonte";
+const FONTE_EVT = "agenda-fonte";
 const FONTES = [0.9, 1, 1.1, 1.2, 1.35];
 /** Tamanho da letra da agenda (A+ / A-), guardado no aparelho. */
 export function useFonteAgenda() {
@@ -24,7 +25,16 @@ export function useFonteAgenda() {
     const v = Number(localStorage.getItem(FONTE_KEY));
     return Number.isInteger(v) && v >= 0 && v < FONTES.length ? v : 1;
   });
-  useEffect(() => { localStorage.setItem(FONTE_KEY, String(n)); }, [n]);
+  useEffect(() => {
+    if (localStorage.getItem(FONTE_KEY) === String(n)) return;
+    localStorage.setItem(FONTE_KEY, String(n));
+    window.dispatchEvent(new CustomEvent(FONTE_EVT, { detail: n }));
+  }, [n]);
+  useEffect(() => {
+    const ouvir = (e: Event) => setN((e as CustomEvent<number>).detail);
+    window.addEventListener(FONTE_EVT, ouvir);
+    return () => window.removeEventListener(FONTE_EVT, ouvir);
+  }, []);
   return {
     zoom: FONTES[n],
     maior: () => setN((x) => Math.min(FONTES.length - 1, x + 1)),
