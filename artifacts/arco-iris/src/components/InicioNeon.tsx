@@ -52,12 +52,12 @@ export function InicioNeon({ fila, pausados }: { fila: number | null; pausados: 
       {/* Herói */}
       <section className="relative flex items-center gap-2 pt-1">
         <div className="flex-1 min-w-0 z-10">
-          <h1 className="font-display font-extrabold text-[34px] sm:text-5xl leading-[1.08] text-white">
+          <h1 className="font-display font-extrabold text-[34px] sm:text-5xl leading-[1.08] text-foreground">
             {texto},<br />
             <span className="bg-gradient-to-r from-fuchsia-300 via-violet-300 to-sky-300 bg-clip-text text-transparent">{quem}</span>
           </h1>
           <div className="mt-3 h-1.5 w-28 rounded-full bg-gradient-to-r from-rose-500 via-amber-400 via-40% to-sky-400" />
-          <p className="mt-3 text-lg sm:text-xl text-white/85 leading-snug">Juntos, construímos uma inclusão cada vez maior!</p>
+          <p className="mt-3 text-lg sm:text-xl text-foreground/85 leading-snug">Juntos, construímos uma inclusão cada vez maior!</p>
         </div>
         <img src={img3d("visual/coracao")} alt="" aria-hidden width={180} height={180} className="w-36 h-36 sm:w-48 sm:h-48 shrink-0 object-contain drop-shadow-[0_0_30px_rgba(99,102,241,.55)]" />
       </section>

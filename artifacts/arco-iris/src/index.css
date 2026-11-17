@@ -665,7 +665,6 @@
   background: linear-gradient(160deg, rgba(36, 26, 84, .82), rgba(17, 13, 44, .88));
   border-color: rgba(139, 92, 246, .38);
   box-shadow: 0 0 0 1px rgba(139, 92, 246, .08) inset, 0 14px 38px -18px rgba(76, 29, 149, .9), 0 0 26px -12px rgba(139, 92, 246, .55);
-  backdrop-filter: blur(10px);
 }
 
 /* Topo, menu e menu de baixo no visual roxo-noite */

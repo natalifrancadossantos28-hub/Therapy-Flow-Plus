@@ -14,7 +14,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { FontSizeToggle } from "@/components/FontSizeToggle";
 import { useThemeTick } from "@/lib/theme";
 import { BackgroundPicker } from "@/components/BackgroundPicker";
-import { LembretesAviso } from "@/components/LembretesAviso";
+import { LembretesAviso, COMPROMISSOS_EVENTO } from "@/components/LembretesAviso";
 import { appBackgroundStyle, useBackground } from "@/lib/background";
 
 type NavItem = {
@@ -73,8 +73,10 @@ function useAvisosHoje(ligado: boolean) {
     if (!ligado) return;
     const hoje = format(new Date(), "yyyy-MM-dd");
     let vivo = true;
-    listCompromissos(hoje, hoje).then((l) => { if (vivo) setN(l.filter((c) => !c.concluido).length); }).catch(() => {});
-    return () => { vivo = false; };
+    const carregar = () => listCompromissos(hoje, hoje).then((l) => { if (vivo) setN(l.filter((c) => !c.concluido).length); }).catch(() => {});
+    void carregar();
+    window.addEventListener(COMPROMISSOS_EVENTO, carregar);
+    return () => { vivo = false; window.removeEventListener(COMPROMISSOS_EVENTO, carregar); };
   }, [ligado]);
   return n;
 }
