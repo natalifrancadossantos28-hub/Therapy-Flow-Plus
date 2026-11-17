@@ -74,6 +74,24 @@ function periodo(h: number) {
   return { idx: 2, texto: "Boa noite", Icon: Moon, cor: "text-indigo-300" };
 }
 
+/** Frase do momento para a pessoa (muda por período; colegas veem frases diferentes). */
+export function fraseDoMomento(quem: string, id: number | null, agora: Date = agoraBR()) {
+  const { idx } = periodo(agora.getHours());
+  // Muda a cada período (manhã/tarde/noite); a madrugada usa a frase da noite anterior.
+  const base = new Date(agora.getTime() - (agora.getHours() < 5 ? 86400000 : 0));
+  const dias = Math.floor(base.getTime() / 86400000);
+  // Cada pessoa tem um deslocamento próprio: no mesmo período, colegas veem frases diferentes.
+  const semente = id ?? [...quem].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % TOTAL_FRASES, 7);
+  const n = dias * 3 + idx + semente * 37;
+  // Até as 17h a frase sempre termina com o desejo de bom trabalho.
+  const h = agora.getHours();
+  return h >= 5 && h < 17
+    ? `${ABERTURAS[((n % ABERTURAS.length) + ABERTURAS.length) % ABERTURAS.length]} ${FECHO_EXPEDIENTE}`
+    : frase(n);
+}
+
+export { agoraBR, periodo };
+
 /** Saudação conforme o horário (Brasília), com o nome de quem está usando e uma frase que muda a cada período. */
 export function Saudacao({ nome, detalhe, pessoaId }: { nome?: string | null; detalhe?: string | null; pessoaId?: number | null }) {
   const [agora, setAgora] = useState(agoraBR);
@@ -91,18 +109,8 @@ export function Saudacao({ nome, detalhe, pessoaId }: { nome?: string | null; de
     if (prof?.professionalName) { quem = prof.professionalName; sub = sub ?? prof.specialty ?? null; id = id ?? prof.professionalId; }
     else quem = scope === "reception" ? "Equipe da Recepção" : "Equipe de Gestão";
   }
-  const { idx, texto, Icon, cor } = periodo(agora.getHours());
-  // Muda a cada período (manhã/tarde/noite); a madrugada usa a frase da noite anterior.
-  const base = new Date(agora.getTime() - (agora.getHours() < 5 ? 86400000 : 0));
-  const dias = Math.floor(base.getTime() / 86400000);
-  // Cada pessoa tem um deslocamento próprio: no mesmo período, colegas veem frases diferentes.
-  const semente = id ?? [...quem].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % TOTAL_FRASES, 7);
-  const n = dias * 3 + idx + semente * 37;
-  // Até as 17h a frase sempre termina com o desejo de bom trabalho.
-  const h = agora.getHours();
-  const fraseAtual = h >= 5 && h < 17
-    ? `${ABERTURAS[((n % ABERTURAS.length) + ABERTURAS.length) % ABERTURAS.length]} ${FECHO_EXPEDIENTE}`
-    : frase(n);
+  const { texto, Icon, cor } = periodo(agora.getHours());
+  const fraseAtual = fraseDoMomento(quem, id, agora);
   const data = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
   return (

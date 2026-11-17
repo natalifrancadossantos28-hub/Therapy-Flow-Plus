@@ -14,6 +14,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
 import { Link } from "wouter";
+import { NeonSaudacao } from "@/components/AgendaNeon";
+import { getCurrentScope } from "@/lib/portal-session";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
@@ -510,6 +512,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
+  // Só visual: "Dia" mostra apenas uma coluna da mesma grade semanal.
+  const [diaFoco, setDiaFoco] = useState<number | null>(null);
   // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
   const [weekRef, setWeekRef] = useState(() => {
     const d = new Date();
@@ -1841,16 +1845,34 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       })
     : availableSlots;
 
+  const scopeAtual = getCurrentScope();
+  const visaoBtn = (ativo: boolean) => cn(
+    "px-4 py-2 rounded-xl text-sm font-bold transition-all",
+    ativo ? "text-white bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-[0_0_14px_rgba(192,38,211,.55)]" : "text-white/75 hover:text-white hover:bg-white/10",
+  );
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className={cn("agenda-neon space-y-6", !portal && "agenda-neon-fundo rounded-3xl p-4 sm:p-6 -m-2 sm:m-0")}>
+      {!portal && (
+        <NeonSaudacao nome={scopeAtual === "reception" ? "Recepção" : "Equipe de Gestão"} />
+      )}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">Agenda Semanal</h1>
-          <p className="text-muted-foreground mt-1">
-            Grade semanal — {weekDays.length > 0 && `${format(weekDays[0], "dd/MM")} a ${format(weekDays[4], "dd/MM/yyyy")}`}
+          <h1 className="text-3xl font-display font-extrabold text-foreground">{diaFoco !== null && weekDays[diaFoco] ? "Agenda do Dia" : "Agenda Semanal"}</h1>
+          <p className="text-muted-foreground mt-1 text-base">
+            {diaFoco !== null && weekDays[diaFoco]
+              ? format(weekDays[diaFoco], "EEEE, dd 'de' MMMM", { locale: ptBR })
+              : <>Grade semanal — {weekDays.length > 0 && `${format(weekDays[0], "dd/MM")} a ${format(weekDays[4], "dd/MM/yyyy")}`}</>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-2xl border border-violet-400/40 bg-white/5 p-1" role="tablist" aria-label="Visualização">
+            <button type="button" role="tab" aria-selected={diaFoco !== null} className={visaoBtn(diaFoco !== null)}
+              onClick={() => { const i = weekDates.indexOf(today); setDiaFoco(i >= 0 ? i : 0); }}>Dia</button>
+            <button type="button" role="tab" aria-selected={diaFoco === null} className={visaoBtn(diaFoco === null)} onClick={() => setDiaFoco(null)}>Semana</button>
+            {!portal && scopeAtual !== "reception" && (
+              <Link href="/agenda-mensal"><span role="tab" aria-selected={false} className={cn(visaoBtn(false), "inline-block cursor-pointer")}>Mês</span></Link>
+            )}
+          </div>
           <button
             type="button"
             onClick={goPrevWeek}
@@ -1914,6 +1936,19 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           )}
         </div>
       </div>
+
+      {diaFoco !== null && (
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Dia da semana">
+          {weekDays.map((d, i) => (
+            <button key={i} type="button" role="tab" aria-selected={diaFoco === i} onClick={() => setDiaFoco(i)}
+              className={cn("min-w-[4.5rem] px-3 py-2 rounded-2xl border text-center transition-all",
+                diaFoco === i ? "border-sky-300 bg-gradient-to-br from-sky-500/70 to-violet-600/70 shadow-[0_0_16px_rgba(139,92,246,.55)] text-white" : "border-white/10 bg-white/5 text-white/80 hover:bg-white/10")}>
+              <span className="block text-sm font-bold capitalize">{format(d, "EEE", { locale: ptBR })}</span>
+              <span className="block text-lg font-extrabold tabular-nums leading-tight">{format(d, "dd/MM")}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {selectedProf && !isTransportSpecialty(selectedProf.specialty) && (
         <ResumoSemana appointments={appointments} weekDates={weekDates} />
@@ -1981,14 +2016,15 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
               <p className="text-sm text-muted-foreground">{selectedProf.specialty} — Agendamento recorrente automático (52 semanas)</p>
             </div>
           )}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto agenda-grade">
             {/* min-w: no celular as 5 colunas ficariam com ~55px e os cards se
                 sobrepunham; abaixo desta largura a grade rola na horizontal. */}
-            <table className="w-full min-w-[820px] text-sm text-left" style={{ tableLayout: "fixed" }}>
+            <table className={cn("w-full text-sm text-left", diaFoco === null ? "min-w-[820px]" : "min-w-[360px]")} style={{ tableLayout: "fixed" }}>
               <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
                 <tr>
                   <th className="px-2 py-2 sticky left-0 bg-secondary/90 backdrop-blur z-10 border-r border-border" style={{ width: "60px" }}>Horário</th>
                   {weekDays.map((d, i) => {
+                    if (diaFoco !== null && diaFoco !== i) return null;
                     const block = dayBlock(weekDates[i]);
                     return (
                     <th key={i} className="px-1 py-2 text-center">
@@ -2019,9 +2055,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                     <tr key={time} className="border-b border-border hover:bg-secondary/10 transition-colors">
                       <td className="px-2 py-2 font-display font-bold text-primary text-sm sticky left-0 bg-card/90 backdrop-blur z-10 border-r border-border">{time}</td>
                       {isLunch ? (
-                        <td colSpan={5} className="px-4 py-3 bg-slate-50/50 text-center text-muted-foreground italic font-medium">Almoço — Pausa</td>
+                        <td colSpan={diaFoco === null ? 5 : 1} className="px-4 py-3 bg-slate-50/50 text-center text-muted-foreground italic font-medium">Almoço — Pausa</td>
                       ) : (
                         weekDates.map((date, i) => {
+                          if (diaFoco !== null && diaFoco !== i) return null;
                           const apts = getApts(date, time);
                           const isGroup = apts.length > 1;
                           return (
