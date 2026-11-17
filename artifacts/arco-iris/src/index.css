@@ -509,8 +509,8 @@
     radial-gradient(800px 500px at 0% 100%, rgba(221,214,254,.8), transparent 60%),
     linear-gradient(160deg, #f6f3ff 0%, #ece6ff 50%, #e2d9fd 100%);
 }
-.agenda-neon .bg-card {
-  background: rgba(255, 255, 255, .86);
+.agenda-neon .bg-card, .has-app-bg .agenda-neon .bg-card {
+  background: rgba(255, 255, 255, .96);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
@@ -521,7 +521,7 @@
 .agenda-neon .bg-card .bg-card { backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
 .agenda-neon .neon-txt { color: #6d28d9; }
 .agenda-neon .lilas-card {
-  background: rgba(255, 255, 255, .82);
+  background: rgba(255, 255, 255, .96);
   border: 1px solid rgba(221, 214, 254, .95);
   border-radius: 1.5rem;
   box-shadow: 0 12px 32px -14px rgba(91, 33, 182, .3);
@@ -536,7 +536,8 @@
 .agenda-neon .agenda-grade th .text-xs { font-size: .9rem; }
 .agenda-neon .agenda-grade td .text-xs { font-size: .9rem; }
 .agenda-neon .agenda-grade td .text-\[9px\] { font-size: 11px; }
-.agenda-neon .agenda-grade td .rounded-xl.border { border-radius: 1rem; background-color: #faf8ff; box-shadow: 0 4px 12px -6px rgba(91,33,182,.25); }
+.agenda-neon .agenda-grade td .cartao-paciente { border-radius: .9rem; background-color: #fff !important; box-shadow: 0 2px 8px -4px rgba(91,33,182,.35) !important; }
+.agenda-neon .agenda-grade td .cel-cartao .cartao-paciente.bg-card { border-color: rgba(221,214,254,.9); }
 .agenda-neon .agenda-grade tbody tr:hover { background: rgba(167, 139, 250, .07); }
 .agenda-neon .agenda-grade .sticky { background: #fbfaff; }
 .agenda-neon .agenda-grade td.sticky { font-size: 1.15rem; color: #3b0764; }

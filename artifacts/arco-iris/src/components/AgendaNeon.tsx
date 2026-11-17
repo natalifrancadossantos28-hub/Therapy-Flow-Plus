@@ -55,8 +55,8 @@ export function NeonCabecalho({ nome, pessoaId, subtitulo, fonte, extra }: {
   const { texto } = periodo(agora.getHours());
   const primeiro = nome.trim().split(/\s+/)[0] || nome;
   return (
-    <header className="flex flex-wrap items-center gap-3 sm:gap-4">
-      <span className="grid place-items-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white shadow-md shrink-0">
+    <header className="lilas-card !rounded-3xl p-3 sm:p-4 flex flex-wrap items-center gap-3 sm:gap-4">
+      <span className="grid place-items-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-violet-50 shadow-sm shrink-0">
         <span className="grid place-items-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white"><CalendarDays size={24} /></span>
       </span>
       <div className="min-w-[14rem] flex-1">
@@ -164,7 +164,7 @@ export function NeonTelas({ titulos, pagina, setPagina, children }: { titulos: s
       {children.map((c, i) => (
         <div key={i} hidden={i !== pagina} className={i === pagina ? `neon-lado-${lado}` : undefined}>{c}</div>
       ))}
-      <div className="flex flex-col items-center gap-1 pt-6">
+      <div className="mx-auto w-fit flex flex-col items-center gap-1 mt-6 px-4 py-1.5 rounded-2xl bg-white/90 shadow-sm">
         <div className="flex items-center gap-1.5" role="tablist" aria-label="Telas">
           {titulos.map((t, i) => (
             <button type="button" key={t} role="tab" aria-selected={i === pagina} aria-label={t} onClick={() => ir(i)} className="h-6 grid place-items-center px-0.5">

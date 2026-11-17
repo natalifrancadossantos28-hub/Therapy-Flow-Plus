@@ -495,6 +495,15 @@ const STATUS_FORA_DA_AGENDA = new Set([
   "falta_nao_justificada", "ausente", "desistência", "desistencia", "óbito",
 ]);
 
+/** Cor da faixa do cartão do horário (só visual). */
+function tomCelula(apts: { status?: string | null }[]): string {
+  const st = apts.map(a => (a.status || "").toLowerCase());
+  if (st.some(x => x === "falta_nao_justificada" || x === "ausente")) return "border-amber-400 bg-amber-50/80";
+  if (st.length && st.every(x => x === "atendimento" || x === "presente")) return "border-emerald-400 bg-emerald-50/80";
+  if (st.some(x => x === "remanejado" || x === "remarcado")) return "border-orange-300 bg-orange-50/70";
+  return "border-violet-500 bg-violet-50/80";
+}
+
 export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   useDocumentTitle(portal ? "Agenda do Profissional" : "Agenda Geral");
   // No portal, o profissional tem as mesmas opções da Administração.
@@ -1932,7 +1941,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         <ResumoSemana appointments={appointments} weekDates={weekDates} />
       )}
 
-      <Card className="p-5 flex flex-col sm:flex-row items-start sm:items-end gap-4">
+      <Card className={cn("p-5 flex flex-col sm:flex-row items-start sm:items-end gap-4", portal && !portal.allowPickProfessional && canView && "hidden")}>
         <div className="flex-1">
           <Label className="mb-2 block">Profissional</Label>
           {portal && !portal.allowPickProfessional ? (
@@ -2136,10 +2145,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                           return (
                             <td key={i} className="px-1.5 py-1.5 relative align-top">
                               {apts.length > 0 ? (
-                                <div className="flex flex-col gap-1.5">
+                                <div className={cn("cel-cartao flex flex-col gap-1.5 rounded-2xl border-l-[5px] p-1.5 shadow-[0_6px_16px_-10px_rgba(91,33,182,.45)]", tomCelula(apts))}>
                                   {isGroup && (
-                                    <span className="text-[9px] uppercase font-bold text-cyan-400 tracking-wider">
-                                      · grupo ({apts.length})
+                                    <span className="px-1 text-[13px] font-bold text-[#1e1b4b]">
+                                      Grupo <span className="text-violet-600 font-semibold">({apts.length})</span>
                                     </span>
                                   )}
                                   {apts.map((apt, ordem) => {
@@ -2164,7 +2173,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                   <div
                                     onClick={() => setActionMenuId(actionMenuId === apt.id ? null : apt.id)}
                                     className={cn(
-                                      "p-2 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none",
+                                      "cartao-paciente px-2 py-1.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none hover:-translate-y-px hover:shadow-md",
                                       isMultiGuest && "border-dashed",
                                       isGhost && "bg-amber-950/20 border-amber-500/60 animate-pulse",
                                       !isGhost && isDesmarcado && "bg-red-950/10 border-red-500/40",
@@ -2193,19 +2202,19 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     }}
                                   >
                                     <div className="flex items-center gap-1.5 min-w-0">
-                                      <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={40} />
-                                      <span className="font-bold text-foreground truncate text-xs leading-tight" title={apt.patientName || undefined}>
+                                      <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={30} />
+                                      <span className="font-semibold text-foreground text-[13px] leading-tight line-clamp-2 break-words" title={apt.patientName || undefined}>
                                         {isGroup && <span className="text-cyan-300 font-extrabold mr-1">{ordem + 1}º</span>}
                                         {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
                                         {isGhost ? (
                                           <span className="text-amber-400">⚠ Sem dados</span>
                                         ) : (
-                                          abbreviateName(apt.patientName) || `#${apt.patientId}`
+                                          abbreviateName(apt.patientName, 34) || `#${apt.patientId}`
                                         )}
                                       </span>
                                     </div>
                                     <AbsenceBadge count={absenceCount(apt.patientId)} compact />
-                                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
+                                    <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
                                       {getStatusLabel(apptStatus(apt))}
                                     </span>
                                     {apt.paused && (
