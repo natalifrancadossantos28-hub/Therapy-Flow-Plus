@@ -3,15 +3,15 @@ import { cn } from "@/lib/utils";
 import { motion, HTMLMotionProps } from "framer-motion";
 
 export const Card = ({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("bg-card text-card-foreground rounded-2xl border border-border shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden transition-all duration-300 hover:border-primary/20 hover:shadow-[0_0_28px_rgba(0,240,255,0.06),0_4px_24px_rgba(0,0,0,0.5)]", className)} {...props}>
+  <div className={cn("ui-card bg-card text-card-foreground rounded-2xl border border-border shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden transition-all duration-300 hover:border-primary/20 hover:shadow-[0_0_28px_rgba(139,92,246,0.06),0_4px_24px_rgba(0,0,0,0.5)]", className)} {...props}>
     {children}
   </div>
 );
 
 export const MotionCard = ({ className, children, ...props }: HTMLMotionProps<"div">) => (
   <motion.div 
-    className={cn("bg-card text-card-foreground rounded-2xl border border-border shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden", className)} 
-    whileHover={{ y: -4, boxShadow: "0 0 30px rgba(0,240,255,0.08), 0 8px 32px rgba(0,0,0,0.5)" }}
+    className={cn("ui-card bg-card text-card-foreground rounded-2xl border border-border shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden", className)} 
+    whileHover={{ y: -4, boxShadow: "0 0 30px rgba(139,92,246,0.08), 0 8px 32px rgba(0,0,0,0.5)" }}
     transition={{ duration: 0.2 }}
     {...props}
   >
@@ -22,8 +22,8 @@ export const MotionCard = ({ className, children, ...props }: HTMLMotionProps<"d
 export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost" | "destructive" | "secondary"; size?: "default" | "sm" | "lg" | "icon" }>(
   ({ className, variant = "default", size = "default", ...props }, ref) => {
     const variants = {
-      default: "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground border-primary/50 hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(0,240,255,0.45),0_0_40px_rgba(0,240,255,0.15)]",
-      outline: "bg-transparent border-2 border-primary/60 text-primary hover:bg-primary/8 hover:border-primary hover:shadow-[0_0_16px_rgba(0,240,255,0.4),0_0_30px_rgba(0,240,255,0.12)]",
+      default: "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground border-primary/50 hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(139,92,246,0.45),0_0_40px_rgba(139,92,246,0.15)]",
+      outline: "bg-transparent border-2 border-primary/60 text-primary hover:bg-primary/8 hover:border-primary hover:shadow-[0_0_16px_rgba(139,92,246,0.4),0_0_30px_rgba(139,92,246,0.12)]",
       ghost: "bg-transparent text-foreground/80 hover:bg-secondary hover:text-foreground border-transparent",
       destructive: "bg-destructive/15 text-destructive border-destructive/40 hover:bg-destructive/20 hover:shadow-[0_0_16px_rgba(255,30,90,0.4)]",
       secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 border-secondary/50",

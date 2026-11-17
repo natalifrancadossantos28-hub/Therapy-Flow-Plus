@@ -2516,10 +2516,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                                   onClick={(e) => { e.stopPropagation(); handleChangeFrequency(apt, freq); }}
                                                   className="rounded-lg p-1.5 text-center transition-all"
                                                   style={{
-                                                    background: isActive ? "rgba(0,240,255,0.12)" : "rgba(255,255,255,0.03)",
-                                                    border: isActive ? "1px solid rgba(0,240,255,0.5)" : "1px solid rgba(255,255,255,0.08)",
+                                                    background: isActive ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.03)",
+                                                    border: isActive ? "1px solid rgba(139,92,246,0.5)" : "1px solid rgba(255,255,255,0.08)",
                                                     color: isActive ? "#67e8f9" : "rgba(255,255,255,0.5)",
-                                                    boxShadow: isActive ? "0 0 8px rgba(0,240,255,0.2)" : "none",
+                                                    boxShadow: isActive ? "0 0 8px rgba(139,92,246,0.2)" : "none",
                                                     cursor: freqSending ? "wait" : "pointer",
                                                     opacity: freqSending ? 0.5 : 1,
                                                   }}

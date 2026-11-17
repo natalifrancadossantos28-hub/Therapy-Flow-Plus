@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HeroTela } from "@/components/HeroTela";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Card, MotionCard, Button, Badge, Label, Select, Input } from "@/components/ui-custom";
 import { Trash2, ListTodo, ListPlus, Snowflake, Undo2, Search, LogOut, History, Clock, X, CalendarClock } from "lucide-react";
@@ -658,9 +659,10 @@ export default function WaitingList() {
 
   return (
     <div className="space-y-8">
+      <HeroTela img="fila" titulo="Fila de Espera" subtitulo="Pacientes aguardando vaga, por prioridade." />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">Fila de Espera</h1>
+          <span className="sr-only">Fila de Espera</span>
           <p className="text-muted-foreground mt-1">Organização por prioridade calculada na triagem. A fila é para pacientes com até {MAX_AGE_FILA} anos.</p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">

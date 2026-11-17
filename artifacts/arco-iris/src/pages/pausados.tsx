@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { HeroTela } from "@/components/HeroTela";
 import { Link } from "wouter";
 import { Snowflake, Clock, Play, Search, RefreshCw, Phone, CircleDot, Loader2, CheckCircle2, XCircle, MessageSquare, Printer, History } from "lucide-react";
 import { buscaStatusLabel } from "@/lib/busca-ativa";
@@ -130,11 +131,10 @@ export default function PausadosPage() {
 
   return (
     <div className="space-y-6">
+      <HeroTela img="pausados" titulo="Pausados" subtitulo="Pacientes com o atendimento pausado." />
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display flex items-center gap-2">
-            <Snowflake className="w-7 h-7 text-sky-400" /> Pausados
-          </h1>
+          <span className="sr-only">Pausados</span>
           <p className="text-muted-foreground mt-1 text-sm">
             Pacientes com o atendimento pausado pelo profissional ou pela fila (ex.: mãe vai ganhar bebê, internação). Aqui fica o motivo, se ficou na agenda e a previsão de retorno. Casos para a assistente social ficam em <Link href="/busca-ativa" className="underline font-semibold">Busca Ativa</Link>.
             Vencido o prazo, o paciente volta sozinho para a Fila de Espera da especialidade.
