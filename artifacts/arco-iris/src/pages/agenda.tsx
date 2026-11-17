@@ -1860,7 +1860,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const pacienteDoDia = hojeApts.find(a => a.time >= agoraHM) ?? hojeApts[0] ?? null;
   const diaNovo = diaFoco !== null ? weekDates[diaFoco] : (weekDates.includes(today) ? today : weekDates[0]);
   return (
-    <div className={cn("agenda-neon space-y-5", !portal && "agenda-neon-fundo rounded-3xl p-4 sm:p-6 -m-2 sm:m-0")} style={{ zoom: fonte.zoom }}>
+    <div style={{ zoom: fonte.zoom }}>
+    {/* Só a tela da agenda recebe as cores lilás; os modais (abaixo) mantêm as cores originais. */}
+    <div className={cn("agenda-neon space-y-5", !portal && "agenda-neon-fundo rounded-3xl p-4 sm:p-6 -m-2 sm:m-0")}>
       <NeonCabecalho
         nome={portal ? (selectedProf?.name ?? "Profissional") : scopeAtual === "reception" ? "Recepção" : "Equipe de Gestão"}
         pessoaId={portal ? selectedProf?.id ?? null : null}
@@ -2510,6 +2512,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         </aside>
       )}
       </div>
+
+    </div>
 
       {/* ── BookingModal ── */}
       {bookingSlot && selectedProfId && (

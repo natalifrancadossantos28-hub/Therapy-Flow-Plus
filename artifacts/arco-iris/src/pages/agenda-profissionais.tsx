@@ -283,7 +283,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
   const ir = (n: number) => { setPagina(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   const inicio = (
-    <div className="space-y-4" style={{ zoom: fonte.zoom }}>
+    <div className="agenda-neon space-y-4" style={{ zoom: fonte.zoom }}>
       {prof ? <NeonCabecalho nome={prof.name} pessoaId={prof.id} subtitulo={prof.specialty ? `${prof.specialty} · seus atendimentos` : undefined} fonte={fonte} /> : (
         <div className={glass} style={neon("#a855f7")}><p className="text-lg text-[#1e1b4b]">Escolha o profissional na tela <b>Agenda</b>.</p></div>
       )}
@@ -333,7 +333,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
   );
 
   const perfil = (
-    <div className="space-y-4">
+    <div className="agenda-neon space-y-4">
       <div className={`${glass} flex items-center gap-4`} style={neon("#a855f7")}>
         <span className="grid place-items-center w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 text-white shrink-0 neon-brilho"><User size={28} /></span>
         <div className="min-w-0">
@@ -359,7 +359,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
   );
 
   return (
-    <div className={`agenda-neon min-h-screen text-foreground ${bgUrl ? "has-app-bg" : "agenda-neon-fundo"}`} style={appBackgroundStyle(bgUrl)}>
+    <div className={`min-h-screen text-foreground ${bgUrl ? "has-app-bg" : "agenda-neon-fundo"}`} style={appBackgroundStyle(bgUrl)}>
       <div className="max-w-[1500px] mx-auto px-3 sm:px-5 pt-5 pb-36">
         <NeonTelas titulos={TELAS} pagina={pagina} setPagina={ir}>
           {[inicio, agenda, perfil]}
