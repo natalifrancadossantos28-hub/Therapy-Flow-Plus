@@ -159,10 +159,10 @@ export default function AgendaProfissionais() {
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
         {!pinVerified ? (
-          <div className="max-w-md mx-auto mt-16">
+          <div className="max-w-md mx-auto mt-4 sm:mt-12">
             <div className="bg-card rounded-3xl border border-primary/20 overflow-hidden" style={{ boxShadow: "0 0 60px rgba(0,0,0,0.5), 0 0 30px rgba(139,92,246,0.05)" }}>
-              <div className="bg-gradient-to-r from-primary/70 to-primary/30 p-8 text-center text-primary-foreground" style={{ borderBottom: "1px solid rgba(139,92,246,0.2)" }}>
-                <img src={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/agenda-icones/calendario.webp`} alt="" aria-hidden width={80} height={80} className="w-20 h-20 mx-auto mb-3 object-contain drop-shadow-[0_0_16px_rgba(139,92,246,.6)]" />
+              <img src={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/visual/hero-profissionais.webp`} alt="Equipe de terapeutas" width={1024} height={683} className="w-full h-48 object-cover object-top" />
+              <div className="bg-gradient-to-r from-primary/70 to-primary/30 px-8 pb-6 pt-4 text-center text-primary-foreground" style={{ borderBottom: "1px solid rgba(139,92,246,0.2)" }}>
                 <h2 className="text-2xl font-bold">Acesso do Profissional</h2>
                 <p className="text-sm opacity-80 mt-1">Selecione seu nome e informe o PIN</p>
               </div>

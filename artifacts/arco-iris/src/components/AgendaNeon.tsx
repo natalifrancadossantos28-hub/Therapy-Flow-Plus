@@ -56,6 +56,7 @@ export function NeonCabecalho({ nome, pessoaId, subtitulo, fonte, extra }: {
   const primeiro = nome.trim().split(/\s+/)[0] || nome;
   return (
     <header className="lilas-card !rounded-3xl p-3 sm:p-4 flex flex-wrap items-center gap-3 sm:gap-4">
+      <img src={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/visual/hero-agenda.webp`} alt="Terapeuta brincando com criança" width={1024} height={683} className="basis-full w-full h-40 sm:h-56 object-cover object-[70%_40%] rounded-2xl shadow-[0_0_24px_-8px_rgba(139,92,246,.8)]" />
       <img src={ICONE_URL("calendario")} alt="" aria-hidden width={72} height={72} className="w-16 h-16 sm:w-[4.5rem] sm:h-[4.5rem] shrink-0 object-contain drop-shadow-[0_8px_12px_rgba(91,33,182,.25)]" />
       <div className="min-w-[14rem] flex-1">
         <h1 className="text-[1.7rem] sm:text-4xl font-extrabold leading-tight tracking-tight text-[#1e1b4b]">
