@@ -1,4 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Home, CalendarCheck, User, Plus } from "lucide-react";
+import { NeonSaudacao, NeonMes, NeonTelas, NeonMenuInferior, glass, neon, CORES_NEON } from "@/components/AgendaNeon";
 import { Saudacao } from "@/components/Saudacao";
 import { Calendar as CalendarIcon, Lock, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -6,7 +10,7 @@ import { BackgroundPicker } from "@/components/BackgroundPicker";
 import { appBackgroundStyle, useBackground } from "@/lib/background";
 import { MensagensComemorativas } from "@/components/MensagensComemorativas";
 import { RecadoEquipeComposer } from "@/components/RecadoEquipeComposer";
-import { listProfessionals, verifyProfessionalPin } from "@/lib/arco-rpc";
+import { listProfessionals, verifyProfessionalPin, listAppointments, type AppointmentListItem } from "@/lib/arco-rpc";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
 import Agenda from "@/pages/agenda";
@@ -75,6 +79,38 @@ export default function AgendaProfissionais() {
     } catch { setPinError("Erro ao verificar PIN."); }
     finally { setPinLoading(false); }
   };
+
+  const sair = () => {
+    if (isAdminViewing) {
+      setLocation("/");
+    } else {
+      clearAllSessions();
+      setLocation("/portal");
+    }
+  };
+
+  if (pinVerified) {
+    const agendaEl = (
+      <Agenda
+        portal={{
+          professionalId: selectedProfId,
+          allowPickProfessional: isAdminViewing,
+          onProfessionalChange: setSelectedProfId,
+        }}
+      />
+    );
+    return (
+      <PortalNeon
+        prof={selectedProf ?? null}
+        bgUrl={bgUrl}
+        bgKey={bgKey}
+        isAdminViewing={isAdminViewing}
+        portalProfName={portalProf?.professionalName ?? null}
+        onSair={sair}
+        agenda={agendaEl}
+      />
+    );
+  }
 
   return (
     <div className={`min-h-screen bg-background text-foreground${bgUrl ? " has-app-bg" : ""}`} style={appBackgroundStyle(bgUrl)}>
@@ -191,6 +227,150 @@ export default function AgendaProfissionais() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+const TELAS = ["Início", "Agenda", "Perfil"];
+const MENU_IDS = ["inicio", "agenda", "perfil"];
+const INATIVOS = new Set(["desmarcado", "cancelado", "remanejado", "remarcado", "alta", "desistência", "desistencia", "óbito", "obito"]);
+const STATUS_TXT: Record<string, string> = {
+  agendado: "Agendado", presente: "Presente", atendimento: "Atendido", ausente: "Falta",
+  falta_nao_justificada: "Falta", falta_justificada: "Falta justificada", justificado: "Falta justificada", abonado: "Abonado",
+};
+
+/** Portal do profissional no visual neon: Início, Agenda e Perfil, com menu inferior e troca deslizando. */
+function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair, agenda }: {
+  prof: Professional | null; bgUrl: string; bgKey: string; isAdminViewing: boolean; portalProfName: string | null;
+  onSair: () => void; agenda: React.ReactNode;
+}) {
+  const [pagina, setPagina] = useState(0);
+  const hoje = format(new Date(), "yyyy-MM-dd");
+  const [mes, setMes] = useState(() => startOfMonth(new Date()));
+  const [diaSel, setDiaSel] = useState(hoje);
+  const [lista, setLista] = useState<AppointmentListItem[]>([]);
+  const [carregando, setCarregando] = useState(false);
+
+  useEffect(() => {
+    if (!prof) { setLista([]); return; }
+    let vivo = true;
+    setCarregando(true);
+    listAppointments({
+      professionalId: prof.id,
+      dateFrom: format(startOfWeek(startOfMonth(mes)), "yyyy-MM-dd"),
+      dateTo: format(endOfWeek(endOfMonth(mes)), "yyyy-MM-dd"),
+    })
+      .then((r) => { if (vivo) setLista(r); })
+      .catch(console.error)
+      .finally(() => { if (vivo) setCarregando(false); });
+    return () => { vivo = false; };
+  }, [prof?.id, mes, pagina]);
+
+  const porDia = useMemo(() => {
+    const m = new Map<string, AppointmentListItem[]>();
+    for (const a of lista) {
+      if (INATIVOS.has((a.status || "").toLowerCase())) continue;
+      const arr = m.get(a.date) ?? [];
+      arr.push(a);
+      m.set(a.date, arr);
+    }
+    for (const arr of m.values()) arr.sort((a, b) => a.time.localeCompare(b.time));
+    return m;
+  }, [lista]);
+  const doDia = porDia.get(diaSel) ?? [];
+  const titDia = diaSel === hoje ? "Hoje" : format(new Date(diaSel + "T12:00:00"), "EEEE", { locale: ptBR });
+  const ir = (n: number) => { setPagina(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
+
+  const inicio = (
+    <div className="space-y-4">
+      {prof ? <NeonSaudacao nome={prof.name} detalhe={prof.specialty} pessoaId={prof.id} /> : (
+        <div className={glass} style={neon("#a855f7")}><p className="text-lg">Escolha o profissional na tela <b>Agenda</b>.</p></div>
+      )}
+      {prof && <MensagensComemorativas professionalId={prof.id} />}
+      {prof && (
+        <section className={glass} style={neon("#a855f7")} aria-live="polite">
+          <div className="flex items-center gap-3">
+            <span className="grid place-items-center w-12 h-12 rounded-2xl bg-white/10 shrink-0"><CalendarCheck size={24} /></span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-xl font-bold leading-tight capitalize">{titDia}</span>
+              <span className="block text-base text-white/80 first-letter:uppercase">{format(new Date(diaSel + "T12:00:00"), "EEEE, dd 'de' MMMM", { locale: ptBR })}</span>
+            </span>
+            <span className="text-sm font-semibold text-white/80">{doDia.length} atendimento{doDia.length === 1 ? "" : "s"}</span>
+          </div>
+          {doDia.length === 0 ? (
+            <button type="button" onClick={() => ir(1)} className="mt-3 w-full rounded-2xl bg-white/10 border border-white/15 px-4 py-3 text-left text-lg font-semibold flex items-center gap-2">
+              <Plus size={22} className="shrink-0" /> {carregando ? "Carregando…" : "Nenhum atendimento neste dia. Toque para abrir a agenda."}
+            </button>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {doDia.map((a, i) => (
+                <button type="button" key={a.id} onClick={() => ir(1)} className="w-full text-left rounded-2xl bg-white/[0.07] px-2.5 py-2 border border-white/15 flex items-center gap-3">
+                  <span className="rounded-xl px-2.5 py-1 text-lg font-bold tabular-nums shrink-0 text-white" style={{ background: `linear-gradient(135deg, ${CORES_NEON[i % 2 ? 1 : 0]}, ${CORES_NEON[i % 2 ? 3 : 5]})`, boxShadow: `0 0 12px ${CORES_NEON[i % 2 ? 1 : 0]}88` }}>{a.time.slice(0, 5)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-lg font-semibold leading-snug break-words">{a.prontuario && <span className="text-cyan-300 mr-1">[{a.prontuario}]</span>}{a.patientName || `Paciente #${a.patientId}`}</span>
+                    <span className="block text-sm text-white/70">{STATUS_TXT[(a.status || "").toLowerCase()] ?? a.status}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          {diaSel !== hoje && <button type="button" onClick={() => setDiaSel(hoje)} className="mt-3 text-base font-semibold text-sky-200 underline">Voltar para hoje</button>}
+        </section>
+      )}
+      {prof && (
+        <div className={`${glass} !p-3`} style={neon("#8b5cf6")}>
+          <p className="text-base text-white/80 mb-2 text-center">Toque num dia para ver os atendimentos</p>
+          <NeonMes mes={mes} setMes={setMes} diaSel={diaSel} onDia={setDiaSel} contar={(d) => porDia.get(d)?.length ?? 0} hoje={hoje} />
+        </div>
+      )}
+      <button type="button" onClick={() => ir(1)} className={`${glass} w-full !py-3 flex items-center justify-center gap-2 text-lg font-semibold`} style={neon("#38bdf8")}>
+        <CalendarCheck size={22} /> Abrir agenda da semana
+      </button>
+    </div>
+  );
+
+  const perfil = (
+    <div className="space-y-4">
+      <div className={`${glass} flex items-center gap-4`} style={neon("#a855f7")}>
+        <span className="grid place-items-center w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-violet-600 shrink-0 neon-brilho"><User size={28} /></span>
+        <div className="min-w-0">
+          <p className="text-xl font-bold leading-tight break-words">{prof?.name ?? portalProfName ?? "Profissional"}</p>
+          {prof?.specialty && <p className="text-base text-white/75">{prof.specialty}</p>}
+        </div>
+      </div>
+      <div className={`${glass} space-y-3`} style={neon("#38bdf8")}>
+        <p className="text-lg font-bold">Aparência</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <BackgroundPicker bgKey={bgKey} subtitle={portalProfName ? `Minha agenda · ${portalProfName}` : "Agenda do profissional"} placement="down-right" />
+          <ThemeToggle compact />
+        </div>
+      </div>
+      {!isAdminViewing && prof && (
+        <RecadoEquipeComposer professionalId={prof.id} professionalName={prof.name} specialty={prof.specialty} />
+      )}
+      <button type="button" onClick={onSair} className={`${glass} w-full !py-3 flex items-center justify-center gap-2 text-lg font-semibold text-rose-200`} style={neon("#f43f5e")}>
+        <LogOut size={20} /> {isAdminViewing ? "Voltar ao painel" : "Sair da Agenda"}
+      </button>
+      <a href={import.meta.env.BASE_URL || "/"} className="block text-center text-sm text-white/60 underline">Ir para o Painel Administrativo</a>
+    </div>
+  );
+
+  return (
+    <div className={`agenda-neon min-h-screen text-foreground ${bgUrl ? "has-app-bg" : "agenda-neon-fundo"}`} style={appBackgroundStyle(bgUrl)}>
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-5 pb-32">
+        <NeonTelas titulos={TELAS} pagina={pagina} setPagina={ir}>
+          {[inicio, agenda, perfil]}
+        </NeonTelas>
+      </div>
+      <NeonMenuInferior
+        ativo={MENU_IDS[pagina]}
+        onItem={(id) => ir(Math.max(0, MENU_IDS.indexOf(id)))}
+        itens={[
+          { id: "inicio", label: "Início", icon: <Home size={21} /> },
+          { id: "agenda", label: "Agenda", icon: <CalendarCheck size={21} /> },
+          { id: "perfil", label: "Perfil", icon: <User size={21} /> },
+        ]}
+      />
     </div>
   );
 }
