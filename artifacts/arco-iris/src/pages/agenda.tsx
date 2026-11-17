@@ -8,11 +8,16 @@ import { openAgendaPrint, type AgendaPrintMode, type PrintAppointment } from "@/
 import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Check, Activity, RotateCcw, LogOut, AlertTriangle,
-  ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck, ClipboardList
+  ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck, ClipboardList,
+  ShieldAlert, Plus, User, FileText, Mic,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
 import { Link } from "wouter";
+import { NeonCabecalho, useFonteAgenda } from "@/components/AgendaNeon";
+import { VozClinica } from "@/components/VozClinica";
+import type { ComandoClinico } from "@/lib/agenda-clinica-voz";
+import { getCurrentScope } from "@/lib/portal-session";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
@@ -65,9 +70,10 @@ import {
   pausePatientFromAgenda,
   pausePatientKeepAgenda,
   resumePatientAgendaPause,
-  type PausedOverviewItem,
+  type BuscaAtivaCaso,
 } from "@/lib/arco-rpc";
-import { listBuscaAtivaAtual, groupBuscaByPatient, retornarDaBuscaAtiva } from "@/lib/busca-ativa";
+import { listBuscaAtivaAtual, groupBuscaByPatient } from "@/lib/busca-ativa";
+import { EncaminharBuscaAtivaModal } from "@/components/EncaminharBuscaAtivaModal";
 import { AvaliacaoFuncionalForm } from "@/components/AvaliacaoFuncionalForm";
 import { avfFaixa, AVF_MAX, isParentalSpecialty } from "@/lib/avaliacao-funcional";
 import { buildMultiGuestAppointments } from "@/lib/multi-agenda";
@@ -508,6 +514,16 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
+  // Só visual: "Dia" mostra apenas uma coluna da mesma grade semanal.
+  const [diaFoco, setDiaFoco] = useState<number | null>(null);
+  const [novoAberto, setNovoAberto] = useState<{ date: string; time: string } | null>(null);
+  const fonte = useFonteAgenda();
+  const [vozAberta, setVozAberta] = useState(false);
+  useEffect(() => {
+    const abrir = () => setVozAberta(true);
+    window.addEventListener("agenda-voz-abrir", abrir);
+    return () => window.removeEventListener("agenda-voz-abrir", abrir);
+  }, []);
   // No sabado/domingo, abrir ja na proxima semana (segunda seguinte).
   const [weekRef, setWeekRef] = useState(() => {
     const d = new Date();
@@ -558,13 +574,14 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [pauseReturnDate, setPauseReturnDate] = useState("");
   const [pauseKeepAgenda, setPauseKeepAgenda] = useState<boolean | null>(null);
   const [pauseSending, setPauseSending] = useState(false);
-  const [buscaByPatient, setBuscaByPatient] = useState<Map<number, PausedOverviewItem[]>>(new Map());
+  const [buscaByPatient, setBuscaByPatient] = useState<Map<number, BuscaAtivaCaso[]>>(new Map());
+  const [encaminharApt, setEncaminharApt] = useState<Appointment | null>(null);
   const refreshBusca = () => {
     listBuscaAtivaAtual().then(l => setBuscaByPatient(groupBuscaByPatient(l))).catch(() => { /* sem acesso */ });
   };
   useEffect(() => { refreshBusca(); }, []);
   const buscaTitle = (patientId: number) =>
-    (buscaByPatient.get(patientId) ?? []).map(i => `Busca Ativa (${i.specialty || i.professionalName}): ${i.pausedReason}`).join("\n") || "Busca Ativa";
+    (buscaByPatient.get(patientId) ?? []).map(i => `Busca Ativa: ${i.motivo}`).join("\n") || "Busca Ativa";
   const menuRef = useRef<HTMLDivElement>(null);
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
@@ -1043,7 +1060,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         // Fica na agenda: horários continuam reservados, só marcados como pausados.
         await pausePatientKeepAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
       } else {
-        // Sai da agenda do profissional (horário fica livre) e vai para "Pausados / Busca Ativa".
+        // Sai da agenda do profissional (horário fica livre) e vai para "Pausados".
         await pausePatientFromAgenda(pauseModal.patientId, pauseModal.professionalId, reason, returnDate);
       }
 
@@ -1053,8 +1070,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       toast({
         title: "⏸ Pausado",
         description: pauseKeepAgenda
-          ? `${pauseModal.patientName} continua na agenda (horário reservado) e aparece em Pausados / Busca Ativa.`
-          : `${pauseModal.patientName} saiu da agenda (horário livre) e está em Pausados / Busca Ativa.`,
+          ? `${pauseModal.patientName} continua na agenda (horário reservado) e aparece em Pausados.`
+          : `${pauseModal.patientName} saiu da agenda (horário livre) e está em Pausados.`,
       });
       refreshBusca();
       setPauseModal(null);
@@ -1073,27 +1090,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       await logNotificacao(apt, "Retorno de Pausa");
       fetchAppointments();
       refreshBusca();
-      toast({ title: "▶ Retornou aos atendimentos", description: `${apt.patientName} saiu da Busca Ativa e voltou para a agenda com status "Agendado".` });
+      toast({ title: "▶ Retornou aos atendimentos", description: `${apt.patientName} voltou para a agenda com status "Agendado".` });
     } catch {
       toast({ title: "Erro", description: "Não foi possível retomar.", variant: "destructive" });
     }
   };
 
-  const handleReturnBusca = async (apt: Appointment) => {
-    setActionMenuId(null);
-    const items = buscaByPatient.get(apt.patientId) ?? [];
-    if (!items.length) return;
-    const lista = items.map(i => `• ${i.specialty || i.professionalName}: ${i.pausedReason}`).join("\n");
-    if (!confirm(`${apt.patientName} está em Busca Ativa:\n${lista}\n\nRetornar aos atendimentos? Ele sai da Busca Ativa (fica registrado no histórico).`)) return;
-    try {
-      for (const i of items) await retornarDaBuscaAtiva(i);
-      fetchAppointments();
-      refreshBusca();
-      toast({ title: "▶ Retornou aos atendimentos", description: `${apt.patientName} saiu da Busca Ativa.` });
-    } catch (err: any) {
-      toast({ title: "Erro", description: err?.message || "Não foi possível retornar.", variant: "destructive" });
-    }
-  };
 
   // ── Exclusão administrativa (sem vínculo clínico) ──
   const handleExcluirAdmin = (apt: Appointment) => {
@@ -1860,79 +1862,78 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       })
     : availableSlots;
 
+  const scopeAtual = getCurrentScope();
+  const vozPacientes = Array.from(new Map(expanded.map(a => [a.patientId, { patientId: a.patientId, patientName: a.patientName || "", prontuario: a.prontuario ?? null }])).values());
+  const vozListarDia = (data: string) => withExtraTimes(expanded.filter(a => a.date === data).map(a => a.time)).flatMap(t => getApts(data, t))
+    .filter(a => apptStatus(a)?.toLowerCase() !== "desmarcado")
+    .map(a => ({ time: a.time, nome: a.patientName || `Paciente #${a.patientId}`, status: getStatusLabel(apptStatus(a)) }));
+  // Voz: só chama os mesmos comandos do menu do paciente (cada um com suas confirmações).
+  const executarVoz = (cmd: ComandoClinico) => {
+    setVozAberta(false);
+    const acao = cmd.acao;
+    if (!acao) return;
+    if (acao === "agendar") {
+      const date = cmd.data && weekDates.includes(cmd.data) ? cmd.data : diaNovo;
+      if (cmd.hora && TIME_SLOTS.includes(cmd.hora)) setBookingSlot({ date, time: cmd.hora });
+      else setNovoAberto({ date, time: TIME_SLOTS.find(t => t !== "12:10" || isPaula) ?? TIME_SLOTS[0] });
+      return;
+    }
+    if (!cmd.paciente) return;
+    const doPaciente = expanded.filter(a => a.patientId === cmd.paciente!.patientId && apptStatus(a)?.toLowerCase() !== "desmarcado")
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    const destino = acao === "remanejar" || acao === "remarcar";
+    const apt = (!destino && cmd.data ? doPaciente.find(a => a.date === cmd.data && (!cmd.hora || a.time === cmd.hora)) : null)
+      ?? doPaciente.find(a => a.date === today)
+      ?? doPaciente.find(a => a.date >= today)
+      ?? doPaciente[0];
+    if (!apt) { toast({ title: "Paciente sem atendimento nesta semana", variant: "destructive" }); return; }
+    const soRecepcao = () => toast({ title: "Essa opção fica com a recepção", description: "No acesso do profissional ela não aparece no menu.", variant: "destructive" });
+    switch (acao) {
+      case "em_atendimento": return void handleAtendimento(apt);
+      case "avaliacao_entrada": return setAvfEntradaApt(apt);
+      case "falta_justificada": return void handleFaltaJustificada(apt);
+      case "falta_nao_justificada": return void handleFaltaNaoJustificada(apt);
+      case "desmarcar": return isProfessionalProfile ? soRecepcao() : void handleDesmarcado(apt, selectedProf?.name || "");
+      case "remanejar": case "remarcar": {
+        setActionMenuId(null);
+        const ref = cmd.data ? new Date(cmd.data + "T12:00:00") : (acao === "remarcar" ? new Date(apt.date + "T12:00:00") : weekRef);
+        setRemanejFlow({ apt, kind: acao, step: "slot", weekRef: ref });
+        setRemanejDone(false);
+        if (cmd.data || cmd.hora) toast({ title: "Escolha o novo horário", description: `Toque em ${[cmd.data?.split("-").reverse().slice(0, 2).join("/"), cmd.hora].filter(Boolean).join(" às ")} para confirmar.` });
+        return;
+      }
+      case "semanal": case "quinzenal": case "mensal": return void handleChangeFrequency(apt, acao);
+      case "pausar": return handleOpenPauseModal(apt);
+      case "busca_ativa": return setEncaminharApt(apt);
+      case "alta": return handleSaida(apt, "Alta");
+      case "desistencia": return handleSaida(apt, "Desistência");
+      case "obito": return handleSaida(apt, "Óbito");
+      case "encaminhamento": return handleEncaminhamento(apt);
+      case "multi": return handleMultiAtendimento(apt);
+      case "transporte": return isProfessionalProfile ? soRecepcao() : handleTransporte(apt);
+      case "excluir": return isProfessionalProfile ? soRecepcao() : handleExcluirAdmin(apt);
+    }
+  };
+  const visaoBtn = (ativo: boolean) => cn(
+    "px-4 py-2 rounded-xl text-base font-semibold transition-all",
+    ativo ? "text-white bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_6px_16px_-6px_rgba(109,40,217,.7)]" : "text-[#1e1b4b] bg-white hover:bg-violet-50",
+  );
+  const navRedondo = "w-10 h-10 rounded-full border border-violet-200 bg-white hover:bg-violet-50 text-violet-800 transition-colors flex items-center justify-center";
+  const agoraHM = format(new Date(), "HH:mm");
+  const hojeApts = withExtraTimes(expanded.filter(a => a.date === today).map(a => a.time)).filter(t => isPaula || t !== "12:10")
+    .flatMap(t => getApts(today, t))
+    .filter(a => apptStatus(a)?.toLowerCase() !== "desmarcado");
+  const pacienteDoDia = hojeApts.find(a => a.time >= agoraHM) ?? hojeApts[0] ?? null;
+  const diaNovo = diaFoco !== null ? weekDates[diaFoco] : (weekDates.includes(today) ? today : weekDates[0]);
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">Agenda Semanal</h1>
-          <p className="text-muted-foreground mt-1">
-            Grade semanal — {weekDays.length > 0 && `${format(weekDays[0], "dd/MM")} a ${format(weekDays[4], "dd/MM/yyyy")}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={goPrevWeek}
-            className="w-9 h-9 rounded-xl border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
-            aria-label="Semana anterior"
-            title="Semana anterior"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={goThisWeek}
-            className="text-xs text-primary hover:underline font-semibold px-2"
-            title="Voltar para esta semana"
-          >
-            Hoje
-          </button>
-          <button
-            type="button"
-            onClick={goNextWeek}
-            className="w-9 h-9 rounded-xl border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
-            aria-label="Próxima semana"
-            title="Próxima semana"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          {canView && selectedProfId && (
-            <div className="relative">
-              <Button variant="outline" className="gap-2 text-sm" onClick={() => setPrintMenuOpen(o => !o)}>
-                <Printer className="w-4 h-4" /> Imprimir
-                <ChevronDown className={cn("w-4 h-4 transition-transform", printMenuOpen && "rotate-180")} />
-              </Button>
-              {printMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setPrintMenuOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden py-1">
-                    <button onClick={() => handlePrint("dia")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
-                      <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Dia
-                    </button>
-                    <button onClick={() => handlePrint("semana")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
-                      <CalendarIcon className="w-4 h-4 text-primary" /> Agenda da Semana
-                    </button>
-                    <button onClick={() => handlePrint("mes")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
-                      <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Mês
-                    </button>
-                    <div className="border-t border-border my-1" />
-                    <button onClick={() => handlePrint("rascunho")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
-                      <Printer className="w-4 h-4 text-muted-foreground" /> Agenda em branco (rascunho)
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-          {!portal && (
-            <Link href="/agenda-profissionais">
-              <Button variant="outline" className="gap-2 text-sm">
-                <ExternalLink className="w-4 h-4" /> Portal do Profissional
-              </Button>
-            </Link>
-          )}
-        </div>
-      </div>
+    <div style={{ zoom: fonte.zoom }}>
+    {/* Só a tela da agenda recebe as cores lilás; os modais (abaixo) mantêm as cores originais. */}
+    <div className={cn("agenda-neon space-y-5", !portal && "agenda-neon-fundo rounded-3xl p-4 sm:p-6 -m-2 sm:m-0")}>
+      <NeonCabecalho
+        nome={portal ? (selectedProf?.name ?? "Profissional") : scopeAtual === "reception" ? "Recepção" : "Equipe de Gestão"}
+        pessoaId={portal ? selectedProf?.id ?? null : null}
+        fonte={fonte}
+      />
 
       {selectedProf && !isTransportSpecialty(selectedProf.specialty) && (
         <ResumoSemana appointments={appointments} weekDates={weekDates} />
@@ -1976,7 +1977,17 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
             {isProfessionalProfile ? "Profissional – Acesso Total" : isAdmin ? "Administrador – Acesso Total" : "Acesso liberado"}
           </div>
         )}
+        {!portal && (
+          <Link href="/agenda-profissionais">
+            <Button variant="outline" className="gap-2 text-sm">
+              <ExternalLink className="w-4 h-4" /> Portal do Profissional
+            </Button>
+          </Link>
+        )}
       </Card>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] items-start">
+      <div className="min-w-0 space-y-4">
 
       {!selectedProfId ? (
         <Card className="p-16 text-center">
@@ -1993,24 +2004,109 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           <p className="text-muted-foreground">Digite o PIN de 4 dígitos do profissional para acessar a agenda.</p>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          {selectedProf && (
-            <div className="px-6 py-4 border-b border-border bg-primary/5">
-              <p className="font-bold text-foreground text-lg">{selectedProf.name}</p>
-              <p className="text-sm text-muted-foreground">{selectedProf.specialty} — Agendamento recorrente automático (52 semanas)</p>
+        <Card className="overflow-hidden !rounded-3xl">
+          <div className="px-4 sm:px-6 py-4 border-b border-border space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="grid place-items-center w-11 h-11 rounded-xl bg-violet-100 text-violet-700 shrink-0"><CalendarIcon className="w-6 h-6" /></span>
+              <div className="min-w-[10rem] flex-1">
+                <h2 className="text-2xl font-extrabold text-[#1e1b4b] leading-tight">{diaFoco !== null && weekDays[diaFoco] ? "Agenda do Dia" : "Agenda Semanal"}</h2>
+                <p className="text-sm text-muted-foreground first-letter:uppercase">
+                  {diaFoco !== null && weekDays[diaFoco]
+                    ? format(weekDays[diaFoco], "EEEE, dd 'de' MMMM", { locale: ptBR })
+                    : weekDays.length > 0 && `${format(weekDays[0], "dd/MM")} a ${format(weekDays[4], "dd/MM/yyyy")}`}
+                  {selectedProf && ` · ${selectedProf.name} – ${selectedProf.specialty}`}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={goPrevWeek} className={navRedondo} aria-label="Semana anterior" title="Semana anterior"><ChevronLeft className="w-5 h-5" /></button>
+                <button type="button" onClick={goThisWeek} className="px-3 h-10 rounded-full border border-violet-200 bg-white text-violet-800 font-semibold hover:bg-violet-50" title="Voltar para esta semana">Hoje</button>
+                <button type="button" onClick={goNextWeek} className={navRedondo} aria-label="Próxima semana" title="Próxima semana"><ChevronRight className="w-5 h-5" /></button>
+                <div className="flex items-center gap-1 rounded-2xl bg-violet-50 border border-violet-200 p-1" role="tablist" aria-label="Visualização">
+                  <button type="button" role="tab" aria-selected={diaFoco === null} className={visaoBtn(diaFoco === null)} onClick={() => setDiaFoco(null)}>Semana</button>
+                  <button type="button" role="tab" aria-selected={diaFoco !== null} className={visaoBtn(diaFoco !== null)}
+                    onClick={() => { const i = weekDates.indexOf(today); setDiaFoco(i >= 0 ? i : 0); }}>Dia</button>
+                  {!portal && scopeAtual !== "reception" && (
+                    <Link href="/agenda-mensal"><span role="tab" aria-selected={false} className={cn(visaoBtn(false), "inline-block cursor-pointer")}>Mês</span></Link>
+                  )}
+                </div>
+                <Button variant="outline" className="gap-2 text-base rounded-xl bg-white text-violet-800 border-violet-200" onClick={() => setVozAberta(true)}>
+                  <Mic className="w-5 h-5" /> Falar
+                </Button>
+                <div className="relative">
+                  <Button className="gap-2 text-base rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white hover:opacity-95" onClick={() => setNovoAberto(o => o ? null : { date: diaNovo, time: TIME_SLOTS.find(t => t !== "12:10" || isPaula) ?? TIME_SLOTS[0] })}>
+                    <Plus className="w-5 h-5" /> Novo Atendimento
+                  </Button>
+                  {novoAberto && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setNovoAberto(null)} />
+                      <div className="absolute right-0 mt-2 w-72 bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3">
+                        <p className="font-bold text-foreground">Escolha o dia e o horário</p>
+                        <Select value={novoAberto.date} onChange={e => setNovoAberto({ ...novoAberto, date: e.target.value })}>
+                          {weekDays.map((d, i) => <option key={i} value={weekDates[i]}>{format(d, "EEEE, dd/MM", { locale: ptBR })}</option>)}
+                        </Select>
+                        <Select value={novoAberto.time} onChange={e => setNovoAberto({ ...novoAberto, time: e.target.value })}>
+                          {TIME_SLOTS.filter(t => isPaula || t !== "12:10").map(t => (
+                            <option key={t} value={t}>{t}{getApts(novoAberto.date, t).length ? ` · ${getApts(novoAberto.date, t).length} paciente(s)` : " · livre"}</option>
+                          ))}
+                        </Select>
+                        <Button className="w-full" onClick={() => { setBookingSlot(novoAberto); setNovoAberto(null); }}>Continuar</Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="relative">
+                  <Button variant="outline" className="gap-2 text-base rounded-xl bg-white" onClick={() => setPrintMenuOpen(o => !o)}>
+                    <Printer className="w-4 h-4" /> Imprimir
+                    <ChevronDown className={cn("w-4 h-4 transition-transform", printMenuOpen && "rotate-180")} />
+                  </Button>
+                  {printMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setPrintMenuOpen(false)} />
+                      <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                        <button onClick={() => handlePrint("dia")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Dia
+                        </button>
+                        <button onClick={() => handlePrint("semana")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <CalendarIcon className="w-4 h-4 text-primary" /> Agenda da Semana
+                        </button>
+                        <button onClick={() => handlePrint("mes")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <CalendarIcon className="w-4 h-4 text-primary" /> Agenda do Mês
+                        </button>
+                        <div className="border-t border-border my-1" />
+                        <button onClick={() => handlePrint("rascunho")} className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 flex items-center gap-2 text-foreground">
+                          <Printer className="w-4 h-4 text-muted-foreground" /> Agenda em branco (rascunho)
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
-          <div className="overflow-x-auto">
+            {diaFoco !== null && (
+              <div className="flex flex-wrap gap-2" role="tablist" aria-label="Dia da semana">
+                {weekDays.map((d, i) => (
+                  <button key={i} type="button" role="tab" aria-selected={diaFoco === i} onClick={() => setDiaFoco(i)}
+                    className={cn("min-w-[4.5rem] px-3 py-2 rounded-2xl border text-center transition-all",
+                      diaFoco === i ? "border-violet-600 bg-gradient-to-br from-violet-500 to-violet-700 text-white shadow-md" : "border-violet-200 bg-white text-[#1e1b4b] hover:bg-violet-50")}>
+                    <span className="block text-sm font-bold capitalize">{format(d, "EEE", { locale: ptBR })}</span>
+                    <span className="block text-lg font-extrabold tabular-nums leading-tight">{format(d, "dd/MM")}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="overflow-x-auto agenda-grade">
             {/* min-w: no celular as 5 colunas ficariam com ~55px e os cards se
                 sobrepunham; abaixo desta largura a grade rola na horizontal. */}
-            <table className="w-full min-w-[820px] text-sm text-left" style={{ tableLayout: "fixed" }}>
+            <table className={cn("w-full text-sm text-left", diaFoco === null ? "min-w-[820px]" : "min-w-[360px]")} style={{ tableLayout: "fixed" }}>
               <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
                 <tr>
                   <th className="px-2 py-2 sticky left-0 bg-secondary/90 backdrop-blur z-10 border-r border-border" style={{ width: "60px" }}>Horário</th>
                   {weekDays.map((d, i) => {
+                    if (diaFoco !== null && diaFoco !== i) return null;
                     const block = dayBlock(weekDates[i]);
                     return (
-                    <th key={i} className="px-1 py-2 text-center">
+                    <th key={i} className={cn("px-1 py-3 text-center", weekDates[i] === today && "dia-hoje")}>
                       <span className="font-bold text-foreground capitalize text-sm">{format(d, "EEE", { locale: ptBR })}</span>
                       <div className="font-normal text-xs">{format(d, "dd/MM")}</div>
                       {block && (
@@ -2038,9 +2134,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                     <tr key={time} className="border-b border-border hover:bg-secondary/10 transition-colors">
                       <td className="px-2 py-2 font-display font-bold text-primary text-sm sticky left-0 bg-card/90 backdrop-blur z-10 border-r border-border">{time}</td>
                       {isLunch ? (
-                        <td colSpan={5} className="px-4 py-3 bg-slate-50/50 text-center text-muted-foreground italic font-medium">Almoço — Pausa</td>
+                        <td colSpan={diaFoco === null ? 5 : 1} className="px-4 py-3 bg-slate-50/50 text-center text-muted-foreground italic font-medium">Almoço — Pausa</td>
                       ) : (
                         weekDates.map((date, i) => {
+                          if (diaFoco !== null && diaFoco !== i) return null;
                           const apts = getApts(date, time);
                           const isGroup = apts.length > 1;
                           return (
@@ -2118,9 +2215,14 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] uppercase font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
                                       {getStatusLabel(apptStatus(apt))}
                                     </span>
-                                    {(apt.paused || buscaByPatient.has(apt.patientId)) && (
-                                      <span title={buscaTitle(apt.patientId)} className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5 w-max">
-                                        <Snowflake className="w-2.5 h-2.5" /> Busca Ativa
+                                    {apt.paused && (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5 w-max">
+                                        <Snowflake className="w-2.5 h-2.5" /> Pausado
+                                      </span>
+                                    )}
+                                    {buscaByPatient.has(apt.patientId) && (
+                                      <span title={buscaTitle(apt.patientId)} className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-0.5 w-max">
+                                        <ShieldAlert className="w-2.5 h-2.5" /> Busca Ativa
                                       </span>
                                     )}
                                     {isDesmarcado && (
@@ -2326,16 +2428,14 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                           <Play className="w-3.5 h-3.5" /> Retornar aos atendimentos
                                         </button>
                                       ) : (
-                                        <>
-                                          {buscaByPatient.has(apt.patientId) && (
-                                            <button style={NEON.green} onClick={() => handleReturnBusca(apt)}>
-                                              <Play className="w-3.5 h-3.5" /> Retornar aos atendimentos
-                                            </button>
-                                          )}
-                                          <button style={NEON.cyan} onClick={() => handleOpenPauseModal(apt)}>
-                                            <Snowflake className="w-3.5 h-3.5" /> Pausar / Busca Ativa
-                                          </button>
-                                        </>
+                                        <button style={NEON.cyan} onClick={() => handleOpenPauseModal(apt)}>
+                                          <Snowflake className="w-3.5 h-3.5" /> Pausar atendimento
+                                        </button>
+                                      )}
+                                      {!buscaByPatient.has(apt.patientId) && (
+                                        <button style={NEON.red} onClick={() => { setActionMenuId(null); setEncaminharApt(apt); }}>
+                                          <ShieldAlert className="w-3.5 h-3.5" /> Encaminhar p/ Busca Ativa
+                                        </button>
                                       )}
 
                                       <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "2px 0" }} />
@@ -2399,16 +2499,17 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       onClick={() => setBookingSlot({ date, time })}
                                       className="w-full text-[10px] font-semibold py-1.5 rounded-lg border border-dashed border-cyan-500/30 text-cyan-400/70 hover:text-cyan-300 hover:border-cyan-400/60 hover:bg-cyan-500/5 transition-colors"
                                     >
-                                      + adicionar ao grupo
+                                      + Adicionar paciente
                                     </button>
                                   )}
                                 </div>
                               ) : (
                                 <button
                                   onClick={() => setBookingSlot({ date, time })}
-                                  className="w-full h-full min-h-[54px] flex items-center justify-center border-2 border-dashed border-border/40 rounded-xl text-muted-foreground/40 hover:border-primary/40 hover:text-primary/60 hover:bg-primary/5 transition-colors text-[10px] font-semibold cursor-pointer"
+                                  className="w-full h-full min-h-[58px] flex flex-col items-center justify-center gap-0.5 border-2 border-dashed border-violet-200 rounded-2xl text-violet-500 bg-white/60 hover:border-violet-400 hover:text-violet-700 hover:bg-violet-50 transition-colors text-xs font-semibold cursor-pointer"
                                 >
-                                  + Agendar
+                                  <span className="grid place-items-center w-6 h-6 rounded-full bg-violet-100 text-violet-700"><Plus className="w-4 h-4" /></span>
+                                  Adicionar Paciente
                                 </button>
                               )}
                             </td>
@@ -2424,29 +2525,67 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         </Card>
       )}
 
-      {/* ── Resumo de Hoje ── */}
+      </div>
+
       {canView && selectedProfId && (
-        <Card className="p-6">
-          <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-primary" /> Resumo de Hoje — {format(new Date(), "dd/MM/yyyy")}
-          </h3>
-          <div className="space-y-2">
-            {withExtraTimes(expanded.filter(a => a.date === today).map(a => a.time)).filter(t => isPaula || t !== "12:10").map(time => {
-              const apts = getApts(today, time);
-              const apt = apts[0] ?? null;
-              return (
-                <div key={time} className={cn("flex items-center gap-4 px-4 py-3 rounded-xl text-sm", apt ? "bg-primary/10 border border-primary/20" : "bg-secondary/50 border border-border/50")}>
-                  <span className="font-bold text-primary w-14 shrink-0">{time}</span>
-                  <span className={apt ? "font-semibold text-foreground" : "text-muted-foreground italic"}>
-                    {apt ? (apt.patientName || `Paciente #${apt.patientId}`) : "Livre"}
-                  </span>
-                  {apt && <AbsenceBadge count={absenceCount(apt.patientId)} />}
-                  {apt && <span className={cn("ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>}
+        <aside className="space-y-4 xl:sticky xl:top-4">
+          <Card className="p-5 !rounded-3xl text-center">
+            <h3 className="font-extrabold text-[#1e1b4b] text-xl mb-3 flex items-center justify-center gap-2">
+              <User className="w-5 h-5 text-violet-700" /> Paciente do Dia
+            </h3>
+            {pacienteDoDia ? (
+              <>
+                <div className="mx-auto w-fit rounded-full p-1 bg-gradient-to-br from-violet-400 to-violet-700">
+                  <div className="rounded-full bg-white p-0.5">
+                    <PatientAvatar url={photoById.get(pacienteDoDia.patientId)} name={pacienteDoDia.patientName} size={96} />
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </Card>
+                <p className="mt-3 text-xl font-extrabold text-[#1e1b4b] leading-tight break-words">{pacienteDoDia.patientName || `Paciente #${pacienteDoDia.patientId}`}</p>
+                <span className={cn("inline-block mt-2 px-3 py-0.5 rounded-full text-xs uppercase font-bold", getStatusColor(apptStatus(pacienteDoDia)))}>{getStatusLabel(apptStatus(pacienteDoDia))}</span>
+                <div className="mt-3 space-y-1.5 text-left text-base text-[#3b3561]">
+                  {pacienteDoDia.prontuario && <p className="flex items-center gap-2"><FileText className="w-4 h-4 text-violet-700" /> Prontuário: {pacienteDoDia.prontuario}</p>}
+                  <p className="flex items-center gap-2"><Clock className="w-4 h-4 text-violet-700" /> Atendimento: {format(new Date(today + "T12:00:00"), "dd/MM")} - {pacienteDoDia.time}</p>
+                </div>
+                {!portal && (
+                  <Link href={`/patients/${pacienteDoDia.patientId}`}>
+                    <Button className="mt-4 w-full rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white">Ver Detalhes →</Button>
+                  </Link>
+                )}
+              </>
+            ) : (
+              <p className="text-muted-foreground">Nenhum atendimento hoje.</p>
+            )}
+          </Card>
+
+          <Card className="p-5 !rounded-3xl">
+            <h3 className="font-extrabold text-[#1e1b4b] text-lg mb-3 flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-violet-700" /> Atendimentos de Hoje
+            </h3>
+            {hojeApts.length === 0 ? (
+              <p className="text-muted-foreground">Nenhum atendimento hoje.</p>
+            ) : (
+              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                {hojeApts.map(apt => (
+                  <div key={`${apt.id}-${apt.time}`} className={cn("flex items-center gap-3 rounded-2xl px-2 py-2", apt.time >= agoraHM ? "bg-violet-50" : "bg-white")}>
+                    <span className="rounded-xl bg-violet-100 text-violet-800 font-bold tabular-nums px-2.5 py-1.5 shrink-0">{apt.time}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-[#1e1b4b] leading-snug break-words">{apt.patientName || `Paciente #${apt.patientId}`}</span>
+                      <span className={cn("inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>
+                    </span>
+                    <AbsenceBadge count={absenceCount(apt.patientId)} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </aside>
+      )}
+      </div>
+
+    </div>
+
+      {vozAberta && canView && selectedProfId && (
+        <VozClinica pacientes={vozPacientes} listarDia={vozListarDia} onConfirmar={executarVoz} onFechar={() => setVozAberta(false)} />
       )}
 
       {/* ── BookingModal ── */}
@@ -2515,6 +2654,16 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       )}
 
       {/* ── Modal de Pausa Temporária ── */}
+      {encaminharApt && (
+        <EncaminharBuscaAtivaModal
+          patientId={encaminharApt.patientId}
+          patientName={encaminharApt.patientName || `#${encaminharApt.patientId}`}
+          specialty={professionals.find(p => p.id === encaminharApt.professionalId)?.specialty ?? selectedProf?.specialty ?? null}
+          professionalId={encaminharApt.professionalId}
+          onClose={() => setEncaminharApt(null)}
+          onDone={refreshBusca}
+        />
+      )}
       {pauseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,20,0.97)", border: "1px solid rgba(56,189,248,0.3)" }}>
@@ -2524,8 +2673,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   <Snowflake className="w-5 h-5" style={{ color: "#7dd3fc" }} />
                 </div>
                 <div>
-                  <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar / Busca Ativa</p>
-                  <p className="text-xs text-white/50">Vai para a lista Pausados / Busca Ativa</p>
+                  <p className="font-bold" style={{ color: "#7dd3fc", textShadow: "0 0 8px rgba(125,211,252,0.8)" }}>Pausar atendimento</p>
+                  <p className="text-xs text-white/50">Vai para a lista Pausados</p>
                 </div>
               </div>
               <p className="text-sm text-white/80 mb-3">
@@ -2543,7 +2692,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                       style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #ef4444" }}
                     >
                       <span className="block text-sm font-bold" style={{ color: "#fca5a5" }}>Sai da agenda</span>
-                      <span className="block text-[11px] text-white/60">Libera o horário e vai para a Busca Ativa</span>
+                      <span className="block text-[11px] text-white/60">Libera o horário e vai para Pausados</span>
                     </button>
                     <button
                       type="button"
@@ -2569,7 +2718,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                     }}
                   >
                     <span className="text-sm font-bold" style={{ color: pauseKeepAgenda ? "#6ee7b7" : "#fca5a5" }}>
-                      {pauseKeepAgenda ? "Fica na agenda (horário reservado)" : "Sai da agenda → Busca Ativa"}
+                      {pauseKeepAgenda ? "Fica na agenda (horário reservado)" : "Sai da agenda → Pausados"}
                     </span>
                     <button type="button" className="text-[11px] text-white/60 underline hover:text-white" onClick={() => setPauseKeepAgenda(null)}>
                       trocar

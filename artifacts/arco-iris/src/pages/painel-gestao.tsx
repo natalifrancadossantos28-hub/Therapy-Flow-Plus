@@ -156,7 +156,7 @@ export default function PainelGestao() {
     { icon: DoorOpen, label: "Ocupação da equipe", value: cap ? fmtPct(ocupacao) : v(null, false), sub: cap ? `${abaixoDaMeta(capF)} abaixo de ${CAPACIDADE_META} pacientes` : "", tone: "#a78bfa",
       origem: `Pacientes com agenda ativa ÷ capacidade (até ${CAPACIDADE_MAX} por profissional).` },
     { icon: Snowflake, label: "Pacientes pausados", value: v(pausedItems ? pausedItems.length : null, false), sub: pausedItems ? `${pausedItems.filter((i) => i.source === "fila").length} fila · ${pausedItems.filter((i) => i.source === "agenda").length} agenda` : "", tone: "#67e8f9",
-      origem: "Pausas ativas na fila (congelados) e na agenda, da mesma lista da página Pausados / Busca Ativa." },
+      origem: "Pausas ativas na fila (congelados) e na agenda, da mesma lista da página Pausados." },
   ];
 
   const [aberto, setAberto] = useState<string | null>(null);
@@ -297,7 +297,7 @@ export default function PainelGestao() {
               ))}
             </tbody>
           </table>
-          <Link href="/pausados" className="text-xs text-primary font-semibold mt-3 inline-block">Abrir Pausados / Busca Ativa →</Link>
+          <Link href="/pausados" className="text-xs text-primary font-semibold mt-3 inline-block">Abrir Pausados →</Link>
         </Detalhe>
       </div>
 

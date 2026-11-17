@@ -1616,7 +1616,7 @@ function PausedOverviewWidget() {
         Pacientes Pausados ({all.length})
       </h2>
       <p className="text-xs text-muted-foreground mb-4">
-        Consolidação de pausas na Fila de Espera (Busca Ativa) e Agenda (Pausa Temporária).
+        Consolidação de pausas na Fila de Espera e na Agenda (Pausa Temporária).
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

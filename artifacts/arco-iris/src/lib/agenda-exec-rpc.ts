@@ -41,6 +41,21 @@ export function getSessao(): AgxSessao | null {
 }
 export const setSessao = (s: AgxSessao) => localStorage.setItem(KEY, JSON.stringify(s));
 export const limparSessao = () => localStorage.removeItem(KEY);
+
+// Cópia da agenda no celular, para ver os compromissos sem internet.
+const chaveOffline = (donaId: number) => `nfs_agx_offline_${donaId}`;
+export function guardarOffline(donaId: number, lista: AgxCompromisso[]) {
+  try {
+    const antes = lerOffline(donaId)?.lista ?? [];
+    const datas = new Set(lista.map((c) => c.data));
+    const ids = new Set(lista.map((c) => c.id));
+    const juntos = [...antes.filter((c) => !ids.has(c.id) && !datas.has(c.data)), ...lista].slice(-1500);
+    localStorage.setItem(chaveOffline(donaId), JSON.stringify({ em: new Date().toISOString(), lista: juntos }));
+  } catch { /* sem espaço */ }
+}
+export function lerOffline(donaId: number): { em: string; lista: AgxCompromisso[] } | null {
+  try { const r = localStorage.getItem(chaveOffline(donaId)); return r ? JSON.parse(r) : null; } catch { return null; }
+}
 export const slugDoAparelho = () => getDeviceCompanySlug() ?? SLUG_PADRAO;
 
 type Erro = { code?: string; message?: string };
@@ -79,6 +94,7 @@ export async function entrar(slug: string, usuarioId: number, pin: string): Prom
 export async function sair() {
   const s = getSessao();
   limparSessao();
+  if (s) try { localStorage.removeItem(chaveOffline(s.dona.id)); } catch { /* ok */ }
   if (s) await rpc("agenda_exec_sair", { p_token: s.token }).catch(() => {});
 }
 

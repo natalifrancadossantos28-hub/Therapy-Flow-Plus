@@ -63,7 +63,7 @@ function numero(s: string | undefined): number | null {
   return NUM[s] ?? null;
 }
 
-function acharData(t: string, hoje: Date): Date | null {
+export function acharData(t: string, hoje: Date): Date | null {
   const d = (n: number) => { const x = new Date(hoje); x.setDate(x.getDate() + n); return x; };
   if (/\bdepois de amanha\b/.test(t)) return d(2);
   if (/\bamanha\b/.test(t)) return d(1);
@@ -88,7 +88,7 @@ function acharData(t: string, hoje: Date): Date | null {
   return x;
 }
 
-function acharHora(t: string): string | null {
+export function acharHora(t: string): string | null {
   const especial = t.match(RE_ESPECIAL);
   if (especial) {
     const min = especial[2] === "meia" ? 30 : numero(especial[2]) ?? 0;

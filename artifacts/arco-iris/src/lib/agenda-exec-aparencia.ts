@@ -16,7 +16,26 @@ export type Aparencia = {
   veu: number;      // -60 (clarear) … 80 (escurecer)
   cartoes: number;  // opacidade dos cartões 20-95
   letra: number;    // tamanho das letras 100-140 (%)
+  rotina?: AtividadeRotina[]; // "Minha Rotina": atividades fixas do dia, cadastradas pela própria pessoa
 };
+
+export type AtividadeRotina = { id: string; hora: string; titulo: string; icone: string; cor: string };
+export const ROTINA_MAX = 20;
+function normalizarRotina(raw: unknown): AtividadeRotina[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((x) => {
+    const r = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    const hora = typeof r.hora === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(r.hora) ? r.hora : null;
+    const titulo = typeof r.titulo === "string" ? r.titulo.trim().slice(0, 40) : "";
+    if (!hora || !titulo) return [];
+    return [{
+      id: typeof r.id === "string" && r.id ? r.id.slice(0, 12) : Math.random().toString(36).slice(2, 8),
+      hora, titulo,
+      icone: typeof r.icone === "string" ? r.icone.slice(0, 12) : "alvo",
+      cor: typeof r.cor === "string" && /^#[0-9a-f]{6}$/i.test(r.cor) ? r.cor : "#a855f7",
+    }];
+  }).sort((a, b) => a.hora.localeCompare(b.hora)).slice(0, ROTINA_MAX);
+}
 
 export const APARENCIA_PADRAO: Aparencia = { fundo: "padrao", posX: 50, posY: 50, zoom: 100, brilho: 100, desfoque: 0, veu: 35, cartoes: 55, letra: 112 };
 
@@ -51,7 +70,7 @@ export function normalizar(raw: unknown): Aparencia {
   return {
     fundo, posX: lim(r.posX, 0, 100, d.posX), posY: lim(r.posY, 0, 100, d.posY), zoom: lim(r.zoom, 100, 200, d.zoom),
     brilho: lim(r.brilho, 50, 150, d.brilho), desfoque: lim(r.desfoque, 0, 20, d.desfoque), veu: lim(r.veu, -60, 80, d.veu), cartoes: lim(r.cartoes, 20, 95, d.cartoes),
-    letra: lim(r.letra, 100, 140, d.letra),
+    letra: lim(r.letra, 100, 140, d.letra), rotina: normalizarRotina(r.rotina),
   };
 }
 
@@ -155,8 +174,7 @@ export function useAparencia(usuarioId: number) {
   }, [usuarioId, enviar]);
 
   const restaurar = useCallback(() => {
-    const p = APARENCIA_PADRAO;
-    setAp(p); gravarLocal(usuarioId, p, new Date().toISOString()); enviar(p);
+    setAp((a) => { const p = { ...APARENCIA_PADRAO, rotina: a.rotina ?? [] }; gravarLocal(usuarioId, p, new Date().toISOString()); enviar(p); return p; });
   }, [usuarioId, enviar]);
 
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);

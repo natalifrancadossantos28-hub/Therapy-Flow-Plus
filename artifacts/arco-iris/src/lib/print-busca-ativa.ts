@@ -1,5 +1,5 @@
 // Relatório imprimível da Busca Ativa (lista para a assistente social).
-import type { PausedOverviewItem } from "@/lib/arco-rpc";
+import type { BuscaAtivaCaso } from "@/lib/arco-rpc";
 import { buscaStatusLabel } from "@/lib/busca-ativa";
 
 function esc(s: string | null | undefined): string {
@@ -13,7 +13,7 @@ function fmt(d: string | null | undefined): string {
   return y && m && day ? `${day}/${m}/${y}` : d;
 }
 
-export function printBuscaAtivaReport(items: PausedOverviewItem[], filtro?: string): void {
+export function printBuscaAtivaReport(items: BuscaAtivaCaso[], filtro?: string): void {
   const dataHora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const rows = items.map((i, idx) => `<tr>
       <td class="n">${idx + 1}º</td>
@@ -22,10 +22,10 @@ export function printBuscaAtivaReport(items: PausedOverviewItem[], filtro?: stri
       <td class="nw">${esc(i.patientPhone || "—")}</td>
       <td>${esc(i.address || "—")}</td>
       <td>${esc(i.specialty || "—")}${i.professionalName ? `<div class="s">${esc(i.professionalName)}</div>` : ""}</td>
-      <td>${esc(i.pausedReason || "—")}</td>
-      <td class="nw">${fmt(i.pausedAt)}</td>
-      <td class="nw">${esc(buscaStatusLabel(i.buscaStatus))}</td>
-      <td>${esc(i.buscaObs || "")}</td>
+      <td>${esc(i.motivo || "—")}${i.encaminhadoPor ? `<div class="s">por ${esc(i.encaminhadoPor)}</div>` : ""}</td>
+      <td class="nw">${fmt(i.createdAt)}</td>
+      <td class="nw">${esc(buscaStatusLabel(i.status))}</td>
+      <td>${esc(i.obs || "")}</td>
       <td class="visita"></td>
     </tr>`).join("");
 

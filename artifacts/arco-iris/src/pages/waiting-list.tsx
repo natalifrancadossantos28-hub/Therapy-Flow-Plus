@@ -89,7 +89,7 @@ const HIST_LABEL: Record<string, { label: string; cls: string }> = {
   desistencia:        { label: "Desistência",         cls: "bg-orange-500/15 text-orange-400 border-orange-500/40" },
   obito:              { label: "Óbito",               cls: "bg-zinc-500/15 text-zinc-300 border-zinc-500/40" },
   removido:           { label: "Removido da fila",    cls: "bg-red-500/15 text-red-400 border-red-500/40" },
-  pausa:              { label: "Pausa / busca ativa", cls: "bg-sky-500/15 text-sky-400 border-sky-500/40" },
+  pausa:              { label: "Pausa",               cls: "bg-sky-500/15 text-sky-400 border-sky-500/40" },
   retorno:            { label: "Voltou à fila",       cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/40" },
   retorno_automatico: { label: "Voltou (prazo venceu)", cls: "bg-yellow-500/15 text-yellow-400 border-yellow-500/40" },
   data_corrigida:     { label: "Data corrigida",      cls: "bg-indigo-500/15 text-indigo-300 border-indigo-500/40" },
@@ -500,7 +500,7 @@ export default function WaitingList() {
           ? { ...e, paused: true, pausedAt: new Date().toISOString(), pausedReason: reason, pausedReturnDate: res.pausedReturnDate, pausedOrigin: "Fila de Espera" }
           : e
       ));
-      toast({ title: "🔵 Em busca ativa", description: `${pauseTarget.patientName} saiu da disputa por vaga${pauseReturn ? ` até ${formatDate(pauseReturn)}` : ""}.` });
+      toast({ title: "⏸ Pausado", description: `${pauseTarget.patientName} saiu da disputa por vaga${pauseReturn ? ` até ${formatDate(pauseReturn)}` : ""}.` });
       setPauseTarget(null);
     } catch (err: any) {
       toast({ title: "Erro", description: err?.message || "Falha ao pausar.", variant: "destructive" });
@@ -779,7 +779,7 @@ export default function WaitingList() {
         <span className="px-1.5 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-400 font-semibold">amarelo ≥ 90 dias</span>
         <span className="px-1.5 rounded border border-red-500/40 bg-red-500/10 text-red-400 font-semibold">vermelho ≥ 180 dias</span>
         <span className="ml-auto flex gap-2">
-          <Link href="/pausados"><Button variant="outline" size="sm" className="gap-1.5"><Snowflake className="w-3.5 h-3.5" /> Pausados / Busca Ativa</Button></Link>
+          <Link href="/pausados"><Button variant="outline" size="sm" className="gap-1.5"><Snowflake className="w-3.5 h-3.5" /> Pausados</Button></Link>
           <Button variant={histOpen ? "default" : "outline"} size="sm" className="gap-1.5" onClick={() => setHistOpen(v => !v)}>
             <History className="w-3.5 h-3.5" /> Histórico da fila
           </Button>
@@ -1115,7 +1115,7 @@ export default function WaitingList() {
                           )}
                           <Button
                             variant="outline"
-                            title="Pausar atendimento (busca ativa) — tira da disputa por vaga sem remover"
+                            title="Pausar atendimento — tira da disputa por vaga sem remover"
                             className="h-8 gap-1.5 text-xs border-sky-500/40 text-sky-300 hover:bg-sky-500/10"
                             onClick={() => handlePause(entry)}
                           >
@@ -1179,10 +1179,10 @@ export default function WaitingList() {
           <div className="flex items-center gap-2 px-6 py-4 bg-sky-500/10 border-b border-sky-500/20">
             <Search className="w-4 h-4 text-sky-400" />
             <h2 className="text-sm font-bold uppercase tracking-wide text-sky-300">
-              Em Busca Ativa ({pausedList.length})
+              Pausados ({pausedList.length})
             </h2>
             <span className="text-xs text-muted-foreground">
-              Fora da disputa por vaga. Vencido o prazo de retorno, volta sozinho à fila. Veja todos em "Pausados / Busca Ativa".
+              Fora da disputa por vaga. Vencido o prazo de retorno, volta sozinho à fila. Veja todos em "Pausados".
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -1202,7 +1202,7 @@ export default function WaitingList() {
                 {displayPausedList.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                      Nenhum paciente em busca ativa nesta especialidade.
+                      Nenhum paciente pausado nesta especialidade.
                     </td>
                   </tr>
                 ) : (
@@ -1239,7 +1239,7 @@ export default function WaitingList() {
                         {entry.specialty || "Qualquer especialidade"}
                       </td>
                       <td className="px-6 py-4 text-muted-foreground italic">
-                        {entry.pausedReason || "Busca ativa"}
+                        {entry.pausedReason || "Pausa"}
                       </td>
                       <td className="px-6 py-4 text-xs"><span className={`font-bold uppercase px-1.5 py-0.5 rounded border ${(entry.pausedOrigin || "").startsWith("Agenda") ? "bg-violet-500/15 text-violet-400 border-violet-500/40" : "bg-sky-500/15 text-sky-400 border-sky-500/40"}`}>{entry.pausedOrigin || "Fila de Espera"}</span></td>
                       <td className="px-6 py-4 font-medium">

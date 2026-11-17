@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Saudacao } from "@/components/Saudacao";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
-  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette, ChevronDown, BarChart3, FileText, CalendarClock } from "lucide-react";
+  Snowflake, Menu, X, Building2, LogOut, Brain, DoorOpen, CalendarOff, HeartHandshake, MessageSquareHeart, Inbox, PanelLeftClose, PanelLeftOpen, MonitorX, Palette, ChevronDown, BarChart3, FileText, CalendarClock, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAllSessions, getCurrentScope } from "@/lib/portal-session";
@@ -35,7 +35,8 @@ const navItems: NavItem[] = [
   { href: "/professionals", label: "Profissionais (cadastro)", icon: UserRound, scopes: ["admin"], group: "Atendimento" },
   { href: "/reception", label: "Recepção", icon: ClipboardList, scopes: ["admin", "reception"], group: "Atendimento" },
   { href: "/waiting-list", label: "Fila de Espera", icon: ListTodo, scopes: ["admin"], group: "Organização" },
-  { href: "/pausados", label: "Pausados / Busca Ativa", icon: Snowflake, scopes: ["admin", "reception"], group: "Atendimento" },
+  { href: "/pausados", label: "Pausados", icon: Snowflake, scopes: ["admin", "reception"], group: "Atendimento" },
+  { href: "/busca-ativa", label: "Busca Ativa", icon: ShieldAlert, scopes: ["admin", "reception"], group: "Atendimento" },
   { href: "/agenda", label: "Agenda Geral", icon: Calendar, scopes: ["admin"], group: "Organização" },
   { href: "/agenda-mensal", label: "Agenda Mensal", icon: CalendarDays, scopes: ["admin"], group: "Organização" },
   { href: "/minha-agenda", label: "Minha Agenda", icon: CalendarClock, scopes: ["admin"], group: "Organização" },

@@ -22,6 +22,7 @@ const PatientDetail = lazy(() => import("@/pages/patient-detail"));
 const Reception = lazy(() => import("@/pages/reception"));
 const WaitingList = lazy(() => import("@/pages/waiting-list"));
 const Pausados = lazy(() => import("@/pages/pausados"));
+const BuscaAtiva = lazy(() => import("@/pages/busca-ativa"));
 const Agenda = lazy(() => import("@/pages/agenda"));
 const AgendaMensal = lazy(() => import("@/pages/agenda-mensal"));
 const AgendaProfissionais = lazy(() => import("@/pages/agenda-profissionais"));
@@ -88,6 +89,7 @@ function Router() {
                 <Route path="/reception">{() => <AdminGuard requiredScope="reception"><Reception /></AdminGuard>}</Route>
                 <Route path="/waiting-list">{() => <AdminGuard requiredScope="reception"><WaitingList /></AdminGuard>}</Route>
                 <Route path="/pausados">{() => <AdminGuard requiredScope="reception"><Pausados /></AdminGuard>}</Route>
+                <Route path="/busca-ativa">{() => <AdminGuard requiredScope="reception"><BuscaAtiva /></AdminGuard>}</Route>
                 <Route path="/agenda">{() => <Agenda />}</Route>
                 <Route path="/agenda-mensal">{() => <AdminGuard><AgendaMensal /></AdminGuard>}</Route>
                 <Route path="/gestao-contratos">{() => <AdminGuard><GestaoContratos /></AdminGuard>}</Route>

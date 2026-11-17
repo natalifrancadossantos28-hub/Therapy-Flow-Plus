@@ -475,3 +475,95 @@
 
 /* Celular: letras um pouco maiores por padrão (o A+/A− do topo muda por aparelho). */
 @media (max-width: 767px) { html { font-size: 112.5%; } }
+
+/* ═══════════════════════════════════════════
+   AGENDA LILÁS (agenda da recepção e do profissional)
+   Só visual: dentro de .agenda-neon as cores ficam claras/lilás em qualquer tema.
+   ═══════════════════════════════════════════ */
+.agenda-neon, :root.light .agenda-neon {
+  --background: 255 70% 97%;
+  --foreground: 252 45% 16%;
+  --border: 255 40% 87%;
+  --input: 255 45% 93%;
+  --ring: 258 75% 58%;
+  --card: 0 0% 100%;
+  --card-foreground: 252 45% 16%;
+  --card-border: 255 40% 88%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 252 45% 16%;
+  --popover-border: 255 40% 88%;
+  --primary: 258 72% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 255 70% 96%;
+  --secondary-foreground: 252 45% 20%;
+  --muted: 255 60% 96%;
+  --muted-foreground: 252 18% 38%;
+  --accent: 258 85% 94%;
+  --accent-foreground: 258 70% 40%;
+  --destructive: 0 75% 50%;
+  color: hsl(var(--foreground));
+}
+.agenda-neon-fundo {
+  background:
+    radial-gradient(900px 500px at 100% 0%, rgba(196,181,253,.55), transparent 60%),
+    radial-gradient(800px 500px at 0% 100%, rgba(221,214,254,.8), transparent 60%),
+    linear-gradient(160deg, #f6f3ff 0%, #ece6ff 50%, #e2d9fd 100%);
+}
+.agenda-neon .bg-card {
+  background: rgba(255, 255, 255, .86);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.agenda-neon .bg-card.border, .agenda-neon .rounded-2xl.border-border {
+  border-color: rgba(196, 181, 253, .7);
+  box-shadow: 0 10px 30px -12px rgba(91, 33, 182, .25);
+}
+.agenda-neon .bg-card .bg-card { backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
+.agenda-neon .neon-txt { color: #6d28d9; }
+.agenda-neon .lilas-card {
+  background: rgba(255, 255, 255, .82);
+  border: 1px solid rgba(221, 214, 254, .95);
+  border-radius: 1.5rem;
+  box-shadow: 0 12px 32px -14px rgba(91, 33, 182, .3);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.agenda-neon .neon-mic { box-shadow: 0 0 0 7px rgba(255,255,255,.9), 0 10px 30px rgba(109,40,217,.55); }
+.agenda-neon .neon-brilho { box-shadow: 0 8px 20px -6px rgba(109,40,217,.5); }
+/* Grade semanal: letras maiores e cartões arredondados */
+.agenda-neon .agenda-grade table { font-size: 1rem; }
+.agenda-neon .agenda-grade thead { background: #f5f1ff; }
+.agenda-neon .agenda-grade th .text-sm { font-size: 1.05rem; }
+.agenda-neon .agenda-grade th .text-xs { font-size: .9rem; }
+.agenda-neon .agenda-grade td .text-xs { font-size: .9rem; }
+.agenda-neon .agenda-grade td .text-\[9px\] { font-size: 11px; }
+.agenda-neon .agenda-grade td .rounded-xl.border { border-radius: 1rem; background-color: #faf8ff; box-shadow: 0 4px 12px -6px rgba(91,33,182,.25); }
+.agenda-neon .agenda-grade tbody tr:hover { background: rgba(167, 139, 250, .07); }
+.agenda-neon .agenda-grade .sticky { background: #fbfaff; }
+.agenda-neon .agenda-grade td.sticky { font-size: 1.15rem; color: #3b0764; }
+.agenda-neon .agenda-grade th.dia-hoje { background: linear-gradient(160deg, #7c3aed, #6d28d9); }
+.agenda-neon .agenda-grade th.dia-hoje, .agenda-neon .agenda-grade th.dia-hoje * { color: #fff !important; }
+.agenda-neon .bg-slate-50\/50 { background: #f7f4ff; }
+@keyframes neon-lado-e { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes neon-lado-d { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+.neon-lado-e { animation: neon-lado-e .28s ease-out; }
+.neon-lado-d { animation: neon-lado-d .28s ease-out; }
+/* Cores de texto escurecidas para ler bem no fundo claro, mesmo com o sistema no tema escuro. */
+.agenda-neon .text-cyan-400, .agenda-neon .text-cyan-300 { color: #0e7490; }
+.agenda-neon .text-sky-400, .agenda-neon .text-sky-300 { color: #0369a1; }
+.agenda-neon .text-blue-400, .agenda-neon .text-blue-300 { color: #1d4ed8; }
+.agenda-neon .text-teal-400, .agenda-neon .text-teal-300 { color: #0f766e; }
+.agenda-neon .text-emerald-400, .agenda-neon .text-emerald-300 { color: #047857; }
+.agenda-neon .text-green-400, .agenda-neon .text-green-300 { color: #15803d; }
+.agenda-neon .text-yellow-400, .agenda-neon .text-yellow-300 { color: #a16207; }
+.agenda-neon .text-amber-400, .agenda-neon .text-amber-300 { color: #b45309; }
+.agenda-neon .text-orange-400, .agenda-neon .text-orange-300 { color: #c2410c; }
+.agenda-neon .text-red-400, .agenda-neon .text-red-300 { color: #b91c1c; }
+.agenda-neon .text-rose-400, .agenda-neon .text-rose-300 { color: #be123c; }
+.agenda-neon .text-pink-400, .agenda-neon .text-pink-300 { color: #be185d; }
+.agenda-neon .text-fuchsia-400, .agenda-neon .text-fuchsia-300 { color: #a21caf; }
+.agenda-neon .text-purple-400, .agenda-neon .text-purple-300 { color: #7e22ce; }
+.agenda-neon .text-violet-400, .agenda-neon .text-violet-300 { color: #6d28d9; }
+.agenda-neon .text-foreground\/40 { color: hsl(var(--foreground) / 0.62); }
+.agenda-neon .text-foreground\/50 { color: hsl(var(--foreground) / 0.68); }
+.agenda-neon .text-foreground\/60 { color: hsl(var(--foreground) / 0.74); }
+.agenda-neon .text-foreground\/70 { color: hsl(var(--foreground) / 0.82); }
