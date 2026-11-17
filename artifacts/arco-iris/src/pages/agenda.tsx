@@ -1903,6 +1903,29 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     if (!lista.length || novo === time) { setAjusteHora(null); return; }
     setAjusteSalvando(true);
     try {
+      // Mesma regra do Remanejar: o paciente não pode ficar no mesmo dia/hora com outro profissional.
+      if (!allowsSameSlotAsPatient(selectedProf?.specialty)) {
+        for (const apt of lista) {
+          if (isPilatesAppointment(apt.notes)) continue;
+          const sameDay = await listAppointments({ patientId: apt.patientId, date });
+          const conflict = sameDay.find(a =>
+            a.time === novo &&
+            a.professionalId !== parseInt(selectedProfId) &&
+            ["agendado", "atendimento", "presente"].includes(a.status.toLowerCase()) &&
+            !(a.notes ?? "").startsWith("Atendimento Multi com ") &&
+            !isPilatesAppointment(a.notes) &&
+            !allowsSameSlotAsPatient(professionals.find(p => p.id === a.professionalId)?.specialty),
+          );
+          if (conflict) {
+            toast({
+              title: "Paciente já tem horário neste dia/hora",
+              description: `${apt.patientName ?? "O paciente"} já está com ${conflict.professionalName ?? "outro profissional"} às ${novo}.`,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
       for (const apt of lista) {
         let realId = apt.id;
         if (apt.id < 0) {
