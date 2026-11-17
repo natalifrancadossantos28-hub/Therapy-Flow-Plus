@@ -898,11 +898,11 @@ export default function Dashboard() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
-                  <PolarGrid stroke="rgba(0,240,255,0.15)" />
+                  <PolarGrid stroke="rgba(139,92,246,0.15)" />
                   <PolarAngleAxis dataKey="area" tick={{ fontSize: 11, fill: "rgba(210,230,255,0.85)", fontWeight: 600 }} />
                   <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 9, fill: "rgba(150,180,220,0.6)" }} tickCount={4} />
                   <Radar name="Média" dataKey="pct" stroke="#00f0ff" fill="#00f0ff" fillOpacity={0.15} strokeWidth={2.5} dot={{ r: 4, fill: "#00f0ff", filter: "drop-shadow(0 0 6px #00f0ff)" }} />
-                  <Tooltip formatter={(v: any) => [`${v}%`, "Média"]} contentStyle={{ background: "hsl(222 50% 8%)", border: "1px solid rgba(0,240,255,0.25)", borderRadius: 12, color: "#e0f0ff", boxShadow: "0 0 20px rgba(0,240,255,0.1)" }} />
+                  <Tooltip formatter={(v: any) => [`${v}%`, "Média"]} contentStyle={{ background: "hsl(222 50% 8%)", border: "1px solid rgba(139,92,246,0.25)", borderRadius: 12, color: "#e0f0ff", boxShadow: "0 0 20px rgba(139,92,246,0.1)" }} />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
@@ -911,7 +911,7 @@ export default function Dashboard() {
                 <div key={d.area} className="flex items-center gap-3">
                   <span className="w-24 text-xs font-semibold text-muted-foreground shrink-0">{d.area}</span>
                   <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${d.pct}%`, background: "linear-gradient(90deg, #00b4d8, #00f0ff)", boxShadow: "0 0 8px rgba(0,240,255,0.5)" }} />
+                    <div className="h-full rounded-full transition-all" style={{ width: `${d.pct}%`, background: "linear-gradient(90deg, #00b4d8, #00f0ff)", boxShadow: "0 0 8px rgba(139,92,246,0.5)" }} />
                   </div>
                   <span className="w-12 text-right text-xs font-bold text-foreground">{d.scoreUi}/{AREA_MAX_UI}</span>
                   <span className="w-10 text-right text-xs text-muted-foreground">{d.pct}%</span>
@@ -1056,17 +1056,17 @@ export default function Dashboard() {
       {/* Status da Equipe — Capacidade dos profissionais */}
       {ocupacao.length > 0 && (() => {
         const STATUS_META: Record<CapacityStatus, { label: string; color: string; bg: string; border: string; icon: string }> = {
-          poucos:     { label: "Precisa de mais pacientes", color: "#00f0ff", bg: "rgba(0,240,255,0.06)",  border: "rgba(0,240,255,0.30)",  icon: "⚠️" },
+          poucos:     { label: "Precisa de mais pacientes", color: "#00f0ff", bg: "rgba(139,92,246,0.06)",  border: "rgba(139,92,246,0.30)",  icon: "⚠️" },
           disponivel: { label: "Disponível",                 color: "#34d399", bg: "rgba(52,211,153,0.06)", border: "rgba(52,211,153,0.30)", icon: "✅" },
           proximo:    { label: "Próximo do limite",           color: "#f97316", bg: "rgba(249,115,22,0.07)", border: "rgba(249,115,22,0.35)", icon: "⚡" },
           lotado:     { label: "Lotado",                     color: "#ef4444", bg: "rgba(239,68,68,0.07)",  border: "rgba(239,68,68,0.35)",  icon: "🔴" },
         };
         const algumPoucos = ocupacao.some(o => o.status === "poucos");
         return (
-          <Card className={cn("p-6", algumPoucos ? "border-[rgba(0,240,255,0.30)] shadow-[0_0_24px_rgba(0,240,255,0.08)]" : "")}>
+          <Card className={cn("p-6", algumPoucos ? "border-[rgba(139,92,246,0.30)] shadow-[0_0_24px_rgba(139,92,246,0.08)]" : "")}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold font-display flex items-center gap-2"
-                style={algumPoucos ? { color: "#00f0ff", textShadow: "0 0 12px rgba(0,240,255,0.4)" } : {}}>
+                style={algumPoucos ? { color: "#00f0ff", textShadow: "0 0 12px rgba(139,92,246,0.4)" } : {}}>
                 <Briefcase className="w-5 h-5" />
                 Status da Equipe
               </h2>
@@ -1733,22 +1733,22 @@ function Heartbeat({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Card 1: Atendimentos do dia */}
-      <Card className="p-6 relative overflow-hidden border-[rgba(0,240,255,0.25)] shadow-[0_0_28px_rgba(0,240,255,0.08)]">
+      <Card className="p-6 relative overflow-hidden border-[rgba(139,92,246,0.25)] shadow-[0_0_28px_rgba(139,92,246,0.08)]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <HeartPulse className="w-5 h-5 text-[#00f0ff]" style={{ filter: "drop-shadow(0 0 6px rgba(0,240,255,0.7))" }} />
+            <HeartPulse className="w-5 h-5 text-[#00f0ff]" style={{ filter: "drop-shadow(0 0 6px rgba(139,92,246,0.7))" }} />
             <h2 className="text-base font-display font-bold text-foreground">Atendimentos hoje</h2>
           </div>
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Pulso</span>
         </div>
         <div className="flex items-end gap-2">
-          <span className="text-5xl font-bold font-display leading-none" style={{ color: "#00f0ff", textShadow: "0 0 18px rgba(0,240,255,0.45)" }}>
+          <span className="text-5xl font-bold font-display leading-none" style={{ color: "#00f0ff", textShadow: "0 0 18px rgba(139,92,246,0.45)" }}>
             {realizado}
           </span>
           <span className="text-2xl font-display text-muted-foreground mb-1">/ {total}</span>
         </div>
         <p className="text-xs text-muted-foreground mt-1 font-medium">realizados de {total} agendados hoje</p>
-        <div className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "rgba(0,240,255,0.08)", border: "1px solid rgba(0,240,255,0.25)" }}>
+        <div className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
           <Users className="w-4 h-4 text-[#00f0ff] shrink-0" />
           <span className="text-lg font-bold font-display text-foreground leading-none">{pessoasHoje}</span>
           <span className="text-[11px] text-muted-foreground leading-tight">pessoas hoje (crianças distintas — p/ lanches/lembranças)</span>
@@ -1758,7 +1758,7 @@ function Heartbeat({
           <PulseStat label="Faltas"    value={falta}    fg="#fca5a5" bg="rgba(248,113,113,0.12)" border="rgba(248,113,113,0.45)" />
           <PulseStat label="Cancel."   value={cancelado} fg="#cbd5e1" bg="rgba(148,163,184,0.12)" border="rgba(148,163,184,0.4)" />
         </div>
-        <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-30" style={{ background: "rgba(0,240,255,0.35)" }} />
+        <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-30" style={{ background: "rgba(139,92,246,0.35)" }} />
       </Card>
 
       {/* Card 2: Taxa de presença */}

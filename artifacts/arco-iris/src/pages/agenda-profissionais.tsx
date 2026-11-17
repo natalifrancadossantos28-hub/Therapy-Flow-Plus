@@ -127,7 +127,7 @@ export default function AgendaProfissionais() {
       <div className="bg-card border-b border-border shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center" style={{ boxShadow: "0 0 12px rgba(0,240,255,0.3)" }}>
+            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center" style={{ boxShadow: "0 0 12px rgba(139,92,246,0.3)" }}>
               <CalendarIcon className="w-5 h-5 text-primary" />
             </div>
             <div>
@@ -160,11 +160,9 @@ export default function AgendaProfissionais() {
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
         {!pinVerified ? (
           <div className="max-w-md mx-auto mt-16">
-            <div className="bg-card rounded-3xl border border-primary/20 overflow-hidden" style={{ boxShadow: "0 0 60px rgba(0,0,0,0.5), 0 0 30px rgba(0,240,255,0.05)" }}>
-              <div className="bg-gradient-to-r from-primary/70 to-primary/30 p-8 text-center text-primary-foreground" style={{ borderBottom: "1px solid rgba(0,240,255,0.2)" }}>
-                <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ boxShadow: "0 0 20px rgba(0,240,255,0.3)" }}>
-                  <Lock className="w-8 h-8" />
-                </div>
+            <div className="bg-card rounded-3xl border border-primary/20 overflow-hidden" style={{ boxShadow: "0 0 60px rgba(0,0,0,0.5), 0 0 30px rgba(139,92,246,0.05)" }}>
+              <div className="bg-gradient-to-r from-primary/70 to-primary/30 p-8 text-center text-primary-foreground" style={{ borderBottom: "1px solid rgba(139,92,246,0.2)" }}>
+                <img src={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/agenda-icones/calendario.webp`} alt="" aria-hidden width={80} height={80} className="w-20 h-20 mx-auto mb-3 object-contain drop-shadow-[0_0_16px_rgba(139,92,246,.6)]" />
                 <h2 className="text-2xl font-bold">Acesso do Profissional</h2>
                 <p className="text-sm opacity-80 mt-1">Selecione seu nome e informe o PIN</p>
               </div>
@@ -172,6 +170,7 @@ export default function AgendaProfissionais() {
                 <div>
                   <label className="block text-sm font-semibold text-foreground mb-2">Profissional</label>
                   <select
+                    aria-label="Escolha seu nome"
                     value={selectedProfId}
                     onChange={e => handleProfChange(e.target.value)}
                     className="w-full border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground font-medium transition-all"
@@ -199,7 +198,7 @@ export default function AgendaProfissionais() {
                 <button
                   onClick={verifyPin}
                   disabled={!selectedProfId || pinInput.length !== 4 || pinLoading}
-                  className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-bold py-3 rounded-xl transition-all hover:shadow-[0_0_20px_rgba(0,240,255,0.4)]"
+                  className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-bold py-3 rounded-xl transition-all hover:shadow-[0_0_20px_rgba(139,92,246,0.4)]"
                 >
                   {pinLoading ? "Verificando..." : "Acessar Agenda"}
                 </button>
@@ -293,7 +292,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
       {prof && (
         <section className={glass} style={neon("#a855f7")} aria-live="polite">
           <div className="flex items-center gap-3">
-            <span className="grid place-items-center w-12 h-12 rounded-2xl bg-violet-100 text-violet-700 shrink-0"><CalendarCheck size={24} /></span>
+            <img src={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/agenda-icones/realizados.webp`} alt="" aria-hidden width={56} height={56} className="w-14 h-14 shrink-0 object-contain" />
             <span className="flex-1 min-w-0">
               <span className="block text-xl font-bold leading-tight capitalize text-[#1e1b4b]">{titDia}</span>
               <span className="block text-base text-[#3b3561] first-letter:uppercase">{format(new Date(diaSel + "T12:00:00"), "EEEE, dd 'de' MMMM", { locale: ptBR })}</span>
@@ -336,7 +335,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
   const perfil = (
     <div className="agenda-neon space-y-4">
       <div className={`${glass} flex items-center gap-4`} style={neon("#a855f7")}>
-        <span className="grid place-items-center w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 text-white shrink-0 neon-brilho"><User size={28} /></span>
+        <img src={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/visual/equipe.webp`} alt="" aria-hidden width={64} height={64} className="w-16 h-16 shrink-0 object-contain" />
         <div className="min-w-0">
           <p className="text-xl font-bold leading-tight break-words text-[#1e1b4b]">{prof?.name ?? portalProfName ?? "Profissional"}</p>
           {prof?.specialty && <p className="text-base text-[#3b3561]">{prof.specialty}</p>}

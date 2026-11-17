@@ -104,7 +104,7 @@ function PinManager({
             placeholder="Novo PIN"
             className="border border-border rounded-lg px-2 py-1.5 w-24 text-center font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/30 bg-muted text-foreground transition-all"
           />
-          <button onClick={handleSave} disabled={newPin.length !== 4 || saving} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-primary text-primary-foreground rounded-lg disabled:opacity-50 hover:bg-primary/90 transition-all hover:shadow-[0_0_12px_rgba(0,240,255,0.3)]">
+          <button onClick={handleSave} disabled={newPin.length !== 4 || saving} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-primary text-primary-foreground rounded-lg disabled:opacity-50 hover:bg-primary/90 transition-all hover:shadow-[0_0_12px_rgba(139,92,246,0.3)]">
             <ShieldCheck className="w-3 h-3" /> {saving ? "..." : "Salvar"}
           </button>
           <button onClick={() => { setShow(false); setNewPin(""); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1">Cancelar</button>
@@ -326,7 +326,7 @@ export default function Professionals() {
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex gap-4 items-center">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary" style={{ boxShadow: "0 0 12px rgba(0,240,255,0.15)" }}>
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary" style={{ boxShadow: "0 0 12px rgba(139,92,246,0.15)" }}>
                     <UserRound className="w-6 h-6" />
                   </div>
                   <div>

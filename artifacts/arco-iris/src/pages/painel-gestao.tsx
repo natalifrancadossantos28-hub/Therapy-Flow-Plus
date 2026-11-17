@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { InicioNeon } from "@/components/InicioNeon";
 import { Link } from "wouter";
 import { addDays, format } from "date-fns";
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
@@ -166,9 +167,10 @@ export default function PainelGestao() {
 
   return (
     <div className="space-y-6">
+      <InicioNeon fila={fila ? filaAtiva.length : null} pausados={pausedItems ? pausedItems.length : null} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-display font-bold">Painel de Gestão</h1>
+          <h2 className="text-3xl font-display font-bold">Painel de Gestão</h2>
           <p className="text-muted-foreground mt-1 text-sm">Visão do dia a dia · {periodo.label}</p>
         </div>
         <div className="flex gap-2">

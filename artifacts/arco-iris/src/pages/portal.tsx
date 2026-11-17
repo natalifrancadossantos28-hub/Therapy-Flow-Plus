@@ -210,7 +210,7 @@ export default function Portal() {
     boxShadow: `0 0 15px ${rgb}, 0 0 40px ${rgb}, inset 0 0 30px rgba(0,0,0,0.5)`,
   });
 
-  const CARD_STYLE = neonCard("rgba(0,240,255,0.5)", "rgba(0,240,255,0.15)");
+  const CARD_STYLE = neonCard("rgba(139,92,246,0.5)", "rgba(139,92,246,0.15)");
 
   const backdropStyle: React.CSSProperties = portalBg
     ? {
@@ -220,11 +220,12 @@ export default function Portal() {
       }
     : { background: "radial-gradient(1200px 600px at 15% -10%, rgba(34,211,238,0.14), transparent 60%), radial-gradient(900px 500px at 100% 110%, rgba(168,85,247,0.14), transparent 60%), #050b1f" };
 
-  const accessCards: Array<{ key: CardKey; color: string; title: string; text: string; Icon: typeof Users }> = [
-    { key: "reception", color: "#22c55e", title: "Recepção", text: "Agendamentos, presenças e acolhimento de pacientes.", Icon: Users },
-    { key: "professional", color: "#22d3ee", title: "Profissional de Saúde", text: "Agenda pessoal e atendimentos.", Icon: Stethoscope },
-    { key: "admin", color: "#a855f7", title: "Administração", text: "Gestão total, dashboards e configurações do sistema.", Icon: Settings },
+  const accessCards: Array<{ key: CardKey; color: string; title: string; text: string; img: string }> = [
+    { key: "reception", color: "#22c55e", title: "Recepção", text: "Agendamentos, presenças e acolhimento de pacientes.", img: "visual/atendimento" },
+    { key: "professional", color: "#22d3ee", title: "Profissional de Saúde", text: "Agenda pessoal e atendimentos.", img: "agenda-icones/calendario" },
+    { key: "admin", color: "#a855f7", title: "Administração", text: "Gestão total, dashboards e configurações do sistema.", img: "visual/config" },
   ];
+  const img3d = (n: string) => `${import.meta.env.BASE_URL.replace(/\/$/, "")}/${n}.webp`;
 
   // Tela dos 3 cards.
   if (!active) {
@@ -263,14 +264,14 @@ export default function Portal() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-7 w-full max-w-md md:max-w-5xl relative">
-          {accessCards.map(({ key, color, title, text, Icon }) => (
+          {accessCards.map(({ key, color, title, text, img }) => (
             <button
               key={key}
               onClick={() => setActive(key)}
               className="portal-access-card rounded-3xl px-6 pt-8 pb-6 text-center flex flex-col items-center"
               style={{ ["--c" as string]: color } as React.CSSProperties}
             >
-              <Icon className="w-11 h-11 mb-3" style={{ color, filter: `drop-shadow(0 0 10px ${color})` }} />
+              <img src={img3d(img)} alt="" aria-hidden width={88} height={88} className="w-20 h-20 mb-3 object-contain" style={{ filter: `drop-shadow(0 0 14px ${color}99)` }} />
               <h2 className="font-display text-2xl font-extrabold text-white">{title}</h2>
               <p className="text-[15px] text-[#e3ecff] mt-2.5 mb-6 min-h-[46px] leading-relaxed">{text}</p>
               <span className="portal-access-btn mt-auto w-full rounded-full py-3.5 font-bold text-[15px] text-[#04111f] flex items-center justify-center gap-2">
@@ -298,13 +299,13 @@ export default function Portal() {
   if (active === "reception" || active === "admin") {
     const isRecep = active === "reception";
     const accent = isRecep ? "#67e8f9" : "#f0abfc";
-    const accentBg = isRecep ? "rgba(0,240,255,0.12)" : "rgba(217,70,239,0.12)";
+    const accentBg = isRecep ? "rgba(139,92,246,0.12)" : "rgba(217,70,239,0.12)";
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={backdropStyle}>
         <div className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl" style={neonCard(isRecep ? "rgba(34,197,94,0.5)" : "rgba(168,85,247,0.5)", isRecep ? "rgba(34,197,94,0.15)" : "rgba(168,85,247,0.15)")}>
           <div className="p-6 text-center" style={{ borderBottom: `1px solid ${accent}33` }}>
             <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3" style={{ background: accentBg, border: `1px solid ${accent}`, boxShadow: `0 0 20px ${accent}40` }}>
-              {isRecep ? <Building2 className="w-7 h-7" style={{ color: accent }} /> : <ShieldCheck className="w-7 h-7" style={{ color: accent }} />}
+              <img src={img3d(isRecep ? "visual/atendimento" : "visual/config")} alt="" aria-hidden width={48} height={48} className="w-12 h-12 object-contain" />
             </div>
             <h2 className="text-lg font-bold text-white" style={{ textShadow: `0 0 10px ${accent}66` }}>{isRecep ? "Recepção" : "Administração"}</h2>
             <p className="text-xs text-white/50 mt-1">Confirme a senha da empresa</p>
@@ -366,9 +367,7 @@ export default function Portal() {
     <div className="min-h-screen flex items-center justify-center p-6" style={backdropStyle}>
       <div className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl" style={{ ...CARD_STYLE, border: "1px solid rgba(16,185,129,0.35)" }}>
         <div className="p-6 text-center" style={{ borderBottom: "1px solid rgba(16,185,129,0.25)" }}>
-          <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid #10b981", boxShadow: "0 0 20px rgba(16,185,129,0.35)" }}>
-            <Lock className="w-7 h-7" style={{ color: "#6ee7b7" }} />
-          </div>
+          <img src={img3d("agenda-icones/calendario")} alt="" aria-hidden width={80} height={80} className="w-20 h-20 mx-auto mb-3 object-contain drop-shadow-[0_0_16px_rgba(139,92,246,.6)]" />
           <h2 className="text-lg font-bold text-white" style={{ textShadow: "0 0 10px rgba(16,185,129,0.5)" }}>Acesso do Profissional</h2>
           <p className="text-xs text-white/50 mt-1">Selecione seu nome e informe o PIN</p>
         </div>
@@ -376,7 +375,7 @@ export default function Portal() {
         <form onSubmit={(e) => { e.preventDefault(); submitProfessional(); }} className="p-6 space-y-4">
           <div>
             <label className="text-[11px] font-semibold text-white/60 mb-1 block uppercase tracking-wider">Profissional</label>
-            <select
+            <select aria-label="Escolha seu nome"
               value={selectedProfId}
               onChange={(e) => setSelectedProfId(e.target.value)}
               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-400/50"
