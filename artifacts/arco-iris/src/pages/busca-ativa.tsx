@@ -109,7 +109,7 @@ export default function BuscaAtivaPage() {
 
   return (
     <div className="space-y-6">
-      <HeroTela img="pacientes" titulo="Busca Ativa" subtitulo="Casos para a assistente social." />
+      <HeroTela img="busca-ativa" titulo="Busca Ativa" subtitulo="Casos para a assistente social." />
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
           <span className="sr-only">Busca Ativa</span>

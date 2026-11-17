@@ -131,7 +131,7 @@ export default function PausadosPage() {
 
   return (
     <div className="space-y-6">
-      <HeroTela img="fila" titulo="Pausados" subtitulo="Pacientes com o atendimento pausado." />
+      <HeroTela img="pausados" titulo="Pausados" subtitulo="Pacientes com o atendimento pausado." />
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
           <span className="sr-only">Pausados</span>

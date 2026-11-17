@@ -129,7 +129,7 @@ export default function AgendaAdministrativa() {
 
   return (
     <div className="space-y-6">
-      <HeroTela img="agenda" titulo="Agenda Administrativa" subtitulo="Reuniões e compromissos da Administração." />
+      <HeroTela img="agenda-adm" titulo="Agenda Administrativa" subtitulo="Reuniões e compromissos da Administração." />
       <div>
         <span className="sr-only">Agenda Administrativa</span>
         <p className="text-muted-foreground mt-1">Reuniões e compromissos da Administração. O sistema avisa na tela antes do horário.</p>

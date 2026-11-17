@@ -297,7 +297,7 @@ export default function Professionals() {
 
   return (
     <div className="space-y-8">
-      <HeroTela img="profissionais" titulo="Profissionais" subtitulo="A equipe do núcleo terapêutico." />
+      <HeroTela img="equipe" titulo="Profissionais" subtitulo="A equipe do núcleo terapêutico." />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <span className="sr-only">Profissionais</span>

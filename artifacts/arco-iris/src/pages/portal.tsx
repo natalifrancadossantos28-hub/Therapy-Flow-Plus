@@ -222,9 +222,9 @@ export default function Portal() {
     : { background: "radial-gradient(1200px 600px at 15% -10%, rgba(34,211,238,0.14), transparent 60%), radial-gradient(900px 500px at 100% 110%, rgba(168,85,247,0.14), transparent 60%), #050b1f" };
 
   const accessCards: Array<{ key: CardKey; color: string; title: string; text: string; img: string }> = [
-    { key: "reception", color: "#22c55e", title: "Recepção", text: "Agendamentos, presenças e acolhimento de pacientes.", img: "visual/hero-recepcao" },
-    { key: "professional", color: "#22d3ee", title: "Profissional de Saúde", text: "Agenda pessoal e atendimentos.", img: "visual/hero-profissionais" },
-    { key: "admin", color: "#a855f7", title: "Administração", text: "Gestão total, dashboards e configurações do sistema.", img: "visual/hero-relatorios" },
+    { key: "reception", color: "#22c55e", title: "Recepção", text: "Agendamentos, presenças e acolhimento de pacientes.", img: "visual/card-recepcao" },
+    { key: "professional", color: "#22d3ee", title: "Profissional de Saúde", text: "Agenda pessoal e atendimentos.", img: "visual/card-profissional" },
+    { key: "admin", color: "#a855f7", title: "Administração", text: "Gestão total, dashboards e configurações do sistema.", img: "visual/card-admin" },
   ];
   const img3d = (n: string) => `${import.meta.env.BASE_URL.replace(/\/$/, "")}/${n}.webp`;
 
@@ -309,7 +309,7 @@ export default function Portal() {
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={backdropStyle}>
         <div className="w-full max-w-md rounded-3xl overflow-hidden shadow-2xl" style={neonCard(isRecep ? "rgba(34,197,94,0.5)" : "rgba(168,85,247,0.5)", isRecep ? "rgba(34,197,94,0.15)" : "rgba(168,85,247,0.15)")}>
-          <img src={img3d(isRecep ? "visual/hero-recepcao" : "visual/hero-entrada")} alt="" aria-hidden width={1024} height={683} className="w-full h-44 object-cover" />
+          <img src={img3d(isRecep ? "visual/card-recepcao" : "visual/card-admin")} alt="" aria-hidden width={1024} height={683} className="w-full h-44 object-cover" />
           <div className="p-6 text-center" style={{ borderBottom: `1px solid ${accent}33` }}>
             <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3" style={{ background: accentBg, border: `1px solid ${accent}`, boxShadow: `0 0 20px ${accent}40` }}>
               <img src={img3d(isRecep ? "visual/atendimento" : "visual/config")} alt="" aria-hidden width={48} height={48} className="w-12 h-12 object-contain" />
@@ -373,7 +373,7 @@ export default function Portal() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={backdropStyle}>
       <div className="w-full max-w-md rounded-3xl overflow-hidden shadow-2xl" style={{ ...CARD_STYLE, border: "1px solid rgba(139,92,246,0.5)" }}>
-        <img src={img3d("visual/hero-profissionais")} alt="Equipe de terapeutas" width={1024} height={683} className="w-full h-52 object-cover object-top" />
+        <img src={img3d("visual/card-profissional")} alt="" width={1024} height={683} className="w-full h-52 object-cover" />
         <div className="px-6 pt-4 pb-5 text-center" style={{ borderBottom: "1px solid rgba(139,92,246,0.3)" }}>
           <h2 className="text-2xl font-bold text-white" style={{ textShadow: "0 0 10px rgba(16,185,129,0.5)" }}>Acesso do Profissional</h2>
           <p className="text-base text-white/75 mt-1">Selecione seu nome e informe o PIN</p>
