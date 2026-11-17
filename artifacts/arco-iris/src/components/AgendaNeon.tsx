@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, CalendarDays, Users, CheckCircle2, AlertCircle, FileCheck2, CalendarCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, CalendarCheck } from "lucide-react";
 import { agoraBR, fraseDoMomento, periodo } from "@/components/Saudacao";
 
 export const neon = (cor: string): React.CSSProperties => ({ borderColor: `${cor}55` });
@@ -56,9 +56,7 @@ export function NeonCabecalho({ nome, pessoaId, subtitulo, fonte, extra }: {
   const primeiro = nome.trim().split(/\s+/)[0] || nome;
   return (
     <header className="lilas-card !rounded-3xl p-3 sm:p-4 flex flex-wrap items-center gap-3 sm:gap-4">
-      <span className="grid place-items-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-violet-50 shadow-sm shrink-0">
-        <span className="grid place-items-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white"><CalendarDays size={24} /></span>
-      </span>
+      <img src={ICONE_URL("calendario")} alt="" aria-hidden width={72} height={72} className="w-16 h-16 sm:w-[4.5rem] sm:h-[4.5rem] shrink-0 object-contain drop-shadow-[0_8px_12px_rgba(91,33,182,.25)]" />
       <div className="min-w-[14rem] flex-1">
         <h1 className="text-[1.7rem] sm:text-4xl font-extrabold leading-tight tracking-tight text-[#1e1b4b]">
           {texto}, <span className="text-violet-700">{primeiro}!</span>
@@ -83,12 +81,14 @@ export function NeonCabecalho({ nome, pessoaId, subtitulo, fonte, extra }: {
   );
 }
 
-const ICONES: Record<string, { icon: React.ReactNode; cor: string; fundo: string }> = {
-  "Atendimentos na semana": { icon: <CalendarDays size={28} />, cor: "#6d28d9", fundo: "#ede9fe" },
-  "Pacientes": { icon: <Users size={28} />, cor: "#16a34a", fundo: "#dcfce7" },
-  "Realizados": { icon: <CheckCircle2 size={28} />, cor: "#ffffff", fundo: "#3b82f6" },
-  "Faltas": { icon: <AlertCircle size={28} />, cor: "#ffffff", fundo: "#f59e0b" },
-  "Faltas justificadas": { icon: <FileCheck2 size={28} />, cor: "#db2777", fundo: "#fce7f3" },
+const ICONE_URL = (n: string) => `${import.meta.env.BASE_URL.replace(/\/$/, "")}/agenda-icones/${n}.webp`;
+/** Desenhos 3D (public/agenda-icones) no lugar dos ícones de traço. */
+const ICONES: Record<string, string> = {
+  "Atendimentos na semana": "calendario",
+  "Pacientes": "pacientes",
+  "Realizados": "realizados",
+  "Faltas": "faltas",
+  "Faltas justificadas": "justificadas",
 };
 
 /** Cartões de resumo com ícone redondo colorido. */
@@ -96,10 +96,11 @@ export function NeonResumo({ itens }: { itens: { label: string; valor: number | 
   return (
     <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
       {itens.map((i, n) => {
-        const ic = ICONES[i.label] ?? { icon: <CalendarDays size={28} />, cor: "#fff", fundo: CORES_NEON[n % CORES_NEON.length] };
+        const ic = ICONES[i.label];
         return (
           <div key={i.label} className="lilas-card !rounded-3xl p-3 sm:p-4 flex items-center gap-3">
-            <span className="grid place-items-center w-14 h-14 rounded-full shrink-0 shadow-md" style={{ background: ic.fundo, color: ic.cor }}>{ic.icon}</span>
+            {ic ? <img src={ICONE_URL(ic)} alt="" aria-hidden width={64} height={64} className="w-16 h-16 shrink-0 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,.18)]" />
+              : <span className="grid place-items-center w-14 h-14 rounded-full shrink-0 shadow-md text-white" style={{ background: CORES_NEON[n % CORES_NEON.length] }}><CalendarDays size={28} /></span>}
             <span className="min-w-0">
               <span className="block text-3xl font-extrabold tabular-nums leading-none text-[#1e1b4b]">{i.valor}</span>
               <span className="block text-base text-[#3b3561] leading-tight mt-1">{i.label}</span>
