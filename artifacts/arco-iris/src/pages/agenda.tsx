@@ -9,7 +9,7 @@ import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Check, Activity, RotateCcw, LogOut, AlertTriangle,
   ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck, ClipboardList,
-  ShieldAlert, Plus, User, FileText, Mic,
+  ShieldAlert, Plus, User, FileText, Mic, FolderOpen, CreditCard, Settings, HeartPulse,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
@@ -461,20 +461,22 @@ const NEON: Record<string, React.CSSProperties> = {
   },
 };
 
-// Menu do paciente: botões em degradê vivo, estilo 3D (mesmas ações e cores por tipo).
-const TONS_VIVO: Record<string, [string, string]> = {
-  green: ["#4ade80", "#16a34a"], blue: ["#60a5fa", "#2563eb"], violet: ["#a78bfa", "#7c3aed"],
-  yellow: ["#fcd34d", "#f59e0b"], red: ["#fb7185", "#e11d48"], slate: ["#a5b4fc", "#6366f1"],
-  orange: ["#fdba74", "#f97316"], purple: ["#c084fc", "#9333ea"], fuchsia: ["#a78bfa", "#6d28d9"],
-  cyan: ["#67e8f9", "#0891b2"], pink: ["#f9a8d4", "#ec4899"],
+// Menu do paciente: botões em degradê com brilho de vidro (igual ao modelo). [claro, forte, texto]
+const TONS_VIVO: Record<string, [string, string, string]> = {
+  green: ["#bbf7d0", "#22c55e", "#0f2e1d"], blue: ["#93c5fd", "#2563eb", "#ffffff"], violet: ["#ede9fe", "#a78bfa", "#1e1b4b"],
+  yellow: ["#fde68a", "#f59e0b", "#3b2203"], red: ["#fecdd3", "#f43f5e", "#3b0a14"], slate: ["#e0e7ff", "#8b93c9", "#1e1b4b"],
+  orange: ["#fed7aa", "#f97316", "#3b1603"], purple: ["#e9d5ff", "#9333ea", "#1e1b4b"], fuchsia: ["#a78bfa", "#5b21b6", "#ffffff"],
+  cyan: ["#67e8f9", "#0e7490", "#ffffff"], pink: ["#fecdd3", "#f43f5e", "#3b0a14"], azul: ["#60a5fa", "#1d4ed8", "#ffffff"],
+  excluir: ["#fb7185", "#be123c", "#ffffff"],
 };
 const NEON_CLARO: Record<string, React.CSSProperties> = Object.fromEntries(
-  Object.entries(TONS_VIVO).map(([k, [c1, c2]]) => [k, {
-    ...NEON.violet, background: `linear-gradient(100deg, ${c2} 0%, ${c1} 55%, ${c2} 100%)`, border: "1px solid rgba(255,255,255,.65)",
-    color: "#ffffff", textShadow: "0 1px 2px rgba(0,0,0,.28)", borderRadius: "9999px", padding: "8px 14px 8px 8px",
-    fontSize: "15px", fontWeight: 700, gap: "12px",
-    boxShadow: `0 10px 18px -10px ${c2}, inset 0 1px 0 rgba(255,255,255,.6), inset 0 -3px 0 rgba(0,0,0,.14)`,
-    ["--c" as string]: "rgba(255,255,255,.28)",
+  Object.entries(TONS_VIVO).map(([k, [c1, c2, txt]]) => [k, {
+    ...NEON.violet,
+    background: `linear-gradient(115deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 38%, rgba(255,255,255,0) 70%, rgba(255,255,255,.35) 85%, rgba(255,255,255,0) 100%), linear-gradient(90deg, ${c1} 0%, ${c2} 100%)`,
+    border: `1.5px solid ${c2}`, color: txt, textShadow: txt === "#ffffff" ? "0 1px 2px rgba(0,0,0,.3)" : "none",
+    borderRadius: "9999px", padding: "9px 16px 9px 12px", fontSize: "16px", fontWeight: 700, gap: "14px",
+    boxShadow: `0 8px 16px -9px ${c2}, inset 0 1px 0 rgba(255,255,255,.8), inset 0 -3px 0 rgba(0,0,0,.12)`,
+    ["--c" as string]: c2, ["--ic" as string]: txt === "#ffffff" ? "#ffffff" : c2,
   } as React.CSSProperties]),
 );
 
@@ -2393,8 +2395,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     <div
                                       className="menu-paciente absolute z-50 top-full mt-1 left-0 w-[19rem] max-w-[88vw] rounded-[2rem] overflow-hidden"
                                       style={{
-                                        background: "linear-gradient(160deg, rgba(255,255,255,.97), rgba(237,233,254,.96))",
-                                        border: "1px solid rgba(255,255,255,.9)",
+                                        background: "linear-gradient(160deg, rgba(255,255,255,.96), rgba(233,226,255,.95))",
+                                        border: "2px solid rgba(167,139,250,.75)",
                                         backdropFilter: "blur(20px)",
                                         padding: "14px",
                                         display: "flex",
@@ -2412,9 +2414,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         <UserX className="w-[18px] h-[18px]" /> Sair deste Multi (daqui em diante)
                                       </button>
                                       <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                      <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1">Saída</p>
+                                      <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1 flex items-center gap-2"><LogOut className="w-6 h-6 text-[#1e1b4b]" /> Saída</p>
                                       <button style={NEON_CLARO.green} onClick={() => handleSaida(apt, "Alta")}>
-                                        <LogOut className="w-[18px] h-[18px]" /> Dar Alta
+                                        <UserCheck className="w-[18px] h-[18px]" /> Dar Alta
                                       </button>
                                       <button style={NEON_CLARO.orange} onClick={() => handleSaida(apt, "Desistência")}>
                                         <UserX className="w-[18px] h-[18px]" /> Desistência
@@ -2427,8 +2429,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     <div
                                       className="menu-paciente absolute z-50 top-full mt-1 left-0 w-[19rem] max-w-[88vw] rounded-[2rem] overflow-hidden"
                                       style={{
-                                        background: "linear-gradient(160deg, rgba(255,255,255,.97), rgba(237,233,254,.96))",
-                                        border: "1px solid rgba(255,255,255,.9)",
+                                        background: "linear-gradient(160deg, rgba(255,255,255,.96), rgba(233,226,255,.95))",
+                                        border: "2px solid rgba(167,139,250,.75)",
                                         backdropFilter: "blur(20px)",
                                         padding: "14px",
                                         display: "flex",
@@ -2444,15 +2446,15 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </span>
                                         <span className="flex-1 min-w-0">
                                           <span className="block text-2xl font-extrabold text-[#1e1b4b] leading-none">Ações</span>
-                                          <span className="block text-sm font-semibold text-[#3b3561] leading-snug mt-1 break-words">{apt.patientName || `Agendamento #${apt.id}`}</span>
+                                          <span className="block text-base font-semibold text-[#3b3561] leading-snug mt-1 break-words capitalize">{(apt.patientName || `Agendamento #${apt.id}`).toLowerCase()}</span>
                                         </span>
                                         <button type="button" onClick={(e) => { e.stopPropagation(); setActionMenuId(null); }} aria-label="Fechar"
                                           className="grid place-items-center w-10 h-10 rounded-full bg-white text-[#1e1b4b] shadow-[0_4px_10px_-4px_rgba(91,33,182,.5),inset_0_1px_0_#fff] shrink-0"><X className="w-5 h-5" /></button>
                                       </div>
                                       {!isGhost && (
                                         <div className="docs-lado grid grid-cols-2 gap-2 mb-1">
-                                          <DocCopyRow label="CPF" value={docsById.get(apt.patientId)?.cpf} />
-                                          <DocCopyRow label="CNS" value={docsById.get(apt.patientId)?.cns} />
+                                          <div className="doc-cartao flex items-center gap-2"><FolderOpen className="w-7 h-7 shrink-0 text-violet-800" /><DocCopyRow label="CPF" value={docsById.get(apt.patientId)?.cpf} /></div>
+                                          <div className="doc-cartao flex items-center gap-2"><CreditCard className="w-7 h-7 shrink-0 text-violet-800" /><DocCopyRow label="CNS" value={docsById.get(apt.patientId)?.cns} /></div>
                                         </div>
                                       )}
                                       {isGhost && (
@@ -2526,7 +2528,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       {(apt.recurrenceGroupId || isMulti) && isAdmin && (
                                         <>
                                           <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                          <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1">Periodicidade</p>
+                                          <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1 flex items-center gap-2"><CalendarIcon className="w-6 h-6 text-violet-700" /> Periodicidade</p>
                                           <div className="grid grid-cols-3 gap-1">
                                             {(["semanal", "quinzenal", "mensal"] as const).map(freq => {
                                               const isActive = (apt.frequency ?? "semanal") === freq;
@@ -2540,7 +2542,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                                   key={freq}
                                                   disabled={freqSending}
                                                   onClick={(e) => { e.stopPropagation(); handleChangeFrequency(apt, freq); }}
-                                                  className="rounded-2xl p-2 text-center transition-all"
+                                                  className="relative rounded-2xl p-2 text-center transition-all"
                                                   style={{
                                                     background: isActive ? "linear-gradient(160deg, #8b5cf6, #6d28d9)" : "linear-gradient(180deg, #ffffff, #f5f3ff)",
                                                     border: isActive ? "2px solid #7c3aed" : "1px solid #ddd6fe",
@@ -2550,7 +2552,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                                     opacity: freqSending ? 0.5 : 1,
                                                   }}
                                                 >
-                                                  <Repeat className="w-4 h-4 mx-auto mb-0.5" />
+                                                  {isActive && <span className="absolute -top-2 -right-2 grid place-items-center w-6 h-6 rounded-full bg-violet-600 text-white ring-2 ring-white"><Check className="w-3.5 h-3.5" /></span>}<CalendarIcon className="w-6 h-6 mx-auto mb-0.5" />
                                                   <span className="text-sm font-bold block">{labels[freq].label}</span>
                                                   <span className="text-[11px] block opacity-70 leading-tight">{labels[freq].desc}</span>
                                                 </button>
@@ -2577,16 +2579,16 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       )}
 
                                       <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                      <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1">Saída</p>
+                                      <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1 flex items-center gap-2"><LogOut className="w-6 h-6 text-[#1e1b4b]" /> Saída</p>
                                       <div className="saida-linha grid grid-cols-3 gap-1.5">
                                       <button style={NEON_CLARO.green} onClick={() => handleSaida(apt, "Alta")}>
-                                        <LogOut className="w-[18px] h-[18px]" /> Dar Alta
+                                        <UserCheck className="w-[18px] h-[18px]" /> Dar Alta
                                       </button>
                                       <button style={NEON_CLARO.orange} onClick={() => handleSaida(apt, "Desistência")}>
                                         <UserX className="w-[18px] h-[18px]" /> Desistência
                                       </button>
                                       <button style={NEON_CLARO.pink} onClick={() => handleSaida(apt, "Óbito")}>
-                                        <XOctagon className="w-[18px] h-[18px]" /> Óbito
+                                        <HeartPulse className="w-[18px] h-[18px]" /> Óbito
                                       </button>
                                       </div>
 
@@ -2602,7 +2604,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       )}
 
                                       {isAdmin && !isProfessionalProfile && drivers.length > 0 && !isTransportSpecialty(selectedProf?.specialty) && (
-                                        <button style={NEON_CLARO.blue} onClick={() => handleTransporte(apt)}>
+                                        <button style={NEON_CLARO.azul} onClick={() => handleTransporte(apt)}>
                                           <Bus className="w-[18px] h-[18px]" /> Transporte (Motorista)
                                         </button>
                                       )}
@@ -2616,8 +2618,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       {isAdmin && !isProfessionalProfile && (
                                         <>
                                           <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                          <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1">Admin</p>
-                                          <button style={NEON_CLARO.red} onClick={() => handleExcluirAdmin(apt)}>
+                                          <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1 flex items-center gap-2"><Settings className="w-6 h-6 text-[#1e1b4b]" /> Administração</p>
+                                          <button style={NEON_CLARO.excluir} onClick={() => handleExcluirAdmin(apt)}>
                                             <Trash2 className="w-[18px] h-[18px]" /> Excluir Agendamento
                                           </button>
                                         </>

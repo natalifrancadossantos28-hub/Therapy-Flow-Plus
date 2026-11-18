@@ -574,18 +574,16 @@
 .menu-paciente .text-white { color: #1e1b4b !important; }
 .menu-paciente .text-white\/30 { color: #6b6890 !important; }
 .menu-paciente button:hover { filter: brightness(.97); }
-/* Menu do paciente em 3D: ícone numa bolinha colorida com relevo */
+/* Menu do paciente (modelo): ícone grande sem bolinha, setinha ">" e brilho de vidro */
 .menu-paciente button[style*="--c"] { transition: transform .12s ease, filter .12s ease; }
-.menu-paciente button[style*="--c"]:hover { transform: translateY(-1px); }
+.menu-paciente button[style*="--c"]:hover { transform: translateY(-1px); filter: brightness(1.03); }
 .menu-paciente button[style*="--c"]:active { transform: translateY(1px); }
-.menu-paciente button[style*="--c"] > svg:first-child {
-  box-sizing: content-box; width: 18px !important; height: 18px !important; padding: 7px; border-radius: 9999px; flex-shrink: 0;
-  color: #fff; background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.55), transparent 45%), var(--c, #8b5cf6);
-  box-shadow: 0 4px 10px -3px var(--c, #8b5cf6), inset 0 -2px 0 rgba(0,0,0,.15);
-}
-/* Menu do paciente: setinha ">" e linha de Saída compacta */
-.menu-paciente button[style*="--c"]::after { content: "›"; margin-left: auto; font-size: 24px; line-height: 1; opacity: .9; }
-.menu-paciente .saida-linha button[style*="--c"] { flex-direction: column; gap: 4px !important; padding: 8px 4px !important; border-radius: 18px !important; font-size: 13px !important; justify-content: center; }
+.menu-paciente button[style*="--c"] > svg:first-child { width: 28px !important; height: 28px !important; flex-shrink: 0; color: var(--ic, #1e1b4b); stroke-width: 2.4; filter: drop-shadow(0 1px 0 rgba(255,255,255,.6)); }
+.menu-paciente button[style*="--c"]::after { content: "›"; margin-left: auto; font-size: 28px; line-height: 1; font-weight: 700; }
+.menu-paciente .saida-linha button[style*="--c"] { flex-direction: row; gap: 6px !important; padding: 9px 8px !important; font-size: 14px !important; justify-content: center; }
+.menu-paciente .saida-linha button[style*="--c"] > svg:first-child { width: 22px !important; height: 22px !important; }
 .menu-paciente .saida-linha button[style*="--c"]::after { content: none; }
-.menu-paciente .docs-lado button { flex-direction: column; align-items: flex-start !important; gap: 2px !important; }
-.menu-paciente .docs-lado button > span:nth-child(2) { font-size: 12px !important; max-width: 100%; }
+.menu-paciente .doc-cartao { background: linear-gradient(180deg, #ffffff, #f3efff); border: 1px solid #ddd6fe; border-radius: 18px; padding: 8px 10px; box-shadow: 0 6px 14px -8px rgba(91,33,182,.45), inset 0 1px 0 #fff; min-width: 0; }
+.menu-paciente .doc-cartao button { background: transparent !important; border: 0 !important; padding: 0 !important; flex-direction: column; align-items: flex-start !important; gap: 0 !important; min-width: 0; }
+.menu-paciente .doc-cartao button > span:first-child { color: #1e1b4b !important; font-size: 15px !important; text-transform: none; width: auto; }
+.menu-paciente .doc-cartao button > span:nth-child(2) { color: #3b3561 !important; font-size: 12px !important; font-style: normal; max-width: 100%; }
