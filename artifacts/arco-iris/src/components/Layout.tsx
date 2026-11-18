@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { SuporteBotao } from "@/components/SuporteBotao";
 import { Saudacao } from "@/components/Saudacao";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
@@ -45,7 +46,7 @@ const navItems: NavItem[] = [
   { href: "/feriados", label: "Feriados & Ausências", icon: CalendarOff, scopes: ["admin", "reception"], group: "Organização" },
   { href: "/datas-conscientizacao", label: "Datas de Conscientização", icon: HeartHandshake, scopes: ["admin", "reception"], group: "Administração" },
   { href: "/central-mensagens", label: "Central de Mensagens", icon: MessageSquareHeart, scopes: ["admin"], group: "Administração" },
-  { href: "/recados-equipe", label: "Recados da Equipe", icon: Inbox, scopes: ["admin"], group: "Administração" },
+  { href: "/recados-equipe", label: "Recados e Suporte", icon: Inbox, scopes: ["admin"], group: "Administração" },
   { href: "/gestao-contratos", label: "Gestão de Contratos", icon: Building2, scopes: ["admin"], group: "Administração" },
   { href: "/ai-brain", label: "Cérebro IA", icon: Brain, scopes: ["admin"], group: "Administração" },
   { href: "/personalizacao-visual", label: "Configurações · Visual", icon: Palette, scopes: ["admin"], group: "Administração" },
@@ -246,6 +247,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {scope === "admin" && <LembretesAviso />}
         </motion.div>
       </main>
+      <SuporteBotao />
     </div>
   );
 }
