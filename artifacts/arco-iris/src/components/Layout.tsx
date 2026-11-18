@@ -159,7 +159,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
         );
         return (
           <div key={group} className="flex flex-col gap-1" style={{ ["--c" as string]: cor } as React.CSSProperties}>
-            {unico || collapsed ? (
+            {collapsed && !unico ? (
+              <>
+                <div className={classeCabeca} title={group} aria-hidden>{cabeca}</div>
+                {items.map((item) => {
+                  const isActive = ativoEm(location, item.href);
+                  return (
+                    <Link key={item.href} href={item.href} onClick={() => setIsMobileOpen(false)} title={item.label} aria-label={item.label}
+                      className={cn("flex justify-center rounded-xl py-2 transition-all",
+                        isActive ? "nav-active-neon" : "hover:bg-secondary/80")}>
+                      <item.icon className="w-5 h-5 shrink-0" style={isActive ? undefined : { color: cor }} />
+                    </Link>
+                  );
+                })}
+              </>
+            ) : unico || collapsed ? (
               <Link href={items[0].href} onClick={() => setIsMobileOpen(false)} className={classeCabeca} title={collapsed ? group : undefined}>{cabeca}</Link>
             ) : (
               <button type="button" onClick={() => toggleGroup(group)} aria-expanded={!closed} className={classeCabeca}>{cabeca}</button>

@@ -6,6 +6,7 @@ import { BarChart3, CalendarCheck, CalendarDays, ChevronRight, Clock, Megaphone,
 import { agoraBR, fraseDoMomento, periodo } from "@/components/Saudacao";
 import { listCompromissos, type Compromisso } from "@/lib/agenda-admin-rpc";
 import { getCurrentScope } from "@/lib/portal-session";
+import { inicioDe } from "@/components/LembretesAviso";
 
 export const img3d = (n: string) => `${import.meta.env.BASE_URL.replace(/\/$/, "")}/${n}.webp`;
 export const IMG_PERIODO = ["visual/sol", "visual/tarde", "visual/lua"];
@@ -34,7 +35,12 @@ export function InicioNeon({ fila, pausados }: { fila: number | null; pausados: 
     const hoje = new Date();
     let vivo = true;
     listCompromissos(format(hoje, "yyyy-MM-dd"), format(addDays(hoje, 60), "yyyy-MM-dd"))
-      .then((l) => { if (vivo) setProximos(l.filter((c) => !c.concluido).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`)).slice(0, 3)); })
+      .then((l) => {
+        if (!vivo) return;
+        const desde = Date.now() - 60 * 60_000;
+        setProximos(l.filter((c) => !c.concluido && inicioDe(c).getTime() >= desde)
+          .sort((a, b) => inicioDe(a).getTime() - inicioDe(b).getTime()).slice(0, 3));
+      })
       .catch(() => { if (vivo) setProximos([]); });
     return () => { vivo = false; };
   }, []);
