@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, CreditCard, FolderClosed } from "lucide-react";
 
 export type PatientDoc = { cpf: string | null; cns: string | null };
 
@@ -150,6 +150,31 @@ export function DocCopyRow({
         ) : (
           <Copy className="w-4 h-4 shrink-0 text-white/40" />
         ))}
+    </button>
+  );
+}
+
+/** CPF/CNS em formato de cartão claro (janela Ações da agenda). Toque copia. */
+export function DocPill({ label, value }: { label: "CPF" | "CNS"; value: string | null | undefined }) {
+  const { copied, run } = useCopied();
+  const filled = !!value && !!value.trim();
+  const has = isPlausibleDoc(value);
+  const pretty = has ? (label === "CPF" ? formatCpf(value) : formatCns(value)) : filled ? "valor inválido" : "não cadastrado";
+  const Icone = label === "CPF" ? FolderClosed : CreditCard;
+  return (
+    <button
+      type="button"
+      disabled={!has}
+      title={has ? `Copiar ${label}` : filled ? `${label} com valor inválido: ${value}` : `${label} não cadastrado`}
+      onClick={(e) => { e.stopPropagation(); if (has) void run(value!); }}
+      className="flex items-center gap-2 w-full min-w-0 rounded-2xl px-2.5 py-2.5 bg-white/75 border border-white text-left shadow-[inset_0_-3px_6px_rgba(76,29,149,.12),0_4px_10px_-6px_rgba(76,29,149,.5)] disabled:cursor-default"
+    >
+      <Icone className="w-6 h-6 shrink-0 text-violet-700" strokeWidth={2.25} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[16px] font-bold leading-tight text-[#1e1b4b]">{label}</span>
+        <span className={has ? "block text-[13px] font-mono font-semibold truncate text-[#1e1b4b]" : filled ? "block text-[12px] italic leading-tight text-amber-700" : "block text-[12px] leading-tight text-[#3b2f8f]/80"}>{pretty}</span>
+      </span>
+      {has && (copied ? <Check className="w-4 h-4 shrink-0 text-green-600" /> : <Copy className="w-4 h-4 shrink-0 text-violet-700/70" />)}
     </button>
   );
 }
