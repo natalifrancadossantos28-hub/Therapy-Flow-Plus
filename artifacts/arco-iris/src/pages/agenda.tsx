@@ -2457,15 +2457,6 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </>
                                       )}
 
-                                      {(apt.paused || (apt.status || "").toLowerCase() === "pausado") ? (
-                                        <AcaoBotao cor="verde" icon={Play} onClick={() => handleUnpause(apt)}>Retornar aos atendimentos</AcaoBotao>
-                                      ) : (
-                                        <AcaoBotao cor="ciano" icon={Snowflake} onClick={() => handleOpenPauseModal(apt)}>Pausar atendimento</AcaoBotao>
-                                      )}
-                                      {!buscaByPatient.has(apt.patientId) && (
-                                        <AcaoBotao cor="rosa" icon={ShieldAlert} onClick={() => { setActionMenuId(null); setEncaminharApt(apt); }}>Encaminhar p/ Busca Ativa</AcaoBotao>
-                                      )}
-
                                       <SecaoAcoes icon={LogOut}>Saída</SecaoAcoes>
                                       <div className="grid grid-cols-[1fr_1.3fr_1fr] gap-2">
                                         <AcaoBotao compacto cor="verde" icon={UserCheck} onClick={() => handleSaida(apt, "Alta")}>Dar Alta</AcaoBotao>
@@ -2483,6 +2474,16 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       {isAdmin && isMulti && (
                                         <AcaoBotao cor="violeta" icon={UserX} onClick={() => handleStartDesfazerMulti(apt)}>Desfazer Multi</AcaoBotao>
                                       )}
+
+                                      {(apt.paused || (apt.status || "").toLowerCase() === "pausado") ? (
+                                        <AcaoBotao cor="verde" icon={Play} onClick={() => handleUnpause(apt)}>Retornar aos atendimentos</AcaoBotao>
+                                      ) : (
+                                        <AcaoBotao cor="ciano" icon={Snowflake} onClick={() => handleOpenPauseModal(apt)}>Pausar atendimento</AcaoBotao>
+                                      )}
+                                      {!buscaByPatient.has(apt.patientId) && (
+                                        <AcaoBotao cor="rosa" icon={ShieldAlert} onClick={() => { setActionMenuId(null); setEncaminharApt(apt); }}>Encaminhar p/ Busca Ativa</AcaoBotao>
+                                      )}
+
 
                                       {isAdmin && !isProfessionalProfile && (
                                         <>

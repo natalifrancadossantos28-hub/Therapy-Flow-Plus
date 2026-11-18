@@ -1,6 +1,6 @@
 import { useEffect, type ButtonHTMLAttributes, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronRight, User, X } from "lucide-react";
+import { Check, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Icone = ComponentType<{ className?: string; strokeWidth?: number; style?: React.CSSProperties }>;
@@ -45,16 +45,16 @@ export function PainelAcoes({ titulo = "Ações", nome, onClose, children }: {
         role="dialog"
         aria-modal="true"
         aria-label={`${titulo} — ${nome}`}
-        className="relative w-full max-w-[440px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain rounded-[34px] border-2 border-white/80 p-4 sm:p-5 flex flex-col gap-2.5 [&>*]:shrink-0"
+        className="relative w-full max-w-[440px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain rounded-[34px] border-2 border-white/80 p-4 sm:p-5 flex flex-col gap-3 [&>*]:shrink-0 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200"
         style={{
           color: ESCURO,
-          background: "linear-gradient(165deg, rgba(248,246,255,.98), rgba(221,214,254,.96) 45%, rgba(237,233,254,.98))",
+          background: "radial-gradient(120% 60% at 100% 0%, rgba(244,114,182,.22), transparent 60%), radial-gradient(90% 50% at 0% 100%, rgba(56,189,248,.18), transparent 60%), linear-gradient(165deg, rgba(248,246,255,.94), rgba(221,214,254,.9) 45%, rgba(237,233,254,.94))",
           boxShadow: "0 0 0 1px rgba(167,139,250,.55), 0 0 44px -4px rgba(168,85,247,.9), 0 30px 60px -20px rgba(0,0,0,.6)",
         }}
       >
         <div className="flex items-center gap-3 mb-1">
-          <div className="relative shrink-0 w-16 h-16 rounded-full grid place-items-center bg-gradient-to-br from-indigo-500 to-violet-800 border-[3px] border-white shadow-[0_6px_16px_-4px_rgba(76,29,149,.7)]">
-            <User className="w-8 h-8 text-white" strokeWidth={2.25} />
+          <div className="relative shrink-0 w-[72px] h-[72px] rounded-full border-[3px] border-white shadow-[0_0_18px_-2px_rgba(139,92,246,.9),0_6px_16px_-4px_rgba(76,29,149,.7)]">
+            <img src={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/visual/avatar-acoes.webp`} alt="" aria-hidden width={256} height={256} className="w-full h-full rounded-full object-cover" />
             <span className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full grid place-items-center bg-violet-600 border-2 border-white">
               <Check className="w-3.5 h-3.5 text-white" strokeWidth={3.5} />
             </span>
@@ -90,7 +90,7 @@ export function AcaoBotao({ cor, icon: I, compacto, children, className, ...prop
       {...props}
       className={cn(
         "relative w-full flex items-center rounded-full border-2 font-bold overflow-hidden transition-all hover:brightness-110 active:scale-[.98] disabled:opacity-60 disabled:cursor-wait",
-        compacto ? "justify-center gap-1 h-12 px-1.5 text-[13px] sm:text-[14px]" : "gap-3 min-h-[50px] py-1.5 pl-3.5 pr-3 text-[17px] leading-tight",
+        compacto ? "justify-center gap-1 h-12 px-1.5 text-[13px] sm:text-[14px]" : "gap-3 min-h-[58px] py-1.5 pl-2 pr-2 text-[16px] sm:text-[17px] leading-tight",
         className,
       )}
       style={{
@@ -102,9 +102,25 @@ export function AcaoBotao({ cor, icon: I, compacto, children, className, ...prop
     >
       <span aria-hidden className="pointer-events-none absolute inset-x-3 top-0 h-1/2 rounded-b-[40%] bg-gradient-to-b from-white/50 to-white/0" />
       <span aria-hidden className="pointer-events-none absolute -right-6 top-0 h-full w-28 skew-x-[-28deg] bg-white/15" />
-      <I className={cn("relative shrink-0 drop-shadow-[0_1px_1px_rgba(255,255,255,.4)]", compacto ? "w-4 h-4 sm:w-5 sm:h-5" : "w-7 h-7")} strokeWidth={2.5} style={{ color: icone }} />
+      {compacto ? (
+        <I className="relative shrink-0 w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.5} style={{ color: icone }} />
+      ) : (
+        <span
+          className="relative shrink-0 w-11 h-11 rounded-full grid place-items-center border-2 border-white/80"
+          style={{
+            background: `radial-gradient(circle at 32% 26%, rgba(255,255,255,.75), ${b} 38%, ${c} 78%)`,
+            boxShadow: `0 0 10px -1px ${brilho}, inset 0 -3px 6px rgba(0,0,0,.3), 0 3px 6px rgba(0,0,0,.25)`,
+          }}
+        >
+          <I className="w-6 h-6 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]" strokeWidth={2.75} />
+        </span>
+      )}
       <span className={cn("relative", compacto ? "truncate" : "flex-1 text-left line-clamp-2")}>{children}</span>
-      {!compacto && <ChevronRight className="relative w-6 h-6 shrink-0" strokeWidth={2.75} />}
+      {!compacto && (
+        <span className="relative shrink-0 w-8 h-8 rounded-full grid place-items-center bg-white/35 border border-white/60">
+          <ChevronRight className="w-5 h-5" strokeWidth={3} />
+        </span>
+      )}
     </button>
   );
 }
