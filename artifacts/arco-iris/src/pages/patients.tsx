@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { HeroTela } from "@/components/HeroTela";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
 import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download, User, Printer, Stethoscope, ClipboardCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -576,10 +577,7 @@ export default function Patients() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Pacientes</h1>
-        <p className="text-muted-foreground mt-1">Cadastro e gestão dos pacientes da clínica.</p>
-      </div>
+      <HeroTela img="pacientes" titulo="Pacientes" subtitulo="Cadastro e gestão dos pacientes da clínica." />
 
       <Card className="p-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-border pb-6">

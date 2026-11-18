@@ -11,6 +11,7 @@ import AdminGuard from "@/components/AdminGuard";
 import { useSessionEpochGuard } from "@/lib/session-epoch";
 
 // ── Lazy-loaded pages (code-splitting) ──────────────────────────────────────
+import { SeletorModerno } from "@/components/SeletorModerno";
 const Portal = lazy(() => import("@/pages/portal"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const PainelGestao = lazy(() => import("@/pages/painel-gestao"));
@@ -122,6 +123,7 @@ function App() {
             <Router />
           </WouterRouter>
           <Toaster />
+          <SeletorModerno />
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>

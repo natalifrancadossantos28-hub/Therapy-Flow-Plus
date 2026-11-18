@@ -9,7 +9,7 @@ import {
   Calendar as CalendarIcon, Clock, Lock, ShieldCheck, ExternalLink,
   X, MessageCircle, CheckCircle, Check, Activity, RotateCcw, LogOut, AlertTriangle,
   ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, UserPlus, UserX, XOctagon, Download, Trash2, Users, Repeat, Undo2, Snowflake, Play, Printer, Bus, UserCheck, ClipboardList,
-  ShieldAlert, Plus, User, FileText, Mic, FolderOpen, CreditCard, Settings, HeartPulse,
+  ShieldAlert, Plus, User, FileText, Mic, ChevronsRight, CalendarDays, HeartPulse, Settings, LogIn,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
@@ -23,7 +23,8 @@ import BookingModal from "@/components/BookingModal";
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { ResumoSemana } from "@/components/ResumoSemana";
 import { AbsenceBadge } from "@/components/AbsenceBadge";
-import { DocCopyRow } from "@/components/PatientDocs";
+import { DocPill } from "@/components/PatientDocs";
+import { PainelAcoes, AcaoBotao, SecaoAcoes, AvisoAcoes, CartaoPeriodo } from "@/components/AcoesAgenda";
 import {
   listProfessionals,
   verifyProfessionalPin,
@@ -461,23 +462,19 @@ const NEON: Record<string, React.CSSProperties> = {
   },
 };
 
-// Menu do paciente: botões em degradê com brilho de vidro (igual ao modelo). [claro, forte, texto]
-const TONS_VIVO: Record<string, [string, string, string]> = {
-  green: ["#16a34a", "#4ade80", "#0b2a17"], blue: ["#1d4ed8", "#3b82f6", "#ffffff"], violet: ["#8b5cf6", "#c4b5fd", "#1e1b4b"],
-  yellow: ["#f59e0b", "#fcd34d", "#2b1a02"], red: ["#e11d48", "#fb7185", "#2b0710"], slate: ["#6366f1", "#c7d2fe", "#1e1b4b"],
-  orange: ["#ea580c", "#fdba74", "#2b1003"], purple: ["#7c3aed", "#c4b5fd", "#1e1b4b"], fuchsia: ["#5b21b6", "#8b5cf6", "#ffffff"],
-  cyan: ["#0e7490", "#22d3ee", "#ffffff"], pink: ["#e11d48", "#fda4af", "#2b0710"], azul: ["#1e40af", "#3b82f6", "#ffffff"],
-  excluir: ["#be123c", "#fb7185", "#ffffff"],
+// Menu do paciente no visual lilás: mesmo conjunto de cores, fundo claro e letra escura.
+const TONS_CLARO: Record<string, [string, string, string]> = {
+  yellow: ["#fefce8", "#facc15", "#854d0e"], green: ["#f0fdf4", "#4ade80", "#166534"],
+  orange: ["#fff7ed", "#fb923c", "#9a3412"], blue: ["#eff6ff", "#60a5fa", "#1e40af"],
+  red: ["#fef2f2", "#f87171", "#991b1b"], fuchsia: ["#fdf4ff", "#e879f9", "#86198f"],
+  cyan: ["#ecfeff", "#22d3ee", "#155e75"], violet: ["#f5f3ff", "#a78bfa", "#5b21b6"],
 };
 const NEON_CLARO: Record<string, React.CSSProperties> = Object.fromEntries(
-  Object.entries(TONS_VIVO).map(([k, [c1, c2, txt]]) => [k, {
-    ...NEON.violet,
-    background: `linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 50%), linear-gradient(115deg, rgba(255,255,255,0) 62%, rgba(255,255,255,.5) 74%, rgba(255,255,255,0) 86%), linear-gradient(90deg, ${c2} 0%, ${c1} 45%, ${c1} 100%)`,
-    border: `1.5px solid ${c1}`, color: txt, textShadow: txt === "#ffffff" ? "0 1px 2px rgba(0,0,0,.3)" : "none",
-    borderRadius: "9999px", padding: "9px 16px 9px 12px", fontSize: "16px", fontWeight: 700, gap: "14px",
-    boxShadow: `0 8px 18px -8px ${c1}, inset 0 1px 0 rgba(255,255,255,.8), inset 0 -3px 0 rgba(0,0,0,.18)`,
-    ["--c" as string]: c1, ["--ic" as string]: txt === "#ffffff" ? "#ffffff" : txt,
-  } as React.CSSProperties]),
+  Object.entries(NEON).map(([k, v]) => {
+    const [bg, borda, cor] = TONS_CLARO[k] ?? ["#f5f3ff", "#a78bfa", "#5b21b6"];
+    return [k, { ...v, background: bg, border: `1px solid ${borda}`, color: cor, textShadow: "none",
+      boxShadow: "0 2px 6px -3px rgba(91,33,182,.25)", borderRadius: "14px", padding: "11px 14px", fontSize: "15px", fontWeight: 600, gap: "10px" }];
+  }),
 );
 
 const SPECIALTIES = [
@@ -543,7 +540,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [pinLoading, setPinLoading] = useState(false);
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
   // Só visual: "Dia" mostra apenas uma coluna da mesma grade semanal.
-  const [diaFoco, setDiaFoco] = useState<number | null>(null);
+  // No celular abre direto no "Dia" (uma coluna larga, letras grandes); a "Semana" continua no botão.
+  const [diaFoco, setDiaFoco] = useState<number | null>(() => {
+    if (typeof window === "undefined" || !window.matchMedia("(max-width: 767px)").matches) return null;
+    const dow = new Date().getDay();
+    return dow >= 1 && dow <= 5 ? dow - 1 : 0;
+  });
   const [novoAberto, setNovoAberto] = useState<{ date: string; time: string } | null>(null);
   // Trocar o horário de uma linha da grade (ex.: 08:00 → 08:10) num dia escolhido.
   const [ajusteHora, setAjusteHora] = useState<{ time: string; date: string; horas: Record<number, string>; definitivo: boolean } | null>(null);
@@ -862,6 +864,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   // Close action menu on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest?.("[data-acoes-painel]")) return;
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setActionMenuId(null);
       }
@@ -2326,16 +2329,20 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                   >
                                     <div className="flex items-center gap-1.5 min-w-0">
                                       <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={30} />
-                                      <span className="font-semibold text-foreground text-[13px] leading-tight line-clamp-2 break-words" title={apt.patientName || undefined}>
-                                        {isGroup && <span className="text-cyan-300 font-extrabold mr-1">{ordem + 1}º</span>}
-                                        {apt.prontuario && <span className="text-cyan-400 font-extrabold mr-1">[{apt.prontuario}]</span>}
+                                      {(isGroup || apt.prontuario) && (
+                                        <span className="text-[13px] font-extrabold leading-tight truncate">
+                                          {isGroup && <span className="text-cyan-300 mr-1">{ordem + 1}º</span>}
+                                          {apt.prontuario && <span className="text-cyan-400">[{apt.prontuario}]</span>}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="font-semibold text-foreground text-[13px] leading-tight line-clamp-2 break-words" title={apt.patientName || undefined}>
                                         {isGhost ? (
                                           <span className="text-amber-400">⚠ Sem dados</span>
                                         ) : (
                                           abbreviateName(apt.patientName, 34) || `#${apt.patientId}`
                                         )}
-                                      </span>
-                                    </div>
+                                    </span>
                                     <AbsenceBadge count={absenceCount(apt.patientId)} compact />
                                     <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
                                       {getStatusLabel(apptStatus(apt))}
@@ -2392,242 +2399,122 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       Presença/falta/remanejo ficam na agenda dele; aqui só
                                       as ações que tiram este profissional do horário. */}
                                   {isGuestMenuOpen && (
-                                    <div
-                                      className="menu-paciente absolute z-50 top-full mt-1 left-0 w-[19rem] max-w-[88vw] rounded-[2rem] overflow-hidden"
-                                      style={{
-                                        background: "linear-gradient(160deg, rgba(255,255,255,.96), rgba(233,226,255,.95))",
-                                        border: "2px solid rgba(167,139,250,.75)",
-                                        backdropFilter: "blur(20px)",
-                                        padding: "14px",
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: "8px",
-                                        boxShadow: "0 24px 48px -16px rgba(76,29,149,.45)",
-                                      }}
-                                    >
-                                      <p className="text-base text-[#1e1b4b] font-extrabold leading-snug mb-1 px-1">Multi — {apt.patientName}</p>
-                                      <p className="text-sm text-[#3b3561] px-1 leading-snug">
-                                        Horário criado por {apt.multiHostName || "outro profissional"}. Presença, falta e remanejo são feitos na agenda de quem criou.
-                                      </p>
-                                      <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                      <button style={NEON_CLARO.violet} onClick={() => handleExcluirAdmin(apt)}>
-                                        <UserX className="w-[18px] h-[18px]" /> Sair deste Multi (daqui em diante)
-                                      </button>
-                                      <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                      <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1 flex items-center gap-2"><LogOut className="w-6 h-6 text-[#1e1b4b]" /> Saída</p>
-                                      <button style={NEON_CLARO.green} onClick={() => handleSaida(apt, "Alta")}>
-                                        <UserCheck className="w-[18px] h-[18px]" /> Dar Alta
-                                      </button>
-                                      <button style={NEON_CLARO.orange} onClick={() => handleSaida(apt, "Desistência")}>
-                                        <UserX className="w-[18px] h-[18px]" /> Desistência
-                                      </button>
-                                    </div>
+                                    <PainelAcoes titulo="Multi" nome={apt.patientName || `Agendamento #${apt.id}`} onClose={() => setActionMenuId(null)}>
+                                      <AvisoAcoes>Horário criado por {apt.multiHostName || "outro profissional"}. Presença, falta e remanejo são feitos na agenda de quem criou.</AvisoAcoes>
+                                      <AcaoBotao cor="violeta" icon={UserX} onClick={() => handleExcluirAdmin(apt)}>Sair deste Multi (daqui em diante)</AcaoBotao>
+                                      <SecaoAcoes icon={LogOut}>Saída</SecaoAcoes>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <AcaoBotao compacto cor="verde" icon={UserCheck} onClick={() => handleSaida(apt, "Alta")}>Dar Alta</AcaoBotao>
+                                        <AcaoBotao compacto cor="laranja" icon={UserX} onClick={() => handleSaida(apt, "Desistência")}>Desistência</AcaoBotao>
+                                      </div>
+                                    </PainelAcoes>
                                   )}
 
-                                  {/* Action menu */}
                                   {isMenuOpen && (
-                                    <div
-                                      className="menu-paciente absolute z-50 top-full mt-1 left-0 w-[19rem] max-w-[88vw] rounded-[2rem] overflow-hidden"
-                                      style={{
-                                        background: "linear-gradient(160deg, rgba(255,255,255,.96), rgba(233,226,255,.95))",
-                                        border: "2px solid rgba(167,139,250,.75)",
-                                        backdropFilter: "blur(20px)",
-                                        padding: "14px",
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: "8px",
-                                        boxShadow: "0 24px 48px -16px rgba(76,29,149,.45)",
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-3 mb-1">
-                                        <img src={`${import.meta.env.BASE_URL}images/avatar-acoes.png`} alt="" className="w-[76px] h-[65px] shrink-0 object-contain rounded-2xl mix-blend-multiply" />
-                                        <span className="flex-1 min-w-0">
-                                          <span className="block text-2xl font-extrabold text-[#1e1b4b] leading-none">Ações</span>
-                                          <span className="block text-base font-semibold text-[#3b3561] leading-snug mt-1 break-words capitalize">{(apt.patientName || `Agendamento #${apt.id}`).toLowerCase()}</span>
-                                        </span>
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); setActionMenuId(null); }} aria-label="Fechar"
-                                          className="grid place-items-center w-10 h-10 rounded-full bg-white text-[#1e1b4b] shadow-[0_4px_10px_-4px_rgba(91,33,182,.5),inset_0_1px_0_#fff] shrink-0"><X className="w-5 h-5" /></button>
-                                      </div>
+                                    <PainelAcoes nome={apt.patientName || `Agendamento #${apt.id}`} onClose={() => setActionMenuId(null)}>
                                       {!isGhost && (
-                                        <div className="docs-lado grid grid-cols-2 gap-2 mb-1">
-                                          <div className="doc-cartao flex items-center gap-2"><FolderOpen className="w-7 h-7 shrink-0 text-violet-800" /><DocCopyRow label="CPF" value={docsById.get(apt.patientId)?.cpf} /></div>
-                                          <div className="doc-cartao flex items-center gap-2"><CreditCard className="w-7 h-7 shrink-0 text-violet-800" /><DocCopyRow label="CNS" value={docsById.get(apt.patientId)?.cns} /></div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <DocPill label="CPF" value={docsById.get(apt.patientId)?.cpf} />
+                                          <DocPill label="CNS" value={docsById.get(apt.patientId)?.cns} />
                                         </div>
                                       )}
                                       {isGhost && (
-                                        <p className="text-sm text-amber-700 font-semibold px-1 mb-1">
-                                          {isProfessionalProfile ? "⚠ Paciente sem dados — peça à administração para limpar" : "⚠ Paciente sem dados — clique em Excluir para limpar"}
-                                        </p>
+                                        <AvisoAcoes>{isProfessionalProfile ? "Paciente sem dados — peça à administração para limpar" : "Paciente sem dados — use Excluir Agendamento para limpar"}</AvisoAcoes>
                                       )}
-                                      {isPastDate && (
-                                        <p className="text-sm text-amber-700 font-semibold px-1 mb-1">⏪ Ajuste Retroativo</p>
-                                      )}
+                                      {isPastDate && <AvisoAcoes>Ajuste retroativo</AvisoAcoes>}
 
                                       {!firstEvalDone.has(firstEvalKey(apt.patientId, selectedProf?.specialty)) && (
-                                        <button style={NEON_CLARO.green} onClick={() => handleAtivo(apt)}>
-                                          <UserCheck className="w-[18px] h-[18px]" /> Ativo
-                                        </button>
+                                        <AcaoBotao cor="verde" icon={UserCheck} onClick={() => handleAtivo(apt)}>Ativo</AcaoBotao>
                                       )}
-
                                       {date <= today && apt.status?.toLowerCase() !== "presente" && (
-                                        <button style={NEON_CLARO.green} onClick={() => handlePresente(apt)}>
-                                          <Check className="w-[18px] h-[18px]" /> {isPastDate ? "Presente (retroativo)" : "Presente (hoje)"}
-                                        </button>
+                                        <AcaoBotao cor="verde" icon={CheckCircle} onClick={() => handlePresente(apt)}>{isPastDate ? "Presente (retroativo)" : "Presente (hoje)"}</AcaoBotao>
                                       )}
-
-                                      <button style={NEON_CLARO.blue} onClick={() => handleAtendimento(apt)}>
-                                        <Activity className="w-[18px] h-[18px]" /> Em Atendimento
-                                      </button>
-
-                                      <button style={NEON_CLARO.violet} onClick={() => { setActionMenuId(null); setAvfEntradaApt(apt); }}
-                                        title="Avaliação Funcional (5 perguntas, 1–5) do início do acompanhamento nesta especialidade">
-                                        <ClipboardList className="w-[18px] h-[18px]" /> Avaliação de Entrada
-                                      </button>
+                                      <AcaoBotao cor="azul" icon={Activity} onClick={() => handleAtendimento(apt)}>Em Atendimento</AcaoBotao>
+                                      <AcaoBotao cor="violeta" icon={LogIn} onClick={() => { setActionMenuId(null); setAvfEntradaApt(apt); }}
+                                        title="Avaliação Funcional (5 perguntas, 1–5) do início do acompanhamento nesta especialidade">Avaliação de Entrada</AcaoBotao>
 
                                       {isAdmin && (
                                         <>
-                                          <button style={NEON_CLARO.yellow} onClick={() => handleFaltaJustificada(apt)}>
-                                            <CheckCircle className="w-[18px] h-[18px]" /> Falta Justificada
-                                          </button>
-                                          <button style={NEON_CLARO.red} onClick={() => handleFaltaNaoJustificada(apt)}>
-                                            <AlertTriangle className="w-[18px] h-[18px]" /> Falta N. Justificada
-                                          </button>
+                                          <AcaoBotao cor="amarelo" icon={ShieldCheck} onClick={() => handleFaltaJustificada(apt)}>Falta Justificada</AcaoBotao>
+                                          <AcaoBotao cor="vermelho" icon={AlertTriangle} onClick={() => handleFaltaNaoJustificada(apt)}>Falta N. Justificada</AcaoBotao>
                                           {!isProfessionalProfile && (
-                                            <>
-                                              <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                              <button style={NEON_CLARO.slate} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
-                                                <AlertTriangle className="w-[18px] h-[18px]" /> Desmarcar
-                                              </button>
-                                            </>
+                                            <AcaoBotao cor="cinza" icon={ChevronsRight} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>Desmarcar</AcaoBotao>
                                           )}
                                           {(isFaltaJustificada || isFaltaNaoJustificada) && (
-                                            <>
-                                              <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                              <button style={NEON_CLARO.cyan} onClick={() => handleCancelarFalta(apt)}>
-                                                <Undo2 className="w-[18px] h-[18px]" /> Cancelar Falta
-                                              </button>
-                                            </>
+                                            <AcaoBotao cor="ciano" icon={Undo2} onClick={() => handleCancelarFalta(apt)}>Cancelar Falta</AcaoBotao>
                                           )}
                                         </>
                                       )}
 
-                                      <button style={NEON_CLARO.orange} onClick={() => handleStartRemanejar(apt)}>
-                                        <RotateCcw className="w-[18px] h-[18px]" /> Remanejar
-                                      </button>
-                                      <button style={NEON_CLARO.purple} onClick={() => handleStartRemarcar(apt)}>
-                                        <CalendarIcon className="w-[18px] h-[18px]" /> Remarcar
-                                      </button>
-                                      <button style={NEON_CLARO.violet} onClick={() => { setActionMenuId(null); abrirAjusteHora(apt.time, apt.date); }}>
-                                        <Clock className="w-[18px] h-[18px]" /> Trocar horário (mesmo dia)
-                                      </button>
+                                      <AcaoBotao cor="laranja" icon={RotateCcw} onClick={() => handleStartRemanejar(apt)}>Remanejar</AcaoBotao>
+                                      <AcaoBotao cor="roxo" icon={CalendarDays} onClick={() => handleStartRemarcar(apt)}>Remarcar</AcaoBotao>
+                                      <AcaoBotao cor="roxo" icon={Clock} onClick={() => { setActionMenuId(null); abrirAjusteHora(apt.time, apt.date); }}>Trocar horário (mesmo dia)</AcaoBotao>
 
-                                      {/* ── Periodicidade (Frequência) Cards ── */}
                                       {(apt.recurrenceGroupId || isMulti) && isAdmin && (
                                         <>
-                                          <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                          <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1 flex items-center gap-2"><CalendarIcon className="w-6 h-6 text-violet-700" /> Periodicidade</p>
-                                          <div className="grid grid-cols-3 gap-1">
+                                          <SecaoAcoes icon={CalendarDays}>Periodicidade</SecaoAcoes>
+                                          <div className="grid grid-cols-3 gap-2">
                                             {(["semanal", "quinzenal", "mensal"] as const).map(freq => {
-                                              const isActive = (apt.frequency ?? "semanal") === freq;
                                               const labels: Record<string, { label: string; desc: string }> = {
                                                 semanal: { label: "Semanal", desc: "Toda semana" },
                                                 quinzenal: { label: "Quinzenal", desc: "A cada 14 dias" },
                                                 mensal: { label: "Mensal", desc: "1x por mês" },
                                               };
                                               return (
-                                                <button
+                                                <CartaoPeriodo
                                                   key={freq}
+                                                  icon={CalendarDays}
+                                                  ativo={(apt.frequency ?? "semanal") === freq}
+                                                  titulo={labels[freq].label}
+                                                  desc={labels[freq].desc}
                                                   disabled={freqSending}
                                                   onClick={(e) => { e.stopPropagation(); handleChangeFrequency(apt, freq); }}
-                                                  className="relative rounded-2xl p-2 text-center transition-all"
-                                                  style={{
-                                                    background: isActive ? "linear-gradient(160deg, #8b5cf6, #6d28d9)" : "linear-gradient(180deg, #ffffff, #f5f3ff)",
-                                                    border: isActive ? "2px solid #7c3aed" : "1px solid #ddd6fe",
-                                                    color: isActive ? "#ffffff" : "#3b3561",
-                                                    boxShadow: isActive ? "0 10px 18px -8px rgba(109,40,217,.8), inset 0 1px 0 rgba(255,255,255,.35)" : "0 6px 12px -8px rgba(91,33,182,.45), inset 0 1px 0 #fff",
-                                                    cursor: freqSending ? "wait" : "pointer",
-                                                    opacity: freqSending ? 0.5 : 1,
-                                                  }}
-                                                >
-                                                  {isActive && <span className="absolute -top-2 -right-2 grid place-items-center w-6 h-6 rounded-full bg-violet-600 text-white ring-2 ring-white"><Check className="w-3.5 h-3.5" /></span>}<CalendarIcon className="w-6 h-6 mx-auto mb-0.5" />
-                                                  <span className="text-sm font-bold block">{labels[freq].label}</span>
-                                                  <span className="text-[11px] block opacity-70 leading-tight">{labels[freq].desc}</span>
-                                                </button>
+                                                />
                                               );
                                             })}
                                           </div>
                                         </>
                                       )}
 
-                                      <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                      {(apt.paused || (apt.status || "").toLowerCase() === "pausado") ? (
-                                        <button style={NEON_CLARO.green} onClick={() => handleUnpause(apt)}>
-                                          <Play className="w-[18px] h-[18px]" /> Retornar aos atendimentos
-                                        </button>
-                                      ) : (
-                                        <button style={NEON_CLARO.cyan} onClick={() => handleOpenPauseModal(apt)}>
-                                          <Snowflake className="w-[18px] h-[18px]" /> Pausar atendimento
-                                        </button>
-                                      )}
-                                      {!buscaByPatient.has(apt.patientId) && (
-                                        <button style={NEON_CLARO.red} onClick={() => { setActionMenuId(null); setEncaminharApt(apt); }}>
-                                          <ShieldAlert className="w-[18px] h-[18px]" /> Encaminhar p/ Busca Ativa
-                                        </button>
-                                      )}
-
-                                      <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                      <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1 flex items-center gap-2"><LogOut className="w-6 h-6 text-[#1e1b4b]" /> Saída</p>
-                                      <div className="saida-linha grid grid-cols-3 gap-1.5">
-                                      <button style={NEON_CLARO.green} onClick={() => handleSaida(apt, "Alta")}>
-                                        <UserCheck className="w-[18px] h-[18px]" /> Dar Alta
-                                      </button>
-                                      <button style={NEON_CLARO.orange} onClick={() => handleSaida(apt, "Desistência")}>
-                                        <UserX className="w-[18px] h-[18px]" /> Desistência
-                                      </button>
-                                      <button style={NEON_CLARO.pink} onClick={() => handleSaida(apt, "Óbito")}>
-                                        <HeartPulse className="w-[18px] h-[18px]" /> Óbito
-                                      </button>
+                                      <SecaoAcoes icon={LogOut}>Saída</SecaoAcoes>
+                                      <div className="grid grid-cols-[1fr_1.3fr_1fr] gap-2">
+                                        <AcaoBotao compacto cor="verde" icon={UserCheck} onClick={() => handleSaida(apt, "Alta")}>Dar Alta</AcaoBotao>
+                                        <AcaoBotao compacto cor="laranja" icon={UserX} onClick={() => handleSaida(apt, "Desistência")}>Desistência</AcaoBotao>
+                                        <AcaoBotao compacto cor="rosa" icon={HeartPulse} onClick={() => handleSaida(apt, "Óbito")}>Óbito</AcaoBotao>
                                       </div>
 
-                                      <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                      <button style={NEON_CLARO.fuchsia} onClick={() => handleEncaminhamento(apt)}>
-                                        <ArrowRightLeft className="w-[18px] h-[18px]" /> Encaminhamento Interno
-                                      </button>
-
+                                      <AcaoBotao cor="indigo" icon={ArrowRightLeft} onClick={() => handleEncaminhamento(apt)}>Encaminhamento Interno</AcaoBotao>
                                       {isAdmin && (
-                                        <button style={NEON_CLARO.cyan} onClick={() => handleMultiAtendimento(apt)}>
-                                          <UserPlus className="w-[18px] h-[18px]" /> Atendimento Multi
-                                        </button>
+                                        <AcaoBotao cor="turquesa" icon={Users} onClick={() => handleMultiAtendimento(apt)}>Atendimento Multi</AcaoBotao>
                                       )}
-
                                       {isAdmin && !isProfessionalProfile && drivers.length > 0 && !isTransportSpecialty(selectedProf?.specialty) && (
-                                        <button style={NEON_CLARO.azul} onClick={() => handleTransporte(apt)}>
-                                          <Bus className="w-[18px] h-[18px]" /> Transporte (Motorista)
-                                        </button>
+                                        <AcaoBotao cor="marinho" icon={Bus} onClick={() => handleTransporte(apt)}>Transporte (Motorista)</AcaoBotao>
+                                      )}
+                                      {isAdmin && isMulti && (
+                                        <AcaoBotao cor="violeta" icon={UserX} onClick={() => handleStartDesfazerMulti(apt)}>Desfazer Multi</AcaoBotao>
                                       )}
 
-                                      {isAdmin && isMulti && (
-                                        <button style={NEON_CLARO.violet} onClick={() => handleStartDesfazerMulti(apt)}>
-                                          <UserX className="w-[18px] h-[18px]" /> Desfazer Multi
-                                        </button>
+                                      {(apt.paused || (apt.status || "").toLowerCase() === "pausado") ? (
+                                        <AcaoBotao cor="verde" icon={Play} onClick={() => handleUnpause(apt)}>Retornar aos atendimentos</AcaoBotao>
+                                      ) : (
+                                        <AcaoBotao cor="ciano" icon={Snowflake} onClick={() => handleOpenPauseModal(apt)}>Pausar atendimento</AcaoBotao>
                                       )}
+                                      {!buscaByPatient.has(apt.patientId) && (
+                                        <AcaoBotao cor="rosa" icon={ShieldAlert} onClick={() => { setActionMenuId(null); setEncaminharApt(apt); }}>Encaminhar p/ Busca Ativa</AcaoBotao>
+                                      )}
+
 
                                       {isAdmin && !isProfessionalProfile && (
                                         <>
-                                          <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                          <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1 flex items-center gap-2"><Settings className="w-6 h-6 text-[#1e1b4b]" /> Administração</p>
-                                          <button style={NEON_CLARO.excluir} onClick={() => handleExcluirAdmin(apt)}>
-                                            <Trash2 className="w-[18px] h-[18px]" /> Excluir Agendamento
-                                          </button>
+                                          <SecaoAcoes icon={Settings}>Administração</SecaoAcoes>
+                                          <AcaoBotao cor="perigo" icon={Trash2} onClick={() => handleExcluirAdmin(apt)}>Excluir Agendamento</AcaoBotao>
                                         </>
                                       )}
 
                                       {!isAdmin && (
-                                        <p className="text-xs text-[#3b3561] px-1 mt-1 italic leading-snug">
-                                          Faltas e desmarcações ficam na Recepção.
-                                        </p>
+                                        <p className="px-1 mt-1 text-[14px] italic text-[#3b2f8f]/80 leading-snug">Faltas e desmarcações ficam na Recepção.</p>
                                       )}
-                                    </div>
+                                    </PainelAcoes>
                                   )}
                                 </div>
                                     );

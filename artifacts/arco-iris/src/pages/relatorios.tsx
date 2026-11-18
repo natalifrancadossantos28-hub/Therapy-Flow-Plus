@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { HeroTela } from "@/components/HeroTela";
 import { resumoAgenda, capacidadeMax, dedupeApts, hojeISO, statusOf } from "@/lib/indicadores";
 import { format, startOfMonth, subMonths } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -101,13 +102,10 @@ export default function Relatorios() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-display font-bold flex items-center gap-2"><BarChart3 className="w-7 h-7 text-primary" /> Relatórios</h1>
-          <p className="text-muted-foreground mt-1">Indicadores calculados com os dados atuais do sistema.</p>
-        </div>
-        <Button variant="outline" className="gap-2 print:hidden" onClick={() => window.print()}><Printer className="w-4 h-4" /> Imprimir</Button>
-      </div>
+      <HeroTela img="relatorios" titulo="Relatórios" subtitulo="Indicadores com os dados atuais do sistema.">
+        <Button variant="outline" className="gap-2 w-fit mt-1 bg-[#120d33]/60" onClick={() => window.print()}><Printer className="w-4 h-4" /> Imprimir</Button>
+      </HeroTela>
+      <h1 className="hidden print:block text-3xl font-display font-bold">Relatórios</h1>
       <Card className="p-4 flex flex-wrap items-end gap-3 print:hidden">
         <label className="text-xs font-semibold text-muted-foreground">De<br /><input type="date" className={inp} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
         <label className="text-xs font-semibold text-muted-foreground">Até<br /><input type="date" className={inp} value={to} onChange={(e) => setTo(e.target.value)} /></label>
