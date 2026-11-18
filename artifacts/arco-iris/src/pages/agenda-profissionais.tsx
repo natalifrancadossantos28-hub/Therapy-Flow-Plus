@@ -366,7 +366,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
           {[inicio, agenda, perfil]}
         </NeonTelas>
       </div>
-      <SuporteBotao className="bottom-28" />
+      <SuporteBotao className="bottom-28" profissional={isAdminViewing || !prof ? null : { id: prof.id, name: prof.name }} />
       <NeonMenuInferior
         ativo={MENU_IDS[pagina]}
         onItem={(id) => { if (id === "falar") { ir(1); abrirVoz(); return; } ir(Math.max(0, MENU_IDS.indexOf(id))); }}

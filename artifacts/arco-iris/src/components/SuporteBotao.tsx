@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const TIPOS = ["Dúvida", "Problema no sistema", "Sugestão", "Urgente"] as const;
 
 /** Botão "Falar com o suporte": a mensagem chega em Recados da Equipe (administração). */
-export function SuporteBotao({ className }: { className?: string }) {
+export function SuporteBotao({ className, profissional }: { className?: string; profissional?: { id: number; name: string } | null }) {
   const { toast } = useToast();
   const [aberto, setAberto] = useState(false);
   const [tipo, setTipo] = useState<(typeof TIPOS)[number]>("Dúvida");
@@ -16,7 +16,8 @@ export function SuporteBotao({ className }: { className?: string }) {
   const [enviando, setEnviando] = useState(false);
 
   const scope = getCurrentScope();
-  const prof = getProfessionalSession();
+  const sessao = getProfessionalSession();
+  const prof = profissional ? { professionalId: profissional.id, professionalName: profissional.name } : sessao;
   const quem = prof?.professionalName ?? (scope === "reception" ? "Recepção" : "Administração");
 
   const enviar = async () => {
