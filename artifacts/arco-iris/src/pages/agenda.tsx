@@ -463,20 +463,20 @@ const NEON: Record<string, React.CSSProperties> = {
 
 // Menu do paciente: botões em degradê com brilho de vidro (igual ao modelo). [claro, forte, texto]
 const TONS_VIVO: Record<string, [string, string, string]> = {
-  green: ["#bbf7d0", "#22c55e", "#0f2e1d"], blue: ["#93c5fd", "#2563eb", "#ffffff"], violet: ["#ede9fe", "#a78bfa", "#1e1b4b"],
-  yellow: ["#fde68a", "#f59e0b", "#3b2203"], red: ["#fecdd3", "#f43f5e", "#3b0a14"], slate: ["#e0e7ff", "#8b93c9", "#1e1b4b"],
-  orange: ["#fed7aa", "#f97316", "#3b1603"], purple: ["#e9d5ff", "#9333ea", "#1e1b4b"], fuchsia: ["#a78bfa", "#5b21b6", "#ffffff"],
-  cyan: ["#67e8f9", "#0e7490", "#ffffff"], pink: ["#fecdd3", "#f43f5e", "#3b0a14"], azul: ["#60a5fa", "#1d4ed8", "#ffffff"],
-  excluir: ["#fb7185", "#be123c", "#ffffff"],
+  green: ["#16a34a", "#4ade80", "#0b2a17"], blue: ["#1d4ed8", "#3b82f6", "#ffffff"], violet: ["#8b5cf6", "#c4b5fd", "#1e1b4b"],
+  yellow: ["#f59e0b", "#fcd34d", "#2b1a02"], red: ["#e11d48", "#fb7185", "#2b0710"], slate: ["#6366f1", "#c7d2fe", "#1e1b4b"],
+  orange: ["#ea580c", "#fdba74", "#2b1003"], purple: ["#7c3aed", "#c4b5fd", "#1e1b4b"], fuchsia: ["#5b21b6", "#8b5cf6", "#ffffff"],
+  cyan: ["#0e7490", "#22d3ee", "#ffffff"], pink: ["#e11d48", "#fda4af", "#2b0710"], azul: ["#1e40af", "#3b82f6", "#ffffff"],
+  excluir: ["#be123c", "#fb7185", "#ffffff"],
 };
 const NEON_CLARO: Record<string, React.CSSProperties> = Object.fromEntries(
   Object.entries(TONS_VIVO).map(([k, [c1, c2, txt]]) => [k, {
     ...NEON.violet,
-    background: `linear-gradient(115deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 38%, rgba(255,255,255,0) 70%, rgba(255,255,255,.35) 85%, rgba(255,255,255,0) 100%), linear-gradient(90deg, ${c1} 0%, ${c2} 100%)`,
-    border: `1.5px solid ${c2}`, color: txt, textShadow: txt === "#ffffff" ? "0 1px 2px rgba(0,0,0,.3)" : "none",
+    background: `linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 50%), linear-gradient(115deg, rgba(255,255,255,0) 62%, rgba(255,255,255,.5) 74%, rgba(255,255,255,0) 86%), linear-gradient(90deg, ${c2} 0%, ${c1} 45%, ${c1} 100%)`,
+    border: `1.5px solid ${c1}`, color: txt, textShadow: txt === "#ffffff" ? "0 1px 2px rgba(0,0,0,.3)" : "none",
     borderRadius: "9999px", padding: "9px 16px 9px 12px", fontSize: "16px", fontWeight: 700, gap: "14px",
-    boxShadow: `0 8px 16px -9px ${c2}, inset 0 1px 0 rgba(255,255,255,.8), inset 0 -3px 0 rgba(0,0,0,.12)`,
-    ["--c" as string]: c2, ["--ic" as string]: txt === "#ffffff" ? "#ffffff" : c2,
+    boxShadow: `0 8px 18px -8px ${c1}, inset 0 1px 0 rgba(255,255,255,.8), inset 0 -3px 0 rgba(0,0,0,.18)`,
+    ["--c" as string]: c1, ["--ic" as string]: txt === "#ffffff" ? "#ffffff" : txt,
   } as React.CSSProperties]),
 );
 
@@ -2440,10 +2440,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       }}
                                     >
                                       <div className="flex items-center gap-3 mb-1">
-                                        <span className="relative shrink-0 rounded-full p-0.5 bg-gradient-to-br from-violet-400 to-violet-700 shadow-[0_8px_18px_-8px_rgba(109,40,217,.8)]">
-                                          <span className="block rounded-full bg-white p-0.5"><PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={48} /></span>
-                                          <span className="absolute -bottom-0.5 -right-0.5 grid place-items-center w-5 h-5 rounded-full bg-violet-600 text-white ring-2 ring-white"><Check className="w-3 h-3" /></span>
-                                        </span>
+                                        <img src={`${import.meta.env.BASE_URL}images/avatar-acoes.png`} alt="" className="w-[76px] h-[65px] shrink-0 object-contain rounded-2xl mix-blend-multiply" />
                                         <span className="flex-1 min-w-0">
                                           <span className="block text-2xl font-extrabold text-[#1e1b4b] leading-none">Ações</span>
                                           <span className="block text-base font-semibold text-[#3b3561] leading-snug mt-1 break-words capitalize">{(apt.patientName || `Agendamento #${apt.id}`).toLowerCase()}</span>
