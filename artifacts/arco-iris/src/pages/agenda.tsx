@@ -471,8 +471,9 @@ const TONS_CLARO: Record<string, [string, string, string]> = {
 const NEON_CLARO: Record<string, React.CSSProperties> = Object.fromEntries(
   Object.entries(NEON).map(([k, v]) => {
     const [bg, borda, cor] = TONS_CLARO[k] ?? ["#f5f3ff", "#a78bfa", "#5b21b6"];
-    return [k, { ...v, background: bg, border: `1px solid ${borda}`, color: cor, textShadow: "none",
-      boxShadow: "0 2px 6px -3px rgba(91,33,182,.25)", borderRadius: "14px", padding: "11px 14px", fontSize: "15px", fontWeight: 600, gap: "10px" }];
+    return [k, { ...v, background: `linear-gradient(180deg, #ffffff 0%, ${bg} 55%, ${bg} 100%)`, border: `1px solid ${borda}`, color: cor, textShadow: "none",
+      boxShadow: `0 8px 16px -8px ${borda}, inset 0 1px 0 #ffffff, inset 0 -3px 0 ${borda}40`, borderRadius: "16px", padding: "9px 12px", fontSize: "15px", fontWeight: 700, gap: "12px",
+      ["--c" as string]: borda } as React.CSSProperties];
   }),
 );
 
@@ -2530,10 +2531,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                                   onClick={(e) => { e.stopPropagation(); handleChangeFrequency(apt, freq); }}
                                                   className="rounded-2xl p-2 text-center transition-all"
                                                   style={{
-                                                    background: isActive ? "#ede9fe" : "#ffffff",
+                                                    background: isActive ? "linear-gradient(160deg, #8b5cf6, #6d28d9)" : "linear-gradient(180deg, #ffffff, #f5f3ff)",
                                                     border: isActive ? "2px solid #7c3aed" : "1px solid #ddd6fe",
-                                                    color: isActive ? "#5b21b6" : "#3b3561",
-                                                    boxShadow: isActive ? "0 4px 12px -6px rgba(109,40,217,.5)" : "none",
+                                                    color: isActive ? "#ffffff" : "#3b3561",
+                                                    boxShadow: isActive ? "0 10px 18px -8px rgba(109,40,217,.8), inset 0 1px 0 rgba(255,255,255,.35)" : "0 6px 12px -8px rgba(91,33,182,.45), inset 0 1px 0 #fff",
                                                     cursor: freqSending ? "wait" : "pointer",
                                                     opacity: freqSending ? 0.5 : 1,
                                                   }}
