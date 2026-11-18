@@ -7,16 +7,16 @@ type Icone = ComponentType<{ className?: string; strokeWidth?: number; style?: R
 
 const ESCURO = "#1e1b4b";
 const CORES = {
-  verde: ["#bbf7d0", "#4ade80", "#15803d", "rgba(34,197,94,.7)", ESCURO, "#14532d"],
-  azul: ["#93c5fd", "#3b82f6", "#1d4ed8", "rgba(59,130,246,.7)", "#fff", "#fff"],
+  verde: ["#86efac", "#4ade80", "#15803d", "rgba(34,197,94,.7)", ESCURO, "#14532d"],
+  azul: ["#60a5fa", "#3b82f6", "#1d4ed8", "rgba(59,130,246,.7)", "#fff", "#fff"],
   violeta: ["#ede9fe", "#c4b5fd", "#8b5cf6", "rgba(139,92,246,.6)", ESCURO, "#4c1d95"],
-  amarelo: ["#fef3c7", "#fbbf24", "#d97706", "rgba(245,158,11,.7)", ESCURO, "#92400e"],
-  vermelho: ["#fecdd3", "#fb7185", "#e11d48", "rgba(244,63,94,.7)", ESCURO, "#9f1239"],
-  cinza: ["#e2e8f0", "#a5b4c8", "#64748b", "rgba(100,116,139,.6)", ESCURO, ESCURO],
-  laranja: ["#fed7aa", "#fb923c", "#ea580c", "rgba(249,115,22,.7)", ESCURO, "#9a3412"],
-  roxo: ["#ddd6fe", "#a78bfa", "#7c3aed", "rgba(124,58,237,.65)", ESCURO, "#3b0764"],
-  ciano: ["#cffafe", "#67e8f9", "#0891b2", "rgba(6,182,212,.65)", ESCURO, "#155e75"],
-  rosa: ["#fbcfe8", "#f472b6", "#db2777", "rgba(236,72,153,.65)", ESCURO, "#831843"],
+  amarelo: ["#fcd34d", "#fbbf24", "#d97706", "rgba(245,158,11,.7)", ESCURO, "#92400e"],
+  vermelho: ["#fda4af", "#fb7185", "#e11d48", "rgba(244,63,94,.7)", ESCURO, "#9f1239"],
+  cinza: ["#cbd5e1", "#a5b4c8", "#64748b", "rgba(100,116,139,.6)", ESCURO, ESCURO],
+  laranja: ["#fdba74", "#fb923c", "#ea580c", "rgba(249,115,22,.7)", ESCURO, "#9a3412"],
+  roxo: ["#c4b5fd", "#a78bfa", "#7c3aed", "rgba(124,58,237,.65)", ESCURO, "#3b0764"],
+  ciano: ["#a5f3fc", "#67e8f9", "#0891b2", "rgba(6,182,212,.65)", ESCURO, "#155e75"],
+  rosa: ["#f9a8d4", "#f472b6", "#db2777", "rgba(236,72,153,.65)", ESCURO, "#831843"],
   indigo: ["#818cf8", "#6d28d9", "#4c1d95", "rgba(109,40,217,.75)", "#fff", "#fff"],
   turquesa: ["#67e8f9", "#0891b2", "#155e75", "rgba(8,145,178,.75)", "#fff", "#fff"],
   marinho: ["#60a5fa", "#1d4ed8", "#1e3a8a", "rgba(29,78,216,.75)", "#fff", "#fff"],
@@ -37,7 +37,7 @@ export function PainelAcoes({ titulo = "Ações", nome, onClose, children }: {
   return createPortal(
     <div
       data-acoes-painel
-      className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6 bg-[#0b0820]/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6 bg-[#0b0820]/45 backdrop-blur-[3px]"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -48,7 +48,7 @@ export function PainelAcoes({ titulo = "Ações", nome, onClose, children }: {
         className="relative w-full max-w-[440px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain rounded-[34px] border-2 border-white/80 p-4 sm:p-5 flex flex-col gap-3 [&>*]:shrink-0 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200"
         style={{
           color: ESCURO,
-          background: "radial-gradient(120% 60% at 100% 0%, rgba(244,114,182,.22), transparent 60%), radial-gradient(90% 50% at 0% 100%, rgba(56,189,248,.18), transparent 60%), linear-gradient(165deg, rgba(248,246,255,.94), rgba(221,214,254,.9) 45%, rgba(237,233,254,.94))",
+          background: "radial-gradient(120% 60% at 100% 0%, rgba(244,114,182,.22), transparent 60%), radial-gradient(90% 50% at 0% 100%, rgba(56,189,248,.18), transparent 60%), linear-gradient(165deg, rgba(248,246,255,.86), rgba(221,214,254,.8) 45%, rgba(237,233,254,.86))",
           boxShadow: "0 0 0 1px rgba(167,139,250,.55), 0 0 44px -4px rgba(168,85,247,.9), 0 30px 60px -20px rgba(0,0,0,.6)",
         }}
       >
@@ -61,7 +61,7 @@ export function PainelAcoes({ titulo = "Ações", nome, onClose, children }: {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-display font-extrabold text-[32px] leading-none !text-[#1e1b4b]">{titulo}</h2>
-            <p className="mt-1 text-[17px] font-semibold text-[#3b2f8f] leading-tight line-clamp-2">{nome}</p>
+            <p className="mt-1 text-[17px] font-medium text-[#2e1065] leading-tight line-clamp-2">{nome}</p>
           </div>
           <button
             type="button"
@@ -90,37 +90,21 @@ export function AcaoBotao({ cor, icon: I, compacto, children, className, ...prop
       {...props}
       className={cn(
         "relative w-full flex items-center rounded-full border-2 font-bold overflow-hidden transition-all hover:brightness-110 active:scale-[.98] disabled:opacity-60 disabled:cursor-wait",
-        compacto ? "justify-center gap-1 h-12 px-1.5 text-[13px] sm:text-[14px]" : "gap-3 min-h-[58px] py-1.5 pl-2 pr-2 text-[16px] sm:text-[17px] leading-tight",
+        compacto ? "justify-center gap-1 h-12 px-1 text-[13px] sm:text-[15px] font-semibold" : "gap-4 min-h-[50px] py-1 pl-4 pr-3 text-[16px] sm:text-[18px] font-semibold leading-tight",
         className,
       )}
       style={{
         color: texto,
-        borderColor: "rgba(255,255,255,.7)",
-        background: `linear-gradient(100deg, ${b} 0%, ${a} 42%, ${b} 72%, ${c} 100%)`,
-        boxShadow: `0 0 14px -3px ${brilho}, 0 6px 14px -8px ${brilho}, inset 0 2px 0 rgba(255,255,255,.65), inset 0 -4px 8px rgba(0,0,0,.16)`,
+        borderColor: b,
+        background: `linear-gradient(90deg, ${c} 0%, ${b} 22%, ${a} 52%, ${b} 80%, ${c} 100%)`,
+        boxShadow: `0 0 16px -2px ${brilho}, 0 0 4px ${brilho}, inset 0 2px 0 rgba(255,255,255,.7), inset 0 -4px 8px rgba(0,0,0,.18)`,
       }}
     >
       <span aria-hidden className="pointer-events-none absolute inset-x-3 top-0 h-1/2 rounded-b-[40%] bg-gradient-to-b from-white/50 to-white/0" />
       <span aria-hidden className="pointer-events-none absolute -right-6 top-0 h-full w-28 skew-x-[-28deg] bg-white/15" />
-      {compacto ? (
-        <I className="relative shrink-0 w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.5} style={{ color: icone }} />
-      ) : (
-        <span
-          className="relative shrink-0 w-11 h-11 rounded-full grid place-items-center border-2 border-white/80"
-          style={{
-            background: `radial-gradient(circle at 32% 26%, rgba(255,255,255,.75), ${b} 38%, ${c} 78%)`,
-            boxShadow: `0 0 10px -1px ${brilho}, inset 0 -3px 6px rgba(0,0,0,.3), 0 3px 6px rgba(0,0,0,.25)`,
-          }}
-        >
-          <I className="w-6 h-6 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]" strokeWidth={2.75} />
-        </span>
-      )}
+      <I className={cn("relative shrink-0", compacto ? "w-5 h-5" : "w-8 h-8")} strokeWidth={2.5} style={{ color: icone }} />
       <span className={cn("relative", compacto ? "truncate" : "flex-1 text-left line-clamp-2")}>{children}</span>
-      {!compacto && (
-        <span className="relative shrink-0 w-8 h-8 rounded-full grid place-items-center bg-white/35 border border-white/60">
-          <ChevronRight className="w-5 h-5" strokeWidth={3} />
-        </span>
-      )}
+      {!compacto && <ChevronRight className="relative w-6 h-6 shrink-0" strokeWidth={3} />}
     </button>
   );
 }
