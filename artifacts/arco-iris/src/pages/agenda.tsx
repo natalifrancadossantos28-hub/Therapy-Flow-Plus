@@ -461,20 +461,21 @@ const NEON: Record<string, React.CSSProperties> = {
   },
 };
 
-// Menu do paciente no visual lilás: mesmo conjunto de cores, fundo claro e letra escura.
-const TONS_CLARO: Record<string, [string, string, string]> = {
-  yellow: ["#fefce8", "#facc15", "#854d0e"], green: ["#f0fdf4", "#4ade80", "#166534"],
-  orange: ["#fff7ed", "#fb923c", "#9a3412"], blue: ["#eff6ff", "#60a5fa", "#1e40af"],
-  red: ["#fef2f2", "#f87171", "#991b1b"], fuchsia: ["#fdf4ff", "#e879f9", "#86198f"],
-  cyan: ["#ecfeff", "#22d3ee", "#155e75"], violet: ["#f5f3ff", "#a78bfa", "#5b21b6"],
+// Menu do paciente: botões em degradê vivo, estilo 3D (mesmas ações e cores por tipo).
+const TONS_VIVO: Record<string, [string, string]> = {
+  green: ["#4ade80", "#16a34a"], blue: ["#60a5fa", "#2563eb"], violet: ["#a78bfa", "#7c3aed"],
+  yellow: ["#fcd34d", "#f59e0b"], red: ["#fb7185", "#e11d48"], slate: ["#a5b4fc", "#6366f1"],
+  orange: ["#fdba74", "#f97316"], purple: ["#c084fc", "#9333ea"], fuchsia: ["#a78bfa", "#6d28d9"],
+  cyan: ["#67e8f9", "#0891b2"], pink: ["#f9a8d4", "#ec4899"],
 };
 const NEON_CLARO: Record<string, React.CSSProperties> = Object.fromEntries(
-  Object.entries(NEON).map(([k, v]) => {
-    const [bg, borda, cor] = TONS_CLARO[k] ?? ["#f5f3ff", "#a78bfa", "#5b21b6"];
-    return [k, { ...v, background: `linear-gradient(180deg, #ffffff 0%, ${bg} 55%, ${bg} 100%)`, border: `1px solid ${borda}`, color: cor, textShadow: "none",
-      boxShadow: `0 8px 16px -8px ${borda}, inset 0 1px 0 #ffffff, inset 0 -3px 0 ${borda}40`, borderRadius: "16px", padding: "9px 12px", fontSize: "15px", fontWeight: 700, gap: "12px",
-      ["--c" as string]: borda } as React.CSSProperties];
-  }),
+  Object.entries(TONS_VIVO).map(([k, [c1, c2]]) => [k, {
+    ...NEON.violet, background: `linear-gradient(100deg, ${c2} 0%, ${c1} 55%, ${c2} 100%)`, border: "1px solid rgba(255,255,255,.65)",
+    color: "#ffffff", textShadow: "0 1px 2px rgba(0,0,0,.28)", borderRadius: "9999px", padding: "8px 14px 8px 8px",
+    fontSize: "15px", fontWeight: 700, gap: "12px",
+    boxShadow: `0 10px 18px -10px ${c2}, inset 0 1px 0 rgba(255,255,255,.6), inset 0 -3px 0 rgba(0,0,0,.14)`,
+    ["--c" as string]: "rgba(255,255,255,.28)",
+  } as React.CSSProperties]),
 );
 
 const SPECIALTIES = [
@@ -2390,10 +2391,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       as ações que tiram este profissional do horário. */}
                                   {isGuestMenuOpen && (
                                     <div
-                                      className="menu-paciente absolute z-50 top-full mt-1 left-0 w-[17.5rem] max-w-[86vw] rounded-3xl overflow-hidden"
+                                      className="menu-paciente absolute z-50 top-full mt-1 left-0 w-[19rem] max-w-[88vw] rounded-[2rem] overflow-hidden"
                                       style={{
-                                        background: "#ffffff",
-                                        border: "1px solid #ddd6fe",
+                                        background: "linear-gradient(160deg, rgba(255,255,255,.97), rgba(237,233,254,.96))",
+                                        border: "1px solid rgba(255,255,255,.9)",
                                         backdropFilter: "blur(20px)",
                                         padding: "14px",
                                         display: "flex",
@@ -2411,11 +2412,11 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         <UserX className="w-[18px] h-[18px]" /> Sair deste Multi (daqui em diante)
                                       </button>
                                       <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                      <p className="text-xs text-violet-700 uppercase tracking-wider font-bold px-1 mt-1">Saída</p>
-                                      <button style={NEON_CLARO.red} onClick={() => handleSaida(apt, "Alta")}>
+                                      <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1">Saída</p>
+                                      <button style={NEON_CLARO.green} onClick={() => handleSaida(apt, "Alta")}>
                                         <LogOut className="w-[18px] h-[18px]" /> Dar Alta
                                       </button>
-                                      <button style={NEON_CLARO.red} onClick={() => handleSaida(apt, "Desistência")}>
+                                      <button style={NEON_CLARO.orange} onClick={() => handleSaida(apt, "Desistência")}>
                                         <UserX className="w-[18px] h-[18px]" /> Desistência
                                       </button>
                                     </div>
@@ -2424,10 +2425,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                   {/* Action menu */}
                                   {isMenuOpen && (
                                     <div
-                                      className="menu-paciente absolute z-50 top-full mt-1 left-0 w-[17.5rem] max-w-[86vw] rounded-3xl overflow-hidden"
+                                      className="menu-paciente absolute z-50 top-full mt-1 left-0 w-[19rem] max-w-[88vw] rounded-[2rem] overflow-hidden"
                                       style={{
-                                        background: "#ffffff",
-                                        border: "1px solid #ddd6fe",
+                                        background: "linear-gradient(160deg, rgba(255,255,255,.97), rgba(237,233,254,.96))",
+                                        border: "1px solid rgba(255,255,255,.9)",
                                         backdropFilter: "blur(20px)",
                                         padding: "14px",
                                         display: "flex",
@@ -2436,12 +2437,22 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         boxShadow: "0 24px 48px -16px rgba(76,29,149,.45)",
                                       }}
                                     >
-                                      <p className="text-base text-[#1e1b4b] font-extrabold leading-snug mb-1 px-1">Ações — {apt.patientName || `Agendamento #${apt.id}`}</p>
+                                      <div className="flex items-center gap-3 mb-1">
+                                        <span className="relative shrink-0 rounded-full p-0.5 bg-gradient-to-br from-violet-400 to-violet-700 shadow-[0_8px_18px_-8px_rgba(109,40,217,.8)]">
+                                          <span className="block rounded-full bg-white p-0.5"><PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={48} /></span>
+                                          <span className="absolute -bottom-0.5 -right-0.5 grid place-items-center w-5 h-5 rounded-full bg-violet-600 text-white ring-2 ring-white"><Check className="w-3 h-3" /></span>
+                                        </span>
+                                        <span className="flex-1 min-w-0">
+                                          <span className="block text-2xl font-extrabold text-[#1e1b4b] leading-none">Ações</span>
+                                          <span className="block text-sm font-semibold text-[#3b3561] leading-snug mt-1 break-words">{apt.patientName || `Agendamento #${apt.id}`}</span>
+                                        </span>
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); setActionMenuId(null); }} aria-label="Fechar"
+                                          className="grid place-items-center w-10 h-10 rounded-full bg-white text-[#1e1b4b] shadow-[0_4px_10px_-4px_rgba(91,33,182,.5),inset_0_1px_0_#fff] shrink-0"><X className="w-5 h-5" /></button>
+                                      </div>
                                       {!isGhost && (
-                                        <div className="flex flex-col gap-1 mb-1">
+                                        <div className="docs-lado grid grid-cols-2 gap-2 mb-1">
                                           <DocCopyRow label="CPF" value={docsById.get(apt.patientId)?.cpf} />
                                           <DocCopyRow label="CNS" value={docsById.get(apt.patientId)?.cns} />
-                                          <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
                                         </div>
                                       )}
                                       {isGhost && (
@@ -2465,11 +2476,11 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         </button>
                                       )}
 
-                                      <button style={NEON_CLARO.green} onClick={() => handleAtendimento(apt)}>
+                                      <button style={NEON_CLARO.blue} onClick={() => handleAtendimento(apt)}>
                                         <Activity className="w-[18px] h-[18px]" /> Em Atendimento
                                       </button>
 
-                                      <button style={NEON_CLARO.cyan} onClick={() => { setActionMenuId(null); setAvfEntradaApt(apt); }}
+                                      <button style={NEON_CLARO.violet} onClick={() => { setActionMenuId(null); setAvfEntradaApt(apt); }}
                                         title="Avaliação Funcional (5 perguntas, 1–5) do início do acompanhamento nesta especialidade">
                                         <ClipboardList className="w-[18px] h-[18px]" /> Avaliação de Entrada
                                       </button>
@@ -2485,7 +2496,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                           {!isProfessionalProfile && (
                                             <>
                                               <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                              <button style={NEON_CLARO.red} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
+                                              <button style={NEON_CLARO.slate} onClick={() => handleDesmarcado(apt, selectedProf?.name || "")}>
                                                 <AlertTriangle className="w-[18px] h-[18px]" /> Desmarcar
                                               </button>
                                             </>
@@ -2504,7 +2515,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       <button style={NEON_CLARO.orange} onClick={() => handleStartRemanejar(apt)}>
                                         <RotateCcw className="w-[18px] h-[18px]" /> Remanejar
                                       </button>
-                                      <button style={NEON_CLARO.yellow} onClick={() => handleStartRemarcar(apt)}>
+                                      <button style={NEON_CLARO.purple} onClick={() => handleStartRemarcar(apt)}>
                                         <CalendarIcon className="w-[18px] h-[18px]" /> Remarcar
                                       </button>
                                       <button style={NEON_CLARO.violet} onClick={() => { setActionMenuId(null); abrirAjusteHora(apt.time, apt.date); }}>
@@ -2515,7 +2526,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       {(apt.recurrenceGroupId || isMulti) && isAdmin && (
                                         <>
                                           <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                          <p className="text-xs text-violet-700 uppercase tracking-wider font-bold px-1 mt-1">Periodicidade</p>
+                                          <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1">Periodicidade</p>
                                           <div className="grid grid-cols-3 gap-1">
                                             {(["semanal", "quinzenal", "mensal"] as const).map(freq => {
                                               const isActive = (apt.frequency ?? "semanal") === freq;
@@ -2566,16 +2577,18 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       )}
 
                                       <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                      <p className="text-xs text-violet-700 uppercase tracking-wider font-bold px-1 mt-1">Saída</p>
-                                      <button style={NEON_CLARO.red} onClick={() => handleSaida(apt, "Alta")}>
+                                      <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1">Saída</p>
+                                      <div className="saida-linha grid grid-cols-3 gap-1.5">
+                                      <button style={NEON_CLARO.green} onClick={() => handleSaida(apt, "Alta")}>
                                         <LogOut className="w-[18px] h-[18px]" /> Dar Alta
                                       </button>
-                                      <button style={NEON_CLARO.red} onClick={() => handleSaida(apt, "Desistência")}>
+                                      <button style={NEON_CLARO.orange} onClick={() => handleSaida(apt, "Desistência")}>
                                         <UserX className="w-[18px] h-[18px]" /> Desistência
                                       </button>
-                                      <button style={NEON_CLARO.red} onClick={() => handleSaida(apt, "Óbito")}>
+                                      <button style={NEON_CLARO.pink} onClick={() => handleSaida(apt, "Óbito")}>
                                         <XOctagon className="w-[18px] h-[18px]" /> Óbito
                                       </button>
+                                      </div>
 
                                       <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
                                       <button style={NEON_CLARO.fuchsia} onClick={() => handleEncaminhamento(apt)}>
@@ -2603,7 +2616,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                       {isAdmin && !isProfessionalProfile && (
                                         <>
                                           <div style={{ height: "1px", background: "#ede9fe", margin: "4px 0" }} />
-                                          <p className="text-xs text-violet-700 uppercase tracking-wider font-bold px-1 mt-1">Admin</p>
+                                          <p className="text-base text-[#1e1b4b] font-bold px-1 mt-1">Admin</p>
                                           <button style={NEON_CLARO.red} onClick={() => handleExcluirAdmin(apt)}>
                                             <Trash2 className="w-[18px] h-[18px]" /> Excluir Agendamento
                                           </button>
