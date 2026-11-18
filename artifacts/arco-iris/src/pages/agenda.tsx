@@ -2448,7 +2448,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
                                       <AcaoBotao cor="laranja" icon={RotateCcw} onClick={() => handleStartRemanejar(apt)}>Remanejar</AcaoBotao>
                                       <AcaoBotao cor="roxo" icon={CalendarDays} onClick={() => handleStartRemarcar(apt)}>Remarcar</AcaoBotao>
-                                      <AcaoBotao cor="roxo" icon={Clock} onClick={() => { setActionMenuId(null); abrirAjusteHora(apt.time, apt.date); }}>Trocar horário (mesmo dia)</AcaoBotao>
+                                      {!["desmarcado", "cancelado", "remanejado", "remarcado"].includes((apt.status || "").toLowerCase()) && (
+                                        <AcaoBotao cor="roxo" icon={Clock} onClick={() => { setActionMenuId(null); abrirAjusteHora(apt.time, apt.date); }}>Trocar horário (mesmo dia)</AcaoBotao>
+                                      )}
 
                                       {(apt.recurrenceGroupId || isMulti) && isAdmin && (
                                         <>
@@ -2635,7 +2637,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   const n = aptsAjuste(weekDates[i], ajusteHora.time).length;
                   const sel = ajusteHora.date === weekDates[i];
                   return (
-                    <button key={i} type="button" onClick={() => setAjusteHora({ ...ajusteHora, date: weekDates[i], horas: {} })}
+                    <button key={i} type="button" onClick={() => { if (!sel) setAjusteHora({ ...ajusteHora, date: weekDates[i], horas: {} }); }}
                       className={cn("min-w-[4.6rem] px-2 py-2 rounded-2xl border text-center", sel ? "border-violet-600 bg-gradient-to-br from-violet-500 to-violet-700 text-white" : "border-violet-200 bg-white")}>
                       <span className="block text-base font-bold capitalize">{format(d, "EEE", { locale: ptBR })}</span>
                       <span className="block text-sm">{n} pac.</span>
@@ -2650,9 +2652,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   {lista.map(a => {
                     const h = horaDe(a.id);
                     return (
-                      <li key={a.id} className={cn("flex items-center gap-3 rounded-2xl border p-3", h !== ajusteHora.time ? "border-violet-400 bg-violet-50" : "border-violet-100 bg-white")}>
+                      <li key={a.id} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border p-3", h !== ajusteHora.time ? "border-violet-400 bg-violet-50" : "border-violet-100 bg-white")}>
                         <PatientAvatar url={photoById.get(a.patientId)} name={a.patientName} size={40} />
-                        <span className="flex-1 min-w-0 text-lg font-semibold leading-snug break-words">{a.patientName || `Paciente #${a.patientId}`}</span>
+                        <span className="flex-1 min-w-[8rem] text-lg font-semibold leading-snug break-words">{a.patientName || `Paciente #${a.patientId}`}</span>
                         <input type="time" value={h} min={lim.min} max={lim.max} step={60} aria-label={`Horário de ${a.patientName}`}
                           onChange={e => setHora(a.id, e.target.value)}
                           className={cn("w-[8.5rem] shrink-0 rounded-xl border px-2 py-2 text-xl font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-violet-400", okHora(h) ? "border-violet-200" : "border-rose-400 text-rose-600")} />
