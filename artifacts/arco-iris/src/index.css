@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Caveat:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Caveat:wght@500;600&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -53,45 +53,45 @@
    PREMIUM DARK NEON THEME
    ═══════════════════════════════════════════ */
 :root {
-  /* Graphite Navy Base — #0f172a com hierarquia para card/popover/sidebar */
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
+  /* Roxo-noite neon (azul-marinho + violeta) */
+  --background: 248 55% 7%;
+  --foreground: 250 100% 98%;
 
-  --border: 222 32% 22%;
-  --input: 222 40% 16%;
-  --ring: 183 100% 52%;
+  --border: 255 38% 24%;
+  --input: 252 42% 15%;
+  --ring: 258 90% 70%;
 
-  --card: 222 45% 14%;
-  --card-foreground: 210 40% 98%;
-  --card-border: 222 32% 22%;
+  --card: 250 48% 12%;
+  --card-foreground: 250 100% 98%;
+  --card-border: 255 38% 24%;
 
-  --popover: 222 45% 15%;
-  --popover-foreground: 210 40% 98%;
-  --popover-border: 222 32% 22%;
+  --popover: 250 48% 13%;
+  --popover-foreground: 250 100% 98%;
+  --popover-border: 255 38% 26%;
 
-  --primary: 183 100% 52%;
-  --primary-foreground: 222 47% 11%;
+  --primary: 258 90% 70%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 222 40% 16%;
-  --secondary-foreground: 210 35% 88%;
+  --secondary: 252 42% 17%;
+  --secondary-foreground: 250 90% 92%;
 
-  --muted: 222 40% 14%;
-  --muted-foreground: 220 16% 65%;
+  --muted: 252 40% 14%;
+  --muted-foreground: 250 25% 74%;
 
-  --accent: 200 70% 26%;
-  --accent-foreground: 183 100% 72%;
+  --accent: 258 50% 26%;
+  --accent-foreground: 258 100% 86%;
 
-  --destructive: 340 100% 60%;
+  --destructive: 345 92% 62%;
   --destructive-foreground: 0 0% 100%;
 
-  --sidebar: 222 47% 9%;
-  --sidebar-foreground: 210 40% 96%;
-  --sidebar-border: 222 32% 20%;
-  --sidebar-primary: 183 100% 52%;
-  --sidebar-primary-foreground: 222 55% 4%;
-  --sidebar-accent: 222 40% 10%;
-  --sidebar-accent-foreground: 183 100% 62%;
-  --sidebar-ring: 183 100% 52%;
+  --sidebar: 248 55% 8%;
+  --sidebar-foreground: 250 100% 96%;
+  --sidebar-border: 255 38% 20%;
+  --sidebar-primary: 258 90% 70%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 252 42% 12%;
+  --sidebar-accent-foreground: 258 100% 82%;
+  --sidebar-ring: 258 90% 70%;
 
   --radius: 0.75rem;
 
@@ -154,9 +154,9 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
     background-image:
-      radial-gradient(ellipse 60% 40% at 80% 0%, rgba(0, 240, 255, 0.05) 0%, transparent 60%),
-      radial-gradient(ellipse 40% 30% at 0% 100%, rgba(0, 255, 136, 0.035) 0%, transparent 60%),
-      radial-gradient(ellipse 80% 60% at 50% 50%, rgba(15, 23, 42, 0.6) 0%, transparent 100%);
+      radial-gradient(ellipse 70% 45% at 85% 0%, rgba(124, 58, 237, 0.28) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 0% 35%, rgba(37, 99, 235, 0.16) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 50% at 50% 100%, rgba(91, 33, 182, 0.22) 0%, transparent 70%);
     background-attachment: fixed;
   }
   :root.light body {
@@ -173,14 +173,14 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: hsl(222 50% 7%);
+    background: hsl(248 55% 7%);
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(222 35% 20%);
+    background: hsl(255 38% 24%);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(183 100% 30%);
+    background: hsl(258 80% 55%);
   }
   :root.light ::-webkit-scrollbar-track { background: hsl(220 22% 92%); }
   :root.light ::-webkit-scrollbar-thumb { background: hsl(220 14% 70%); }
@@ -351,19 +351,19 @@
   transition: all 0.25s ease;
 }
 .btn-neon:hover:not(:disabled) {
-  box-shadow: 0 0 16px rgba(0, 240, 255, 0.45), 0 0 32px rgba(0, 240, 255, 0.15);
-  border-color: rgba(0, 240, 255, 0.9) !important;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.45), 0 0 32px rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.9) !important;
 }
 .btn-neon-primary:hover:not(:disabled) {
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.5), 0 0 40px rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.5), 0 0 40px rgba(139, 92, 246, 0.2);
 }
 
 /* ═══════════════════════════════════════════
    NEON CARD HOVER GLOW
    ═══════════════════════════════════════════ */
 .card-neon:hover {
-  box-shadow: 0 0 30px rgba(0, 240, 255, 0.07), 0 4px 24px rgba(0, 0, 0, 0.4);
-  border-color: rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.07), 0 4px 24px rgba(0, 0, 0, 0.4);
+  border-color: rgba(139, 92, 246, 0.2);
   transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
@@ -371,10 +371,10 @@
    SIDEBAR ACTIVE NEON GLOW
    ═══════════════════════════════════════════ */
 .nav-active-neon {
-  background: linear-gradient(90deg, #0ea5e9, #2563eb);
+  background: linear-gradient(90deg, rgba(124, 58, 237, .55), rgba(79, 70, 229, .35));
   color: #ffffff;
-  box-shadow: 0 0 18px -4px rgba(14, 165, 233, 0.8);
-  border: 1px solid rgba(125, 211, 252, 0.45);
+  box-shadow: 0 0 22px -6px rgba(139, 92, 246, 0.9), inset 0 1px 0 rgba(255,255,255,.12);
+  border: 1px solid rgba(167, 139, 250, 0.55);
 }
 
 /* ═══════════════════════════════════════════
@@ -407,7 +407,7 @@
 /* Portal: cartões de acesso com borda neon (cor via --c) */
 .portal-access-card {
   border: 2px solid var(--c);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 22%, rgba(6, 14, 40, 0.82)), rgba(6, 14, 40, 0.80));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 18%, rgba(30, 20, 80, 0.9)), rgba(16, 11, 44, 0.94));
   backdrop-filter: blur(6px);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent),
@@ -478,7 +478,7 @@
 
 /* ═══════════════════════════════════════════
    AGENDA LILÁS (agenda da recepção e do profissional)
-   Só visual: dentro de .agenda-neon as cores ficam claras/lilás em qualquer tema.
+   Modo claro: lilás/branco. Modo escuro: mesma cara em roxo-noite (bloco abaixo).
    ═══════════════════════════════════════════ */
 .agenda-neon, :root.light .agenda-neon {
   --background: 255 70% 97%;
@@ -548,29 +548,146 @@
 @keyframes neon-lado-d { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
 .neon-lado-e { animation: neon-lado-e .28s ease-out; }
 .neon-lado-d { animation: neon-lado-d .28s ease-out; }
-/* Cores de texto escurecidas para ler bem no fundo claro, mesmo com o sistema no tema escuro. */
-.agenda-neon .text-cyan-400, .agenda-neon .text-cyan-300 { color: #0e7490; }
-.agenda-neon .text-sky-400, .agenda-neon .text-sky-300 { color: #0369a1; }
-.agenda-neon .text-blue-400, .agenda-neon .text-blue-300 { color: #1d4ed8; }
-.agenda-neon .text-teal-400, .agenda-neon .text-teal-300 { color: #0f766e; }
-.agenda-neon .text-emerald-400, .agenda-neon .text-emerald-300 { color: #047857; }
-.agenda-neon .text-green-400, .agenda-neon .text-green-300 { color: #15803d; }
-.agenda-neon .text-yellow-400, .agenda-neon .text-yellow-300 { color: #a16207; }
-.agenda-neon .text-amber-400, .agenda-neon .text-amber-300 { color: #b45309; }
-.agenda-neon .text-orange-400, .agenda-neon .text-orange-300 { color: #c2410c; }
-.agenda-neon .text-red-400, .agenda-neon .text-red-300 { color: #b91c1c; }
-.agenda-neon .text-rose-400, .agenda-neon .text-rose-300 { color: #be123c; }
-.agenda-neon .text-pink-400, .agenda-neon .text-pink-300 { color: #be185d; }
-.agenda-neon .text-fuchsia-400, .agenda-neon .text-fuchsia-300 { color: #a21caf; }
-.agenda-neon .text-purple-400, .agenda-neon .text-purple-300 { color: #7e22ce; }
-.agenda-neon .text-violet-400, .agenda-neon .text-violet-300 { color: #6d28d9; }
+/* Cores de texto escurecidas para ler bem no fundo claro (modo claro). */
+:root.light .agenda-neon .text-cyan-400, :root.light .agenda-neon .text-cyan-300 { color: #0e7490; }
+:root.light .agenda-neon .text-sky-400, :root.light .agenda-neon .text-sky-300 { color: #0369a1; }
+:root.light .agenda-neon .text-blue-400, :root.light .agenda-neon .text-blue-300 { color: #1d4ed8; }
+:root.light .agenda-neon .text-teal-400, :root.light .agenda-neon .text-teal-300 { color: #0f766e; }
+:root.light .agenda-neon .text-emerald-400, :root.light .agenda-neon .text-emerald-300 { color: #047857; }
+:root.light .agenda-neon .text-green-400, :root.light .agenda-neon .text-green-300 { color: #15803d; }
+:root.light .agenda-neon .text-yellow-400, :root.light .agenda-neon .text-yellow-300 { color: #a16207; }
+:root.light .agenda-neon .text-amber-400, :root.light .agenda-neon .text-amber-300 { color: #b45309; }
+:root.light .agenda-neon .text-orange-400, :root.light .agenda-neon .text-orange-300 { color: #c2410c; }
+:root.light .agenda-neon .text-red-400, :root.light .agenda-neon .text-red-300 { color: #b91c1c; }
+:root.light .agenda-neon .text-rose-400, :root.light .agenda-neon .text-rose-300 { color: #be123c; }
+:root.light .agenda-neon .text-pink-400, :root.light .agenda-neon .text-pink-300 { color: #be185d; }
+:root.light .agenda-neon .text-fuchsia-400, :root.light .agenda-neon .text-fuchsia-300 { color: #a21caf; }
+:root.light .agenda-neon .text-purple-400, :root.light .agenda-neon .text-purple-300 { color: #7e22ce; }
+:root.light .agenda-neon .text-violet-400, :root.light .agenda-neon .text-violet-300 { color: #6d28d9; }
 .agenda-neon .text-foreground\/40 { color: hsl(var(--foreground) / 0.62); }
 .agenda-neon .text-foreground\/50 { color: hsl(var(--foreground) / 0.68); }
 .agenda-neon .text-foreground\/60 { color: hsl(var(--foreground) / 0.74); }
 .agenda-neon .text-foreground\/70 { color: hsl(var(--foreground) / 0.82); }
-/* Menu do paciente (lilás): CPF/CNS legíveis no fundo branco */
-.menu-paciente button[title*="CPF"], .menu-paciente button[title*="CNS"] { background: #faf8ff !important; border: 1px solid #ede9fe !important; padding: 8px 10px !important; border-radius: 12px !important; }
-.menu-paciente .text-white\/40 { color: #6d28d9 !important; }
-.menu-paciente .text-white { color: #1e1b4b !important; }
-.menu-paciente .text-white\/30 { color: #6b6890 !important; }
-.menu-paciente button:hover { filter: brightness(.97); }
+
+/* Agenda: letra moderna e tamanhos mínimos maiores (lê bem no celular). */
+.agenda-neon { font-family: 'Plus Jakarta Sans', 'DM Sans', sans-serif; }
+.agenda-neon .font-display { font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif; }
+.agenda-neon .text-\[8px\], .agenda-neon .text-\[9px\], .agenda-neon .agenda-grade td .text-\[9px\] { font-size: 12px; }
+.agenda-neon .text-\[10px\] { font-size: 12.5px; }
+.agenda-neon .text-\[11px\] { font-size: 13px; }
+.agenda-neon .text-\[13px\] { font-size: 15px; }
+.agenda-neon .text-xs, .agenda-neon .agenda-grade th .text-xs, .agenda-neon .agenda-grade td .text-xs { font-size: .875rem; }
+.agenda-neon .agenda-grade td .cartao-paciente .text-\[13px\] { font-size: 15px; line-height: 1.25; }
+
+/* ═══════════════════════════════════════════
+   AGENDA — MODO ESCURO (roxo-noite). Vale quando o botão de tema está no escuro.
+   ═══════════════════════════════════════════ */
+:root:not(.light) .agenda-neon {
+  --background: 252 45% 9%;
+  --foreground: 250 100% 97%;
+  --border: 255 35% 28%;
+  --input: 254 40% 18%;
+  --ring: 258 90% 72%;
+  --card: 253 42% 15%;
+  --card-foreground: 250 100% 97%;
+  --card-border: 255 35% 28%;
+  --popover: 253 42% 16%;
+  --popover-foreground: 250 100% 97%;
+  --popover-border: 255 35% 30%;
+  --primary: 258 90% 72%;
+  --primary-foreground: 252 45% 9%;
+  --secondary: 254 40% 19%;
+  --secondary-foreground: 250 90% 92%;
+  --muted: 254 38% 17%;
+  --muted-foreground: 252 30% 78%;
+  --accent: 258 45% 26%;
+  --accent-foreground: 258 100% 86%;
+  --destructive: 350 90% 62%;
+  color: hsl(var(--foreground));
+  color-scheme: dark;
+}
+:root:not(.light) .agenda-neon-fundo {
+  background:
+    radial-gradient(900px 500px at 100% 0%, rgba(124,58,237,.30), transparent 60%),
+    radial-gradient(800px 500px at 0% 100%, rgba(76,29,149,.40), transparent 60%),
+    linear-gradient(160deg, #0d0a22 0%, #130e30 50%, #1a1240 100%);
+}
+:root:not(.light) .agenda-neon .lilas-card,
+:root:not(.light) .agenda-neon .bg-card, :root:not(.light) .has-app-bg .agenda-neon .bg-card {
+  background: rgba(27, 21, 58, .92);
+  border-color: rgba(139, 92, 246, .32);
+  box-shadow: 0 12px 32px -14px rgba(0, 0, 0, .6);
+}
+:root:not(.light) .agenda-neon .bg-card .bg-card { box-shadow: none; }
+:root:not(.light) .agenda-neon .bg-white,
+:root:not(.light) .agenda-neon .bg-white\/80,
+:root:not(.light) .agenda-neon .bg-white\/90,
+:root:not(.light) .agenda-neon .bg-white\/95,
+:root:not(.light) .agenda-neon .hover\:bg-white:hover { background-color: #221a4a; }
+:root:not(.light) .agenda-neon .bg-violet-50,
+:root:not(.light) .agenda-neon .bg-violet-50\/80,
+:root:not(.light) .agenda-neon .hover\:bg-violet-50:hover,
+:root:not(.light) .agenda-neon .bg-slate-50,
+:root:not(.light) .agenda-neon .bg-slate-50\/50 { background-color: rgba(139, 92, 246, .14); }
+:root:not(.light) .agenda-neon .bg-violet-100,
+:root:not(.light) .agenda-neon .hover\:bg-violet-100:hover { background-color: rgba(139, 92, 246, .24); }
+:root:not(.light) .agenda-neon .border-violet-100,
+:root:not(.light) .agenda-neon .border-violet-200 { border-color: rgba(139, 92, 246, .35); }
+:root:not(.light) .agenda-neon .text-\[\#1e1b4b\],
+:root:not(.light) .agenda-neon .text-slate-800 { color: #f5f3ff; }
+:root:not(.light) .agenda-neon .text-\[\#3b3561\],
+:root:not(.light) .agenda-neon .text-slate-600 { color: #d6cff5; }
+:root:not(.light) .agenda-neon .text-violet-600,
+:root:not(.light) .agenda-neon .text-violet-700,
+:root:not(.light) .agenda-neon .text-violet-700\/90,
+:root:not(.light) .agenda-neon .text-violet-800,
+:root:not(.light) .agenda-neon .text-violet-900 { color: #c4b5fd; }
+:root:not(.light) .agenda-neon .text-violet-700\/70,
+:root:not(.light) .agenda-neon .text-violet-900\/60,
+:root:not(.light) .agenda-neon .text-violet-500 { color: #a99be6; }
+:root:not(.light) .agenda-neon .bg-violet-300 { background-color: #5b4a9e; }
+:root:not(.light) .agenda-neon .neon-txt { color: #c4b5fd; }
+:root:not(.light) .agenda-neon .neon-mic { box-shadow: 0 0 0 7px rgba(27,21,58,.95), 0 10px 30px rgba(124,58,237,.6); }
+:root:not(.light) .agenda-neon .agenda-grade thead { background: #1d1642; }
+:root:not(.light) .agenda-neon .agenda-grade .sticky { background: #18123a; }
+:root:not(.light) .agenda-neon .agenda-grade td.sticky { color: #ddd6fe; }
+:root:not(.light) .agenda-neon .agenda-grade tbody tr:hover { background: rgba(167, 139, 250, .06); }
+:root:not(.light) .agenda-neon .agenda-grade td .cartao-paciente { background-color: #241c4f !important; box-shadow: 0 4px 14px -6px rgba(0,0,0,.6) !important; }
+:root:not(.light) .agenda-neon .agenda-grade td .cel-cartao .cartao-paciente.bg-card { border-color: rgba(139, 92, 246, .35); }
+
+:root:not(.light) .agenda-neon .bg-white\/60 { background-color: rgba(34, 26, 74, .7); }
+:root:not(.light) .agenda-neon .bg-emerald-50\/80 { background-color: rgba(16, 185, 129, .16); }
+:root:not(.light) .agenda-neon .bg-amber-50\/80 { background-color: rgba(245, 158, 11, .16); }
+:root:not(.light) .agenda-neon .bg-orange-50\/70 { background-color: rgba(249, 115, 22, .16); }
+
+/* Cartões neon (modo escuro) — vidro roxo com borda iluminada */
+:root:not(.light) .ui-card {
+  background: linear-gradient(160deg, rgba(36, 26, 84, .82), rgba(17, 13, 44, .88));
+  border-color: rgba(139, 92, 246, .38);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, .08) inset, 0 14px 38px -18px rgba(76, 29, 149, .9), 0 0 26px -12px rgba(139, 92, 246, .55);
+}
+
+/* Topo, menu e menu de baixo no visual roxo-noite */
+.topo-neon { background: linear-gradient(180deg, rgba(12, 9, 36, .96), rgba(12, 9, 36, .82)); border-bottom: 1px solid rgba(139, 92, 246, .22); backdrop-filter: blur(12px); }
+.menu-neon { background: linear-gradient(180deg, rgba(16, 12, 44, .97), rgba(10, 8, 30, .98)); backdrop-filter: blur(14px); }
+.menu-inferior-neon { background: linear-gradient(180deg, rgba(18, 13, 48, .92), rgba(9, 7, 26, .98)); border-top: 1px solid rgba(139, 92, 246, .3); box-shadow: 0 -10px 30px -12px rgba(91, 33, 182, .7); backdrop-filter: blur(14px); }
+:root.light .topo-neon, :root.light .menu-neon, :root.light .menu-inferior-neon { background: rgba(255, 255, 255, .94); border-color: hsl(var(--border)); box-shadow: none; }
+:root.light .topo-neon .text-white, :root.light .menu-neon .text-white { color: hsl(var(--foreground)); }
+:root:not(.light) select:not([data-nativo]) { color-scheme: dark; }
+
+/* Início neon */
+.neon-tile {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 18%, rgba(20, 14, 52, .9)), rgba(14, 10, 38, .92));
+  border: 1.5px solid color-mix(in srgb, var(--c) 60%, transparent);
+  box-shadow: 0 0 18px -6px var(--c), inset 0 1px 0 rgba(255, 255, 255, .08);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.neon-tile:hover { transform: translateY(-2px); box-shadow: 0 0 26px -4px var(--c), inset 0 1px 0 rgba(255, 255, 255, .1); }
+.neon-painel {
+  border-radius: 26px;
+  background: linear-gradient(160deg, rgba(40, 28, 96, .78), rgba(16, 12, 42, .9));
+  border: 1.5px solid color-mix(in srgb, var(--c) 55%, transparent);
+  box-shadow: 0 0 30px -12px var(--c), inset 0 1px 0 rgba(255, 255, 255, .07);
+  backdrop-filter: blur(10px);
+}
+:root.light .neon-tile, :root.light .neon-painel { background: linear-gradient(160deg, #2a1d63, #160f3d); }

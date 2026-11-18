@@ -1314,8 +1314,10 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
     }
     setDica("Não entendi. Fale de novo, por exemplo: “festa de aniversário da Ana sábado às 8 da noite”.");
   };
-  // No app Android (WebView) o reconhecimento do navegador não funciona: grava e manda para a IA.
-  const usarGravador = gravadorSuportado() && (ehIOS() || ehAppNativo() || !Rec);
+  // Reconhecimento do próprio celular (rápido, sem IA de áudio). No app Android (WebView) ele não existe,
+  // e no iPhone pode estar desligado: nesses casos grava e manda o áudio para a IA.
+  const [recFalhou, setRecFalhou] = useState(false);
+  const usarGravador = gravadorSuportado() && (ehAppNativo() || !Rec || recFalhou);
   const mandarAudio = async (blob: Blob) => {
     if (blob.size < 1500) { setDica("Não ouvi nada. Toque e fale de novo."); return; }
     setPensando(true); setDica("");
@@ -1354,6 +1356,11 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
       };
       r.onerror = (e) => {
         continuarEscuta.current=false;
+        if ((e.error === "service-not-allowed" || e.error === "not-allowed" || e.error === "network") && gravadorSuportado() && !recFalhou) {
+          setRecFalhou(true); rec.current = null; setOuvindo(false);
+          window.setTimeout(() => void ouvirGravando(), 50);
+          return;
+        }
         setDica(e.error === "not-allowed" || e.error === "service-not-allowed"
           ? "O microfone está bloqueado. Libere o microfone para a agenda nas configurações, ou use o microfone do teclado."
           : e.error === "no-speech" ? "Não ouvi nada. Toque no microfone para falar, ou use os botões abaixo."
@@ -1367,7 +1374,11 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
         }
       };
       rec.current = r; r.start(); setOuvindo(true);
-    } catch {continuarEscuta.current=false;setOuvindo(false);setDica("Toque no microfone para tentar de novo, ou use os botões abaixo.");}
+    } catch {
+      continuarEscuta.current=false;setOuvindo(false);rec.current=null;
+      if (gravadorSuportado()) { setRecFalhou(true); void ouvirGravando(); return; }
+      setDica("Toque no microfone para tentar de novo, ou use os botões abaixo.");
+    }
   };
   iniciar.current=ouvir;
   const input = res && novoCompromisso(res.data ?? ISO(new Date()), {
