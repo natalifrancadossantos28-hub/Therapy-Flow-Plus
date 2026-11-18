@@ -568,3 +568,9 @@
 .agenda-neon .text-foreground\/50 { color: hsl(var(--foreground) / 0.68); }
 .agenda-neon .text-foreground\/60 { color: hsl(var(--foreground) / 0.74); }
 .agenda-neon .text-foreground\/70 { color: hsl(var(--foreground) / 0.82); }
+/* Menu do paciente (lilás): CPF/CNS legíveis no fundo branco */
+.menu-paciente button[title*="CPF"], .menu-paciente button[title*="CNS"] { background: #faf8ff !important; border: 1px solid #ede9fe !important; padding: 8px 10px !important; border-radius: 12px !important; }
+.menu-paciente .text-white\/40 { color: #6d28d9 !important; }
+.menu-paciente .text-white { color: #1e1b4b !important; }
+.menu-paciente .text-white\/30 { color: #6b6890 !important; }
+.menu-paciente button:hover { filter: brightness(.97); }
