@@ -512,3 +512,29 @@ export async function masterDeleteCompany(id: number): Promise<void> {
   });
   if (error) throw error;
 }
+
+// ── Reconhecimento facial ───────────────────────────────────────────────────
+export async function setEmployeeFace(id: number, descriptor: number[] | null): Promise<void> {
+  const { slug, password } = requireCompanyCredentials();
+  const supabase = requireSupabase();
+  const { error } = await supabase.rpc("set_employee_face", {
+    p_slug: slug, p_password: password, p_id: id, p_descriptor: descriptor,
+  });
+  if (error) throw error;
+}
+
+export async function listEmployeeFaces(): Promise<number[]> {
+  const { slug, password } = requireCompanyCredentials();
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("list_employee_faces", { p_slug: slug, p_password: password });
+  if (error) throw error;
+  return ((data as unknown[]) ?? []).map((x) => Number(typeof x === "object" && x ? Object.values(x)[0] : x));
+}
+
+export async function kioskFaceList(slugOverride?: string): Promise<{ id: number; d: number[] }[]> {
+  const slug = slugOverride ?? requireCompanySlug();
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("kiosk_face_list", { p_slug: slug });
+  if (error) throw error;
+  return (data as { id: number; d: number[] }[] | null) ?? [];
+}
