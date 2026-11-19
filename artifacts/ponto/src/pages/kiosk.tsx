@@ -390,7 +390,7 @@ export default function KioskPage() {
       {/* Header */}
       <div className="absolute top-6 left-0 right-0 flex flex-col items-center z-10">
         <img src="/nfs-logo.png" alt="NFs systems" className="h-20 md:h-24 w-auto mb-2 drop-shadow-xl" />
-        <h1 className="font-display text-3xl md:text-4xl font-bold text-primary tracking-tight text-center">
+        <h1 className="font-display text-3xl md:text-4xl font-extrabold text-white tracking-tight text-center drop-shadow-[0_0_18px_rgba(139,92,246,.7)]">
           {companyLoading ? "Carregando..." : companyName ?? "NFs – Bater Ponto"}
         </h1>
         <p className="text-muted-foreground mt-1 text-base md:text-lg">
