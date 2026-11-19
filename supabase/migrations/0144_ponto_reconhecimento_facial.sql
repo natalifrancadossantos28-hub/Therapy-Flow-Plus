@@ -39,7 +39,8 @@ declare
   v_cid bigint;
 begin
   v_cid := public._verify_company_admin(p_slug, p_password);
-  if p_descriptor is not null and (array_length(p_descriptor, 1) <> 128 or p_photo_hash is null) then
+  if p_descriptor is not null and (array_ndims(p_descriptor) <> 1 or array_length(p_descriptor, 1) <> 128
+      or array_position(p_descriptor, null) is not null or p_photo_hash is null) then
     raise exception 'invalid face descriptor';
   end if;
   update public.ponto_employees
@@ -108,7 +109,10 @@ declare
   v_cid bigint;
   v_id bigint;
 begin
-  if p_descriptor is null or array_length(p_descriptor, 1) <> 128 then return null; end if;
+  if p_descriptor is null or array_ndims(p_descriptor) <> 1 or array_length(p_descriptor, 1) <> 128
+     or array_position(p_descriptor, null) is not null then
+    return null;
+  end if;
   v_cid := public._active_company_id(p_slug);
   if v_cid is null then return null; end if;
   select e.id into v_id
