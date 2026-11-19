@@ -44,6 +44,29 @@ export function useFonteAgenda() {
   };
 }
 
+const FOTOS_SEMANA = ["hero-agenda", "hero-agenda-2", "hero-agenda-3", "hero-agenda-4", "hero-agenda-5", "hero-agenda-6"];
+/** Foto do topo: troca toda segunda-feira (horário de Brasília). */
+function fotoDaSemana(agora: Date) {
+  const dias = Math.floor(Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate()) / 86400000);
+  const semana = Math.floor((dias + 3) / 7);
+  return `${import.meta.env.BASE_URL.replace(/\/$/, "")}/visual/${FOTOS_SEMANA[semana % FOTOS_SEMANA.length]}.webp`;
+}
+
+/** Relógio grande com o horário de Brasília, por cima da foto. */
+function RelogioBrasilia() {
+  const [agora, setAgora] = useState(agoraBR);
+  useEffect(() => { const t = setInterval(() => setAgora(agoraBR()), 1000); return () => clearInterval(t); }, []);
+  const hm = format(agora, "HH:mm");
+  return (
+    <div className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 text-white drop-shadow-[0_4px_14px_rgba(0,0,0,.6)] pointer-events-none select-none">
+      <p className="font-extrabold tabular-nums leading-none tracking-tight text-5xl sm:text-7xl md:text-8xl">
+        {hm}<span className="text-2xl sm:text-4xl md:text-5xl text-white/80">:{format(agora, "ss")}</span>
+      </p>
+      <p className="mt-1 sm:mt-2 text-sm sm:text-lg font-semibold text-violet-200">Horário de Brasília</p>
+    </div>
+  );
+}
+
 const redondo = "grid place-items-center w-11 h-11 rounded-full bg-white/90 border border-violet-200 text-violet-800 font-bold shadow-sm hover:bg-white disabled:opacity-40 transition";
 
 /** Topo: ícone, "Boa tarde, Nome!", frase do dia, data e botões A+ / A-. */
@@ -56,7 +79,10 @@ export function NeonCabecalho({ nome, pessoaId, subtitulo, fonte, extra }: {
   const primeiro = nome.trim().split(/\s+/)[0] || nome;
   return (
     <header className="lilas-card !rounded-3xl p-3 sm:p-4 flex flex-wrap items-center gap-3 sm:gap-4">
-      <img src={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/visual/hero-agenda.webp`} alt="Terapeuta brincando com criança" width={1024} height={683} className="basis-full w-full h-40 sm:h-56 object-cover object-[70%_40%] rounded-2xl shadow-[0_0_24px_-8px_rgba(139,92,246,.8)]" />
+      <div className="relative basis-full w-full">
+        <img src={fotoDaSemana(agora)} alt="Terapeuta brincando com criança" width={1024} height={683} className="w-full h-40 sm:h-56 object-cover object-[70%_25%] rounded-2xl shadow-[0_0_24px_-8px_rgba(139,92,246,.8)]" />
+        <RelogioBrasilia />
+      </div>
       <img src={ICONE_URL("calendario")} alt="" aria-hidden width={72} height={72} className="w-16 h-16 sm:w-[4.5rem] sm:h-[4.5rem] shrink-0 object-contain drop-shadow-[0_8px_12px_rgba(91,33,182,.25)]" />
       <div className="min-w-[14rem] flex-1">
         <h1 className="text-[1.7rem] sm:text-4xl font-extrabold leading-tight tracking-tight text-[#1e1b4b]">
