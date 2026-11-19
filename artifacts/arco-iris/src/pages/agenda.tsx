@@ -1591,7 +1591,22 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     setRemanejDone(false);
   };
 
+  useEffect(() => {
+    const recarregar = () => { listAusencias().then(setAusencias).catch(console.error); };
+    window.addEventListener("ausencias-mudaram", recarregar);
+    return () => window.removeEventListener("ausencias-mudaram", recarregar);
+  }, []);
+  // Feriado ou ausência do profissional: não deixa marcar nada novo no dia.
+  const diaBloqueado = (date: string): boolean => {
+    const b = dayBlock(date);
+    if (b) toast({ title: "Dia bloqueado", description: `${b}. Não é possível agendar neste dia.`, variant: "destructive" });
+    return !!b;
+  };
+  const abrirBooking = (slot: { date: string; time: string }) => {
+    if (!diaBloqueado(slot.date)) setBookingSlot(slot);
+  };
   const handlePickRemanejSlot = (newDate: string, newTime: string) => {
+    if (diaBloqueado(newDate)) return;
     if (!remanejFlow) return;
     setRemanejFlow({ ...remanejFlow, step: "carla", newDate, newTime });
   };
@@ -1994,7 +2009,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     if (!acao) return;
     if (acao === "agendar") {
       const date = cmd.data && weekDates.includes(cmd.data) ? cmd.data : diaNovo;
-      if (cmd.hora && TIME_SLOTS.includes(cmd.hora)) setBookingSlot({ date, time: cmd.hora });
+      if (cmd.hora && TIME_SLOTS.includes(cmd.hora)) abrirBooking({ date, time: cmd.hora });
       else setNovoAberto({ date, time: TIME_SLOTS.find(t => t !== "12:10" || isPaula) ?? TIME_SLOTS[0] });
       return;
     }
@@ -2169,7 +2184,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                             <option key={t} value={t}>{t}{getApts(novoAberto.date, t).length ? ` · ${getApts(novoAberto.date, t).length} paciente(s)` : " · livre"}</option>
                           ))}
                         </Select>
-                        <Button className="w-full" onClick={() => { setBookingSlot(novoAberto); setNovoAberto(null); }}>Continuar</Button>
+                        <Button className="w-full" onClick={() => { abrirBooking(novoAberto); setNovoAberto(null); }}>Continuar</Button>
                       </div>
                     </>
                   )}
@@ -2524,7 +2539,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                   {/* Admin pode empilhar outro paciente no mesmo slot (atendimento em grupo). */}
                                   {isAdmin && (
                                     <button
-                                      onClick={() => setBookingSlot({ date, time })}
+                                      onClick={() => abrirBooking({ date, time })}
                                       className="w-full text-[10px] font-semibold py-1.5 rounded-lg border border-dashed border-cyan-500/30 text-cyan-400/70 hover:text-cyan-300 hover:border-cyan-400/60 hover:bg-cyan-500/5 transition-colors"
                                     >
                                       + Adicionar paciente
@@ -2533,7 +2548,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                 </div>
                               ) : (
                                 <button
-                                  onClick={() => setBookingSlot({ date, time })}
+                                  onClick={() => abrirBooking({ date, time })}
                                   className="w-full h-full min-h-[58px] flex flex-col items-center justify-center gap-0.5 border-2 border-dashed border-violet-200 rounded-2xl text-violet-500 bg-white/60 hover:border-violet-400 hover:text-violet-700 hover:bg-violet-50 transition-colors text-xs font-semibold cursor-pointer"
                                 >
                                   <span className="grid place-items-center w-6 h-6 rounded-full bg-violet-100 text-violet-700"><Plus className="w-4 h-4" /></span>

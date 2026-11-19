@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { SuporteBotao } from "@/components/SuporteBotao";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Home, CalendarCheck, User, Plus, Mic } from "lucide-react";
+import { Home, CalendarCheck, User, Plus, Mic, Plane } from "lucide-react";
+import { MinhasAusencias, lembrarPinProfissional } from "@/components/MinhasAusencias";
 import { NeonCabecalho, useFonteAgenda, NeonMes, NeonTelas, NeonMenuInferior, glass, neon, CORES_NEON } from "@/components/AgendaNeon";
 import { Saudacao } from "@/components/Saudacao";
 import { Calendar as CalendarIcon, Lock, LogOut } from "lucide-react";
@@ -75,7 +76,7 @@ export default function AgendaProfissionais() {
     setPinLoading(true); setPinError("");
     try {
       const prof = await verifyProfessionalPin(parseInt(selectedProfId), pinInput);
-      if (prof) { setPinVerified(true); }
+      if (prof) { lembrarPinProfissional(parseInt(selectedProfId), pinInput); setPinVerified(true); }
       else { setPinError("PIN incorreto"); setPinInput(""); }
     } catch { setPinError("Erro ao verificar PIN."); }
     finally { setPinLoading(false); }
@@ -231,8 +232,8 @@ export default function AgendaProfissionais() {
   );
 }
 
-const TELAS = ["Início", "Agenda", "Perfil"];
-const MENU_IDS = ["inicio", "agenda", "perfil"];
+const TELAS = ["Início", "Agenda", "Ausências", "Perfil"];
+const MENU_IDS = ["inicio", "agenda", "ausencias", "perfil"];
 const abrirVoz = () => setTimeout(() => window.dispatchEvent(new Event("agenda-voz-abrir")), 50);
 const INATIVOS = new Set(["desmarcado", "cancelado", "remanejado", "remarcado", "alta", "desistência", "desistencia", "óbito", "obito"]);
 const STATUS_TXT: Record<string, string> = {
@@ -333,6 +334,9 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
     </div>
   );
 
+  const ausencias = prof && !isAdminViewing ? <MinhasAusencias professionalId={prof.id} /> : (
+    <div className="agenda-neon"><div className={glass} style={neon("#a855f7")}><p className="text-lg text-[#1e1b4b]">{isAdminViewing ? "As ausências de todos os profissionais ficam em Feriados & Ausências, no painel." : "Escolha o profissional na tela Agenda."}</p></div></div>
+  );
   const perfil = (
     <div className="agenda-neon space-y-4">
       <div className={`${glass} flex items-center gap-4`} style={neon("#a855f7")}>
@@ -363,7 +367,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
     <div className={`min-h-screen text-foreground ${bgUrl ? "has-app-bg" : "agenda-neon-fundo"}`} style={appBackgroundStyle(bgUrl)}>
       <div className="max-w-[1500px] mx-auto px-3 sm:px-5 pt-5 pb-36">
         <NeonTelas titulos={TELAS} pagina={pagina} setPagina={ir}>
-          {[inicio, agenda, perfil]}
+          {[inicio, agenda, ausencias, perfil]}
         </NeonTelas>
       </div>
       <SuporteBotao className="bottom-28" profissional={isAdminViewing || !prof ? null : { id: prof.id, name: prof.name }} />
@@ -374,6 +378,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
           { id: "inicio", label: "Início", icon: <Home size={21} /> },
           { id: "agenda", label: "Agenda", icon: <CalendarCheck size={21} /> },
           { id: "falar", label: "Falar", icon: <Mic size={30} />, destaque: true },
+          { id: "ausencias", label: "Ausências", icon: <Plane size={21} /> },
           { id: "perfil", label: "Perfil", icon: <User size={21} /> },
         ]}
       />

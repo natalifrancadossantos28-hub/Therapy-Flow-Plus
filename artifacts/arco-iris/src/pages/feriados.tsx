@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { MotionCard, Button, Input, Label, Select } from "@/components/ui-custom";
-import { CalendarOff, Plus, Trash2, Plane, Sparkles } from "lucide-react";
+import { CalendarOff, Plus, Trash2, Plane, Sparkles, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   listFeriados,
@@ -10,6 +10,7 @@ import {
   listAusencias,
   addAusencia,
   deleteAusencia,
+  updateAusencia,
   listProfessionals,
   type Feriado,
   type Ausencia,
@@ -116,6 +117,7 @@ export default function FeriadosPage() {
   const [ausFim, setAusFim] = useState("");
   const [ausMotivo, setAusMotivo] = useState("");
   const [savingAus, setSavingAus] = useState(false);
+  const [editAusId, setEditAusId] = useState<number | null>(null);
 
   const addAusenciaHandler = async () => {
     if (!ausProf) {
@@ -128,7 +130,9 @@ export default function FeriadosPage() {
     }
     setSavingAus(true);
     try {
-      await addAusencia(parseInt(ausProf), ausIni, ausFim || ausIni, ausMotivo.trim());
+      if (editAusId) await updateAusencia(editAusId, ausIni, ausFim || ausIni, ausMotivo.trim());
+      else await addAusencia(parseInt(ausProf), ausIni, ausFim || ausIni, ausMotivo.trim());
+      setEditAusId(null);
       setAusIni("");
       setAusFim("");
       setAusMotivo("");
@@ -237,7 +241,7 @@ export default function FeriadosPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <div className="lg:col-span-2">
             <Label>Profissional</Label>
-            <Select value={ausProf} onChange={(e) => setAusProf(e.target.value)}>
+            <Select value={ausProf} disabled={!!editAusId} onChange={(e) => setAusProf(e.target.value)}>
               <option value="">Selecione…</option>
               {professionals.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -256,8 +260,11 @@ export default function FeriadosPage() {
             <Input type="date" value={ausFim} onChange={(e) => setAusFim(e.target.value)} />
           </div>
           <Button onClick={addAusenciaHandler} disabled={savingAus}>
-            <Plus className="w-4 h-4 mr-1" /> Adicionar
+            {editAusId ? <><Pencil className="w-4 h-4 mr-1" /> Salvar</> : <><Plus className="w-4 h-4 mr-1" /> Adicionar</>}
           </Button>
+          {editAusId && (
+            <Button variant="outline" onClick={() => { setEditAusId(null); setAusProf(""); setAusIni(""); setAusFim(""); setAusMotivo(""); }}>Cancelar</Button>
+          )}
         </div>
         <div className="mt-3">
           <Label>Motivo (opcional)</Label>
@@ -290,7 +297,17 @@ export default function FeriadosPage() {
                       {a.dataFim !== a.dataInicio ? ` a ${fmt(a.dataFim)}` : ""}
                       {a.motivo ? ` · ${a.motivo}` : ""}
                     </span>
+                    {a.criadoPor === "profissional" && (
+                      <span className="ml-2 inline-block rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">Registrada pelo profissional</span>
+                    )}
                   </div>
+                  <button
+                    className="p-2 rounded-lg text-primary hover:bg-primary/10 transition-colors"
+                    title="Editar ausência"
+                    onClick={() => { setEditAusId(a.id); setAusProf(String(a.professionalId)); setAusIni(a.dataInicio); setAusFim(a.dataFim); setAusMotivo(a.motivo); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                   <button
                     className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
                     title="Remover ausência"
