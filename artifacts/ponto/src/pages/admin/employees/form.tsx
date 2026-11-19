@@ -28,6 +28,8 @@ import {
   listCameras,
   pickPreferredCamera,
 } from "@/lib/camera";
+import { assinaturaDaFoto, hashDaFoto } from "@/lib/face";
+import { setEmployeeFace } from "@/lib/ponto-rpc";
 
 const compressImage = (dataUrl: string, maxPx = 500, quality = 0.72): Promise<string> =>
   new Promise((resolve) => {
@@ -280,16 +282,33 @@ export default function EmployeeForm() {
     reader.readAsDataURL(file);
   };
 
+  const ativarFacial = async (empId: number, foto: string | null) => {
+    try {
+      const d = foto ? await assinaturaDaFoto(foto) : null;
+      await setEmployeeFace(empId, d, foto ? await hashDaFoto(foto) : null);
+      if (foto && !d) toast({ title: "Rosto não encontrado na foto", description: "O ponto pelo rosto não vai funcionar para esta pessoa. Tire outra foto de frente, com boa luz.", variant: "destructive" });
+    } catch {
+      toast({ title: "Ponto pelo rosto não foi ativado", description: "O cadastro foi salvo. Tente de novo pelo botão \"Ativar ponto pelo rosto\" na lista de funcionários.", variant: "destructive" });
+    }
+  };
+
   const onSubmit = (data: FormValues) => {
     const payload = { ...data, schedule: JSON.stringify(schedule) };
+    const fotoMudou = isNew || data.photo !== (employee?.photo ?? null);
+    const concluir = async (empId: number, titulo: string) => {
+      if (fotoMudou) await ativarFacial(empId, data.photo);
+      queryClient.invalidateQueries({ queryKey: getGetPontoEmployeesQueryKey() });
+      toast({ title: titulo });
+      setLocation("/admin/employees");
+    };
     if (isNew) {
       createMutation.mutate({ data: payload as any }, {
-        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetPontoEmployeesQueryKey() }); toast({ title: "Funcionário cadastrado!" }); setLocation("/admin/employees"); },
+        onSuccess: (emp) => concluir(emp.id, "Funcionário cadastrado!"),
         onError: () => toast({ title: "Erro ao cadastrar", variant: "destructive" }),
       });
     } else {
       updateMutation.mutate({ id: employeeId, data: payload as any }, {
-        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetPontoEmployeesQueryKey() }); toast({ title: "Dados atualizados!" }); setLocation("/admin/employees"); },
+        onSuccess: () => concluir(employeeId, "Dados atualizados!"),
         onError: () => toast({ title: "Erro ao atualizar", variant: "destructive" }),
       });
     }

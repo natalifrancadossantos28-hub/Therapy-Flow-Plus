@@ -2,7 +2,11 @@ import { useGetPontoEmployees } from "@/lib/ponto-hooks";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, Badge, Search } from "lucide-react";
+import { Plus, Badge, Search, ScanFace } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { listEmployeeFaces, setEmployeeFace } from "@/lib/ponto-rpc";
+import { assinaturaDaFoto, hashDaFoto } from "@/lib/face";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Badge as UiBadge } from "@/components/ui/badge";
@@ -10,6 +14,35 @@ import { Badge as UiBadge } from "@/components/ui/badge";
 export default function EmployeesList() {
   const { data: employees = [], isLoading } = useGetPontoEmployees();
   const [search, setSearch] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: comFacial, isError: facialIndisponivel } = useQuery({ queryKey: ["ponto-faces"], queryFn: listEmployeeFaces, retry: false });
+  const facialIds = new Set(comFacial ?? []);
+  const [ativando, setAtivando] = useState<string | null>(null);
+
+  const ativarFacialTodos = async () => {
+    const faltam = employees.filter((e) => e.active && e.photo && !facialIds.has(e.id));
+    if (faltam.length === 0) { toast({ title: "Todos com foto já estão com o ponto pelo rosto ativado." }); return; }
+    const semRosto: string[] = [];
+    try {
+      for (let i = 0; i < faltam.length; i++) {
+        setAtivando(`${i + 1} de ${faltam.length}`);
+        const d = await assinaturaDaFoto(faltam[i].photo!);
+        if (!d) { semRosto.push(faltam[i].name); continue; }
+        try { await setEmployeeFace(faltam[i].id, d, await hashDaFoto(faltam[i].photo!)); }
+        catch (e: any) { if (e?.code !== "P0002") throw e; /* foto trocada no meio: o cadastro já cuida */ }
+      }
+      toast({
+        title: "Ponto pelo rosto ativado",
+        description: semRosto.length ? `Sem rosto visível na foto (tire outra foto): ${semRosto.join(", ")}` : undefined,
+      });
+    } catch {
+      toast({ title: "Não foi possível ativar", description: "Verifique a internet e tente de novo.", variant: "destructive" });
+    } finally {
+      setAtivando(null);
+      queryClient.invalidateQueries({ queryKey: ["ponto-faces"] });
+    }
+  };
 
   const filteredEmployees = employees.filter(emp => 
     emp.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -24,12 +57,20 @@ export default function EmployeesList() {
           <h1 className="text-3xl font-display font-bold text-foreground">Funcionários</h1>
           <p className="text-muted-foreground">Gerencie o cadastro da equipe e gere crachás.</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        {!facialIndisponivel && (
+          <Button variant="outline" className="border-primary/40" onClick={ativarFacialTodos} disabled={!!ativando}>
+            <ScanFace className="w-4 h-4 mr-2" />
+            {ativando ? `Ativando ${ativando}…` : "Ativar ponto pelo rosto"}
+          </Button>
+        )}
         <Link href="/admin/employees/new">
           <Button>
             <Plus className="w-4 h-4 mr-2" />
             Novo Funcionário
           </Button>
         </Link>
+        </div>
       </div>
 
       <Card className="glass-card">
@@ -91,6 +132,9 @@ export default function EmployeesList() {
                           <UiBadge variant={emp.active ? "default" : "destructive"} className="bg-opacity-20">
                             {emp.active ? "Ativo" : "Inativo"}
                           </UiBadge>
+                          {facialIds.has(emp.id) && (
+                            <UiBadge variant="outline" className="ml-2 border-primary/40 text-primary"><ScanFace className="w-3 h-3 mr-1" />Rosto</UiBadge>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right space-x-2">
                           <Link href={`/admin/employees/${emp.id}/badge`}>

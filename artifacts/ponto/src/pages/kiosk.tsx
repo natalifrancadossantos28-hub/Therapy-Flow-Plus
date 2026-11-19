@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { Html5Qrcode } from "html5-qrcode";
 import { useGetPontoEmployeeByCpf, useCreatePontoRecord } from "@/lib/ponto-hooks";
-import { getCompanyBySlug } from "@/lib/ponto-rpc";
+import { getCompanyBySlug, kioskFaceCount, kioskFaceMatch, registerPunch, type PontoKioskEmployee } from "@/lib/ponto-rpc";
+import { carregarFaceApi, assinaturaDoVideo } from "@/lib/face";
 import { format } from "date-fns";
-import { CheckCircle2, XCircle, Zap, Building2, LogIn, Coffee, Utensils, LogOut, Camera, RefreshCw } from "lucide-react";
+import { CheckCircle2, XCircle, Zap, Building2, LogIn, Coffee, Utensils, LogOut, Camera, RefreshCw, QrCode, ScanFace } from "lucide-react";
 import {
   type CameraInfo,
   describeCameraError,
@@ -78,6 +79,8 @@ async function initCompanyContext(slug: string): Promise<InitResult> {
 }
 
 type CameraState = "checking" | "blocked" | "missing" | "ready";
+type Modo = "qr" | "rosto";
+const MODO_KEY = "ponto_modo";
 
 export default function KioskPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -97,6 +100,12 @@ export default function KioskPage() {
   const [cameras, setCameras] = useState<CameraInfo[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
   const [permissionAttempt, setPermissionAttempt] = useState(0);
+
+  const [modo, setModoState] = useState<Modo>(() => (localStorage.getItem(MODO_KEY) === "rosto" ? "rosto" : "qr"));
+  const setModo = (m: Modo) => { localStorage.setItem(MODO_KEY, m); setModoState(m); };
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [faceEmployee, setFaceEmployee] = useState<PontoKioskEmployee | null>(null);
+  const [faceStatus, setFaceStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -140,6 +149,7 @@ export default function KioskPage() {
       setScannedCpf(null);
       setErrorMessage(null);
       setPunchResult(null);
+      setFaceEmployee(null);
       processingRef.current = false;
       resumeScanner();
     }, delay);
@@ -238,7 +248,7 @@ export default function KioskPage() {
   // 2) Start / restart the Html5Qrcode scanner against the active camera.
   //    Keep this isolated from permission/listing so switching cameras is cheap.
   useEffect(() => {
-    if (cameraState !== "ready" || !activeCameraId) return;
+    if (modo !== "qr" || cameraState !== "ready" || !activeCameraId) return;
 
     let cancelled = false;
     const container = document.getElementById("reader");
@@ -271,7 +281,87 @@ export default function KioskPage() {
         .catch(() => {})
         .finally(() => { try { s.clear(); } catch (_) {} });
     };
-  }, [cameraState, activeCameraId, handleScan]);
+  }, [modo, cameraState, activeCameraId, handleScan]);
+
+  // 3) Ponto pelo rosto: câmera em <video>, compara com as assinaturas da empresa.
+  useEffect(() => {
+    if (modo !== "rosto" || cameraState !== "ready" || !activeCameraId) return;
+    let cancelado = false;
+    let stream: MediaStream | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let total = 0;
+    let totalEm = 0;
+    let anterior: number | null = null;
+
+    const atualizarLista = async () => {
+      total = await kioskFaceCount();
+      totalEm = Date.now();
+      if (!cancelado) setFaceStatus(total ? null : "Nenhum funcionário com o ponto pelo rosto ativado. Use o crachá ou peça ao administrador para ativar.");
+    };
+
+    const ciclo = async () => {
+      if (cancelado) return;
+      const video = videoRef.current;
+      try {
+        if (Date.now() - totalEm > 5 * 60_000) await atualizarLista();
+        if (!processingRef.current && video && video.readyState >= 2 && total) {
+          const d = await assinaturaDoVideo(video);
+          const id = d ? await kioskFaceMatch(d) : null;
+          const achou = id != null ? { id } : null;
+          if (achou && achou.id === anterior && !processingRef.current && !cancelado) {
+            anterior = null;
+            processingRef.current = true;
+            playBeep();
+            setScanState("detected");
+            try {
+              const r = await registerPunch(achou.id);
+              setFaceEmployee({ id: r.employeeId, companyId: r.companyId, name: r.employeeName, photo: r.employeePhoto, role: "" });
+              setPunchResult({
+                label: r.punchTypeLabel ?? "ponto",
+                time: format(new Date(r.punchedAt), "HH:mm"),
+                index: r.punchIndex ?? 1,
+                type: r.type ?? "ENTRADA_DIARIA",
+              });
+              setScanState("success");
+              scheduleReset();
+            } catch (err: any) {
+              showError(err?.message ?? "Erro ao registrar ponto. Tente novamente.");
+            }
+          } else {
+            anterior = achou?.id ?? null;
+          }
+        }
+      } catch {
+        if (!cancelado) setFaceStatus("Não foi possível carregar o reconhecimento facial. Verifique a internet.");
+      }
+      if (!cancelado) timer = setTimeout(ciclo, 350);
+    };
+
+    (async () => {
+      setFaceStatus("Preparando o reconhecimento facial…");
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: activeCameraId }, width: { ideal: 640 }, height: { ideal: 640 } }, audio: false });
+        if (cancelado) { stream.getTracks().forEach((t) => t.stop()); return; }
+        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => {}); }
+        await carregarFaceApi();
+        await atualizarLista();
+        ciclo();
+      } catch (err) {
+        if (cancelado) return;
+        if (!stream) { setCameraState("blocked"); setCameraError(describeCameraError(err)); }
+        else setFaceStatus("Não foi possível carregar o reconhecimento facial. Verifique a internet.");
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+      if (timer) clearTimeout(timer);
+      stream?.getTracks().forEach((t) => t.stop());
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
+  }, [modo, cameraState, activeCameraId, scheduleReset, showError]);
+
+  const shown = employee ?? faceEmployee;
 
   useEffect(() => {
     return () => {
@@ -304,17 +394,44 @@ export default function KioskPage() {
           {companyLoading ? "Carregando..." : companyName ?? "NFs – Bater Ponto"}
         </h1>
         <p className="text-muted-foreground mt-1 text-base md:text-lg">
-          Aproxime seu crachá da câmera para registrar o ponto
+          {modo === "rosto" ? "Olhe para a câmera para registrar o ponto" : "Aproxime seu crachá da câmera para registrar o ponto"}
         </p>
       </div>
 
       <div className="w-full max-w-4xl mx-auto flex flex-col items-center mt-24">
 
+        {/* Escolha: crachá ou rosto */}
+        <div className={`mb-4 grid grid-cols-2 gap-2 w-full max-w-lg p-1.5 rounded-2xl glass-card ${isIdle ? "" : "invisible"}`} role="group" aria-label="Como bater o ponto">
+          {([["qr", "Crachá (QR)", QrCode], ["rosto", "Rosto", ScanFace]] as const).map(([m, rotulo, Icone]) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setModo(m)}
+              aria-pressed={modo === m}
+              className={`flex items-center justify-center gap-2 rounded-xl py-3 text-lg font-bold transition ${modo === m ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Icone className="w-6 h-6" /> {rotulo}
+            </button>
+          ))}
+        </div>
+
         {/* Scanner */}
         <div className={`w-full max-w-lg aspect-square relative rounded-3xl overflow-hidden glass-card transition-all duration-300 ${isIdle ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none absolute"}`}>
-          <div id="reader" className="w-full h-full [&>div]:border-none [&>div]:bg-transparent" />
+          {modo === "qr" ? (
+            <div id="reader" className="w-full h-full [&>div]:border-none [&>div]:bg-transparent" />
+          ) : (
+            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover -scale-x-100" />
+          )}
           <div className="absolute inset-0 pointer-events-none border-[12px] border-background/50 rounded-3xl z-10" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[260px] h-[260px] pointer-events-none z-20">
+          {modo === "rosto" && (
+            <>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[58%] h-[72%] rounded-[50%] border-4 border-primary/70 shadow-[0_0_30px_rgba(139,92,246,.5)] pointer-events-none z-20" />
+              {faceStatus && (
+                <div className="absolute bottom-6 left-4 right-4 z-20 rounded-xl bg-background/85 backdrop-blur px-4 py-3 text-center text-sm text-foreground">{faceStatus}</div>
+              )}
+            </>
+          )}
+          <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[260px] h-[260px] pointer-events-none z-20 ${modo === "rosto" ? "hidden" : ""}`}>
             <div className="w-full h-full border-2 border-primary/50 rounded-xl relative">
               <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-xl" />
               <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-xl" />
@@ -378,21 +495,21 @@ export default function KioskPage() {
           <div className="w-28 h-28 rounded-full bg-primary/20 flex items-center justify-center mb-6 animate-pulse">
             <Zap className="w-14 h-14 text-primary" />
           </div>
-          <h2 className="text-3xl font-bold text-primary mb-2">QR Code Lido!</h2>
+          <h2 className="text-3xl font-bold text-primary mb-2">{modo === "rosto" ? "Rosto reconhecido!" : "QR Code Lido!"}</h2>
           <p className="text-muted-foreground text-lg animate-pulse">Registrando ponto…</p>
         </div>
 
         {/* Success */}
-        {employee && (
+        {shown && (
           <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-300 z-30 bg-background/95 backdrop-blur-xl ${isSuccess ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}>
             <div className="max-w-2xl w-full flex flex-col items-center px-4">
               {/* Photo */}
               <div className="relative mb-6">
                 <div className="w-56 h-56 md:w-72 md:h-72 rounded-full border-4 border-primary overflow-hidden shadow-[0_0_50px_rgba(59,130,246,0.3)] bg-muted">
-                  {employee.photo ? (
-                    <img src={employee.photo} alt={employee.name} className="w-full h-full object-cover" />
+                  {shown.photo ? (
+                    <img src={shown.photo} alt={shown.name} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-6xl text-muted-foreground bg-secondary">{employee.name.charAt(0)}</div>
+                    <div className="w-full h-full flex items-center justify-center text-6xl text-muted-foreground bg-secondary">{shown.name.charAt(0)}</div>
                   )}
                 </div>
                 <div className={`absolute -bottom-4 -right-4 w-20 h-20 rounded-full flex items-center justify-center border-4 border-background shadow-lg ${punchColors.bg} ${punchColors.border} border-2`}>
@@ -401,8 +518,8 @@ export default function KioskPage() {
               </div>
 
               {/* Name + Role */}
-              <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground text-center mb-1">{employee.name}</h2>
-              <p className="text-xl text-primary font-medium mb-6">{employee.role}</p>
+              <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground text-center mb-1">{shown.name}</h2>
+              <p className="text-xl text-primary font-medium mb-6">{shown.role}</p>
 
               {/* Punch result */}
               {punchResult && (
