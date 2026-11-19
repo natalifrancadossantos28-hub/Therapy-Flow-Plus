@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { SuporteBotao } from "@/components/SuporteBotao";
 import { Saudacao } from "@/components/Saudacao";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, UserRound, Calendar, CalendarDays, ClipboardList, ListTodo,
@@ -52,7 +53,7 @@ const navItems: NavItem[] = [
   { href: "/pausados", label: "Pausados", icon: Snowflake, scopes: ["admin", "reception"], group: "Pacientes" },
   { href: "/busca-ativa", label: "Busca Ativa", icon: ShieldAlert, scopes: ["admin", "reception"], group: "Pacientes" },
   { href: "/professionals", label: "Profissionais", icon: UserRound, scopes: ["admin"], group: "Equipe" },
-  { href: "/recados-equipe", label: "Recados da Equipe", icon: Inbox, scopes: ["admin"], group: "Equipe" },
+  { href: "/recados-equipe", label: "Recados e Suporte", icon: Inbox, scopes: ["admin"], group: "Equipe" },
   { href: "/central-mensagens", label: "Central de Mensagens", icon: MessageSquareHeart, scopes: ["admin"], group: "Equipe" },
   { href: "/datas-conscientizacao", label: "Datas de Conscientização", icon: HeartHandshake, scopes: ["admin", "reception"], group: "Equipe" },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3, scopes: ["admin"], group: "Relatórios" },
@@ -322,6 +323,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {scope === "admin" && <LembretesAviso />}
         </motion.div>
       </main>
+      <SuporteBotao className="bottom-24 md:bottom-4" />
 
       {/* Menu de baixo (celular) */}
       <nav aria-label="Atalhos" className="menu-inferior-neon md:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 px-2 pt-2 pb-[max(0.6rem,env(safe-area-inset-bottom))]">

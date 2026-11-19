@@ -462,6 +462,21 @@ const NEON: Record<string, React.CSSProperties> = {
   },
 };
 
+// Menu do paciente no visual lilás: mesmo conjunto de cores, fundo claro e letra escura.
+const TONS_CLARO: Record<string, [string, string, string]> = {
+  yellow: ["#fefce8", "#facc15", "#854d0e"], green: ["#f0fdf4", "#4ade80", "#166534"],
+  orange: ["#fff7ed", "#fb923c", "#9a3412"], blue: ["#eff6ff", "#60a5fa", "#1e40af"],
+  red: ["#fef2f2", "#f87171", "#991b1b"], fuchsia: ["#fdf4ff", "#e879f9", "#86198f"],
+  cyan: ["#ecfeff", "#22d3ee", "#155e75"], violet: ["#f5f3ff", "#a78bfa", "#5b21b6"],
+};
+const NEON_CLARO: Record<string, React.CSSProperties> = Object.fromEntries(
+  Object.entries(NEON).map(([k, v]) => {
+    const [bg, borda, cor] = TONS_CLARO[k] ?? ["#f5f3ff", "#a78bfa", "#5b21b6"];
+    return [k, { ...v, background: bg, border: `1px solid ${borda}`, color: cor, textShadow: "none",
+      boxShadow: "0 2px 6px -3px rgba(91,33,182,.25)", borderRadius: "14px", padding: "11px 14px", fontSize: "15px", fontWeight: 600, gap: "10px" }];
+  }),
+);
+
 const SPECIALTIES = [
   "Psicologia", "Psicologia Parental", "Psicomotricidade", "Fisioterapia", "Fisioterapia Pilates",
   "Terapia Ocupacional", "Fonoaudiologia", "Nutrição", "Psicopedagogia", "Educação Física",
@@ -533,7 +548,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   });
   const [novoAberto, setNovoAberto] = useState<{ date: string; time: string } | null>(null);
   // Trocar o horário de uma linha da grade (ex.: 08:00 → 08:10) num dia escolhido.
-  const [ajusteHora, setAjusteHora] = useState<{ time: string; date: string; novo: string; definitivo: boolean } | null>(null);
+  const [ajusteHora, setAjusteHora] = useState<{ time: string; date: string; horas: Record<number, string>; definitivo: boolean } | null>(null);
   const [ajusteSalvando, setAjusteSalvando] = useState(false);
   const fonte = useFonteAgenda();
   const [vozAberta, setVozAberta] = useState(false);
@@ -1898,22 +1913,24 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   };
   const aptsAjuste = (date: string, time: string) => getApts(date, time)
     .filter(a => !a.multiGuest && !["desmarcado", "cancelado", "remanejado", "remarcado"].includes((a.status || "").toLowerCase()));
-  const abrirAjusteHora = (time: string) => {
+  const abrirAjusteHora = (time: string, dataEscolhida?: string) => {
     const comPaciente = weekDates.find(d => aptsAjuste(d, time).length > 0);
-    const date = diaFoco !== null ? weekDates[diaFoco] : (comPaciente ?? (weekDates.includes(today) ? today : weekDates[0]));
-    setAjusteHora({ time, date, novo: time, definitivo: false });
+    const date = dataEscolhida ?? (diaFoco !== null ? weekDates[diaFoco] : (comPaciente ?? (weekDates.includes(today) ? today : weekDates[0])));
+    setAjusteHora({ time, date, horas: {}, definitivo: false });
   };
   const salvarAjusteHora = async () => {
     if (!ajusteHora || !selectedProfId) return;
-    const { time, date, novo, definitivo } = ajusteHora;
-    const lista = aptsAjuste(date, time);
-    if (!lista.length || novo === time) { setAjusteHora(null); return; }
+    const { time, date, horas, definitivo } = ajusteHora;
+    // Cada paciente do grupo pode ir para um horário diferente.
+    const lista = aptsAjuste(date, time).filter(a => (horas[a.id] ?? time) !== time);
+    if (!lista.length) { setAjusteHora(null); return; }
     setAjusteSalvando(true);
     try {
       // Mesma regra do Remanejar: o paciente não pode ficar no mesmo dia/hora com outro profissional.
       if (!allowsSameSlotAsPatient(selectedProf?.specialty)) {
         for (const apt of lista) {
           if (isPilatesAppointment(apt.notes)) continue;
+          const novo = horas[apt.id];
           const sameDay = await listAppointments({ patientId: apt.patientId, date });
           const conflict = sameDay.find(a =>
             a.time === novo &&
@@ -1934,6 +1951,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         }
       }
       for (const apt of lista) {
+        const novo = horas[apt.id];
         let realId = apt.id;
         if (apt.id < 0) {
           const mat = await materializeVirtualAppointment({
@@ -1960,7 +1978,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           });
         }
       }
-      toast({ title: "Horário trocado", description: `${lista.length} paciente(s) de ${time} para ${novo}${definitivo ? ", daqui pra frente" : ", só neste dia"}.` });
+      toast({ title: "Horário trocado", description: `${lista.map(a => `${(a.patientName || "").split(" ")[0]} ${horas[a.id]}`).join(", ")}${definitivo ? ", daqui pra frente" : ", só neste dia"}.` });
       setAjusteHora(null);
       fetchAppointments();
     } catch (err: any) {
@@ -2430,6 +2448,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
                                       <AcaoBotao cor="laranja" icon={RotateCcw} onClick={() => handleStartRemanejar(apt)}>Remanejar</AcaoBotao>
                                       <AcaoBotao cor="roxo" icon={CalendarDays} onClick={() => handleStartRemarcar(apt)}>Remarcar</AcaoBotao>
+                                      {!["desmarcado", "cancelado", "remanejado", "remarcado"].includes((apt.status || "").toLowerCase()) && (
+                                        <AcaoBotao cor="roxo" icon={Clock} onClick={() => { setActionMenuId(null); abrirAjusteHora(apt.time, apt.date); }}>Trocar horário (mesmo dia)</AcaoBotao>
+                                      )}
 
                                       {(apt.recurrenceGroupId || isMulti) && isAdmin && (
                                         <>
@@ -2595,53 +2616,64 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       {ajusteHora && canView && selectedProfId && (() => {
         const lim = limitesFaixa(ajusteHora.time);
         const lista = aptsAjuste(ajusteHora.date, ajusteHora.time);
-        const valido = ajusteHora.novo >= lim.min && ajusteHora.novo <= lim.max && (isPaula || ajusteHora.novo !== "12:10");
+        const horaDe = (id: number) => ajusteHora.horas[id] ?? ajusteHora.time;
+        const okHora = (h: string) => h >= lim.min && h <= lim.max && (isPaula || h !== "12:10");
+        const valido = lista.every(a => okHora(horaDe(a.id)));
+        const mudou = lista.filter(a => horaDe(a.id) !== ajusteHora.time).length;
+        const setHora = (id: number, h: string) => setAjusteHora({ ...ajusteHora, horas: { ...ajusteHora.horas, [id]: h } });
         return (
           <div className="agenda-neon fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-label="Trocar horário" onClick={() => !ajusteSalvando && setAjusteHora(null)}>
-            <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl space-y-4 text-[#1e1b4b]" onClick={e => e.stopPropagation()}>
+            <div className="w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl space-y-4 text-[#1e1b4b]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center gap-3">
                 <span className="grid place-items-center w-12 h-12 rounded-2xl bg-violet-100 text-violet-700 shrink-0"><Clock className="w-6 h-6" /></span>
                 <div className="flex-1">
-                  <p className="text-xl font-extrabold">Trocar o horário das {ajusteHora.time}</p>
-                  <p className="text-sm text-[#3b3561]">Escolha o dia e um horário entre {lim.min} e {lim.max}.</p>
+                  <p className="text-2xl font-extrabold">Horários das {ajusteHora.time}</p>
+                  <p className="text-base text-[#3b3561]">Toque no horário de cada paciente para trocar (entre {lim.min} e {lim.max}).</p>
                 </div>
-                <button type="button" onClick={() => setAjusteHora(null)} aria-label="Fechar" className="grid place-items-center w-10 h-10 rounded-full bg-violet-50 text-violet-800"><X className="w-5 h-5" /></button>
+                <button type="button" onClick={() => setAjusteHora(null)} aria-label="Fechar" className="grid place-items-center w-11 h-11 rounded-full bg-violet-50 text-violet-800"><X className="w-5 h-5" /></button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {weekDays.map((d, i) => {
                   const n = aptsAjuste(weekDates[i], ajusteHora.time).length;
                   const sel = ajusteHora.date === weekDates[i];
                   return (
-                    <button key={i} type="button" onClick={() => setAjusteHora({ ...ajusteHora, date: weekDates[i] })}
-                      className={cn("min-w-[4.2rem] px-2 py-2 rounded-2xl border text-center", sel ? "border-violet-600 bg-gradient-to-br from-violet-500 to-violet-700 text-white" : "border-violet-200 bg-white")}>
-                      <span className="block text-sm font-bold capitalize">{format(d, "EEE", { locale: ptBR })}</span>
-                      <span className="block text-xs">{n} pac.</span>
+                    <button key={i} type="button" onClick={() => { if (!sel) setAjusteHora({ ...ajusteHora, date: weekDates[i], horas: {} }); }}
+                      className={cn("min-w-[4.6rem] px-2 py-2 rounded-2xl border text-center", sel ? "border-violet-600 bg-gradient-to-br from-violet-500 to-violet-700 text-white" : "border-violet-200 bg-white")}>
+                      <span className="block text-base font-bold capitalize">{format(d, "EEE", { locale: ptBR })}</span>
+                      <span className="block text-sm">{n} pac.</span>
                     </button>
                   );
                 })}
               </div>
-              <label className="block">
-                <span className="text-sm font-semibold text-[#3b3561]">Novo horário</span>
-                <input type="time" value={ajusteHora.novo} min={lim.min} max={lim.max} step={60}
-                  onChange={e => setAjusteHora({ ...ajusteHora, novo: e.target.value })}
-                  className="mt-1 w-full rounded-2xl border border-violet-200 px-4 py-3 text-2xl font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-violet-400" />
-              </label>
-              {!valido && <p className="text-rose-600 text-sm font-medium">Escolha um horário entre {lim.min} e {lim.max}.</p>}
+              {lista.length === 0 ? (
+                <p className="rounded-2xl bg-violet-50 p-4 text-lg text-[#3b3561]">Nenhum paciente nesse horário neste dia.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {lista.map(a => {
+                    const h = horaDe(a.id);
+                    return (
+                      <li key={a.id} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border p-3", h !== ajusteHora.time ? "border-violet-400 bg-violet-50" : "border-violet-100 bg-white")}>
+                        <PatientAvatar url={photoById.get(a.patientId)} name={a.patientName} size={40} />
+                        <span className="flex-1 min-w-[8rem] text-lg font-semibold leading-snug break-words">{a.patientName || `Paciente #${a.patientId}`}</span>
+                        <input type="time" value={h} min={lim.min} max={lim.max} step={60} aria-label={`Horário de ${a.patientName}`}
+                          onChange={e => setHora(a.id, e.target.value)}
+                          className={cn("w-[8.5rem] shrink-0 rounded-xl border px-2 py-2 text-xl font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-violet-400", okHora(h) ? "border-violet-200" : "border-rose-400 text-rose-600")} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {!valido && <p className="text-rose-600 text-base font-medium">Use um horário entre {lim.min} e {lim.max}.</p>}
               <div className="grid grid-cols-2 gap-2">
                 {[false, true].map(def => (
                   <button key={String(def)} type="button" onClick={() => setAjusteHora({ ...ajusteHora, definitivo: def })}
-                    className={cn("rounded-2xl border px-3 py-2 text-sm font-semibold", ajusteHora.definitivo === def ? "border-violet-600 bg-violet-50 text-violet-800" : "border-violet-200")}>
+                    className={cn("rounded-2xl border px-3 py-2.5 text-base font-semibold", ajusteHora.definitivo === def ? "border-violet-600 bg-violet-50 text-violet-800" : "border-violet-200")}>
                     {def ? "Todas as semanas daqui pra frente" : "Só neste dia"}
                   </button>
                 ))}
               </div>
-              <div className="rounded-2xl bg-violet-50 p-3 text-sm">
-                {lista.length === 0 ? <p className="text-[#3b3561]">Nenhum paciente nesse horário neste dia.</p> : (
-                  <ul className="space-y-0.5">{lista.map(a => <li key={a.id}>• {a.patientName || `Paciente #${a.patientId}`}</li>)}</ul>
-                )}
-              </div>
-              <Button className="w-full rounded-2xl py-3 text-base bg-gradient-to-br from-violet-500 to-violet-700 text-white" disabled={!valido || !lista.length || ajusteHora.novo === ajusteHora.time || ajusteSalvando} onClick={salvarAjusteHora}>
-                {ajusteSalvando ? "Salvando…" : `Trocar para ${ajusteHora.novo}`}
+              <Button className="w-full rounded-2xl py-3 text-lg bg-gradient-to-br from-violet-500 to-violet-700 text-white" disabled={!valido || mudou === 0 || ajusteSalvando} onClick={salvarAjusteHora}>
+                {ajusteSalvando ? "Salvando…" : mudou ? `Salvar ${mudou} horário(s)` : "Troque algum horário"}
               </Button>
             </div>
           </div>
