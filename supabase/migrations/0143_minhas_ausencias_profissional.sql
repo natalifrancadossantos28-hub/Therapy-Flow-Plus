@@ -32,6 +32,7 @@ begin
     from public.ponto_companies c
     join public.professionals p on p.company_id = c.id
    where c.slug = lower(trim(p_slug))
+     and c.active = true
      and p.id = p_professional_id
      and p.pin is not null
      and p.pin = p_pin
