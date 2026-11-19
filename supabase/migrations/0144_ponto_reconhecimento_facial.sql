@@ -1,6 +1,7 @@
 -- Ponto: reconhecimento facial no quiosque (além do QR do crachá).
 -- Guarda só a "assinatura" do rosto (128 números) calculada no navegador a
--- partir da foto do cadastro. O quiosque recebe apenas id + assinatura.
+-- partir da foto do cadastro. As assinaturas nunca saem do banco: o quiosque
+-- manda a assinatura do rosto na câmera e recebe só o id de quem bateu.
 
 alter table public.ponto_employees add column if not exists face_descriptor real[];
 
@@ -23,8 +24,11 @@ create trigger ponto_employees_reset_face
   for each row execute function public._ponto_employees_reset_face();
 
 -- Admin: grava (ou apaga, com null) a assinatura do rosto do funcionário.
+-- p_photo_hash = sha256 (hex) da foto usada no cálculo; se a foto mudou nesse
+-- meio-tempo, recusa (P0002) para não gravar assinatura de foto antiga.
+drop function if exists public.set_employee_face(text, text, bigint, real[]);
 create or replace function public.set_employee_face(
-  p_slug text, p_password text, p_id bigint, p_descriptor real[]
+  p_slug text, p_password text, p_id bigint, p_descriptor real[], p_photo_hash text
 )
 returns void
 language plpgsql
@@ -35,20 +39,22 @@ declare
   v_cid bigint;
 begin
   v_cid := public._verify_company_admin(p_slug, p_password);
-  if p_descriptor is not null and array_length(p_descriptor, 1) <> 128 then
+  if p_descriptor is not null and (array_length(p_descriptor, 1) <> 128 or p_photo_hash is null) then
     raise exception 'invalid face descriptor';
   end if;
   update public.ponto_employees
      set face_descriptor = p_descriptor
-   where id = p_id and company_id = v_cid;
+   where id = p_id and company_id = v_cid
+     and (p_descriptor is null
+          or encode(sha256(convert_to(coalesce(photo, ''), 'UTF8')), 'hex') = p_photo_hash);
   if not found then
-    raise exception 'employee not found' using errcode = 'P0002';
+    raise exception 'employee not found or photo changed' using errcode = 'P0002';
   end if;
 end;
 $$;
 
-revoke all on function public.set_employee_face(text, text, bigint, real[]) from public;
-grant execute on function public.set_employee_face(text, text, bigint, real[]) to anon, authenticated;
+revoke all on function public.set_employee_face(text, text, bigint, real[], text) from public;
+grant execute on function public.set_employee_face(text, text, bigint, real[], text) to anon, authenticated;
 
 -- Admin: quem já tem o facial ativado.
 create or replace function public.list_employee_faces(p_slug text, p_password text)
@@ -70,25 +76,54 @@ $$;
 revoke all on function public.list_employee_faces(text, text) from public;
 grant execute on function public.list_employee_faces(text, text) to anon, authenticated;
 
--- Quiosque: assinaturas dos funcionários ativos (sem nome, CPF ou foto).
-create or replace function public.kiosk_face_list(p_slug text)
-returns jsonb
+drop function if exists public.kiosk_face_list(text);
+
+-- Quiosque: quantos funcionários ativos têm o facial ativado.
+create or replace function public.kiosk_face_count(p_slug text)
+returns integer
+language sql
+stable
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+  select count(*)::int
+    from public.ponto_employees
+   where company_id = public._active_company_id(p_slug)
+     and active = true and face_descriptor is not null;
+$$;
+
+revoke all on function public.kiosk_face_count(text) from public;
+grant execute on function public.kiosk_face_count(text) to anon, authenticated;
+
+-- Quiosque: compara a assinatura da câmera com as da empresa (distância
+-- euclidiana < 0.5) e devolve só o id do mais parecido, ou null.
+create or replace function public.kiosk_face_match(p_slug text, p_descriptor real[])
+returns bigint
 language plpgsql
+stable
 security definer
 set search_path = public, extensions, pg_temp
 as $$
 declare
   v_cid bigint;
+  v_id bigint;
 begin
+  if p_descriptor is null or array_length(p_descriptor, 1) <> 128 then return null; end if;
   v_cid := public._active_company_id(p_slug);
-  if v_cid is null then return '[]'::jsonb; end if;
-  return coalesce((
-    select jsonb_agg(jsonb_build_object('id', id, 'd', to_jsonb(face_descriptor)))
-      from public.ponto_employees
-     where company_id = v_cid and active = true and face_descriptor is not null
-  ), '[]'::jsonb);
+  if v_cid is null then return null; end if;
+  select e.id into v_id
+    from public.ponto_employees e
+    cross join lateral (
+      select sqrt(sum((a - b) * (a - b))) as dist
+        from unnest(e.face_descriptor, p_descriptor) as t(a, b)
+    ) x
+   where e.company_id = v_cid and e.active = true and e.face_descriptor is not null
+     and x.dist < 0.5
+   order by x.dist
+   limit 1;
+  return v_id;
 end;
 $$;
 
-revoke all on function public.kiosk_face_list(text) from public;
-grant execute on function public.kiosk_face_list(text) to anon, authenticated;
+revoke all on function public.kiosk_face_match(text, real[]) from public;
+grant execute on function public.kiosk_face_match(text, real[]) to anon, authenticated;

@@ -6,7 +6,7 @@ import { Plus, Badge, Search, ScanFace } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { listEmployeeFaces, setEmployeeFace } from "@/lib/ponto-rpc";
-import { assinaturaDaFoto } from "@/lib/face";
+import { assinaturaDaFoto, hashDaFoto } from "@/lib/face";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Badge as UiBadge } from "@/components/ui/badge";
@@ -28,7 +28,9 @@ export default function EmployeesList() {
       for (let i = 0; i < faltam.length; i++) {
         setAtivando(`${i + 1} de ${faltam.length}`);
         const d = await assinaturaDaFoto(faltam[i].photo!);
-        if (d) await setEmployeeFace(faltam[i].id, d); else semRosto.push(faltam[i].name);
+        if (!d) { semRosto.push(faltam[i].name); continue; }
+        try { await setEmployeeFace(faltam[i].id, d, await hashDaFoto(faltam[i].photo!)); }
+        catch (e: any) { if (e?.code !== "P0002") throw e; /* foto trocada no meio: o cadastro já cuida */ }
       }
       toast({
         title: "Ponto pelo rosto ativado",

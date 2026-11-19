@@ -1,11 +1,10 @@
 // Reconhecimento facial no navegador (face-api, servido de /face-api/).
-// Do rosto sai uma "assinatura" de 128 números; duas assinaturas próximas
-// (distância < LIMIAR) são a mesma pessoa.
+// Do rosto sai uma "assinatura" de 128 números. A comparação entre assinaturas
+// é feita no banco (kiosk_face_match), que nunca devolve as assinaturas.
 
 type FaceApi = any;
 
 const BASE = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/face-api`;
-export const LIMIAR = 0.5;
 
 let carregando: Promise<FaceApi> | null = null;
 
@@ -13,6 +12,7 @@ export function carregarFaceApi(): Promise<FaceApi> {
   if (!carregando) {
     carregando = (async () => {
       const faceapi: FaceApi = await import(/* @vite-ignore */ `${BASE}/face-api.esm.js`);
+      await faceapi.tf.ready();
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(BASE),
         faceapi.nets.faceLandmark68TinyNet.loadFromUri(BASE),
@@ -47,18 +47,8 @@ export async function assinaturaDoVideo(video: HTMLVideoElement): Promise<number
   return assinatura(faceapi, video, 320);
 }
 
-export function distancia(a: number[], b: number[]) {
-  let s = 0;
-  for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; s += d * d; }
-  return Math.sqrt(s);
-}
-
-/** Pessoa mais parecida, se estiver abaixo do limiar. */
-export function reconhecer(alvo: number[], lista: { id: number; d: number[] }[]) {
-  let melhor: { id: number; dist: number } | null = null;
-  for (const p of lista) {
-    const dist = distancia(alvo, p.d);
-    if (!melhor || dist < melhor.dist) melhor = { id: p.id, dist };
-  }
-  return melhor && melhor.dist < LIMIAR ? melhor : null;
+// Identifica a foto usada no cálculo (o banco recusa a assinatura se a foto mudou).
+export async function hashDaFoto(foto: string): Promise<string> {
+  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(foto));
+  return Array.from(new Uint8Array(h), (b) => b.toString(16).padStart(2, "0")).join("");
 }

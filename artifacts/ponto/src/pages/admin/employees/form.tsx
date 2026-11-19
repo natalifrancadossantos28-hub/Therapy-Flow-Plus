@@ -28,7 +28,7 @@ import {
   listCameras,
   pickPreferredCamera,
 } from "@/lib/camera";
-import { assinaturaDaFoto } from "@/lib/face";
+import { assinaturaDaFoto, hashDaFoto } from "@/lib/face";
 import { setEmployeeFace } from "@/lib/ponto-rpc";
 
 const compressImage = (dataUrl: string, maxPx = 500, quality = 0.72): Promise<string> =>
@@ -285,7 +285,7 @@ export default function EmployeeForm() {
   const ativarFacial = async (empId: number, foto: string | null) => {
     try {
       const d = foto ? await assinaturaDaFoto(foto) : null;
-      await setEmployeeFace(empId, d);
+      await setEmployeeFace(empId, d, foto ? await hashDaFoto(foto) : null);
       if (foto && !d) toast({ title: "Rosto não encontrado na foto", description: "O ponto pelo rosto não vai funcionar para esta pessoa. Tire outra foto de frente, com boa luz.", variant: "destructive" });
     } catch {
       toast({ title: "Ponto pelo rosto não foi ativado", description: "O cadastro foi salvo. Tente de novo pelo botão \"Ativar ponto pelo rosto\" na lista de funcionários.", variant: "destructive" });

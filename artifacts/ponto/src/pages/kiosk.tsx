@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { Html5Qrcode } from "html5-qrcode";
 import { useGetPontoEmployeeByCpf, useCreatePontoRecord } from "@/lib/ponto-hooks";
-import { getCompanyBySlug, kioskFaceList, registerPunch, type PontoKioskEmployee } from "@/lib/ponto-rpc";
-import { carregarFaceApi, assinaturaDoVideo, reconhecer } from "@/lib/face";
+import { getCompanyBySlug, kioskFaceCount, kioskFaceMatch, registerPunch, type PontoKioskEmployee } from "@/lib/ponto-rpc";
+import { carregarFaceApi, assinaturaDoVideo } from "@/lib/face";
 import { format } from "date-fns";
 import { CheckCircle2, XCircle, Zap, Building2, LogIn, Coffee, Utensils, LogOut, Camera, RefreshCw, QrCode, ScanFace } from "lucide-react";
 import {
@@ -289,24 +289,25 @@ export default function KioskPage() {
     let cancelado = false;
     let stream: MediaStream | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    let lista: { id: number; d: number[] }[] = [];
-    let listaEm = 0;
+    let total = 0;
+    let totalEm = 0;
     let anterior: number | null = null;
 
     const atualizarLista = async () => {
-      lista = await kioskFaceList();
-      listaEm = Date.now();
-      if (!cancelado) setFaceStatus(lista.length ? null : "Nenhum funcionário com o ponto pelo rosto ativado. Use o crachá ou peça ao administrador para ativar.");
+      total = await kioskFaceCount();
+      totalEm = Date.now();
+      if (!cancelado) setFaceStatus(total ? null : "Nenhum funcionário com o ponto pelo rosto ativado. Use o crachá ou peça ao administrador para ativar.");
     };
 
     const ciclo = async () => {
       if (cancelado) return;
       const video = videoRef.current;
       try {
-        if (Date.now() - listaEm > 5 * 60_000) await atualizarLista();
-        if (!processingRef.current && video && video.readyState >= 2 && lista.length) {
+        if (Date.now() - totalEm > 5 * 60_000) await atualizarLista();
+        if (!processingRef.current && video && video.readyState >= 2 && total) {
           const d = await assinaturaDoVideo(video);
-          const achou = d ? reconhecer(d, lista) : null;
+          const id = d ? await kioskFaceMatch(d) : null;
+          const achou = id != null ? { id } : null;
           if (achou && achou.id === anterior && !processingRef.current && !cancelado) {
             anterior = null;
             processingRef.current = true;
