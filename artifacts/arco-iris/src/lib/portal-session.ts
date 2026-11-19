@@ -149,6 +149,9 @@ export function clearAllSessions() {
   sessionStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(LEGACY_KEY);
   sessionStorage.removeItem(PROFESSIONAL_KEY);
+  for (const k of Object.keys(sessionStorage)) {
+    if (k.startsWith("nfs_prof_pin_")) sessionStorage.removeItem(k);
+  }
   // NAO limpa DEVICE_KEY: o enrollment persiste entre logouts.
 }
 

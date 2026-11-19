@@ -2786,6 +2786,7 @@ export type Ausencia = {
   dataInicio: string;
   dataFim: string;
   motivo: string;
+  criadoPor: "admin" | "profissional";
 };
 
 type AusenciaRow = {
@@ -2796,6 +2797,7 @@ type AusenciaRow = {
   data_fim: string;
   motivo: string | null;
   created_at: string;
+  criado_por?: string | null;
 };
 
 function mapAusencia(r: AusenciaRow): Ausencia {
@@ -2806,6 +2808,7 @@ function mapAusencia(r: AusenciaRow): Ausencia {
     dataInicio: r.data_inicio,
     dataFim: r.data_fim,
     motivo: r.motivo ?? "",
+    criadoPor: r.criado_por === "profissional" ? "profissional" : "admin",
   };
 }
 
@@ -2849,6 +2852,57 @@ export async function deleteAusencia(id: number): Promise<void> {
     p_slug: slug,
     p_password: password,
     p_id: id,
+  });
+  if (error) throw error;
+}
+
+export async function updateAusencia(id: number, dataInicio: string, dataFim: string, motivo: string): Promise<Ausencia> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("update_ausencia", {
+    p_slug: slug, p_password: password, p_id: id,
+    p_data_inicio: dataInicio, p_data_fim: dataFim, p_motivo: motivo,
+  });
+  if (error) throw error;
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r) throw new Error("Falha ao salvar ausência.");
+  return mapAusencia(r as AusenciaRow);
+}
+
+// Ausências do próprio profissional (validadas pelo PIN dele no banco).
+function profSlug(): string {
+  const slug = readSession()?.companySlug;
+  if (!slug) throw new Error("Sessão de empresa expirada. Faça login novamente.");
+  return slug;
+}
+
+export async function listMinhasAusencias(professionalId: number, pin: string): Promise<Ausencia[]> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("list_minhas_ausencias", {
+    p_slug: profSlug(), p_professional_id: professionalId, p_pin: pin,
+  });
+  if (error) throw error;
+  return ((data ?? []) as AusenciaRow[]).map(mapAusencia);
+}
+
+export async function salvarMinhaAusencia(
+  professionalId: number, pin: string, a: { id?: number; dataInicio: string; dataFim: string; motivo: string }
+): Promise<Ausencia> {
+  const supabase = requireSupabase();
+  const base = { p_slug: profSlug(), p_professional_id: professionalId, p_pin: pin, p_data_inicio: a.dataInicio, p_data_fim: a.dataFim, p_motivo: a.motivo };
+  const { data, error } = a.id
+    ? await supabase.rpc("update_minha_ausencia", { ...base, p_id: a.id })
+    : await supabase.rpc("add_minha_ausencia", base);
+  if (error) throw error;
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r) throw new Error("Falha ao salvar ausência.");
+  return mapAusencia(r as AusenciaRow);
+}
+
+export async function cancelarMinhaAusencia(professionalId: number, pin: string, id: number): Promise<void> {
+  const supabase = requireSupabase();
+  const { error } = await supabase.rpc("delete_minha_ausencia", {
+    p_slug: profSlug(), p_professional_id: professionalId, p_pin: pin, p_id: id,
   });
   if (error) throw error;
 }
