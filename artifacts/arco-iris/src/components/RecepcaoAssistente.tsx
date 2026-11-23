@@ -327,9 +327,11 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
     const isDriver = (id: number) => isTransportSpecialty(profById.get(id)?.specialty);
     const clinicos = new Map<number, AppointmentListItem[]>();
     const vans = new Map<number, string[]>();
+    const vanTimes = new Map<number, string[]>();
     for (const a of ativos) {
       if (isDriver(a.professionalId)) {
         vans.set(a.patientId, [...new Set([...(vans.get(a.patientId) ?? []), a.professionalName])]);
+        vanTimes.set(a.patientId, [...new Set([...(vanTimes.get(a.patientId) ?? []), a.time])].sort());
       } else {
         clinicos.set(a.patientId, [...(clinicos.get(a.patientId) ?? []), a]);
       }
@@ -342,6 +344,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
       const nome = apts[0].patientName;
       const linhas = apts.map(a => `• ${a.time} — ${profById.get(a.professionalId)?.specialty ?? "Atendimento"} com ${a.professionalName}`).join("\n");
       const motoristas = vans.get(pid);
+      const horaVan = (vanTimes.get(pid) ?? [apts[0].time]).join(" e ");
       const phone = apts[0].guardianPhone || phoneOf(pid);
       todos.push({
         key: `lembrete-${pid}`,
@@ -351,18 +354,18 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
         message:
           `Olá! Aqui é da recepção do ${UNIDADE}\n\n` +
           `Lembramos que ${firstName(nome)} tem atendimento ${dia}:\n${linhas}\n\n` +
-          (motoristas ? `🚐 A van vai buscar ${firstName(nome)} (motorista ${motoristas.join(" / ")}).\n\n` : "") +
+          (motoristas ? `🚐 A van vai buscar ${firstName(nome)} para o horário das ${horaVan} (motorista ${motoristas.join(" / ")}).\n\n` : "") +
           `Por favor, confirme a presença respondendo esta mensagem. Se não for possível vir, avise com antecedência. Obrigado!`,
       });
       if (motoristas) {
         van.push({
           key: `van-${pid}`,
           name: nome,
-          sub: `${apts[0].time} · motorista ${motoristas.join(" / ")}`,
+          sub: `${horaVan} · motorista ${motoristas.join(" / ")}`,
           phone,
           message:
             `Olá! Aqui é da recepção do ${UNIDADE}\n\n` +
-            `${dia.charAt(0).toUpperCase()}${dia.slice(1)}, a van (motorista ${motoristas.join(" / ")}) vai buscar ${firstName(nome)} para o atendimento das ${apts[0].time}.\n\n` +
+            `${dia.charAt(0).toUpperCase()}${dia.slice(1)}, a van (motorista ${motoristas.join(" / ")}) vai buscar ${firstName(nome)} para o atendimento das ${horaVan}.\n\n` +
             `Por favor, responda esta mensagem confirmando. Se ${firstName(nome)} não puder vir, avise a recepção com antecedência: assim o motorista não faz a viagem sem necessidade e consegue buscar as outras crianças no horário.\n\n` +
             `Obrigado pela colaboração!`,
         });
@@ -392,9 +395,16 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
 
   // ── Van: faltas de hoje sem aviso ──────────────────────────────────────
   const faltasVan = useMemo<Envio[]>(() => {
+    // O transporte é agendado no mesmo horário do atendimento que a van atende.
+    const vanSlots = new Set<string>();
+    for (const a of dayAppointments) {
+      const st = (a.status ?? "").toLowerCase();
+      if (isTransportSpecialty(a.professionalSpecialty) && st !== "desmarcado" && st !== "cancelado") vanSlots.add(`${a.patientId}|${a.time}`);
+    }
     const porPaciente = new Map<number, AppointmentToday[]>();
     for (const a of dayAppointments) {
       if (isTransportSpecialty(a.professionalSpecialty) || !transportByPatient.has(a.patientId)) continue;
+      if (!vanSlots.has(`${a.patientId}|${a.time}`)) continue;
       porPaciente.set(a.patientId, [...(porPaciente.get(a.patientId) ?? []), a]);
     }
     const out: Envio[] = [];
