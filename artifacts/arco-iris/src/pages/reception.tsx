@@ -1181,10 +1181,10 @@ export default function Reception() {
 
       {ausentesHoje.length > 0 && (
         <div className="rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-2.5 flex items-center gap-2 flex-wrap text-sm">
-          <Plane className="w-4 h-4 text-violet-300 flex-shrink-0" />
-          <span className="font-bold text-violet-200">Ausentes hoje:</span>
+          <Plane className="w-4 h-4 text-violet-500 flex-shrink-0" />
+          <span className="font-bold text-foreground">Ausentes hoje:</span>
           {ausentesHoje.map(a => (
-            <span key={a.id} className="px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-400/40 text-xs font-semibold text-violet-100">
+            <span key={a.id} className="px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-400/40 text-xs font-semibold text-foreground">
               {a.nome} · {a.motivo}{a.ate > hojeISO ? ` até ${formatDate(a.ate)}` : ""}
             </span>
           ))}
