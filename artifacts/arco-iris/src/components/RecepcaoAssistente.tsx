@@ -281,7 +281,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
       if (isTransportSpecialty(a.professionalSpecialty)) continue;
       porProf.set(a.professionalId, [...(porProf.get(a.professionalId) ?? []), a]);
     }
-    const filaAtiva = fila.filter(f => !(f as { paused?: boolean }).paused);
+    const filaAtiva = fila.filter(f => !(f as { paused?: boolean }).paused && !f.semLaudo);
     const ocupadoHoje = new Set(dayAppointments.map(a => `${a.patientId}|${a.time}`));
     const usados = new Set<number>();
     const out: { time: string; prof: string; specialty: string; sugerido: WaitingListEntry }[] = [];
