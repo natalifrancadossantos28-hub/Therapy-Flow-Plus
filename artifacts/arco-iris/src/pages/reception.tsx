@@ -24,13 +24,14 @@ import {
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { supabase } from "@/lib/supabase";
 import { Card, Badge, Button, Select, Input, MotionCard } from "@/components/ui-custom";
-import { getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, cn, todayBR } from "@/lib/utils";
+import { getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, cn, todayBR, formatDate } from "@/lib/utils";
 import { isHiddenByPatientStatus } from "@/lib/schedule";
 import {
   Check, X, CalendarClock, AlertCircle, MoreHorizontal,
   Printer, ShieldCheck, CheckCircle,
   UserPlus, PhoneOff, FileCheck, Bell, MessageSquare, Copy,
   BellRing, Undo2, Bus, Search, FileText,
+  Plane,
 } from "lucide-react";
 import { DeclaracaoModal, type DeclaracaoTarget } from "@/components/DeclaracaoModal";
 import { useToast } from "@/hooks/use-toast";
@@ -685,6 +686,33 @@ export default function Reception() {
       .catch((e) => { console.error(e); setIsLoading(false); });
   }, [profIdFilter, reloadAbsences]);
 
+  const reloadBloqueios = useCallback(() => {
+    Promise.all([listFeriados(), listAusencias()])
+      .then(([f, a]) => {
+        const mudou =
+          JSON.stringify(a) !== JSON.stringify(ausenciasRef.current) ||
+          JSON.stringify(f) !== JSON.stringify(feriadosRef.current);
+        feriadosRef.current = f;
+        ausenciasRef.current = a;
+        setFeriados(f);
+        setAusencias(a);
+        if (mudou) void reloadAppointments();
+      })
+      .catch(console.error);
+  }, [reloadAppointments]);
+
+  const hojeISO = todayBR();
+  const ausentesHoje = useMemo(() => {
+    const out: { id: number; nome: string; motivo: string; ate: string }[] = [];
+    for (const a of ausencias) {
+      if (hojeISO < a.dataInicio || hojeISO > a.dataFim) continue;
+      const prof = professionals.find(p => p.id === a.professionalId);
+      if (!prof || isTransportSpecialty(prof.specialty)) continue;
+      out.push({ id: a.id, nome: prof.name, motivo: (a.motivo || "Ausência").split(" — ")[0], ate: a.dataFim });
+    }
+    return out;
+  }, [ausencias, professionals, hojeISO]);
+
   useEffect(() => {
     listProfessionals().then(setProfessionals).catch(console.error);
     // Completa as séries recorrentes ativas (as 52 semanas gravadas acabam e o
@@ -692,15 +720,7 @@ export default function Reception() {
     estenderRecorrencias()
       .then(r => { if (r.criados > 0) void reloadAppointments(); })
       .catch(console.error);
-    Promise.all([listFeriados(), listAusencias()])
-      .then(([f, a]) => {
-        feriadosRef.current = f;
-        ausenciasRef.current = a;
-        setFeriados(f);
-        setAusencias(a);
-        void reloadAppointments();
-      })
-      .catch(console.error);
+    reloadBloqueios();
     listPatients().then((patients) => {
       setPatientsList(patients);
       const map = new Map<number, string>();
@@ -716,6 +736,8 @@ export default function Reception() {
 
   // Visibility-aware: pausa polling quando a aba está oculta
   useVisibleInterval(reloadAppointments, 20_000);
+  // Ausência registrada pelo profissional (Minhas Ausências) entra sem precisar recarregar a página.
+  useVisibleInterval(reloadBloqueios, 60_000);
 
   // Fase 5D: Realtime — recebe INSERTs em notificacoes_recepcao (remanejar/desmarcar/falta)
   // e dispara um alerta visual pulsante + refetch da agenda.
@@ -1154,6 +1176,19 @@ export default function Reception() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {ausentesHoje.length > 0 && (
+        <div className="rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-2.5 flex items-center gap-2 flex-wrap text-sm">
+          <Plane className="w-4 h-4 text-violet-300 flex-shrink-0" />
+          <span className="font-bold text-violet-200">Ausentes hoje:</span>
+          {ausentesHoje.map(a => (
+            <span key={a.id} className="px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-400/40 text-xs font-semibold text-violet-100">
+              {a.nome} · {a.motivo}{a.ate > hojeISO ? ` até ${formatDate(a.ate)}` : ""}
+            </span>
+          ))}
+          <span className="text-xs text-muted-foreground">Os atendimentos deles não aparecem na lista.</span>
         </div>
       )}
 
