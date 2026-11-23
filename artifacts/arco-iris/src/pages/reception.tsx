@@ -8,7 +8,6 @@ import {
   listProfessionals,
   listPatients,
   updateAppointment,
-  deletePatient,
   countAbsencesBySpecialty,
   reverterFalta,
   listFirstEvaluationDone,
@@ -20,6 +19,7 @@ import {
   type AbsenceBySpecialty,
   type Feriado,
   type Ausencia,
+  type Patient,
 } from "@/lib/arco-rpc";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { supabase } from "@/lib/supabase";
@@ -27,18 +27,22 @@ import { Card, Badge, Button, Select, Input, MotionCard } from "@/components/ui-
 import { getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, cn, todayBR } from "@/lib/utils";
 import { isHiddenByPatientStatus } from "@/lib/schedule";
 import {
-  Check, X, CalendarClock, AlertCircle, UserMinus,
-  ChevronRight, Printer, ShieldCheck, CheckCircle,
+  Check, X, CalendarClock, AlertCircle, MoreHorizontal,
+  Printer, ShieldCheck, CheckCircle,
   UserPlus, PhoneOff, FileCheck, Bell, MessageSquare, Copy,
   BellRing, Undo2, Bus, Search, FileText,
 } from "lucide-react";
 import { DeclaracaoModal, type DeclaracaoTarget } from "@/components/DeclaracaoModal";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import NotificationBell from "@/components/NotificationBell";
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
+import { RecepcaoAssistente } from "@/components/RecepcaoAssistente";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type Appointment = {
   id: number;
@@ -59,17 +63,6 @@ type Appointment = {
   updatedAt: string;
 };
 
-type DischargeAlert = {
-  appointment: Appointment;
-  newAbsenceCount: number;
-};
-
-type VacancyAlert = {
-  professionalId: number;
-  patientName: string;
-  priority: string;
-};
-
 type Atestado = {
   guardianPhone: string;
   patientName: string;
@@ -88,67 +81,6 @@ type ContatoDesconhecido = {
   identificadoEm: string;
   dispensado?: boolean;
 };
-
-function DischargeModal({
-  alert, onDischarge, onClose, isLoading,
-}: { alert: DischargeAlert; onDischarge: () => void; onClose: () => void; isLoading: boolean }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <MotionCard className="w-full max-w-md p-8 shadow-2xl" initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-        <div className="flex flex-col items-center text-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-rose-100 flex items-center justify-center">
-            <AlertCircle className="w-8 h-8 text-rose-600" />
-          </div>
-          <div>
-            <h3 className="text-2xl font-bold text-foreground">Alerta de Faltas</h3>
-            <p className="text-muted-foreground mt-1">
-              <span className="font-semibold text-foreground">{alert.appointment.patientName}</span> acumulou{" "}
-              <span className="font-bold text-rose-600">{alert.newAbsenceCount} faltas</span>.
-            </p>
-          </div>
-        </div>
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl mb-6 text-sm text-rose-800 font-medium">
-          O protocolo da clínica indica que pacientes com 3 ou mais faltas devem ter alta avaliada. Deseja dar alta para este paciente e liberar a vaga?
-        </div>
-        <div className="flex gap-3">
-          <Button variant="ghost" className="flex-1" onClick={onClose}>Manter Paciente</Button>
-          <Button variant="destructive" className="flex-1 gap-2" onClick={onDischarge} disabled={isLoading}>
-            <UserMinus className="w-4 h-4" />
-            {isLoading ? "Dando Alta..." : "Dar Alta"}
-          </Button>
-        </div>
-      </MotionCard>
-    </div>
-  );
-}
-
-function VacancyModal({ alert, onClose }: { alert: VacancyAlert; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <MotionCard className="w-full max-w-md p-8 shadow-2xl border-2 border-emerald-200" initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-        <div className="flex flex-col items-center text-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center text-3xl">🎉</div>
-          <div>
-            <h3 className="text-2xl font-bold text-foreground">Vaga Liberada!</h3>
-            <p className="text-muted-foreground mt-1">Uma nova vaga foi aberta. A lista de espera sugere chamar:</p>
-          </div>
-        </div>
-        <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-xl mb-6 flex items-center justify-between">
-          <div>
-            <p className="font-bold text-lg text-emerald-900">{alert.patientName}</p>
-            <p className="text-sm text-emerald-700 mt-0.5">Prioridade: <span className="font-semibold capitalize">{alert.priority}</span></p>
-          </div>
-          <Link href="/waiting-list" onClick={onClose}>
-            <Button variant="outline" className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-100">
-              Ver Fila <ChevronRight className="w-4 h-4" />
-            </Button>
-          </Link>
-        </div>
-        <Button variant="ghost" className="w-full" onClick={onClose}>Fechar</Button>
-      </MotionCard>
-    </div>
-  );
-}
 
 function FirstAppointmentMessageModal({
   apt, onClose,
@@ -410,7 +342,7 @@ function AbsenceBellModal({
 }
 
 function AppointmentRow({
-  apt, index, atestado, onStatusChange, onDischargeRequest, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, onDeclaracao, photoUrl, drivers, emAcompanhamento,
+  apt, index, atestado, onStatusChange, onAbonarClick, isUpdating, specialtyAbsences, onFirstApptMsg, onAbsenceBell, onDeclaracao, photoUrl, drivers, emAcompanhamento,
 }: {
   apt: Appointment;
   emAcompanhamento: boolean;
@@ -419,7 +351,6 @@ function AppointmentRow({
   index: number;
   atestado: Atestado | null;
   onStatusChange: (id: number, status: string) => Promise<number>;
-  onDischargeRequest: (apt: Appointment, count: number) => void;
   onAbonarClick: (apt: Appointment, atestado: Atestado) => void;
   isUpdating: boolean;
   specialtyAbsences: Map<string, number>;
@@ -427,9 +358,12 @@ function AppointmentRow({
   onAbsenceBell: (apt: Appointment, absenceCount: number) => void;
   onDeclaracao: (apt: Appointment) => void;
 }) {
+  // Recepção não dá alta: na 3ª falta já abre o aviso que convida a família
+  // a comparecer à unidade.
   const handleAbsent = async () => {
-    const newCount = await onStatusChange(apt.id, "falta_nao_justificada");
-    if (newCount >= 3) onDischargeRequest(apt, newCount);
+    await onStatusChange(apt.id, "falta_nao_justificada");
+    const newCount = specAbsCount + 1;
+    if (newCount >= 3) onAbsenceBell(apt, newCount);
   };
 
   const handleJustificada = async () => {
@@ -443,6 +377,9 @@ function AppointmentRow({
   const isJustificado = statusLower === "falta_justificada" || statusLower === "justificado" || statusLower === "abonado";
   const isPresente = statusLower === "presente";
   const recepcaoStatus = displayApptStatus(apt.status, emAcompanhamento);
+  // Só presença e falta: "Em Atendimento" não aparece; "Avaliação" (1ª vez) e o
+  // que já foi marcado continuam visíveis.
+  const mostraStatus = recepcaoStatus !== "ativo" && !isPresente;
 
   return (
     <MotionCard
@@ -480,9 +417,9 @@ function AppointmentRow({
               {apt.professionalName} • {apt.professionalSpecialty}
             </p>
             {drivers.length > 0 && (
-              <p className="text-xs font-bold mt-0.5 flex items-center gap-1 text-blue-400">
-                <Bus className="w-3.5 h-3.5" /> Transporte: {drivers.join(", ")}
-              </p>
+              <span className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-blue-300 border border-blue-400/50 bg-blue-500/10">
+                <Bus className="w-3 h-3" /> Van · motorista {drivers.join(" / ")}
+              </span>
             )}
             {(() => {
               const s = apt.status?.toLowerCase() ?? "";
@@ -520,145 +457,130 @@ function AppointmentRow({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <Badge className={getStatusColor(recepcaoStatus)}>{getStatusLabel(recepcaoStatus)}</Badge>
+        <div className="flex items-center gap-2 flex-wrap md:flex-nowrap md:justify-end shrink-0">
+          {mostraStatus && (
+            <Badge className={getStatusColor(recepcaoStatus)}>{isFalta ? "Falta" : getStatusLabel(recepcaoStatus)}</Badge>
+          )}
 
-          <div className="flex gap-2 ml-4 pl-4 border-l border-border">
-            {/* ✓ Presente */}
-            <button
-              className="h-9 w-9 rounded-lg border border-emerald-200 text-emerald-600 hover:bg-emerald-50 flex items-center justify-center transition-colors disabled:opacity-40"
-              onClick={() => onStatusChange(apt.id, "presente")}
-              disabled={isUpdating}
-              title="Presente"
-            >
-              <Check className="w-4 h-4" />
-            </button>
-
-            {/* 📄 Falta Justificada */}
-            <button
-              className="h-9 w-9 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
-              style={{
-                background: "rgba(6,182,212,0.06)",
-                border: "1px solid rgba(6,182,212,0.35)",
-                color: "#22d3ee",
-              }}
-              onClick={handleJustificada}
-              disabled={isUpdating}
-              title="Falta Justificada"
-            >
-              <FileCheck className="w-4 h-4" />
-            </button>
-
-            {/* ✗ Ausente */}
-            <button
-              className="h-9 w-9 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors disabled:opacity-40"
-              onClick={handleAbsent}
-              disabled={isUpdating}
-              title="Ausente (sem justificativa)"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            {/* Abonar (só aparece quando há atestado) */}
-            {atestado && (
-              <button
-                className="h-9 px-3 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
-                style={{
-                  background: "rgba(255,220,0,0.10)",
-                  border: "1px solid rgba(255,220,0,0.40)",
-                  color: "#ffd700",
-                  boxShadow: "0 0 8px rgba(255,220,0,0.20)",
-                }}
-                onClick={() => onAbonarClick(apt, atestado)}
-                disabled={isUpdating}
-                title="Abonar falta com atestado"
-              >
-                <ShieldCheck className="w-4 h-4 inline mr-1" />
-                Abonar
-              </button>
+          <button
+            className={cn(
+              "h-9 px-3 rounded-lg border text-sm font-bold flex items-center gap-1.5 transition-colors disabled:opacity-40",
+              isPresente ? "bg-emerald-500 border-emerald-500 text-white" : "border-emerald-400/60 text-emerald-400 hover:bg-emerald-500/10",
             )}
+            onClick={() => onStatusChange(apt.id, "presente")}
+            disabled={isUpdating || isPresente}
+            title="Presente"
+          >
+            <Check className="w-4 h-4" /> Presente
+          </button>
 
-            {/* 1º Agendamento — mensagem WhatsApp */}
+          <button
+            className={cn(
+              "h-9 px-3 rounded-lg border text-sm font-bold flex items-center gap-1.5 transition-colors disabled:opacity-40",
+              isFalta ? "bg-rose-500 border-rose-500 text-white" : "border-rose-400/60 text-rose-400 hover:bg-rose-500/10",
+            )}
+            onClick={handleAbsent}
+            disabled={isUpdating || isFalta}
+            title="Falta (sem justificativa)"
+          >
+            <X className="w-4 h-4" /> Falta
+          </button>
+
+          <button
+            className={cn(
+              "h-9 px-3 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-40",
+              isJustificado ? "bg-cyan-500 border-cyan-500 text-white" : "border-cyan-400/50 text-cyan-400 hover:bg-cyan-500/10",
+            )}
+            onClick={handleJustificada}
+            disabled={isUpdating || isJustificado}
+            title="Falta Justificada (a família avisou)"
+          >
+            <FileCheck className="w-4 h-4" /> Justificada
+          </button>
+
+          {atestado && (
             <button
-              className="h-9 w-9 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
+              className="h-9 px-3 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
               style={{
-                background: "rgba(34,197,94,0.08)",
-                border: "1px solid rgba(34,197,94,0.35)",
-                color: "#22c55e",
+                background: "rgba(255,220,0,0.10)",
+                border: "1px solid rgba(255,220,0,0.40)",
+                color: "#ffd700",
               }}
-              onClick={() => onFirstApptMsg(apt)}
+              onClick={() => onAbonarClick(apt, atestado)}
               disabled={isUpdating}
-              title="Mensagem do 1º Agendamento"
+              title="Abonar falta com atestado"
             >
-              <MessageSquare className="w-4 h-4" />
+              <ShieldCheck className="w-4 h-4 inline mr-1" />
+              Abonar
             </button>
+          )}
 
+          {isFalta && (
             <button
-              className="h-9 w-9 rounded-lg flex items-center justify-center transition-colors"
-              style={{
-                background: "rgba(8,145,178,0.08)",
-                border: "1px solid rgba(8,145,178,0.35)",
-                color: "#0891b2",
-              }}
-              onClick={() => onDeclaracao(apt)}
-              title="Emitir Declaração (comparecimento / acompanhamento)"
-            >
-              <FileText className="w-4 h-4" />
-            </button>
-
-            {/* 🔔 Sininho de Faltas — marca ausente + abre WhatsApp */}
-            <button
-              className="h-9 w-9 rounded-lg flex items-center justify-center transition-all disabled:opacity-40 relative"
-              style={{
-                background: "rgba(251,146,60,0.10)",
-                border: "1px solid rgba(251,146,60,0.45)",
-                color: "#fb923c",
-                boxShadow: specAbsCount > 0 ? "0 0 12px rgba(251,146,60,0.35)" : "none",
-              }}
-              onClick={async () => {
-                let newCount = specAbsCount;
-                const sLower = apt.status?.toLowerCase() ?? "";
-                const alreadyAbsent = sLower === "ausente" || sLower === "falta_nao_justificada";
-                if (!alreadyAbsent) {
-                  await onStatusChange(apt.id, "falta_nao_justificada");
-                  newCount = specAbsCount + 1;
-                }
-                onAbsenceBell(apt, newCount);
-              }}
+              className="h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-green-600 text-white hover:bg-green-700 disabled:opacity-40"
+              onClick={() => onAbsenceBell(apt, Math.max(specAbsCount, 1))}
               disabled={isUpdating}
-              title="Sininho de Faltas — Registrar ausência e notificar"
+              title="Mensagem de falta para a família (WhatsApp)"
             >
-              <BellRing className="w-4 h-4" />
-              {specAbsCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white"
-                  style={{
-                    background: specAbsCount >= 3 ? "#ef4444" : specAbsCount >= 2 ? "#f59e0b" : "#fb923c",
-                    boxShadow: "0 0 6px rgba(0,0,0,0.3)",
-                  }}>
-                  {specAbsCount}
-                </span>
+              <MessageSquare className="w-4 h-4" /> Avisar família
+            </button>
+          )}
+
+          <button
+            className="h-9 px-3 rounded-lg border border-sky-500/40 text-sky-400 hover:bg-sky-500/10 text-xs font-bold flex items-center gap-1.5 transition-colors"
+            onClick={() => onDeclaracao(apt)}
+            title="Emitir Declaração (comparecimento / acompanhamento)"
+          >
+            <FileText className="w-4 h-4" /> Declaração
+          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="h-9 w-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-secondary flex items-center justify-center"
+                title="Mais opções"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuItem onClick={() => onFirstApptMsg(apt)} className="gap-2">
+                <MessageSquare className="w-4 h-4 text-green-500" /> Mensagem do 1º agendamento
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={isUpdating}
+                className="gap-2"
+                onClick={async () => {
+                  let newCount = specAbsCount;
+                  if (!isFalta) {
+                    await onStatusChange(apt.id, "falta_nao_justificada");
+                    newCount = specAbsCount + 1;
+                  }
+                  onAbsenceBell(apt, Math.max(newCount, 1));
+                }}
+              >
+                <BellRing className="w-4 h-4 text-orange-400" /> {isFalta ? "Mensagem de falta (WhatsApp)" : "Marcar falta e avisar família"}
+              </DropdownMenuItem>
+              {(isFalta || isJustificado) && (
+                <DropdownMenuItem
+                  disabled={isUpdating}
+                  className="gap-2"
+                  onClick={() => onStatusChange(apt.id, "agendado")}
+                >
+                  <Undo2 className="w-4 h-4 text-cyan-400" /> Cancelar falta
+                </DropdownMenuItem>
               )}
-            </button>
-
-            {/* ↩ Cancelar Falta (só quando falta foi aplicada) */}
-            {(isFalta || isJustificado) && (
-              <button
-                className="h-9 px-3 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
-                style={{
-                  background: "rgba(6,182,212,0.08)",
-                  border: "1px solid rgba(6,182,212,0.40)",
-                  color: "#22d3ee",
-                  boxShadow: "0 0 8px rgba(6,182,212,0.20)",
-                }}
-                onClick={() => onStatusChange(apt.id, "agendado")}
-                disabled={isUpdating}
-                title="Cancelar Falta — voltar para Agendado"
-              >
-                <Undo2 className="w-4 h-4 inline mr-1" />
-                Cancelar Falta
-              </button>
-            )}
-          </div>
+              {isPresente && (
+                <DropdownMenuItem
+                  disabled={isUpdating}
+                  className="gap-2"
+                  onClick={() => onStatusChange(apt.id, "agendado")}
+                >
+                  <Undo2 className="w-4 h-4 text-cyan-400" /> Desfazer presença
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </MotionCard>
@@ -699,6 +621,9 @@ export default function Reception() {
   const [professionals, setProfessionals] = useState<ArcoProfessional[]>([]);
   const [transportByPatient, setTransportByPatient] = useState<Map<number, string[]>>(new Map());
   const [appointments, setAppointments] = useState<AppointmentToday[]>([]);
+  const [dayAppointments, setDayAppointments] = useState<AppointmentToday[]>([]);
+  const [patientsList, setPatientsList] = useState<Patient[]>([]);
+  const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [prontuarioMap, setProntuarioMap] = useState<Map<number, string>>(new Map());
   const [photoMap, setPhotoMap] = useState<Map<number, string | null>>(new Map());
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -749,6 +674,7 @@ export default function Reception() {
           transport.set(a.patientId, names);
         }
         setTransportByPatient(transport);
+        setDayAppointments(visible);
         setAppointments(visible.filter(a =>
           !isTransportSpecialty(a.professionalSpecialty) &&
           (filterId === null || a.professionalId === filterId)
@@ -771,10 +697,12 @@ export default function Reception() {
         feriadosRef.current = f;
         ausenciasRef.current = a;
         setFeriados(f);
+        setAusencias(a);
         void reloadAppointments();
       })
       .catch(console.error);
     listPatients().then((patients) => {
+      setPatientsList(patients);
       const map = new Map<number, string>();
       const photos = new Map<number, string | null>();
       for (const p of patients) {
@@ -839,27 +767,14 @@ export default function Reception() {
     };
   }, [reloadAppointments, scheduleReload]);
 
-  const [, navigate] = useLocation();
-  const [dischargeAlert, setDischargeAlert] = useState<DischargeAlert | null>(null);
-  const [vacancyAlert, setVacancyAlert] = useState<VacancyAlert | null>(null);
   const [firstApptMsgApt, setFirstApptMsgApt] = useState<Appointment | null>(null);
   const [absenceBellData, setAbsenceBellData] = useState<{ apt: Appointment; absenceCount: number } | null>(null);
   const [declaracaoTarget, setDeclaracaoTarget] = useState<DeclaracaoTarget | null>(null);
-  const [vacancyProfId, setVacancyProfId] = useState<number>(0);
   const [atestados, setAtestados] = useState<Atestado[]>([]);
   const [desconhecidos, setDesconhecidos] = useState<ContatoDesconhecido[]>([]);
   const [abonarDialog, setAbonarDialog] = useState<AbonarDialog | null>(null);
   const [abonarSending, setAbonarSending] = useState(false);
   const [abonarDone, setAbonarDone] = useState(false);
-
-  const checkVacancy = async () => {
-    if (!vacancyProfId) return { data: null as null | { hasVacancy: boolean; nextWaitingPatient: { patientName: string; priority: string } | null } };
-    try {
-      const res = await fetch(`/api/professionals/${vacancyProfId}/vacancy-alert`);
-      if (!res.ok) return { data: null };
-      return { data: await res.json() };
-    } catch { return { data: null }; }
-  };
 
   // Poll atestados e contatos desconhecidos
   useEffect(() => {
@@ -1028,6 +943,11 @@ export default function Reception() {
         return newAbsenceCount;
       }
 
+      if (status === "agendado") {
+        toast({ title: "↩ Presença desfeita", description: `${apt?.patientName} voltou para os Pendentes.` });
+        return newAbsenceCount;
+      }
+
       const label = getStatusLabel(status);
       const toastTitle = status === "presente"
         ? "✅ Presente"
@@ -1049,36 +969,6 @@ export default function Reception() {
       setIsMutating(false);
     }
     return newAbsenceCount;
-  };
-
-  const handleDischargeRequest = (apt: Appointment, count: number) => {
-    setVacancyProfId(apt.professionalId);
-    setDischargeAlert({ appointment: apt, newAbsenceCount: count });
-  };
-
-  const handleConfirmDischarge = async () => {
-    if (!dischargeAlert) return;
-    const { appointment } = dischargeAlert;
-    setIsMutating(true);
-    try {
-      await deletePatient(appointment.patientId);
-      await reloadAppointments();
-      setDischargeAlert(null);
-      toast({ title: "Alta Realizada", description: `${appointment.patientName} recebeu alta.` });
-
-      const { data: alertData } = await checkVacancy();
-      if (alertData?.hasVacancy && alertData?.nextWaitingPatient) {
-        setVacancyAlert({
-          professionalId: appointment.professionalId,
-          patientName: alertData.nextWaitingPatient.patientName,
-          priority: alertData.nextWaitingPatient.priority,
-        });
-      }
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível dar alta.", variant: "destructive" });
-    } finally {
-      setIsMutating(false);
-    }
   };
 
   const handleAbonarClick = (apt: Appointment, atestado: Atestado) => {
@@ -1267,14 +1157,23 @@ export default function Reception() {
         </div>
       )}
 
+      <RecepcaoAssistente
+        dayAppointments={dayAppointments}
+        transportByPatient={transportByPatient}
+        professionals={professionals}
+        patients={patientsList}
+        feriados={feriados}
+        ausencias={ausencias}
+        ready={!isLoading}
+      />
+
       <Card className="p-6">
         <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 bg-card/95 backdrop-blur flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-border pb-6">
           <div>
             <h2 className="text-xl font-bold">Atendimentos Terapêuticos – Hoje</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              <strong>Presente</strong> com o check-in da recepção (botão ✓) ou pelo profissional na agenda. <strong>Avaliação</strong> = paciente recém-puxado,
-              ainda sem a primeira avaliação; depois dela ele fica <strong>Em Atendimento</strong> até receber alta.
-              Falta é registrada só pela recepção ou pelo profissional (use "Cancelar Falta" para desfazer).
+              Marque <strong>Presente</strong> ou <strong>Falta</strong>. Quem já foi marcado desce para "Já marcados".
+              Desfazer e mensagens ficam no botão <strong>⋯</strong> do paciente.
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -1369,7 +1268,6 @@ export default function Reception() {
                 index={i}
                 atestado={findAtestado(enriched)}
                 onStatusChange={handleStatusChange}
-                onDischargeRequest={handleDischargeRequest}
                 onAbonarClick={handleAbonarClick}
                 isUpdating={isMutating}
                 specialtyAbsences={specialtyAbsences}
@@ -1386,12 +1284,6 @@ export default function Reception() {
       </Card>
 
       <AnimatePresence>
-        {dischargeAlert && (
-          <DischargeModal alert={dischargeAlert} onDischarge={handleConfirmDischarge} onClose={() => setDischargeAlert(null)} isLoading={isMutating} />
-        )}
-        {vacancyAlert && (
-          <VacancyModal alert={vacancyAlert} onClose={() => setVacancyAlert(null)} />
-        )}
         {firstApptMsgApt && (
           <FirstAppointmentMessageModal apt={firstApptMsgApt} onClose={() => setFirstApptMsgApt(null)} />
         )}
