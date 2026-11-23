@@ -100,13 +100,18 @@ function useSentSet(listId: string) {
     try { localStorage.setItem(sentStorageKey(listId), JSON.stringify([...n])); } catch { /* sem storage */ }
     return n;
   });
-  return { sent, mark };
+  const unmark = (key: string) => setSent(prev => {
+    const n = new Set(prev); n.delete(key);
+    try { localStorage.setItem(sentStorageKey(listId), JSON.stringify([...n])); } catch { /* sem storage */ }
+    return n;
+  });
+  return { sent, mark, unmark };
 }
 
 export function EnvioEmMassaModal({
   listId, titulo, descricao, envios, onClose,
 }: { listId: string; titulo: string; descricao?: string; envios: Envio[]; onClose: () => void }) {
-  const { sent, mark } = useSentSet(listId);
+  const { sent, mark, unmark } = useSentSet(listId);
   const [aberto, setAberto] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
   const comTelefone = envios.filter(e => waPhone(e.phone));
@@ -150,7 +155,7 @@ export function EnvioEmMassaModal({
             {pendentes.length === 0 ? "Todos enviados" : `Enviar próxima — ${pendentes[0].name} (${pendentes.length} faltando)`}
           </button>
           <p className="text-[11px] text-muted-foreground mt-2 text-center">
-            Cada clique abre o WhatsApp com a mensagem pronta; é só apertar enviar lá e voltar aqui para a próxima.
+            Cada clique abre o WhatsApp com a mensagem pronta; é só apertar enviar lá e voltar aqui para a próxima. Se não chegou a enviar, clique em "Enviado" para voltar para a lista.
           </p>
         </div>
 
@@ -175,7 +180,8 @@ export function EnvioEmMassaModal({
                   </button>
                   <button
                     disabled={!temTel}
-                    onClick={() => enviar(e)}
+                    onClick={() => (ok ? unmark(e.key) : enviar(e))}
+                    title={ok ? "Não enviou? Clique para voltar para a lista" : "Abrir WhatsApp com a mensagem"}
                     className={cn(
                       "h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-40",
                       ok ? "border border-emerald-500/40 text-emerald-400" : "bg-green-600 text-white hover:bg-green-700",
