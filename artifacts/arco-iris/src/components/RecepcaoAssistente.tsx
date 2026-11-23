@@ -32,7 +32,8 @@ const TIME_SLOTS = [
 ];
 
 /** Status em que o horário não está ocupado (vaga liberada). */
-const LIVRE_STATUSES = ["desmarcado", "cancelado", "remanejado", "remarcado"];
+// "remanejado"/"remarcado" ficam gravados no NOVO horário, que está ocupado.
+const LIVRE_STATUSES = ["desmarcado", "cancelado"];
 
 export function waPhone(p: string | null | undefined): string {
   const digits = (p ?? "").replace(/\D/g, "");
