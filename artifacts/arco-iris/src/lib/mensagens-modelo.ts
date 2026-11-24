@@ -17,6 +17,7 @@ const ESPECIALIDADE: Campo = { tag: "especialidade", desc: "especialidade", exem
 const PROFISSIONAL: Campo = { tag: "profissional", desc: "profissional", exemplo: "Bruna" };
 const PERIODO: Campo = { tag: "periodo", desc: "dias escolhidos no aviso", exemplo: "de segunda-feira (30/11) a sexta-feira (04/12)" };
 const ATENDIMENTOS: Campo = { tag: "atendimentos", desc: "dias e horários do paciente nesse período", exemplo: "• segunda-feira (30/11) às 08:00\n• quarta-feira (02/12) às 08:00" };
+const SOLICITANTE: Campo = { tag: "solicitante", desc: "quem pediu o aviso", exemplo: "Paula (Nutrição)" };
 const RECADO: Campo = { tag: "recado", desc: "o recado escrito no card", exemplo: "Na próxima semana, por favor, não tragam alimentos para a terapia." };
 
 export const MODELOS: Record<ModeloId, { titulo: string; campos: Campo[]; padrao: string }> = {
@@ -94,10 +95,10 @@ export const MODELOS: Record<ModeloId, { titulo: string; campos: Campo[]; padrao
   },
   avisoGeral: {
     titulo: "Aviso — recado do profissional",
-    campos: [RECADO, NOME, PACIENTE, RESPONSAVEL, PROFISSIONAL, ESPECIALIDADE, PERIODO, ATENDIMENTOS, UNIDADE],
+    campos: [RECADO, SOLICITANTE, NOME, PACIENTE, RESPONSAVEL, PROFISSIONAL, ESPECIALIDADE, PERIODO, ATENDIMENTOS, UNIDADE],
     padrao:
       "Olá! Aqui é da recepção do {unidade}\n\n" +
-      "Recado para a família de {nome}:\n\n" +
+      "{solicitante} pediu para avisar a família de {nome}:\n\n" +
       "{recado}\n\n" +
       "Obrigado pela colaboração!",
   },
