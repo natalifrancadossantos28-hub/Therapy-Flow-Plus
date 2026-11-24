@@ -40,6 +40,7 @@ import NotificationBell from "@/components/NotificationBell";
 import { PatientAvatar } from "@/components/PatientAvatar";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
 import { RecepcaoAssistente } from "@/components/RecepcaoAssistente";
+import { abrirWhatsApp } from "@/lib/whatsapp";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -103,11 +104,7 @@ function FirstAppointmentMessageModal({
 
   const sendViaWhatsApp = (msg: string) => {
     const phone = sanitizePhone(apt.patientPhone);
-    const url = phone
-      ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
-      : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-    const waWindow = window.open(url, "whatsapp_nfs");
-    if (waWindow) waWindow.focus();
+    abrirWhatsApp(phone, msg);
     onClose();
   };
 
@@ -200,11 +197,7 @@ function AbsenceBellModal({
 
   const sendViaWhatsApp = (msg: string) => {
     const phone = sanitizePhone(apt.patientPhone);
-    const url = phone
-      ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
-      : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-    const waWindow = window.open(url, "whatsapp_nfs");
-    if (waWindow) waWindow.focus();
+    abrirWhatsApp(phone, msg);
     onClose();
   };
 
