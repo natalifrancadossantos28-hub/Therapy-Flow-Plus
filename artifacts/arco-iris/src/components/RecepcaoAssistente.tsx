@@ -160,12 +160,12 @@ export function EnvioEmMassaModal({
   // Ao voltar para a Recepção, Enter já abre a próxima família.
   useEffect(() => {
     if (!emSequencia) return;
-    if (!proxima) { setEmSequencia(false); return; }
+    if (!proxima) return;
     const foco = () => proximaRef.current?.focus();
     const tecla = (ev: KeyboardEvent) => {
       const alvo = ev.target as HTMLElement | null;
-      if (ev.key !== "Enter" || ev.repeat || alvo?.tagName === "TEXTAREA" || alvo?.tagName === "INPUT") return;
-      if (alvo === proximaRef.current) return;
+      // Enter em botão/campo faz a ação dele; o atalho vale só fora deles (ex.: ao voltar do WhatsApp).
+      if (ev.key !== "Enter" || ev.repeat || alvo?.closest("button, a, input, textarea, select, [contenteditable]")) return;
       ev.preventDefault();
       enviarProxima();
     };
