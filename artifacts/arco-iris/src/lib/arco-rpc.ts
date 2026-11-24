@@ -2480,6 +2480,55 @@ export async function updateBuscaAtivaCaso(
   if (error) throw error;
 }
 
+/** Card de retorno da Busca Ativa para o profissional que encaminhou. */
+export type BuscaAtivaRetorno = {
+  id: number;
+  patientId: number;
+  patientName: string;
+  prontuario: string | null;
+  specialty: string | null;
+  motivo: string;
+  status: BuscaAtivaStatus;
+  obs: string | null;
+  saida: string | null;
+  createdAt: string;
+  updatedAt: string;
+  finalizadoAt: string | null;
+};
+
+const isMissingRpc = (e: unknown) =>
+  typeof e === "object" && e !== null && (e as { code?: string }).code === "PGRST202";
+
+/** Lista vazia enquanto a migração 0145 não foi rodada. */
+export async function listBuscaAtivaRetornosDoProfissional(professionalId: number, limit = 30): Promise<BuscaAtivaRetorno[]> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { data, error } = await supabase.rpc("list_busca_ativa_retornos_profissional", {
+    p_slug: slug,
+    p_password: password,
+    p_professional_id: professionalId,
+    p_limit: limit,
+  });
+  if (error) {
+    if (isMissingRpc(error)) return [];
+    throw error;
+  }
+  return (data ?? []) as BuscaAtivaRetorno[];
+}
+
+/** Tira o card da lista do profissional; o caso continua guardado para a gestão. */
+export async function ocultarBuscaAtivaRetorno(id: number, professionalId: number): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("ocultar_busca_ativa_retorno", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_professional_id: professionalId,
+  });
+  if (error) throw error;
+}
+
 // ── Salas (Gestão Inteligente de Salas) ─────────────────────────────────────
 
 export type Sala = {
@@ -3203,8 +3252,8 @@ export async function markRecadoEquipeLido(id: number, lido = true): Promise<voi
 }
 
 /**
- * Exclui um recado. Informando `professionalId`, o banco só apaga se o recado
- * for dele e ainda não estiver resolvido (exclusão pelo portal do profissional).
+ * Exclui um recado. Informando `professionalId`, o recado precisa ser dele:
+ * não resolvido é apagado; resolvido só sai da lista do profissional (0145).
  */
 export async function deleteRecadoEquipe(id: number, professionalId?: number | null): Promise<void> {
   const supabase = requireSupabase();
