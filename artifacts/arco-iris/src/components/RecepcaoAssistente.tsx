@@ -436,7 +436,7 @@ const ROTULOS: Record<string, string> = {
   nome: "[paciente]", paciente: "[paciente]", responsavel: "[responsável]", horarios: "[horário — especialidade com profissional]",
   aviso_van: "", motorista: "[motorista]", hora_van: "[horário]", hora: "[horário]",
   especialidade: "[especialidade]", profissional: "[profissional]", unidade: UNIDADE,
-  periodo: "[dias]", atendimentos: "[dias e horários do paciente]", recado: "[recado]",
+  periodo: "[dias]", atendimentos: "[dias e horários do paciente]", recado: "[recado]", solicitante: "[quem pediu]",
 };
 
 function Previa({ texto }: { texto: string }) {
@@ -556,6 +556,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
   const [avisoDe, setAvisoDe] = useState<string | null>(null);
   const [avisoAte, setAvisoAte] = useState<string | null>(null);
   const [recado, setRecado] = useState("");
+  const [avisoSolic, setAvisoSolic] = useState<number | null>(null);
   const avisoInicio = avisoDe ?? proximoDia;
   const avisoFim = avisoAte && avisoAte >= avisoInicio ? avisoAte : avisoInicio;
   // "Todos" só faz sentido para recado; férias e desmarcar são sempre de um profissional.
@@ -802,6 +803,11 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
     () => avisoProfId === null ? [] : ausencias.filter(a => a.professionalId === avisoProfId && a.dataFim >= today),
     [ausencias, avisoProfId, today],
   );
+  const solicId = avisoProfId ?? avisoSolic;
+  const solicProf = solicId !== null ? profById.get(solicId) : undefined;
+  const solicitante = solicProf
+    ? `${firstName(solicProf.name)}${solicProf.specialty ? ` (${solicProf.specialty})` : ""}`
+    : "A coordenação";
   const periodoTexto = avisoInicio === avisoFim ? diaTexto(avisoInicio, today) : `de ${diaCurto(avisoInicio)} a ${diaCurto(avisoFim)}`;
   const avisoEnvios = useMemo<Envio[] | null>(() => {
     if (!agendaAviso) return null;
@@ -835,12 +841,13 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
           periodo: periodoTexto,
           atendimentos: apts.map(a => `• ${diaCurto(a.date)} às ${a.time}${varios ? ` — ${a.professionalName}` : ""}`).join("\n"),
           recado: recado.trim(),
+          solicitante,
         }),
       });
     }
     return out.sort((a, b) => a.name.localeCompare(b.name));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agendaAviso, avisoTipo, recado, periodoTexto, profById, patientById, modelos, today]);
+  }, [agendaAviso, avisoTipo, recado, solicitante, periodoTexto, profById, patientById, modelos, today]);
   const avisoLista = {
     listId: `${avisoTipo}-${avisoProfId ?? "todos"}-${avisoInicio}-${avisoFim}`,
     titulo: `${AVISO_TIPOS.find(t => t.id === avisoTipo)!.rotulo} — ${avisoProfId !== null ? profById.get(avisoProfId)?.name ?? "" : "todos os profissionais"} · ${periodoTexto}`,
@@ -1160,6 +1167,21 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
                 })}
               </div>
             )}
+            {avisoTipo === "avisoGeral" && avisoProfId === null && (
+              <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted-foreground">
+                Quem pediu o aviso
+                <select
+                  value={avisoSolic ?? ""}
+                  onChange={ev => setAvisoSolic(ev.target.value ? Number(ev.target.value) : null)}
+                  className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
+                >
+                  <option value="">Coordenação</option>
+                  {profsClinicos.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}{p.specialty ? ` — ${p.specialty}` : ""}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             {avisoTipo === "avisoGeral" && (
               <textarea
                 value={recado}
@@ -1177,6 +1199,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
               especialidade: avisoProfId !== null ? profById.get(avisoProfId)?.specialty ?? "" : "[especialidade]",
               periodo: periodoTexto,
               recado: recado.trim() || "[recado]",
+              solicitante,
             })} />
             <p className="text-[11px] text-muted-foreground">
               {!avisoPronto
