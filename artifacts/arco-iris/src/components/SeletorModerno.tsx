@@ -3,6 +3,14 @@ import { createPortal } from "react-dom";
 import { Check, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Texto do <label> que envolve o select, sem o texto das <option> dentro dele.
+function textoDoRotulo(l: HTMLLabelElement | null): string {
+  if (!l) return "";
+  const c = l.cloneNode(true) as HTMLElement;
+  c.querySelectorAll("select").forEach((s) => s.remove());
+  return c.textContent?.trim() ?? "";
+}
+
 type Opcao = { value: string; label: string; disabled: boolean; grupo: string | null };
 
 const CORES = ["#8b5cf6", "#3b82f6", "#ec4899", "#14b8a6", "#f97316", "#22c55e", "#eab308", "#06b6d4"];
@@ -73,7 +81,7 @@ export function SeletorModerno() {
   const rotulo =
     sel.getAttribute("aria-label") ||
     (sel.id && document.querySelector(`label[for="${CSS.escape(sel.id)}"]`)?.textContent) ||
-    sel.closest("label")?.textContent?.trim() ||
+    textoDoRotulo(sel.closest("label")) ||
     sel.parentElement?.querySelector("label")?.textContent ||
     "Escolha uma opção";
   const pessoas = opcoes.filter((o) => o.value !== "").length > 3 && /profissional|paciente|nome|terapeuta/i.test(`${rotulo} ${opcoes[0]?.label ?? ""}`);
