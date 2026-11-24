@@ -1,6 +1,6 @@
 /** Modelos editáveis das mensagens do Assistente da recepção (salvos neste computador). */
 
-export type ModeloId = "lembrete" | "avaliacao" | "van" | "faltaVan" | "buscaAtiva" | "buscaFalta" | "encaixe";
+export type ModeloId = "lembrete" | "avaliacao" | "van" | "faltaVan" | "buscaAtiva" | "buscaFalta" | "encaixe" | "avisoFerias" | "avisoDesmarcar" | "avisoGeral";
 export type Campo = { tag: string; desc: string; exemplo: string };
 
 const UNIDADE: Campo = { tag: "unidade", desc: "nome da unidade", exemplo: "Núcleo de Atendimento Novo Arco-íris 🌈" };
@@ -15,6 +15,9 @@ const HORA_VAN: Campo = { tag: "hora_van", desc: "horário da van", exemplo: "08
 const HORA: Campo = { tag: "hora", desc: "horário", exemplo: "08:00" };
 const ESPECIALIDADE: Campo = { tag: "especialidade", desc: "especialidade", exemplo: "Fonoaudiologia" };
 const PROFISSIONAL: Campo = { tag: "profissional", desc: "profissional", exemplo: "Bruna" };
+const PERIODO: Campo = { tag: "periodo", desc: "dias escolhidos no aviso", exemplo: "de segunda-feira (30/11) a sexta-feira (04/12)" };
+const ATENDIMENTOS: Campo = { tag: "atendimentos", desc: "dias e horários do paciente nesse período", exemplo: "• segunda-feira (30/11) às 08:00\n• quarta-feira (02/12) às 08:00" };
+const RECADO: Campo = { tag: "recado", desc: "o recado escrito no card", exemplo: "Na próxima semana, por favor, não tragam alimentos para a terapia." };
 
 export const MODELOS: Record<ModeloId, { titulo: string; campos: Campo[]; padrao: string }> = {
   lembrete: {
@@ -70,6 +73,33 @@ export const MODELOS: Record<ModeloId, { titulo: string; campos: Campo[]; padrao
       "Identificamos faltas sem apresentação de atestado ou declaração. Pedimos, por gentileza, que compareça à administração do Núcleo para conversarmos sobre a situação.\n\n" +
       "Agradecemos a compreensão!\n\n" +
       "Administração do Núcleo Arco-Íris. 🌈",
+  },
+  avisoFerias: {
+    titulo: "Aviso — profissional de férias",
+    campos: [NOME, PACIENTE, RESPONSAVEL, PROFISSIONAL, ESPECIALIDADE, PERIODO, ATENDIMENTOS, UNIDADE],
+    padrao:
+      "Olá! Aqui é da recepção do {unidade}\n\n" +
+      "Informamos que {profissional} ({especialidade}) estará de férias {periodo}. Por isso, os atendimentos de {nome} nesses dias não vão acontecer:\n{atendimentos}\n\n" +
+      "Os atendimentos voltam normalmente quando {profissional} retornar. Os outros atendimentos de {nome} continuam iguais.\n\n" +
+      "Qualquer dúvida, estamos à disposição. Obrigado!",
+  },
+  avisoDesmarcar: {
+    titulo: "Aviso — atendimento desmarcado",
+    campos: [NOME, PACIENTE, RESPONSAVEL, PROFISSIONAL, ESPECIALIDADE, PERIODO, ATENDIMENTOS, UNIDADE],
+    padrao:
+      "Olá! Aqui é da recepção do {unidade}\n\n" +
+      "Informamos que {profissional} ({especialidade}) não poderá atender {periodo}, e os atendimentos de {nome} nesses dias foram desmarcados:\n{atendimentos}\n\n" +
+      "Pedimos desculpas pelo transtorno. Os próximos atendimentos continuam normalmente.\n\n" +
+      "Qualquer dúvida, estamos à disposição. Obrigado!",
+  },
+  avisoGeral: {
+    titulo: "Aviso — recado do profissional",
+    campos: [RECADO, NOME, PACIENTE, RESPONSAVEL, PROFISSIONAL, ESPECIALIDADE, PERIODO, ATENDIMENTOS, UNIDADE],
+    padrao:
+      "Olá! Aqui é da recepção do {unidade}\n\n" +
+      "Recado para a família de {nome}:\n\n" +
+      "{recado}\n\n" +
+      "Obrigado pela colaboração!",
   },
   encaixe: {
     titulo: "Encaixe",
