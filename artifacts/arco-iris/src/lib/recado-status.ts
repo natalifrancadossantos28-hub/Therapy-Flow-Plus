@@ -1,4 +1,4 @@
-import type { RecadoEquipe, RecadoEquipeStatus } from "@/lib/arco-rpc";
+import type { BuscaAtivaStatus, RecadoEquipe, RecadoEquipeStatus } from "@/lib/arco-rpc";
 
 /** Cores do selo de status do recado, iguais na Administração e no Portal. */
 export const RECADO_STATUS_META: Record<RecadoEquipeStatus, { label: string; badge: string; dot: string }> = {
@@ -8,3 +8,10 @@ export const RECADO_STATUS_META: Record<RecadoEquipeStatus, { label: string; bad
 };
 
 export const recadoStatusOf = (r: RecadoEquipe): RecadoEquipeStatus => r.status ?? "pendente";
+
+/** Selo do card de retorno da Busca Ativa, no mesmo padrão dos recados. */
+export const BUSCA_RETORNO_STATUS_META: Record<BuscaAtivaStatus, { label: string; badge: string; dot: string }> = {
+  ...RECADO_STATUS_META,
+  nao_resolvido: { label: "Não resolvido", badge: "bg-red-500/15 text-red-300 border-red-400/40",          dot: "bg-red-400" },
+  finalizado:    { label: "Finalizado",    badge: "bg-violet-500/15 text-violet-300 border-violet-400/40", dot: "bg-violet-400" },
+};
