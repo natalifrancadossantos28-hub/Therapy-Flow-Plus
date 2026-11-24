@@ -588,8 +588,6 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [cancelDialog, setCancelDialog] = useState<CancelDialog | null>(null);
-  const [notifySending, setNotifySending] = useState(false);
-  const [notifyDone, setNotifyDone] = useState(false);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [altaConfirm, setAltaConfirm] = useState<Appointment | null>(null);
   const [altaMotivo, setAltaMotivo] = useState("");
@@ -994,7 +992,6 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       const realApt = { ...apt, id: data.id, status: "desmarcado" };
       await markNotificacoesLidoByAppointment(realApt.id);
       await logNotificacao(realApt, "Desmarcado");
-      setNotifyDone(false);
       setCancelDialog({ apt: realApt, profName, originalStatus });
     } catch {
       toast({ title: "Erro", description: "Não foi possível desmarcar.", variant: "destructive" });
@@ -1613,7 +1610,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     setRemanejFlow({ ...remanejFlow, step: "carla", newDate, newTime });
   };
 
-  const confirmRemanejar = async (notifyCarla: boolean) => {
+  const confirmRemanejar = async () => {
     if (!remanejFlow?.newDate || !remanejFlow?.newTime) return;
     const isRemarcar = remanejFlow.kind === "remarcar";
     const newStatus = isRemarcar ? "remarcado" : "remanejado";
@@ -1685,21 +1682,6 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           setAppointments(prev => prev.map(a => m.has(a.id) ? { ...a, date: m.get(a.id)!.date, time: m.get(a.id)!.time } : a));
         }
       }
-      if (notifyCarla && remanejFlow.apt.guardianPhone) {
-        const dayLabel = weekDays.find(d => format(d, "yyyy-MM-dd") === remanejFlow.newDate);
-        const dayStr = dayLabel ? format(dayLabel, "EEEE dd/MM", { locale: ptBR }) : remanejFlow.newDate;
-        await fetch("/api/whatsapp/cancel-notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            guardianPhone: remanejFlow.apt.guardianPhone,
-            guardianName: remanejFlow.apt.guardianName || "Responsável",
-            patientName: remanejFlow.apt.patientName || "Paciente",
-            professionalName: selectedProf?.name || "",
-            remanejadoPara: `${dayStr} às ${remanejFlow.newTime}`,
-          }),
-        });
-      }
       await markNotificacoesLidoByAppointment(realId);
       await logNotificacao(
         { ...remanejFlow.apt, id: realId, date: remanejFlow.newDate, time: remanejFlow.newTime },
@@ -1719,40 +1701,6 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       }
     } finally {
       setRemanejSending(false);
-    }
-  };
-
-  // ── Cancel notification (Carla) ──
-  const sendCancelNotification = async () => {
-    if (!cancelDialog) return;
-    const { apt, profName } = cancelDialog;
-    if (!apt.guardianPhone) {
-      toast({ title: "Sem telefone", description: "O responsável não tem telefone cadastrado.", variant: "destructive" });
-      return;
-    }
-    setNotifySending(true);
-    try {
-      const res = await fetch("/api/whatsapp/cancel-notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          guardianPhone: apt.guardianPhone,
-          guardianName: apt.guardianName || "Responsável",
-          patientName: apt.patientName || "Paciente",
-          professionalName: profName,
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setNotifyDone(true);
-        toast({ title: "Mensagem enviada!", description: `Carla avisou o responsável de ${apt.patientName}.` });
-      } else {
-        toast({ title: "Erro no envio", description: data.error || "Tente novamente.", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Bot offline", description: "O WhatsApp não está conectado ainda.", variant: "destructive" });
-    } finally {
-      setNotifySending(false);
     }
   };
 
@@ -3395,7 +3343,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         );
       })()}
 
-      {/* ── Remanejar / Remarcar: Carla Notify ── */}
+      {/* ── Remanejar / Remarcar: confirmação ── */}
       {remanejFlow?.step === "carla" && (() => {
         const isRemarcar = remanejFlow.kind === "remarcar";
         const fmtDia = (d?: string) => d ? format(new Date(d + "T12:00:00"), "EEEE dd/MM", { locale: ptBR }) : "";
@@ -3429,19 +3377,11 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   </div>
                 </div>
                 <p className="text-base text-[#3b3561]">
-                  {isRemarcar ? "Só nesta data — na semana seguinte volta ao horário de sempre." : "Vale para todas as semanas daqui pra frente."} Quer avisar o responsável pelo WhatsApp?
+                  {isRemarcar ? "Só nesta data — na semana seguinte volta ao horário de sempre." : "Vale para todas as semanas daqui pra frente."} A recepção recebe o aviso no sininho.
                 </p>
-                {!remanejFlow.apt.guardianPhone && (
-                  <p className="rounded-2xl border border-amber-300 bg-amber-50/80 px-3 py-2 text-base font-medium text-amber-600">Responsável sem telefone cadastrado.</p>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" className={BTN_LILAS_CONTORNO} disabled={remanejSending} onClick={() => confirmRemanejar(false)}>
-                    {isRemarcar ? "Só remarcar" : "Só remanejar"}
-                  </button>
-                  <button type="button" className={cn(BTN_LILAS, "flex items-center justify-center gap-2 text-base")} disabled={remanejSending || !remanejFlow.apt.guardianPhone} onClick={() => confirmRemanejar(true)}>
-                    <MessageCircle className="w-5 h-5" /> {remanejSending ? "Salvando…" : "Confirmar e avisar mãe"}
-                  </button>
-                </div>
+                <button type="button" className={cn(BTN_LILAS, "flex items-center justify-center gap-2")} disabled={remanejSending} onClick={() => confirmRemanejar()}>
+                  <MessageCircle className="w-5 h-5" /> {remanejSending ? "Salvando…" : "Confirmar e avisar recepção"}
+                </button>
                 <button type="button" className="w-full text-base font-semibold text-violet-700 py-1" disabled={remanejSending} onClick={() => setRemanejFlow({ ...remanejFlow, step: "slot" })}>
                   ← Escolher outro horário
                 </button>
@@ -3451,37 +3391,18 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         );
       })()}
 
-      {/* ── Carla Cancel Dialog ── */}
+      {/* ── Desmarcado: aviso à recepção ── */}
       {cancelDialog && (
         <ModalLilas icon={ChevronsRight} titulo="Desmarcado"
           subtitulo={<><strong>{cancelDialog.apt.patientName || "Paciente"}</strong> — {format(new Date(cancelDialog.apt.date + "T12:00:00"), "EEEE dd/MM", { locale: ptBR })} às {cancelDialog.apt.time}</>}
           onClose={() => setCancelDialog(null)}>
-          {notifyDone ? (
-            <>
-              <div className="flex flex-col items-center gap-2 rounded-2xl bg-violet-50 p-5 text-center">
-                <CheckCircle className="w-10 h-10 text-violet-700" />
-                <p className="text-xl font-bold">Mensagem enviada!</p>
-                <p className="text-base text-[#3b3561]">O responsável de <strong>{cancelDialog.apt.patientName}</strong> foi avisado pelo WhatsApp.</p>
-              </div>
-              <button type="button" className={BTN_LILAS} onClick={() => setCancelDialog(null)}>Fechar</button>
-            </>
-          ) : (
-            <>
-              <p className="rounded-2xl bg-violet-50 p-4 text-lg leading-snug">
-                O atendimento com <strong>{cancelDialog.profName}</strong> foi desmarcado só neste dia. Quer avisar o responsável agora?
-              </p>
-              {!cancelDialog.apt.guardianPhone && (
-                <p className="rounded-2xl border border-amber-300 bg-amber-50/80 px-3 py-2 text-base font-medium text-amber-600">Responsável sem telefone cadastrado — não dá para enviar o WhatsApp.</p>
-              )}
-              <button type="button" className={cn(BTN_LILAS, "flex items-center justify-center gap-2")} onClick={sendCancelNotification} disabled={notifySending || !cancelDialog.apt.guardianPhone}>
-                <MessageCircle className="w-5 h-5" /> {notifySending ? "Enviando…" : "Confirmar e avisar mãe"}
-              </button>
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" className={BTN_LILAS_CONTORNO} disabled={notifySending} onClick={() => setCancelDialog(null)}>Só desmarcar</button>
-                <button type="button" className={BTN_LILAS_CONTORNO} disabled={notifySending} onClick={() => handleRevertClick(cancelDialog.apt)}>Desfazer (reverter)</button>
-              </div>
-            </>
-          )}
+          <p className="rounded-2xl bg-violet-50 p-4 text-lg leading-snug">
+            O atendimento com <strong>{cancelDialog.profName}</strong> foi desmarcado só neste dia. A recepção recebe o aviso no sininho.
+          </p>
+          <button type="button" className={cn(BTN_LILAS, "flex items-center justify-center gap-2")} onClick={() => setCancelDialog(null)}>
+            <MessageCircle className="w-5 h-5" /> Confirmar e avisar recepção
+          </button>
+          <button type="button" className={BTN_LILAS_CONTORNO} onClick={() => handleRevertClick(cancelDialog.apt)}>Desfazer (reverter)</button>
         </ModalLilas>
       )}
     </div>
