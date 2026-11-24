@@ -117,12 +117,16 @@ function editadosKey(listId: string) {
 
 /** Mensagens editadas uma a uma (ficam guardadas neste computador). */
 function useEditados(listId: string) {
-  const [editados, setEditados] = useState<Record<string, string>>(() => {
-    try { return JSON.parse(localStorage.getItem(editadosKey(listId)) || "{}") ?? {}; } catch { return {}; }
+  // Guarda também a mensagem que foi editada: se a agenda mudar (outro horário, outra falta), a edição antiga não vale mais.
+  const [editados, setEditados] = useState<Record<string, { base: string; texto: string }>>(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(editadosKey(listId)) || "{}") ?? {};
+      return Object.fromEntries(Object.entries(raw).filter(([, v]) => v && typeof v === "object")) as Record<string, { base: string; texto: string }>;
+    } catch { return {}; }
   });
-  const editar = (key: string, texto: string | null) => setEditados(prev => {
+  const editar = (key: string, base: string, texto: string | null) => setEditados(prev => {
     const n = { ...prev };
-    if (texto == null) delete n[key]; else n[key] = texto;
+    if (texto == null) delete n[key]; else n[key] = { base, texto };
     try { localStorage.setItem(editadosKey(listId), JSON.stringify(n)); } catch { /* sem storage */ }
     return n;
   });
@@ -137,7 +141,8 @@ export function EnvioEmMassaModal({
   const [aberto, setAberto] = useState<string | null>(envios.length === 1 ? envios[0].key : null);
   const [editando, setEditando] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
-  const msg = (e: Envio) => editados[e.key] ?? e.message;
+  const edicao = (e: Envio) => (editados[e.key]?.base === e.message ? editados[e.key].texto : undefined);
+  const msg = (e: Envio) => edicao(e) ?? e.message;
   const comTelefone = envios.filter(e => waPhone(e.phone));
   const pendentes = comTelefone.filter(e => !sent.has(e.key));
   const enviar = (e: Envio) => { openWhatsApp(e.phone, msg(e)); mark(e.key); };
@@ -190,7 +195,7 @@ export function EnvioEmMassaModal({
           {envios.map(e => {
             const ok = sent.has(e.key);
             const temTel = !!waPhone(e.phone);
-            const editada = e.key in editados;
+            const editada = edicao(e) !== undefined;
             return (
               <div key={e.key} className={cn("rounded-xl border p-3", ok ? "border-emerald-500/30 bg-emerald-500/5" : "border-border/60")}>
                 <div className="flex items-center gap-3">
@@ -233,14 +238,14 @@ export function EnvioEmMassaModal({
                     <textarea
                       autoFocus
                       value={msg(e)}
-                      onChange={ev => editar(e.key, ev.target.value)}
+                      onChange={ev => editar(e.key, e.message, ev.target.value)}
                       rows={Math.min(14, msg(e).split("\n").length + 2)}
                       className="w-full text-xs leading-relaxed p-2.5 rounded-lg bg-background border border-amber-500/40 focus:outline-none focus:ring-1 focus:ring-amber-500/60"
                     />
                     <div className="flex items-center gap-3 text-[11px]">
                       <span className="text-muted-foreground">Muda só a mensagem de {firstName(e.name)}. Fica salva neste computador.</span>
                       {editada && (
-                        <button onClick={() => editar(e.key, null)} className="ml-auto font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1">
+                        <button onClick={() => editar(e.key, e.message, null)} className="ml-auto font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1">
                           <RotateCcw className="w-3 h-3" /> Desfazer edição
                         </button>
                       )}
@@ -611,7 +616,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
     const porPaciente = new Map<number, BuscaAtivaCaso>();
     for (const c of casos.filter(casoAberto)) if (!porPaciente.has(c.patientId)) porPaciente.set(c.patientId, c);
     return [...porPaciente.values()].map(c => ({
-      key: `busca-${c.patientId}`,
+      key: `busca-${c.id}`,
       name: c.patientName,
       sub: [c.specialty, c.motivo].filter(Boolean).join(" · "),
       phone: c.patientPhone || phoneOf(c.patientId),
@@ -844,7 +849,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
                   </div>
                   <button
                     disabled={!waPhone(e.phone)}
-                    onClick={() => setModal({ listId: "falta-van", titulo: "Falta de van sem aviso", fonte: "faltaVan", so: e.key })}
+                    onClick={() => setModal({ listId: `falta-van-${today}`, titulo: "Falta de van sem aviso", fonte: "faltaVan", so: e.key })}
                     className={btnEnviarMini}
                   >
                     Avisar família
@@ -857,7 +862,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
             {faltasVan.length > 1 && (
               <button
                 className={btnContorno}
-                onClick={() => setModal({ listId: "falta-van", titulo: "Faltas de van sem aviso — hoje", fonte: "faltaVan" })}
+                onClick={() => setModal({ listId: `falta-van-${today}`, titulo: "Faltas de van sem aviso — hoje", fonte: "faltaVan" })}
               >
                 Avisar todas as faltas de van ({faltasVan.length})
               </button>
