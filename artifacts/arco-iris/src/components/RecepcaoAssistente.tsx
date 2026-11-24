@@ -50,6 +50,12 @@ export function openWhatsApp(phone: string | null | undefined, msg: string) {
   abrirWhatsApp(waPhone(phone), msg);
 }
 
+function hashTexto(t: string): string {
+  let h = 0;
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
 function firstName(name: string): string {
   return (name || "").trim().split(/\s+/)[0] || name;
 }
@@ -849,7 +855,9 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agendaAviso, avisoTipo, recado, solicitante, periodoTexto, profById, patientById, modelos, today]);
   const avisoLista = {
-    listId: `${avisoTipo}-${avisoProfId ?? "todos"}-${avisoInicio}-${avisoFim}`,
+    // Recados diferentes (outro texto ou outro solicitante) nos mesmos dias não compartilham o "enviado".
+    listId: `${avisoTipo}-${avisoProfId ?? "todos"}-${avisoInicio}-${avisoFim}` +
+      (avisoTipo === "avisoGeral" ? `-${solicId ?? "coord"}-${hashTexto(recado.trim())}` : ""),
     titulo: `${AVISO_TIPOS.find(t => t.id === avisoTipo)!.rotulo} — ${avisoProfId !== null ? profById.get(avisoProfId)?.name ?? "" : "todos os profissionais"} · ${periodoTexto}`,
     fonte: avisoTipo,
   };
