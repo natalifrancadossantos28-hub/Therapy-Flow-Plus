@@ -10,6 +10,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { specialtyTone, specialtyShortLabel } from "@/lib/specialty-colors";
+import { abrirWhatsApp } from "@/lib/whatsapp";
 
 /**
  * Central de Notificações da Recepção.
@@ -140,14 +141,7 @@ export default function NotificationBell() {
     const phone = sanitizePhone(n.patientPhone);
     const msg = buildWhatsAppMessage(n);
     // Sem telefone cadastrado → abre WhatsApp Web genérico já com o texto pronto.
-    const url = phone
-      ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
-      : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-    // Janela única: reaproveita sempre a mesma aba do WhatsApp (nome fixo do
-    // target) em vez de abrir uma nova a cada clique. Sem noopener para que o
-    // navegador reutilize a janela nomeada.
-    const waWindow = window.open(url, "whatsapp_nfs");
-    if (waWindow) waWindow.focus();
+    abrirWhatsApp(phone, msg);
     if (!phone) {
       toast({
         title: "Sem telefone do responsável",

@@ -23,6 +23,7 @@ import { isHiddenByPatientStatus, worksThroughLunch } from "@/lib/schedule";
 import { isTransportSpecialty, specialtyKey } from "@/lib/specialty-colors";
 import { MotionCard } from "@/components/ui-custom";
 import { cn, todayBR, displayApptStatus, firstEvalKey } from "@/lib/utils";
+import { abrirWhatsApp, lerModoWhatsApp, gravarModoWhatsApp, type WhatsAppModo } from "@/lib/whatsapp";
 import { MODELOS, type ModeloId, lerModelos, gravarModelos, preencher, exemploDe } from "@/lib/mensagens-modelo";
 
 const UNIDADE = "Núcleo de Atendimento Novo Arco-íris 🌈";
@@ -46,12 +47,7 @@ export function waPhone(p: string | null | undefined): string {
 }
 
 export function openWhatsApp(phone: string | null | undefined, msg: string) {
-  const ph = waPhone(phone);
-  const url = ph
-    ? `https://wa.me/${ph}?text=${encodeURIComponent(msg)}`
-    : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-  const w = window.open(url, "whatsapp_nfs");
-  if (w) w.focus();
+  abrirWhatsApp(waPhone(phone), msg);
 }
 
 function firstName(name: string): string {
@@ -484,6 +480,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
   const [verTodosEncaixes, setVerTodosEncaixes] = useState(false);
   const [modelos, setModelos] = useState(lerModelos);
   const [editandoModelo, setEditandoModelo] = useState<ModeloId | null>(null);
+  const [modoWa, setModoWa] = useState<WhatsAppModo>(lerModoWhatsApp);
 
   const proximoDia = useMemo(() => nextWorkingDay(today, feriados), [today, feriados]);
   const [diaLembrete, setDiaLembrete] = useState<string | null>(null);
@@ -808,9 +805,24 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
 
   return (
     <section className="space-y-4">
-      <div className="flex items-baseline gap-3">
+      <div className="flex flex-wrap items-baseline gap-3">
         <h2 className="text-lg font-bold">Assistente da recepção</h2>
         <span className="text-xs text-muted-foreground">mensagens prontas a partir da agenda · o lápis edita o texto</span>
+        <div className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground" title="Onde as mensagens abrem. Fica salvo neste computador.">
+          Abrir no:
+          {([["web", "WhatsApp Web (mesma aba)"], ["app", "Aplicativo do WhatsApp"]] as const).map(([m, rotulo]) => (
+            <button
+              key={m}
+              onClick={() => { gravarModoWhatsApp(m); setModoWa(m); }}
+              className={cn(
+                "h-7 px-2.5 rounded-lg border",
+                modoWa === m ? "bg-green-600 text-white border-green-600" : "border-border hover:bg-secondary",
+              )}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
