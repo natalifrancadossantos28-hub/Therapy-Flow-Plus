@@ -25,6 +25,7 @@ import { ResumoSemana } from "@/components/ResumoSemana";
 import { AbsenceBadge } from "@/components/AbsenceBadge";
 import { DocPill } from "@/components/PatientDocs";
 import { PainelAcoes, AcaoBotao, SecaoAcoes, AvisoAcoes, CartaoPeriodo } from "@/components/AcoesAgenda";
+import { ModalLilas, BTN_LILAS, BTN_LILAS_CONTORNO } from "@/components/ModalLilas";
 import {
   listProfessionals,
   verifyProfessionalPin,
@@ -318,6 +319,7 @@ type RemanejFlow = {
   kind: "remanejar" | "remarcar";
   step: "slot" | "carla";
   weekRef: Date;
+  dia?: string;
   newDate?: string;
   newTime?: string;
 };
@@ -3119,105 +3121,52 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       {undoMultiApt && (() => {
         const partner = (undoMultiApt.notes || "").replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "").trim();
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => !undoMultiSending && setUndoMultiApt(null)}>
-            <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(8,0,14,0.97)", border: "1px solid rgba(139,92,246,0.4)" }} onClick={e => e.stopPropagation()}>
-              <div className="px-6 py-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(139,92,246,0.15)", border: "1px solid #8b5cf6" }}>
-                    <UserX className="w-5 h-5" style={{ color: "#c4b5fd" }} />
-                  </div>
-                  <div>
-                    <p className="font-bold" style={{ color: "#c4b5fd", textShadow: "0 0 8px rgba(196,181,253,0.8)" }}>Desfazer Multi</p>
-                    <p className="text-xs text-white/50">{undoMultiApt.patientName} — {undoMultiApt.time}</p>
-                  </div>
-                </div>
-
-                <p className="text-sm text-white/80 mb-2 leading-relaxed">
-                  Remover o profissional convidado{partner ? <> <span className="font-bold text-violet-300">{partner}</span></> : ""} deste atendimento?
-                </p>
-                <p className="text-[11px] text-white/45 mb-4 leading-relaxed">
-                  {selectedProf?.name ? <><span className="font-semibold text-white/70">{selectedProf.name}</span> continua com o atendimento normalmente.</> : "O profissional principal continua com o atendimento normalmente."} As ocorrências passadas são preservadas.
-                </p>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={confirmDesfazerMulti}
-                    disabled={undoMultiSending}
-                    style={{ ...NEON.violet, flex: 1, justifyContent: "center", padding: "10px", opacity: undoMultiSending ? 0.5 : 1, cursor: undoMultiSending ? "wait" : "pointer" }}
-                  >
-                    <UserX className="w-4 h-4" /> {undoMultiSending ? "Removendo..." : "Remover convidado"}
-                  </button>
-                  <Button variant="outline" disabled={undoMultiSending} className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setUndoMultiApt(null)}>
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
+          <ModalLilas icon={UserX} titulo="Desfazer Multi" subtitulo={`${undoMultiApt.patientName ?? ""} — ${undoMultiApt.time}`} onClose={() => !undoMultiSending && setUndoMultiApt(null)}>
+            <p className="rounded-2xl bg-violet-50 p-4 text-lg leading-snug">
+              Remover o profissional convidado{partner ? <> <strong>{partner}</strong></> : ""} deste atendimento?
+            </p>
+            <p className="text-base text-[#3b3561]">
+              {selectedProf?.name ? <><strong>{selectedProf.name}</strong> continua com o atendimento normalmente.</> : "O profissional principal continua com o atendimento normalmente."} As ocorrências passadas são preservadas.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" className={BTN_LILAS_CONTORNO} disabled={undoMultiSending} onClick={() => setUndoMultiApt(null)}>Cancelar</button>
+              <button type="button" className={BTN_LILAS} disabled={undoMultiSending} onClick={confirmDesfazerMulti}>
+                {undoMultiSending ? "Removendo…" : "Remover convidado"}
+              </button>
             </div>
-          </div>
+          </ModalLilas>
         );
       })()}
 
       {/* ── Atendimento Multi Modal ── */}
       {multiApt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setMultiApt(null)}>
-          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,8,10,0.97)", border: "1px solid rgba(6,182,212,0.3)" }} onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(6,182,212,0.15)", border: "1px solid #06b6d4" }}>
-                  <UserPlus className="w-5 h-5" style={{ color: "#67e8f9" }} />
-                </div>
-                <div>
-                  <p className="font-bold" style={{ color: "#67e8f9", textShadow: "0 0 8px rgba(103,232,249,0.8)" }}>Atendimento Multi</p>
-                  <p className="text-xs text-white/50">{multiApt.patientName} — {multiApt.time}</p>
-                </div>
-              </div>
-
-              {multiErro && (
-                <div className="rounded-xl p-3 mb-4 text-sm font-semibold" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171" }}>
-                  {multiErro}
-                </div>
-              )}
-
-              <div className="mb-4">
-                <label className="block text-xs font-bold mb-1" style={{ color: "#67e8f9" }}>Segundo Profissional *</label>
-                <select
-                  value={multiProfId}
-                  onChange={e => { setMultiProfId(e.target.value); setMultiErro(""); }}
-                  className="w-full rounded-xl text-sm p-3"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(6,182,212,0.3)", color: "#fff", outline: "none" }}
-                  onFocus={e => { e.currentTarget.style.borderColor = "#06b6d4"; e.currentTarget.style.boxShadow = "0 0 10px rgba(6,182,212,0.3)"; }}
-                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(6,182,212,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
-                >
-                  <option value="" style={{ background: "#000a0c" }}>Selecione o profissional...</option>
-                  {professionals
-                    .filter(p => String(p.id) !== selectedProfId && !isTransportSpecialty(p.specialty))
-                    .map(p => (
-                      <option key={p.id} value={String(p.id)} style={{ background: "#000a0c" }}>
-                        {p.name} — {p.specialty || "Sem especialidade"}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <p className="text-[10px] text-white/40 mb-4 leading-relaxed">
-                O horário ficará bloqueado na agenda de ambos os profissionais. Profissionais da mesma especialidade não são permitidos.
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={confirmMultiAtendimento}
-                  disabled={!multiProfId || multiSending}
-                  style={{ ...NEON.cyan, flex: 1, justifyContent: "center", padding: "10px", opacity: multiProfId && !multiSending ? 1 : 0.4, cursor: multiProfId && !multiSending ? "pointer" : "not-allowed" }}
-                >
-                  <UserPlus className="w-4 h-4" /> {multiSending ? "Criando..." : "Confirmar Multi"}
-                </button>
-                <Button variant="outline" className="flex-1 border-white/10 text-white/60 hover:text-white hover:bg-white/5" onClick={() => setMultiApt(null)}>
-                  Cancelar
-                </Button>
-              </div>
-            </div>
+        <ModalLilas icon={UserPlus} titulo="Atendimento Multi" subtitulo={`${multiApt.patientName ?? ""} — ${multiApt.time}`} onClose={() => setMultiApt(null)}>
+          {multiErro && <p className="rounded-2xl border border-rose-300 bg-rose-50 p-3 text-base font-semibold text-rose-600">{multiErro}</p>}
+          <p className="text-base text-[#3b3561]">Toque no segundo profissional que vai atender junto:</p>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+            {professionals
+              .filter(p => String(p.id) !== selectedProfId && !isTransportSpecialty(p.specialty))
+              .map(p => {
+                const sel = multiProfId === String(p.id);
+                return (
+                  <li key={p.id}>
+                    <button type="button" onClick={() => { setMultiProfId(String(p.id)); setMultiErro(""); }} aria-pressed={sel}
+                      className={cn("w-full text-left rounded-2xl border px-3 py-2.5", sel ? "border-violet-600 bg-gradient-to-br from-violet-500 to-violet-700 text-white" : "border-violet-200 bg-white")}>
+                      <span className="block text-lg font-semibold leading-snug break-words">{p.name}</span>
+                      <span className={cn("block text-sm", sel ? "text-white/85" : "text-[#3b3561]")}>{p.specialty || "Sem especialidade"}</span>
+                    </button>
+                  </li>
+                );
+              })}
+          </ul>
+          <p className="text-sm text-[#3b3561]">O horário fica bloqueado na agenda dos dois profissionais. Não pode ser da mesma especialidade.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" className={BTN_LILAS_CONTORNO} onClick={() => setMultiApt(null)}>Cancelar</button>
+            <button type="button" className={BTN_LILAS} disabled={!multiProfId || multiSending} onClick={confirmMultiAtendimento}>
+              {multiSending ? "Criando…" : "Confirmar Multi"}
+            </button>
           </div>
-        </div>
+        </ModalLilas>
       )}
 
       {/* ── Transporte (Motorista) Modal ── */}
@@ -3377,220 +3326,163 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       )}
 
       {/* ── Remanejar / Remarcar: Pick Slot ── */}
-      {remanejFlow?.step === "slot" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,5,15,0.97)", border: "1px solid rgba(59,130,246,0.3)" }}>
-            <div className="px-6 py-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "rgba(59,130,246,0.15)", border: "1px solid #3b82f6" }}>
-                    <RotateCcw className="w-4 h-4" style={{ color: "#60a5fa" }} />
-                  </div>
-                  <div>
-                    <p className="font-bold" style={{ color: "#60a5fa", textShadow: "0 0 8px rgba(96,165,250,0.8)" }}>
-                      {remanejFlow.kind === "remarcar" ? "Remarcar" : "Remanejar"}
-                    </p>
-                    <p className="text-xs text-white/50">{remanejFlow.apt.patientName}</p>
-                  </div>
-                </div>
-                <button onClick={() => setRemanejFlow(null)} className="text-white/30 hover:text-white/70"><X className="w-5 h-5" /></button>
+      {remanejFlow?.step === "slot" && (() => {
+        const isRemarcar = remanejFlow.kind === "remarcar";
+        const dias = isRemarcar ? modalWeekDates : weekDates;
+        const diasD = isRemarcar ? modalWeekDays : weekDays;
+        const nDia = (d: string) => modalAvailableSlots.filter(s => s.date === d).length;
+        const dia = remanejFlow.dia && dias.includes(remanejFlow.dia) ? remanejFlow.dia
+          : dias.includes(remanejFlow.apt.date) && nDia(remanejFlow.apt.date) ? remanejFlow.apt.date
+          : dias.find(d => nDia(d) > 0) ?? dias[0];
+        const slotsDia = modalAvailableSlots.filter(s => s.date === dia);
+        const diaAtual = format(new Date(remanejFlow.apt.date + "T12:00:00"), "EEEE dd/MM", { locale: ptBR });
+        return (
+          <ModalLilas icon={isRemarcar ? CalendarDays : RotateCcw} titulo={isRemarcar ? "Remarcar" : "Remanejar"}
+            subtitulo={<><strong>{remanejFlow.apt.patientName}</strong> — hoje está {diaAtual} às {remanejFlow.apt.time}</>}
+            onClose={() => setRemanejFlow(null)}>
+            <p className="rounded-2xl bg-violet-50 px-4 py-3 text-base text-[#3b3561]">
+              {isRemarcar
+                ? "Só nesta data: na semana seguinte volta ao horário de sempre."
+                : "Todas as semanas daqui pra frente: o novo dia e horário ficam fixos."}
+            </p>
+            {isRemarcar && (
+              <div className="flex items-center justify-between gap-2">
+                <button type="button" aria-label="Semana anterior" onClick={() => setRemanejFlow({ ...remanejFlow, dia: undefined, weekRef: addDays(remanejFlow.weekRef, -7) })}
+                  className="grid place-items-center w-11 h-11 rounded-full bg-violet-50 text-violet-800"><ChevronLeft className="w-5 h-5" /></button>
+                <p className="text-lg font-bold">{format(modalWeekDays[0], "dd/MM")} a {format(modalWeekDays[4], "dd/MM/yyyy")}</p>
+                <button type="button" aria-label="Próxima semana" onClick={() => setRemanejFlow({ ...remanejFlow, dia: undefined, weekRef: addDays(remanejFlow.weekRef, 7) })}
+                  className="grid place-items-center w-11 h-11 rounded-full bg-violet-50 text-violet-800"><ChevronRight className="w-5 h-5" /></button>
               </div>
-
-              {remanejFlow.kind === "remarcar" && (
-                <div className="flex items-center justify-between mb-3 px-1">
-                  <button
-                    type="button"
-                    onClick={() => setRemanejFlow({ ...remanejFlow, weekRef: addDays(remanejFlow.weekRef, -7) })}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center"
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}
-                    aria-label="Semana anterior"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
+            )}
+            <div className="flex flex-wrap gap-2">
+              {dias.map((d, i) => {
+                const sel = d === dia;
+                const n = nDia(d);
+                return (
+                  <button key={d} type="button" onClick={() => setRemanejFlow({ ...remanejFlow, dia: d })}
+                    className={cn("min-w-[4.6rem] flex-1 px-2 py-2 rounded-2xl border text-center", sel ? "border-violet-600 bg-gradient-to-br from-violet-500 to-violet-700 text-white" : "border-violet-200 bg-white")}>
+                    <span className="block text-base font-bold capitalize">{format(diasD[i], "EEE", { locale: ptBR })}</span>
+                    <span className="block text-xs">{format(diasD[i], "dd/MM")}</span>
+                    <span className="block text-sm">{n} {n === 1 ? "opção" : "opções"}</span>
                   </button>
-                  <p className="text-xs font-bold text-white/80 text-center">
-                    {format(modalWeekDays[0], "dd/MM")} a {format(modalWeekDays[4], "dd/MM/yyyy")}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setRemanejFlow({ ...remanejFlow, weekRef: addDays(remanejFlow.weekRef, 7) })}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center"
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}
-                    aria-label="Próxima semana"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              <p className="text-sm text-white/60 mb-4">
-                {remanejFlow.kind === "remarcar"
-                  ? "Navegue entre as semanas e escolha um horário livre ou um grupo:"
-                  : "Escolha um novo horário — livre ou um grupo já existente:"}
-              </p>
-
-              {modalAvailableSlots.length === 0 ? (
-                <p className="text-center text-white/40 py-8">Nenhum horário disponível nesta semana.</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
-                  {(remanejFlow.kind === "remarcar" ? modalWeekDates : weekDates).map(date => {
-                    const daySlots = modalAvailableSlots.filter(s => s.date === date);
-                    if (daySlots.length === 0) return null;
-                    const dayLabel = (remanejFlow.kind === "remarcar" ? modalWeekDays : weekDays).find(d => format(d, "yyyy-MM-dd") === date);
-                    return (
-                      <div key={date}>
-                        <p className="text-[10px] text-white/40 uppercase font-bold mb-1">
-                          {dayLabel ? format(dayLabel, "EEE dd/MM", { locale: ptBR }) : date}
-                        </p>
-                        {daySlots.map(slot => (
-                          <button
-                            key={slot.time}
-                            onClick={() => handlePickRemanejSlot(slot.date, slot.time)}
-                            style={slot.group.length > 0 ? NEON.cyan : NEON.blue}
-                            className="mb-1"
-                            title={slot.group.length > 0 ? `Entrar no grupo: ${slot.group.join(", ")}` : "Horário livre"}
-                          >
-                            {slot.time}
-                            {slot.group.length > 0 && (
-                              <span className="text-[9px] font-bold uppercase"> · grupo ({slot.group.length})</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                );
+              })}
             </div>
-          </div>
-        </div>
-      )}
+            {slotsDia.length === 0 ? (
+              <p className="rounded-2xl bg-violet-50 p-4 text-lg text-[#3b3561]">Nenhum horário disponível neste dia.</p>
+            ) : (
+              <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-80 overflow-y-auto pr-1">
+                {slotsDia.map(slot => {
+                  const grupo = slot.group.length > 0;
+                  return (
+                    <li key={slot.time}>
+                      <button type="button" onClick={() => handlePickRemanejSlot(slot.date, slot.time)}
+                        title={grupo ? `Entrar no grupo: ${slot.group.join(", ")}` : "Horário livre"}
+                        className={cn("w-full h-full text-left rounded-2xl border px-3 py-2 hover:border-violet-600", grupo ? "border-violet-200 bg-violet-50" : "border-violet-200 bg-white")}>
+                        <span className="flex items-center gap-1.5 text-xl font-bold tabular-nums">
+                          {grupo ? <Users className="w-4 h-4 text-violet-700" /> : <Clock className="w-4 h-4 text-violet-700" />}{slot.time}
+                        </span>
+                        <span className="block text-sm text-[#3b3561] leading-snug line-clamp-2">
+                          {grupo ? `Grupo: ${slot.group.join(", ")}` : "Livre"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </ModalLilas>
+        );
+      })()}
 
       {/* ── Remanejar / Remarcar: Carla Notify ── */}
-      {remanejFlow?.step === "carla" && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-            <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">N</div>
-              <div className="flex-1">
-                <p className="text-white font-bold text-sm">Assistente</p>
-                <p className="text-white/70 text-xs">NFs Gestão</p>
-              </div>
-              <button onClick={() => setRemanejFlow(null)} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="px-5 py-5">
-              {remanejDone ? (
-                <div className="flex flex-col items-center gap-3 py-4 text-center">
-                  <CheckCircle className="w-10 h-10 text-blue-500" />
-                  <p className="font-semibold text-slate-800">
-                    {remanejFlow.kind === "remarcar" ? "Remarcação concluída!" : "Remanejamento concluído!"}
+      {remanejFlow?.step === "carla" && (() => {
+        const isRemarcar = remanejFlow.kind === "remarcar";
+        const fmtDia = (d?: string) => d ? format(new Date(d + "T12:00:00"), "EEEE dd/MM", { locale: ptBR }) : "";
+        return (
+          <ModalLilas icon={isRemarcar ? CalendarDays : RotateCcw} titulo={isRemarcar ? "Remarcar" : "Remanejar"}
+            subtitulo={remanejFlow.apt.patientName} onClose={() => setRemanejFlow(null)}>
+            {remanejDone ? (
+              <>
+                <div className="flex flex-col items-center gap-2 rounded-2xl bg-violet-50 p-5 text-center">
+                  <CheckCircle className="w-10 h-10 text-violet-700" />
+                  <p className="text-xl font-bold">{isRemarcar ? "Remarcação concluída!" : "Remanejamento concluído!"}</p>
+                  <p className="text-base text-[#3b3561]">
+                    {remanejFlow.apt.patientName} foi para {fmtDia(remanejFlow.newDate)} às {remanejFlow.newTime}.
+                    {isRemarcar && " Na semana seguinte, volta ao horário de sempre."}
                   </p>
-                  <p className="text-sm text-slate-600">
-                    {remanejFlow.apt.patientName} movido(a) para {remanejFlow.newTime} do dia {remanejFlow.newDate}.
-                    {remanejFlow.kind === "remarcar" && " Na semana seguinte, retorna ao horário original."}
-                  </p>
-                  <Button onClick={() => setRemanejFlow(null)} className="mt-2 w-full">Fechar</Button>
                 </div>
-              ) : (
-                <>
-                  <div className="bg-blue-50 border border-blue-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
-                    <p className="text-sm text-slate-800 leading-relaxed">
-                      Vi que você {remanejFlow.kind === "remarcar" ? "remarcou" : "remanejou"} o atendimento de{" "}
-                      <strong>{remanejFlow.apt.patientName}</strong> para{" "}
-                      <strong>{remanejFlow.newTime} — {
-                        (() => {
-                          const allDays = [...weekDays, ...modalWeekDays];
-                          const match = allDays.find(d => format(d, "yyyy-MM-dd") === remanejFlow.newDate);
-                          return match ? format(match, "EEEE dd/MM", { locale: ptBR }) : remanejFlow.newDate;
-                        })()
-                      }</strong>.{" "}
-                      {remanejFlow.kind === "remarcar"
-                        ? "Essa mudança é pontual — na semana seguinte, volta ao horário original. "
-                        : "Essa mudança é definitiva — o novo horário vale para as próximas semanas. "}
-                      Posso avisar o responsável pelo WhatsApp?
-                    </p>
+                <button type="button" className={BTN_LILAS} onClick={() => setRemanejFlow(null)}>Fechar</button>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div className="rounded-2xl border border-violet-200 bg-white p-3">
+                    <p className="text-sm text-[#3b3561]">Antes</p>
+                    <p className="text-base font-semibold capitalize">{fmtDia(remanejFlow.apt.date)}</p>
+                    <p className="text-2xl font-bold tabular-nums">{remanejFlow.apt.time}</p>
                   </div>
-                  {!remanejFlow.apt.guardianPhone && (
-                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
-                      Responsável sem telefone cadastrado.
-                    </p>
-                  )}
-                  <div className="flex gap-3">
-                    <Button
-                      className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700 text-xs"
-                      onClick={() => confirmRemanejar(true)}
-                      disabled={remanejSending || !remanejFlow.apt.guardianPhone}
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      {remanejSending ? "Processando..." : "Confirmar e Avisar Mãe"}
-                    </Button>
-                    <Button variant="outline" className="flex-1" onClick={() => confirmRemanejar(false)} disabled={remanejSending}>
-                      {remanejFlow.kind === "remarcar" ? "Só remarcar" : "Só remanejar"}
-                    </Button>
+                  <div className="rounded-2xl border border-violet-600 bg-violet-50 p-3">
+                    <p className="text-sm text-[#3b3561]">Depois</p>
+                    <p className="text-base font-semibold capitalize">{fmtDia(remanejFlow.newDate)}</p>
+                    <p className="text-2xl font-bold tabular-nums">{remanejFlow.newTime}</p>
                   </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+                </div>
+                <p className="text-base text-[#3b3561]">
+                  {isRemarcar ? "Só nesta data — na semana seguinte volta ao horário de sempre." : "Vale para todas as semanas daqui pra frente."} Quer avisar o responsável pelo WhatsApp?
+                </p>
+                {!remanejFlow.apt.guardianPhone && (
+                  <p className="rounded-2xl border border-amber-300 bg-amber-50/80 px-3 py-2 text-base font-medium text-amber-600">Responsável sem telefone cadastrado.</p>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" className={BTN_LILAS_CONTORNO} disabled={remanejSending} onClick={() => confirmRemanejar(false)}>
+                    {isRemarcar ? "Só remarcar" : "Só remanejar"}
+                  </button>
+                  <button type="button" className={cn(BTN_LILAS, "flex items-center justify-center gap-2 text-base")} disabled={remanejSending || !remanejFlow.apt.guardianPhone} onClick={() => confirmRemanejar(true)}>
+                    <MessageCircle className="w-5 h-5" /> {remanejSending ? "Salvando…" : "Confirmar e avisar mãe"}
+                  </button>
+                </div>
+                <button type="button" className="w-full text-base font-semibold text-violet-700 py-1" disabled={remanejSending} onClick={() => setRemanejFlow({ ...remanejFlow, step: "slot" })}>
+                  ← Escolher outro horário
+                </button>
+              </>
+            )}
+          </ModalLilas>
+        );
+      })()}
 
       {/* ── Carla Cancel Dialog ── */}
       {cancelDialog && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-            <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-violet-600 to-indigo-600">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">N</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-bold text-sm">Assistente</p>
-                <p className="text-white/70 text-xs">NFs Gestão</p>
+        <ModalLilas icon={ChevronsRight} titulo="Desmarcado"
+          subtitulo={<><strong>{cancelDialog.apt.patientName || "Paciente"}</strong> — {format(new Date(cancelDialog.apt.date + "T12:00:00"), "EEEE dd/MM", { locale: ptBR })} às {cancelDialog.apt.time}</>}
+          onClose={() => setCancelDialog(null)}>
+          {notifyDone ? (
+            <>
+              <div className="flex flex-col items-center gap-2 rounded-2xl bg-violet-50 p-5 text-center">
+                <CheckCircle className="w-10 h-10 text-violet-700" />
+                <p className="text-xl font-bold">Mensagem enviada!</p>
+                <p className="text-base text-[#3b3561]">O responsável de <strong>{cancelDialog.apt.patientName}</strong> foi avisado pelo WhatsApp.</p>
               </div>
-              <button onClick={() => setCancelDialog(null)} className="text-white/60 hover:text-white transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="px-5 py-5">
-              {notifyDone ? (
-                <div className="flex flex-col items-center gap-3 py-4 text-center">
-                  <CheckCircle className="w-10 h-10 text-green-500" />
-                  <p className="font-semibold text-slate-800">Mensagem enviada!</p>
-                  <p className="text-sm text-slate-600">
-                    O responsável de <strong>{cancelDialog.apt.patientName}</strong> foi avisado pelo WhatsApp.
-                  </p>
-                  <Button onClick={() => setCancelDialog(null)} className="mt-2 w-full">Fechar</Button>
-                </div>
-              ) : (
-                <>
-                  <div className="bg-violet-50 border border-violet-100 rounded-2xl rounded-tl-none px-4 py-3 mb-5">
-                    <p className="text-sm text-slate-800 leading-relaxed">
-                      Vi que você desmarcou o atendimento de <strong>{cancelDialog.profName}</strong>.{" "}
-                      Posso avisar o responsável pelo(a) <strong>{cancelDialog.apt.patientName || "Paciente"}</strong> agora?
-                    </p>
-                  </div>
-                  {!cancelDialog.apt.guardianPhone && (
-                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
-                      ⚠️ Responsável sem telefone cadastrado — não será possível enviar o WhatsApp.
-                    </p>
-                  )}
-                  <div className="flex gap-3">
-                    <Button
-                      className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700 text-xs"
-                      onClick={sendCancelNotification}
-                      disabled={notifySending || !cancelDialog.apt.guardianPhone}
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      {notifySending ? "Enviando..." : "Confirmar Cancelamento e Avisar Mãe"}
-                    </Button>
-                    <Button variant="outline" className="flex-1" onClick={() => {
-                      if (cancelDialog) handleRevertClick(cancelDialog.apt);
-                    }} disabled={notifySending}>
-                      Reverter
-                    </Button>
-                  </div>
-                </>
+              <button type="button" className={BTN_LILAS} onClick={() => setCancelDialog(null)}>Fechar</button>
+            </>
+          ) : (
+            <>
+              <p className="rounded-2xl bg-violet-50 p-4 text-lg leading-snug">
+                O atendimento com <strong>{cancelDialog.profName}</strong> foi desmarcado só neste dia. Quer avisar o responsável agora?
+              </p>
+              {!cancelDialog.apt.guardianPhone && (
+                <p className="rounded-2xl border border-amber-300 bg-amber-50/80 px-3 py-2 text-base font-medium text-amber-600">Responsável sem telefone cadastrado — não dá para enviar o WhatsApp.</p>
               )}
-            </div>
-          </div>
-        </div>
+              <button type="button" className={cn(BTN_LILAS, "flex items-center justify-center gap-2")} onClick={sendCancelNotification} disabled={notifySending || !cancelDialog.apt.guardianPhone}>
+                <MessageCircle className="w-5 h-5" /> {notifySending ? "Enviando…" : "Confirmar e avisar mãe"}
+              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" className={BTN_LILAS_CONTORNO} disabled={notifySending} onClick={() => setCancelDialog(null)}>Só desmarcar</button>
+                <button type="button" className={BTN_LILAS_CONTORNO} disabled={notifySending} onClick={() => handleRevertClick(cancelDialog.apt)}>Desfazer (reverter)</button>
+              </div>
+            </>
+          )}
+        </ModalLilas>
       )}
     </div>
   );
