@@ -144,6 +144,35 @@ export function EnvioEmMassaModal({
   const comTelefone = envios.filter(e => waPhone(e.phone));
   const pendentes = comTelefone.filter(e => !sent.has(e.key));
   const enviar = (e: Envio) => { openWhatsApp(e.phone, msg(e)); mark(e.key); };
+  const [emSequencia, setEmSequencia] = useState(false);
+  const [ultimo, setUltimo] = useState<Envio | null>(null);
+  const proximaRef = useRef<HTMLButtonElement>(null);
+  const proxima = pendentes[0];
+  const enviarProxima = () => {
+    if (!proxima) return;
+    setUltimo(proxima);
+    enviar(proxima);
+  };
+  const modoApp = lerModoWhatsApp() === "app";
+
+  useEffect(() => { if (emSequencia) proximaRef.current?.focus(); }, [emSequencia, proxima?.key]);
+
+  // Ao voltar para a Recepção, Enter já abre a próxima família.
+  useEffect(() => {
+    if (!emSequencia) return;
+    if (!proxima) return;
+    const foco = () => proximaRef.current?.focus();
+    const tecla = (ev: KeyboardEvent) => {
+      const alvo = ev.target as HTMLElement | null;
+      // Enter em botão/campo faz a ação dele; o atalho vale só fora deles (ex.: ao voltar do WhatsApp).
+      if (ev.key !== "Enter" || ev.repeat || alvo?.closest("button, a, input, textarea, select, [contenteditable]")) return;
+      ev.preventDefault();
+      enviarProxima();
+    };
+    window.addEventListener("focus", foco);
+    window.addEventListener("keydown", tecla);
+    return () => { window.removeEventListener("focus", foco); window.removeEventListener("keydown", tecla); };
+  });
   const copiar = (e: Envio) => {
     navigator.clipboard.writeText(msg(e)).catch(() => {});
     setCopiado(e.key);
@@ -175,17 +204,49 @@ export function EnvioEmMassaModal({
 
         {envios.length > 1 && (
           <div className="p-4 border-b border-border">
-            <button
-              disabled={pendentes.length === 0}
-              onClick={() => pendentes[0] && enviar(pendentes[0])}
-              className="w-full h-11 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-lg shadow-green-500/20 hover:opacity-95 disabled:opacity-40 flex items-center justify-center gap-2"
-            >
-              <MessageSquare className="w-4 h-4" />
-              {pendentes.length === 0 ? "Todos enviados" : `Enviar próxima — ${pendentes[0].name} (${pendentes.length} faltando)`}
-            </button>
-            <p className="text-[11px] text-muted-foreground mt-2 text-center">
-              Cada clique abre o WhatsApp com a mensagem pronta; é só apertar enviar lá e voltar aqui para a próxima. Dá para enviar uma por uma pelo botão de cada família e mudar o texto de uma só pelo lápis. Se não chegou a enviar, clique em "Enviado" para voltar para a lista.
-            </p>
+            {!emSequencia ? (
+              <>
+                <button
+                  disabled={pendentes.length === 0}
+                  onClick={() => { setEmSequencia(true); enviarProxima(); }}
+                  className="w-full h-11 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-lg shadow-green-500/20 hover:opacity-95 disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  {pendentes.length === 0 ? "Todos enviados" : `Enviar para todos — ${pendentes.length} famílias`}
+                </button>
+                <p className="text-[11px] text-muted-foreground mt-2 text-center">
+                  Abre uma família depois da outra: você só aperta Enter. Dá para enviar uma por uma pelo botão de cada família e mudar o texto de uma só pelo lápis. Se não chegou a enviar, clique em "Enviado" para voltar para a lista.
+                </p>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <button
+                  ref={proximaRef}
+                  disabled={!proxima}
+                  onClick={enviarProxima}
+                  className="w-full h-12 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-lg shadow-green-500/20 hover:opacity-95 disabled:opacity-40 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-background"
+                >
+                  <Send className="w-4 h-4" />
+                  {proxima ? `Enter = abrir a próxima: ${proxima.name} (${pendentes.length} faltando)` : "Todos enviados"}
+                </button>
+                <ol className="text-[11px] text-muted-foreground grid sm:grid-cols-3 gap-1.5">
+                  <li className="rounded-lg bg-secondary/40 px-2 py-1.5"><b className="text-foreground">1.</b> No WhatsApp, aperte <b className="text-foreground">Enter</b> para enviar</li>
+                  <li className="rounded-lg bg-secondary/40 px-2 py-1.5">
+                    <b className="text-foreground">2.</b> Volte para cá com <b className="text-foreground">{modoApp ? "Alt+Tab" : "Ctrl+W"}</b>
+                    {modoApp ? "" : " (fecha a aba do WhatsApp)"}
+                  </li>
+                  <li className="rounded-lg bg-secondary/40 px-2 py-1.5"><b className="text-foreground">3.</b> Aperte <b className="text-foreground">Enter</b> e abre a próxima família</li>
+                </ol>
+                <div className="flex items-center gap-3 text-[11px]">
+                  {ultimo && sent.has(ultimo.key) && (
+                    <button onClick={() => unmark(ultimo.key)} className="font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1">
+                      <RotateCcw className="w-3 h-3" /> Não enviei a de {firstName(ultimo.name)}
+                    </button>
+                  )}
+                  <button onClick={() => setEmSequencia(false)} className="ml-auto font-semibold text-muted-foreground hover:text-foreground">Parar</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -810,7 +871,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
         <span className="text-xs text-muted-foreground">mensagens prontas a partir da agenda · o lápis edita o texto</span>
         <div className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground" title="Onde as mensagens abrem. Fica salvo neste computador.">
           Abrir no:
-          {([["web", "WhatsApp Web (mesma aba)"], ["app", "Aplicativo do WhatsApp"]] as const).map(([m, rotulo]) => (
+          {([["web", "WhatsApp Web"], ["app", "Aplicativo do WhatsApp"]] as const).map(([m, rotulo]) => (
             <button
               key={m}
               onClick={() => { gravarModoWhatsApp(m); setModoWa(m); }}
