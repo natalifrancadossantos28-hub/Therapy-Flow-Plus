@@ -53,9 +53,10 @@ export const MODELOS: Record<ModeloId, { titulo: string; campos: Campo[]; padrao
     campos: [NOME, PACIENTE, RESPONSAVEL, HORA, MOTORISTA, UNIDADE],
     padrao:
       "Olá! Aqui é da recepção do {unidade}\n\n" +
-      "Hoje {nome} tinha atendimento às {hora}, com transporte pela van, e não compareceu. Não recebemos aviso e esperamos que esteja tudo bem.\n\n" +
-      "Pedimos, por gentileza, que sempre que {nome} não puder vir, a recepção seja avisada com antecedência pelo WhatsApp. Assim o motorista não faz a viagem sem necessidade e consegue buscar as outras crianças no horário.\n\n" +
-      "Contamos com a colaboração de vocês. Obrigado!",
+      "Hoje, {nome} tinha atendimento às {hora}, com transporte pela van, mas não compareceu. Esperamos que esteja tudo bem!\n\n" +
+      "Pedimos, por gentileza, que sempre que o paciente não puder comparecer, a recepção seja avisada com pelo menos 1 dia de antecedência pelo WhatsApp. Assim, evitamos viagens desnecessárias e conseguimos organizar melhor o transporte.\n\n" +
+      "Lembramos que temos uma fila de espera para o transporte e que faltas frequentes sem aviso poderão ocasionar o retorno do paciente à fila de espera.\n\n" +
+      "Contamos com a compreensão e colaboração de vocês. Obrigado!",
   },
   buscaAtiva: {
     titulo: "Busca Ativa",
