@@ -13,7 +13,8 @@ export type DriverLike = { id: number; name: string; specialty?: string | null }
 /** Chave `pacienteId|data` → nomes dos motoristas que buscam a criança naquele dia. */
 export type TransportMap = Map<string, string[]>;
 
-const IGNORED_STATUSES = ["desmarcado", "cancelado", "remanejado", "remarcado"];
+// "remanejado"/"remarcado" ficam gravados no NOVO dia/horário: o atendimento continua de pé.
+const IGNORED_STATUSES = ["desmarcado", "cancelado"];
 
 export function transportKey(patientId: number, date: string): string {
   return `${patientId}|${date}`;
