@@ -368,7 +368,7 @@ function SeletorDia({ value, min, onChange }: { value: string; min: string; onCh
         type="date"
         value={value}
         min={min}
-        onChange={ev => ev.target.value && onChange(ev.target.value)}
+        onChange={ev => ev.target.value && ev.target.value >= min && onChange(ev.target.value)}
         className="h-7 rounded-lg border border-border bg-background px-2 text-xs text-foreground"
       />
     </label>
