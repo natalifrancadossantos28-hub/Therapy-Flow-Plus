@@ -365,7 +365,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
 
   return (
     <div className={`min-h-screen text-foreground ${bgUrl ? "has-app-bg" : "agenda-neon-fundo"}`} style={appBackgroundStyle(bgUrl)}>
-      <div className="max-w-[1500px] mx-auto px-3 sm:px-5 pt-5 pb-36">
+      <div className="max-w-[1500px] mx-auto px-3 sm:px-5 pt-5 pb-[calc(13rem+env(safe-area-inset-bottom))]">
         <NeonTelas titulos={TELAS} pagina={pagina} setPagina={ir}>
           {[inicio, agenda, ausencias, perfil]}
         </NeonTelas>

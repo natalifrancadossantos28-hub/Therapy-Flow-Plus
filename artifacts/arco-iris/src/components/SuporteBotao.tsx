@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Headset, X, Send, Loader2 } from "lucide-react";
+import { Headset, X, Send, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { createRecadoEquipe } from "@/lib/arco-rpc";
 import { getCurrentScope, getProfessionalSession } from "@/lib/portal-session";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,13 @@ export function SuporteBotao({ className, profissional }: { className?: string; 
   const [tipo, setTipo] = useState<(typeof TIPOS)[number]>("Dúvida");
   const [mensagem, setMensagem] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [minimizado, setMinimizado] = useState(() => {
+    try { return localStorage.getItem("nfs_suporte_min") === "1"; } catch { return false; }
+  });
+  const minimizar = (v: boolean) => {
+    setMinimizado(v);
+    try { localStorage.setItem("nfs_suporte_min", v ? "1" : "0"); } catch { /* ignore */ }
+  };
 
   const scope = getCurrentScope();
   const sessao = getProfessionalSession();
@@ -43,13 +50,28 @@ export function SuporteBotao({ className, profissional }: { className?: string; 
 
   return (
     <>
-      <button type="button" onClick={() => setAberto(true)} aria-label="Falar com o suporte"
-        className={cn("fixed z-40 right-4 flex items-center gap-2 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-white font-semibold p-3 sm:pl-3 sm:pr-4 shadow-[0_10px_24px_-8px_rgba(109,40,217,.7)] hover:brightness-110 transition", className ?? "bottom-4")}>
-        <Headset className="w-5 h-5" /> <span className="hidden sm:inline">Falar com o suporte</span>
-      </button>
+      {/* Só o ícone (o texto aparece ao passar o mouse) e pode ser recolhido para a borda, para não cobrir botões e textos. */}
+      {minimizado ? (
+        <button type="button" onClick={() => minimizar(false)} aria-label="Mostrar botão Falar com o suporte" title="Falar com o suporte"
+          className={cn("fixed z-40 right-0 flex items-center gap-0.5 rounded-l-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white py-2 pl-1 pr-1.5 opacity-80 hover:opacity-100 shadow-[0_6px_16px_-8px_rgba(109,40,217,.7)] transition", className ?? "bottom-4")}>
+          <ChevronLeft className="w-3.5 h-3.5" /><Headset className="w-4 h-4" />
+        </button>
+      ) : (
+        <div className={cn("fixed z-40 right-3 group flex items-center gap-1", className ?? "bottom-4")}>
+          <button type="button" onClick={() => minimizar(true)} aria-label="Recolher botão do suporte" title="Recolher"
+            className="grid place-items-center w-6 h-6 rounded-full bg-black/45 text-white/90 hover:bg-black/70 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100">
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+          <button type="button" onClick={() => setAberto(true)} aria-label="Falar com o suporte" title="Falar com o suporte"
+            className="flex items-center gap-2 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-white font-semibold p-3 shadow-[0_10px_24px_-8px_rgba(109,40,217,.7)] hover:brightness-110 transition">
+            <Headset className="w-5 h-5" />
+            <span className="hidden max-w-0 overflow-hidden whitespace-nowrap transition-all duration-200 sm:inline group-hover:max-w-[12rem] group-hover:pr-1">Falar com o suporte</span>
+          </button>
+        </div>
+      )}
       {aberto && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-label="Falar com o suporte" onClick={() => !enviando && setAberto(false)}>
-          <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl space-y-4 text-[#1e1b4b]" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 overflow-y-auto z-[70] flex items-end-safe sm:items-center-safe justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-label="Falar com o suporte" onClick={() => !enviando && setAberto(false)}>
+          <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl space-y-4 text-[#1e1b4b]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <span className="grid place-items-center w-12 h-12 rounded-2xl bg-violet-100 text-violet-700 shrink-0"><Headset className="w-6 h-6" /></span>
               <div className="flex-1">

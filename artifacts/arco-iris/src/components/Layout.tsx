@@ -312,7 +312,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Conteúdo */}
-      <main id="main-content" className="flex-1 px-4 pt-3 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:p-8 overflow-y-auto w-full mx-auto relative">
+      <main id="main-content" className="flex-1 px-4 pt-3 pb-[calc(9rem+env(safe-area-inset-bottom))] md:p-8 md:pb-24 overflow-y-auto min-w-0 w-full mx-auto relative">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

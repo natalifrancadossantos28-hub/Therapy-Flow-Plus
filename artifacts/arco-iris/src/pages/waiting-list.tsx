@@ -1267,7 +1267,7 @@ export default function WaitingList() {
       )}
 
       {dateTarget && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 overflow-y-auto bg-background/80 backdrop-blur-sm z-50 flex items-center-safe justify-center p-4">
           <MotionCard className="w-full max-w-md p-6 overflow-visible border-indigo-500/40" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -1297,7 +1297,7 @@ export default function WaitingList() {
       )}
 
       {pauseTarget && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 overflow-y-auto bg-background/80 backdrop-blur-sm z-50 flex items-center-safe justify-center p-4">
           <MotionCard className="w-full max-w-md p-6 overflow-visible border-sky-500/40" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -1331,7 +1331,7 @@ export default function WaitingList() {
       )}
 
       {isDialogOpen && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 overflow-y-auto bg-background/80 backdrop-blur-sm z-50 flex items-center-safe justify-center p-4">
           <MotionCard className="w-full max-w-md p-6 overflow-visible" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <h2 className="text-2xl font-bold font-display mb-1">Adicionar à Fila de Espera</h2>
 
@@ -1446,7 +1446,7 @@ export default function WaitingList() {
       )}
 
       {saidaTarget && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 overflow-y-auto bg-background/80 backdrop-blur-sm z-50 flex items-center-safe justify-center p-4">
           <MotionCard className="w-full max-w-md p-6 overflow-visible" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <h2 className="text-2xl font-bold font-display mb-1">
               {saidaTipo === "Alta" ? "Dar Alta" : saidaTipo === "Desistência" ? "Registrar Desistência" : "Registrar Óbito"}

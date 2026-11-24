@@ -263,7 +263,7 @@ export function AbcChecklistForm({
             <p className="text-sm text-muted-foreground max-w-md mx-auto">{nivelInfo.desc}</p>
           </div>
 
-          <div className="rounded-xl border border-border/50 overflow-hidden">
+          <div className="rounded-xl border border-border/50 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/50">

@@ -47,7 +47,7 @@ export function EncaminharBuscaAtivaModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 overflow-y-auto z-[100] flex items-center-safe justify-center bg-black/60 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl border border-rose-500/40 bg-card p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full flex items-center justify-center bg-rose-500/15 text-rose-400">

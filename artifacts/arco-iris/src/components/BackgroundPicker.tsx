@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ImageIcon, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,32 +13,10 @@ import {
 
 type Placement = "down-right" | "down-left" | "up-left" | "side";
 
-// Painel em portal com posição fixa, para não ser cortado por menus com overflow.
-function panelPosition(rect: DOMRect, placement: Placement): CSSProperties {
-  const gap = 8;
-  if (window.innerWidth < 640) {
-    const vertical = placement === "down-right" || placement === "down-left"
-      ? { top: rect.bottom + gap }
-      : { bottom: window.innerHeight - rect.top + gap };
-    return { ...vertical, left: 16, right: 16, width: "auto", maxWidth: "none" };
-  }
-  switch (placement) {
-    case "down-right":
-      return { top: rect.bottom + gap, right: Math.max(16, window.innerWidth - rect.right) };
-    case "down-left":
-      return { top: rect.bottom + gap, left: Math.max(16, rect.left) };
-    case "up-left":
-      return { bottom: window.innerHeight - rect.top + gap, left: Math.max(16, rect.left) };
-    case "side":
-      return { bottom: Math.max(16, window.innerHeight - rect.bottom), left: rect.right + 12 };
-  }
-}
-
 export function BackgroundPicker({
   bgKey,
   subtitle,
   variant = "icon",
-  placement = "down-right",
   className,
 }: {
   bgKey: string;
@@ -51,32 +29,16 @@ export function BackgroundPicker({
   const [error, setError] = useState("");
   useBackground(bgKey); // re-renderiza quando a escolha muda
   const wrapRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<CSSProperties>({});
   const fileRef = useRef<HTMLInputElement>(null);
   const current = getBackgroundChoice(bgKey);
   const custom = getCustomBackground(bgKey);
 
   useEffect(() => {
     if (!open) return;
-    const place = () => {
-      if (wrapRef.current) setPos(panelPosition(wrapRef.current.getBoundingClientRect(), placement));
-    };
-    place();
-    const onDown = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (!wrapRef.current?.contains(t) && !panelRef.current?.contains(t)) setOpen(false);
-    };
-    window.addEventListener("resize", place);
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", place);
-    };
-  }, [open, placement]);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -139,12 +101,13 @@ export function BackgroundPicker({
       )}
 
       {open && createPortal(
+        // Centralizado na tela: em menus com rolagem, zoom ou telas deslizantes o painel ancorado no botão saía da área visível.
+        <div className="fixed inset-0 z-[100] flex items-center-safe justify-center p-4 overflow-y-auto bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)}>
         <div
-          ref={panelRef}
-          style={pos}
-          className={cn(
-            "fixed z-[100] w-[340px] max-w-[calc(100vw-2rem)] p-4 rounded-2xl text-[#e6eeff] border border-cyan-400/40 bg-[rgba(8,16,44,0.96)] backdrop-blur-xl shadow-[0_0_30px_-8px_#22d3ee,0_20px_50px_rgba(0,0,0,0.5)]",
-          )}
+          role="dialog"
+          aria-label="Personalizar fundo"
+          onClick={(e) => e.stopPropagation()}
+          className="w-[360px] max-w-full max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-4 rounded-2xl text-[#e6eeff] border border-cyan-400/40 bg-[rgba(8,16,44,0.96)] backdrop-blur-xl shadow-[0_0_30px_-8px_#22d3ee,0_20px_50px_rgba(0,0,0,0.5)]"
         >
           <div className="flex items-center justify-between mb-1">
             <h4 className="text-sm font-bold text-white">Personalizar fundo</h4>
@@ -170,6 +133,7 @@ export function BackgroundPicker({
           <p className="text-[11.5px] text-[#93a4c7] mt-3">
             Sua escolha fica salva neste navegador. As telas ganham um véu por cima da foto para continuar legíveis.
           </p>
+        </div>
         </div>,
         document.body,
       )}

@@ -37,7 +37,7 @@ export function PainelAcoes({ titulo = "Ações", nome, onClose, children }: {
   return createPortal(
     <div
       data-acoes-painel
-      className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6 bg-[#0b0820]/45 backdrop-blur-[3px]"
+      className="fixed inset-0 overflow-y-auto z-[90] flex items-center-safe justify-center p-3 sm:p-6 bg-[#0b0820]/45 backdrop-blur-[3px]"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       onClick={(e) => e.stopPropagation()}
     >

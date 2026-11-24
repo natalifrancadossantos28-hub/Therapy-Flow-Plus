@@ -33,7 +33,7 @@ export function ValidarCriteriosFila({ entry, onSaved }: {
   };
   return <>
     <Button variant="outline" className="h-8 text-xs" onClick={abrir}>Validar critérios</Button>
-    {open && <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" role="presentation">
+    {open && <div className="fixed inset-0 overflow-y-auto z-50 bg-black/60 flex items-center-safe justify-center p-4" role="presentation">
       <div role="dialog" aria-modal="true" aria-label={`Validar critérios de ${entry.patientName}`} className="bg-card border border-border rounded-2xl p-5 space-y-4 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold">Validar critérios da fila</h2>
         <p className="text-sm">{entry.patientName} · {entry.specialty}</p>

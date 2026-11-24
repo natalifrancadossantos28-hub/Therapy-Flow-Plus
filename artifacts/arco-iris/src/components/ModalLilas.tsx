@@ -14,7 +14,7 @@ export function ModalLilas({ icon: I, titulo, subtitulo, onClose, children }: {
   }, [onClose]);
 
   return (
-    <div className="agenda-neon fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={titulo} onClick={onClose}>
+    <div className="agenda-neon fixed inset-0 overflow-y-auto z-[60] flex items-end-safe sm:items-center-safe justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={titulo} onClick={onClose}>
       <div className="w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl space-y-4 text-[#1e1b4b]" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-3">
           <span className="grid place-items-center w-12 h-12 rounded-2xl bg-violet-100 text-violet-700 shrink-0"><I className="w-6 h-6" /></span>
