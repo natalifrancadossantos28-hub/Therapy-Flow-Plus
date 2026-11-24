@@ -1,6 +1,6 @@
 /** Modelos editáveis das mensagens do Assistente da recepção (salvos neste computador). */
 
-export type ModeloId = "lembrete" | "avaliacao" | "van" | "faltaVan" | "buscaAtiva" | "encaixe";
+export type ModeloId = "lembrete" | "avaliacao" | "van" | "faltaVan" | "buscaAtiva" | "buscaFalta" | "encaixe";
 export type Campo = { tag: string; desc: string; exemplo: string };
 
 const UNIDADE: Campo = { tag: "unidade", desc: "nome da unidade", exemplo: "Núcleo de Atendimento Novo Arco-íris 🌈" };
@@ -61,6 +61,15 @@ export const MODELOS: Record<ModeloId, { titulo: string; campos: Campo[]; padrao
       "Estamos entrando em contato a respeito do(a) {paciente}. Pedimos, por gentileza, que compareça à unidade assim que possível para conversar com a administração.\n\n" +
       "Se preferir, responda esta mensagem para combinarmos o melhor dia e horário.\n\n" +
       "Atenciosamente,\nAdministração",
+  },
+  buscaFalta: {
+    titulo: "Busca Ativa — faltas",
+    campos: [PACIENTE, NOME, RESPONSAVEL, UNIDADE],
+    padrao:
+      "Prezada família de {paciente},\n\n" +
+      "Identificamos faltas sem apresentação de atestado ou declaração. Pedimos, por gentileza, que compareça à administração do Núcleo para conversarmos sobre a situação.\n\n" +
+      "Agradecemos a compreensão!\n\n" +
+      "Administração do Núcleo Arco-Íris. 🌈",
   },
   encaixe: {
     titulo: "Encaixe",

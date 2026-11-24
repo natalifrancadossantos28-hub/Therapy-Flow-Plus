@@ -428,7 +428,7 @@ type Props = {
   ready: boolean;
 };
 
-type Fonte = Exclude<ModeloId, "encaixe">;
+type Fonte = Exclude<ModeloId, "encaixe" | "buscaFalta">;
 type Modal = { listId: string; titulo: string; descricao?: string; fonte: Fonte; so?: string };
 type Lembretes = { envios: Envio[]; van: Envio[] };
 
@@ -615,6 +615,11 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
   );
 
   // ── Busca Ativa ────────────────────────────────────────────────────────
+  // Caso aberto por faltas: encaminhamento "Faltas seguidas…" ou pausa cujo motivo fala de faltas/não comparecer.
+  const ehCasoDeFalta = (c: BuscaAtivaCaso) => {
+    const m = c.origem === "encaminhamento" ? (c.motivo ?? "").split(" — ")[0] : (c.motivo ?? "");
+    return /falt|comparec|comprec|n[aã]o retorn|pararam de trazer/i.test(m);
+  };
   const buscaEnvios = useMemo<Envio[]>(() => {
     const porPaciente = new Map<number, BuscaAtivaCaso>();
     for (const c of casos.filter(casoAberto)) if (!porPaciente.has(c.patientId)) porPaciente.set(c.patientId, c);
@@ -623,7 +628,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
       name: c.patientName,
       sub: [c.specialty, c.motivo].filter(Boolean).join(" · "),
       phone: c.patientPhone || phoneOf(c.patientId),
-      message: preencher(tpl("buscaAtiva"), {
+      message: preencher(tpl(ehCasoDeFalta(c) ? "buscaFalta" : "buscaAtiva"), {
         unidade: UNIDADE, paciente: c.patientName, nome: firstName(c.patientName),
         responsavel: responsavelDe(c.patientId, c.guardianName),
       }),
@@ -803,8 +808,11 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
           icon={<Search className="w-5 h-5" />} cor="#f59e0b"
           titulo="Busca Ativa"
           sub={`${buscaEnvios.length} caso(s) em aberto`}
-          acoes={<BotaoEditar onClick={() => setEditandoModelo("buscaAtiva")} />}
         >
+          <div className="flex flex-wrap gap-1.5">
+            <BotaoEditar onClick={() => setEditandoModelo("buscaFalta")} label="Mensagem de faltas" />
+            <BotaoEditar onClick={() => setEditandoModelo("buscaAtiva")} label="Outros casos" />
+          </div>
           {buscaEnvios.slice(0, 2).map(e => (
             <div key={e.key} className="flex items-center gap-3 rounded-xl bg-secondary/40 border border-border/40 p-2.5">
               <div className="flex-1 min-w-0">
@@ -816,12 +824,12 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
               </button>
             </div>
           ))}
-          <Previa texto={previa("buscaAtiva", "")} />
+          <Previa texto={previa("buscaFalta", "")} />
           <div className="mt-auto space-y-2">
             <button
               className={btnVerde}
               disabled={buscaEnvios.length === 0}
-              onClick={() => setModal({ ...buscaLista, descricao: "Convida a família a comparecer à unidade para conversar com a administração. Pelo lápis de cada família dá para colocar as faltas e as datas." })}
+              onClick={() => setModal({ ...buscaLista, descricao: "Casos de falta recebem a mensagem de faltas; os outros, o convite para conversar com a administração. Pelo lápis de cada família dá para colocar as faltas e as datas." })}
             >
               <Send className="w-4 h-4" /> Enviar para todos da Busca Ativa ({buscaEnvios.length})
             </button>
