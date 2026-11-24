@@ -3267,6 +3267,22 @@ export async function deleteRecadoEquipe(id: number, professionalId?: number | n
   if (error) throw error;
 }
 
+/** Tira um recado resolvido da lista do profissional (a administração mantém). */
+export async function ocultarRecadoEquipe(id: number, professionalId: number): Promise<void> {
+  const supabase = requireSupabase();
+  const { slug, password } = requireCompanyCredentials();
+  const { error } = await supabase.rpc("ocultar_recado_equipe", {
+    p_slug: slug,
+    p_password: password,
+    p_id: id,
+    p_professional_id: professionalId,
+  });
+  if (error) {
+    if (isMissingRpc(error)) throw new Error("Peça para a administração ativar a limpeza de recados (migração 0145).");
+    throw error;
+  }
+}
+
 export async function setRecadoEquipeStatus(id: number, status: RecadoEquipeStatus): Promise<RecadoEquipe> {
   const supabase = requireSupabase();
   const { slug, password } = requireCompanyCredentials();

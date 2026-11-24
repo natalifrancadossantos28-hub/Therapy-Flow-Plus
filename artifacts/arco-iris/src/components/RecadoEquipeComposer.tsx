@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageSquarePlus, Send, ChevronDown, ChevronUp, RefreshCw, Trash2, ShieldAlert } from "lucide-react";
 import {
   createRecadoEquipe, deleteRecadoEquipe, listRecadosEquipeDoProfissional,
-  listBuscaAtivaRetornosDoProfissional, ocultarBuscaAtivaRetorno,
+  listBuscaAtivaRetornosDoProfissional, ocultarBuscaAtivaRetorno, ocultarRecadoEquipe,
   type BuscaAtivaRetorno, type RecadoEquipe, type RecadoEquipeStatus,
 } from "@/lib/arco-rpc";
 import { BUSCA_RETORNO_STATUS_META, RECADO_STATUS_META, recadoStatusOf } from "@/lib/recado-status";
@@ -68,7 +68,8 @@ export function RecadoEquipeComposer({ professionalId, professionalName, special
     setExcluindoId(key);
     try {
       if (item.kind === "recado") {
-        await deleteRecadoEquipe(item.r.id, professionalId);
+        if (recadoStatusOf(item.r) === "resolvido") await ocultarRecadoEquipe(item.r.id, professionalId);
+        else await deleteRecadoEquipe(item.r.id, professionalId);
         setMeus(prev => prev.filter(m => m.id !== item.r.id));
       } else {
         await ocultarBuscaAtivaRetorno(item.b.id, professionalId);

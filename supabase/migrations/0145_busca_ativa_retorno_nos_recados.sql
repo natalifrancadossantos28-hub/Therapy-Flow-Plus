@@ -38,8 +38,8 @@ end $$;
 revoke all on function public.update_busca_ativa_caso(text, text, bigint, text, text, text) from public;
 grant execute on function public.update_busca_ativa_caso(text, text, bigint, text, text, text) to anon, authenticated;
 
--- Só aparece depois que a equipe mexeu no caso (status diferente de pendente
--- ou observação preenchida).
+-- Só aparece depois que a equipe mexeu no caso (status, observação ou
+-- qualquer atualização, inclusive "Reabrir busca").
 create or replace function public.list_busca_ativa_retornos_profissional(
   p_slug text, p_password text, p_professional_id bigint, p_limit int default 30
 ) returns jsonb language plpgsql security definer
@@ -62,7 +62,7 @@ begin
        where c.company_id = v_company_id
          and c.professional_id = p_professional_id
          and c.oculto_prof_at is null
-         and (c.status <> 'pendente' or c.obs is not null)
+         and (c.status <> 'pendente' or c.obs is not null or c.updated_at > c.created_at)
        order by c.updated_at desc, c.id desc
        limit greatest(coalesce(p_limit, 30), 1)
     ) t;
@@ -85,6 +85,25 @@ begin
 end $$;
 revoke all on function public.ocultar_busca_ativa_retorno(text, text, bigint, bigint) from public;
 grant execute on function public.ocultar_busca_ativa_retorno(text, text, bigint, bigint) to anon, authenticated;
+
+-- Só tira da lista do profissional; nunca apaga. Se a administração já
+-- reabriu o recado, recusa (o portal recarrega a lista).
+create or replace function public.ocultar_recado_equipe(
+  p_slug text, p_password text, p_id bigint, p_professional_id bigint
+) returns void language plpgsql security definer
+set search_path = public, extensions, pg_temp as $$
+declare v_company_id bigint;
+begin
+  v_company_id := public._verify_company_admin(p_slug, p_password);
+  update public.recados_equipe
+     set oculto_prof_at = now()
+   where id = p_id and company_id = v_company_id
+     and professional_id = p_professional_id
+     and coalesce(status, 'pendente') = 'resolvido';
+  if not found then raise exception 'Este recado não está mais resolvido. Atualize a lista.'; end if;
+end $$;
+revoke all on function public.ocultar_recado_equipe(text, text, bigint, bigint) from public;
+grant execute on function public.ocultar_recado_equipe(text, text, bigint, bigint) to anon, authenticated;
 
 -- Recado resolvido: o profissional tira da lista dele; a administração mantém.
 create or replace function public.delete_recado_equipe(
