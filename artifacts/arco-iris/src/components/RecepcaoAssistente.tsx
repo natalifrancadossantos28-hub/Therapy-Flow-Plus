@@ -36,6 +36,8 @@ const TIME_SLOTS = [
 /** Status em que o horário não está ocupado (vaga liberada). */
 // "remanejado"/"remarcado" ficam gravados no NOVO horário, que está ocupado.
 const LIVRE_STATUSES = ["desmarcado", "cancelado"];
+// Atendimentos que já têm presença/falta marcada não pedem mais confirmação.
+const JA_MARCADO = ["presente", "ausente", "falta_nao_justificada", "falta_justificada", "justificado", "abonado"];
 
 export function waPhone(p: string | null | undefined): string {
   const digits = (p ?? "").replace(/\D/g, "");
@@ -538,6 +540,7 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
       !a.paused &&
       !LIVRE_STATUSES.includes((a.status ?? "").toLowerCase()) &&
       (a.status ?? "").toLowerCase() !== "pausado" &&
+      !JA_MARCADO.includes((a.status ?? "").toLowerCase()) &&
       !isHiddenByPatientStatus(a.patientStatus, a.date, today) &&
       !isBlocked(a.date, a.professionalId, feriados, ausencias),
     );
