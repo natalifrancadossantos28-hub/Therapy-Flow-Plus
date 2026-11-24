@@ -618,11 +618,14 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
   // Caso aberto por faltas: encaminhamento "Faltas seguidas…" ou pausa cujo motivo fala de faltas/não comparecer.
   const ehCasoDeFalta = (c: BuscaAtivaCaso) => {
     const m = c.origem === "encaminhamento" ? (c.motivo ?? "").split(" — ")[0] : (c.motivo ?? "");
-    return /falt|comparec|comprec|n[aã]o retorn|pararam de trazer/i.test(m);
+    return /falt(?!a de )|aus[eê]nc|comparec|comprec|n[aã]o retorn|pararam de trazer/i.test(m);
   };
   const buscaEnvios = useMemo<Envio[]>(() => {
     const porPaciente = new Map<number, BuscaAtivaCaso>();
-    for (const c of casos.filter(casoAberto)) if (!porPaciente.has(c.patientId)) porPaciente.set(c.patientId, c);
+    for (const c of casos.filter(casoAberto)) {
+      const atual = porPaciente.get(c.patientId);
+      if (!atual || (ehCasoDeFalta(c) && !ehCasoDeFalta(atual))) porPaciente.set(c.patientId, c);
+    }
     return [...porPaciente.values()].map(c => ({
       key: `busca-${c.id}`,
       name: c.patientName,
