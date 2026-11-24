@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
-  CalendarClock, MessageSquare, Search, Bus, Copy, Check, X, Send, TrendingUp, ChevronDown, ChevronUp, Pencil, RotateCcw, ClipboardList,
+  CalendarClock, MessageSquare, Search, Bus, Copy, Check, X, Send, TrendingUp, ChevronDown, ChevronUp, Pencil, RotateCcw, ClipboardList, Megaphone,
 } from "lucide-react";
 import {
   listAppointments,
@@ -379,6 +379,7 @@ const ROTULOS: Record<string, string> = {
   nome: "[paciente]", paciente: "[paciente]", responsavel: "[responsável]", horarios: "[horário — especialidade com profissional]",
   aviso_van: "", motorista: "[motorista]", hora_van: "[horário]", hora: "[horário]",
   especialidade: "[especialidade]", profissional: "[profissional]", unidade: UNIDADE,
+  periodo: "[dias]", atendimentos: "[dias e horários do paciente]", recado: "[recado]",
 };
 
 function Previa({ texto }: { texto: string }) {
@@ -432,6 +433,33 @@ type Fonte = Exclude<ModeloId, "encaixe" | "buscaFalta">;
 type Modal = { listId: string; titulo: string; descricao?: string; fonte: Fonte; so?: string };
 type Lembretes = { envios: Envio[]; van: Envio[] };
 
+type AvisoTipo = "avisoFerias" | "avisoDesmarcar" | "avisoGeral";
+const AVISO_TIPOS: { id: AvisoTipo; rotulo: string }[] = [
+  { id: "avisoFerias", rotulo: "Férias" },
+  { id: "avisoDesmarcar", rotulo: "Desmarcar" },
+  { id: "avisoGeral", rotulo: "Recado" },
+];
+
+function diaCurto(date: string): string {
+  const d = new Date(`${date}T12:00:00`);
+  return `${d.toLocaleDateString("pt-BR", { weekday: "long" })} (${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })})`;
+}
+
+/** Agenda de um período, opcionalmente de um profissional (null enquanto carrega). */
+function useAgendaPeriodo(de: string, ate: string, professionalId: number | null, ativo: boolean): AppointmentListItem[] | null {
+  const chave = `${de}|${ate}|${professionalId ?? ""}`;
+  const [data, setData] = useState<{ chave: string; items: AppointmentListItem[] } | null>(null);
+  useEffect(() => {
+    if (!ativo || !de || !ate || ate < de) return;
+    let vivo = true;
+    listAppointments({ dateFrom: de, dateTo: ate, professionalId })
+      .then(items => { if (vivo) setData({ chave, items }); })
+      .catch(() => { if (vivo) setData({ chave, items: [] }); });
+    return () => { vivo = false; };
+  }, [chave, ativo]); // eslint-disable-line react-hooks/exhaustive-deps
+  return data?.chave === chave ? data.items : null;
+}
+
 /** Agenda de um dia escolhido (null enquanto carrega). */
 function useAgendaDia(date: string, ready: boolean): AppointmentListItem[] | null {
   const [data, setData] = useState<{ date: string; items: AppointmentListItem[] } | null>(null);
@@ -464,6 +492,18 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
   const dataAval = diaAval ?? proximoDia;
   const agendaLembrete = useAgendaDia(dataLembrete, ready);
   const agendaAval = useAgendaDia(dataAval, ready);
+
+  const [avisoTipo, setAvisoTipo] = useState<AvisoTipo>("avisoFerias");
+  const [avisoProf, setAvisoProf] = useState<number | null>(null);
+  const [avisoDe, setAvisoDe] = useState<string | null>(null);
+  const [avisoAte, setAvisoAte] = useState<string | null>(null);
+  const [recado, setRecado] = useState("");
+  const avisoInicio = avisoDe ?? proximoDia;
+  const avisoFim = avisoAte && avisoAte >= avisoInicio ? avisoAte : avisoInicio;
+  // "Todos" só faz sentido para recado; férias e desmarcar são sempre de um profissional.
+  const avisoProfId = avisoProf ?? null;
+  const avisoPronto = (avisoProfId !== null || avisoTipo === "avisoGeral") && (avisoTipo !== "avisoGeral" || recado.trim() !== "");
+  const agendaAviso = useAgendaPeriodo(avisoInicio, avisoFim, avisoProfId, ready && (avisoProfId !== null || avisoTipo === "avisoGeral"));
 
   useEffect(() => {
     listWaitingList().then(setFila).catch(console.error);
@@ -695,11 +735,66 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
     return { pct, p, f, porDia: porDia.map((d, i) => ({ dia: dias[i], pct: d.p + d.f > 0 ? d.p / (d.p + d.f) : null })) };
   }, [semana, profById]);
 
+  // ── Aviso aos pacientes de um profissional (férias, desmarcar, recado) ──
+  const profsClinicos = useMemo(
+    () => professionals.filter(p => !isTransportSpecialty(p.specialty)).sort((a, b) => a.name.localeCompare(b.name)),
+    [professionals],
+  );
+  const ausenciasDoProf = useMemo(
+    () => avisoProfId === null ? [] : ausencias.filter(a => a.professionalId === avisoProfId && a.dataFim >= today),
+    [ausencias, avisoProfId, today],
+  );
+  const periodoTexto = avisoInicio === avisoFim ? diaTexto(avisoInicio, today) : `de ${diaCurto(avisoInicio)} a ${diaCurto(avisoFim)}`;
+  const avisoEnvios = useMemo<Envio[] | null>(() => {
+    if (!agendaAviso) return null;
+    // Quem já desmarcou na agenda por causa das férias também precisa do aviso.
+    const ignorar = avisoTipo === "avisoGeral" ? LIVRE_STATUSES : ["cancelado"];
+    const porPaciente = new Map<number, AppointmentListItem[]>();
+    for (const a of agendaAviso) {
+      const st = (a.status ?? "").toLowerCase();
+      if (a.paused || st === "pausado" || ignorar.includes(st)) continue;
+      if (isTransportSpecialty(profById.get(a.professionalId)?.specialty)) continue;
+      if (isHiddenByPatientStatus(a.patientStatus, a.date, today)) continue;
+      porPaciente.set(a.patientId, [...(porPaciente.get(a.patientId) ?? []), a]);
+    }
+    const out: Envio[] = [];
+    for (const [pid, apts] of porPaciente) {
+      apts.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      const nomesProf = [...new Set(apts.map(a => a.professionalName))];
+      const specs = [...new Set(apts.map(a => profById.get(a.professionalId)?.specialty).filter(Boolean))];
+      const varios = nomesProf.length > 1;
+      const nome = apts[0].patientName;
+      out.push({
+        key: `aviso-${pid}`,
+        name: nome,
+        sub: apts.map(a => `${a.date.slice(8, 10)}/${a.date.slice(5, 7)} ${a.time}`).join(", ") + (varios ? ` · ${nomesProf.join(", ")}` : ""),
+        phone: apts[0].guardianPhone || phoneOf(pid),
+        message: preencher(tpl(avisoTipo), {
+          unidade: UNIDADE, nome: firstName(nome), paciente: nome,
+          responsavel: responsavelDe(pid, apts[0].guardianName),
+          profissional: nomesProf.map(firstName).join(", "),
+          especialidade: specs.join(", ") || "Atendimento",
+          periodo: periodoTexto,
+          atendimentos: apts.map(a => `• ${diaCurto(a.date)} às ${a.time}${varios ? ` — ${a.professionalName}` : ""}`).join("\n"),
+          recado: recado.trim(),
+        }),
+      });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agendaAviso, avisoTipo, recado, periodoTexto, profById, patientById, modelos, today]);
+  const avisoLista = {
+    listId: `${avisoTipo}-${avisoProfId ?? "todos"}-${avisoInicio}-${avisoFim}`,
+    titulo: `${AVISO_TIPOS.find(t => t.id === avisoTipo)!.rotulo} — ${avisoProfId !== null ? profById.get(avisoProfId)?.name ?? "" : "todos os profissionais"} · ${periodoTexto}`,
+    fonte: avisoTipo,
+  };
+
   const enviosDe = (f: Fonte): Envio[] =>
     f === "lembrete" ? lembretes?.envios ?? []
     : f === "avaliacao" ? avaliacoes?.envios ?? []
     : f === "van" ? lembretes?.van ?? []
     : f === "faltaVan" ? faltasVan
+    : f === "avisoFerias" || f === "avisoDesmarcar" || f === "avisoGeral" ? avisoEnvios ?? []
     : buscaEnvios;
   const modalEnvios = modal ? enviosDe(modal.fonte).filter(e => !modal.so || e.key === modal.so) : [];
   const previa = (id: ModeloId, dia: string) => preencher(tpl(id), { ...ROTULOS, dia });
@@ -919,6 +1014,113 @@ export function RecepcaoAssistente({ dayAppointments, transportByPatient, profes
           )}
         </AssistCard>
       </div>
+
+      <AssistCard
+        icon={<Megaphone className="w-5 h-5" />} cor="#a855f7"
+        titulo="Aviso aos pacientes de um profissional"
+        sub="férias, atendimento desmarcado ou recado: vai para todas as famílias com atendimento nos dias escolhidos"
+        acoes={<BotaoEditar onClick={() => setEditandoModelo(avisoTipo)} label="Mensagem" />}
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-1.5">
+              {AVISO_TIPOS.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setAvisoTipo(t.id)}
+                  className={cn(
+                    "h-8 px-3 rounded-lg text-xs font-bold border",
+                    avisoTipo === t.id ? "bg-purple-600 text-white border-purple-600" : "border-border hover:bg-secondary",
+                  )}
+                >
+                  {t.rotulo}
+                </button>
+              ))}
+            </div>
+            <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted-foreground">
+              Profissional
+              <select
+                value={avisoProf ?? ""}
+                onChange={ev => setAvisoProf(ev.target.value ? Number(ev.target.value) : null)}
+                className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
+              >
+                <option value="">{avisoTipo === "avisoGeral" ? "Todos os profissionais" : "Escolha o profissional"}</option>
+                {profsClinicos.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}{p.specialty ? ` — ${p.specialty}` : ""}</option>
+                ))}
+              </select>
+            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                De:
+                <input
+                  type="date" value={avisoInicio} min={today}
+                  onChange={ev => ev.target.value && ev.target.value >= today && setAvisoDe(ev.target.value)}
+                  className="h-7 rounded-lg border border-border bg-background px-2 text-xs text-foreground"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                Até:
+                <input
+                  type="date" value={avisoFim} min={avisoInicio}
+                  onChange={ev => ev.target.value && ev.target.value >= avisoInicio && setAvisoAte(ev.target.value)}
+                  className="h-7 rounded-lg border border-border bg-background px-2 text-xs text-foreground"
+                />
+              </label>
+            </div>
+            {ausenciasDoProf.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {ausenciasDoProf.map(a => {
+                  const de = a.dataInicio < today ? today : a.dataInicio;
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={() => {
+                        setAvisoDe(de); setAvisoAte(a.dataFim);
+                        setAvisoTipo(/f[eé]rias/i.test(a.motivo) ? "avisoFerias" : "avisoDesmarcar");
+                      }}
+                      className="h-7 px-2.5 rounded-lg text-[11px] font-semibold border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20"
+                    >
+                      Usar ausência: {a.motivo} · {de.slice(8, 10)}/{de.slice(5, 7)} a {a.dataFim.slice(8, 10)}/{a.dataFim.slice(5, 7)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {avisoTipo === "avisoGeral" && (
+              <textarea
+                value={recado}
+                onChange={ev => setRecado(ev.target.value)}
+                rows={3}
+                placeholder="Ex.: Na próxima semana, por favor, não tragam alimentos para a terapia."
+                className="w-full rounded-xl border border-border bg-background p-2.5 text-sm"
+              />
+            )}
+          </div>
+          <div className="flex flex-col gap-3">
+            <Previa texto={preencher(tpl(avisoTipo), {
+              ...ROTULOS,
+              profissional: avisoProfId !== null ? firstName(profById.get(avisoProfId)?.name ?? "") : "[profissional]",
+              especialidade: avisoProfId !== null ? profById.get(avisoProfId)?.specialty ?? "" : "[especialidade]",
+              periodo: periodoTexto,
+              recado: recado.trim() || "[recado]",
+            })} />
+            <p className="text-[11px] text-muted-foreground">
+              {!avisoPronto
+                ? avisoTipo === "avisoGeral" ? "Escreva o recado para montar a lista." : "Escolha o profissional para montar a lista."
+                : avisoEnvios === null ? "Carregando a agenda..."
+                : `${avisoEnvios.length} família(s) com atendimento nesses dias. A mensagem só avisa; a agenda não é alterada.`}
+            </p>
+            <button
+              className={cn(btnVerde, "mt-auto")}
+              disabled={!avisoPronto || !avisoEnvios || avisoEnvios.length === 0}
+              onClick={() => setModal({ ...avisoLista, descricao: "Uma mensagem por paciente, com os dias e horários dele nesse período." })}
+            >
+              <Send className="w-4 h-4" /> Enviar aviso para as famílias ({avisoPronto ? avisoEnvios?.length ?? 0 : 0})
+            </button>
+          </div>
+        </div>
+      </AssistCard>
 
       {modal && (
         <EnvioEmMassaModal
