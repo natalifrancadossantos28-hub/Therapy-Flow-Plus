@@ -2115,7 +2115,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   {novoAberto && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setNovoAberto(null)} />
-                      <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3">
+                      <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3">
                         <p className="font-bold text-foreground">Escolha o dia e o horário</p>
                         <Select value={novoAberto.date} onChange={e => setNovoAberto({ ...novoAberto, date: e.target.value })}>
                           {weekDays.map((d, i) => <option key={i} value={weekDates[i]}>{format(d, "EEEE, dd/MM", { locale: ptBR })}</option>)}
