@@ -41,6 +41,8 @@ declare
   v_step     integer;
   v_ref      public.appointments%rowtype;
   v_ref_date date;
+  v_first    date;
+  v_lower    date;
   v_start    date;
   v_last     date;
   v_horizon  date;
@@ -61,7 +63,8 @@ begin
    where company_id = p_company_id
      and recurrence_group_id = p_recurrence_group_id
      and "date"::date >= v_today
-     and public._is_open_appointment_status(status)
+     and (public._is_open_appointment_status(status)
+          or lower(coalesce(status, '')) = 'remanejado')
    order by "date", "time", id
    limit 1;
   -- Sem sessão futura: última sessão real (exclui remarcação/desmarcação pontual).
@@ -87,7 +90,7 @@ begin
   end if;
   v_ref_date := v_ref."date"::date;
 
-  select max("date")::date into v_last
+  select min("date")::date, max("date")::date into v_first, v_last
     from public.appointments
    where company_id = p_company_id
      and recurrence_group_id = p_recurrence_group_id;
@@ -114,12 +117,14 @@ begin
     get diagnostics v_deleted = row_count;
   end if;
 
-  -- Primeira data >= hoje no passo da referência (repõe semanas entre hoje e
-  -- a referência, ex.: mensal -> semanal).
-  if v_ref_date > v_today then
-    v_start := v_ref_date - (((v_ref_date - v_today) / v_step) * v_step);
+  -- Primeira data >= hoje (e >= início da série) no passo da referência:
+  -- repõe semanas entre hoje e a referência (ex.: mensal -> semanal) sem
+  -- antecipar série que ainda não começou.
+  v_lower := greatest(v_today, v_first);
+  if v_ref_date > v_lower then
+    v_start := v_ref_date - (((v_ref_date - v_lower) / v_step) * v_step);
   else
-    v_start := v_ref_date + (((v_today - v_ref_date + v_step - 1) / v_step) * v_step);
+    v_start := v_ref_date + (((v_lower - v_ref_date + v_step - 1) / v_step) * v_step);
   end if;
 
   v_horizon := greatest(
@@ -140,7 +145,7 @@ begin
     to_char(d, 'YYYY-MM-DD'), v_ref."time", 'agendado', v_ref.notes,
     p_recurrence_group_id, v_freq
   from generate_series(v_start, v_horizon, (v_step || ' days')::interval) as g(d)
-  where d >= v_today
+  where d >= v_lower
     and not exists (
       select 1 from public.appointments dup
        where dup.company_id = p_company_id
@@ -160,7 +165,7 @@ begin
   return jsonb_build_object('deletedCount', v_deleted, 'createdCount', v_created);
 end;
 $$;
-revoke all on function public._realinhar_grupo_recorrencia(bigint, text, text) from public;
+revoke all on function public._realinhar_grupo_recorrencia(bigint, text, text) from public, anon, authenticated;
 
 -- ── 2. Estender séries sem travar em horário de grupo ────────────────────
 create or replace function public._estender_recorrencias_empresa(
@@ -264,7 +269,7 @@ begin
           and a4."date" = to_char(d, 'YYYY-MM-DD')
           and a4."time"  = g.hora
           and a4.patient_id <> g.patient_id
-          and lower(coalesce(a4.status, '')) not in ('desmarcado', 'cancelado', 'remarcado', 'remanejado')
+          and lower(coalesce(a4.status, '')) not in ('desmarcado', 'cancelado')
           and not exists (
             select 1 from public.appointments a7
              where a7.company_id = v_company_id
@@ -303,7 +308,7 @@ begin
   return jsonb_build_object('ok', true, 'series', v_series, 'criados', v_criados);
 end;
 $$;
-revoke all on function public._estender_recorrencias_empresa(bigint, int) from public;
+revoke all on function public._estender_recorrencias_empresa(bigint, int) from public, anon, authenticated;
 
 create or replace function public.estender_recorrencias(
   p_slug     text,
