@@ -2185,6 +2185,31 @@ export async function markNotificacoesLidoByAppointment(appointmentId: number): 
   }
 }
 
+/**
+ * Avisos de Remarcado/Remanejado ainda pendentes de um atendimento. Também acha o
+ * aviso criado pelo parceiro do Atendimento Multi (outro ID, mesmo paciente/dia/hora).
+ */
+export async function avisosRemanejoPendentes(p: {
+  appointmentId: number;
+  patientName: string;
+  date: string;
+  time: string;
+}): Promise<NotificacaoRecepcao[]> {
+  try {
+    const all = await listNotificacoes();
+    return all.filter((n) =>
+      !n.lido &&
+      ["remarcado", "remanejado"].includes((n.acao || "").toLowerCase()) &&
+      (n.appointmentId === p.appointmentId ||
+        (n.patientName === p.patientName &&
+          (n.dataConsulta || "").slice(0, 10) === p.date &&
+          (n.horaConsulta || "").slice(0, 5) === p.time.slice(0, 5)))
+    );
+  } catch {
+    return [];
+  }
+}
+
 // ── AI Brain API calls ─────────────────────────────────────────────────────
 
 export type AIAnalysis = {

@@ -40,6 +40,8 @@ import {
   removeProfessionalFromPatientAgenda,
   createNotificacao,
   markNotificacoesLidoByAppointment,
+  markNotificacaoLido,
+  avisosRemanejoPendentes,
   createAppointments,
   listWaitingList,
   deleteWaitingListEntry,
@@ -2044,11 +2046,15 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
             excludeId: realId,
           });
         }
-        // Remanejado/remarcado com aviso para a recepção: o aviso passa a ter a hora nova.
+        // Remanejado/remarcado: o aviso da recepção passa a ter a hora nova (os outros avisos ficam).
         const st = (apt.status || "").toLowerCase();
         if (st === "remanejado" || st === "remarcado") {
-          await markNotificacoesLidoByAppointment(realId);
-          await logNotificacao({ ...apt, id: realId, time: novo }, st === "remanejado" ? "Remanejado" : "Remarcado");
+          const pend = await avisosRemanejoPendentes({ appointmentId: realId, patientName: apt.patientName || `Paciente #${apt.patientId}`, date, time: apt.time });
+          await Promise.all(pend.map(n => markNotificacaoLido(n.id).catch(() => {})));
+          await logNotificacao(
+            { ...apt, id: pend[0]?.appointmentId ?? realId, time: novo, professionalName: pend[0]?.professionalName ?? apt.professionalName },
+            pend[0]?.acao ?? (st === "remanejado" ? "Remanejado" : "Remarcado"),
+          );
         }
       }
       toast({ title: "Horário trocado", description: `${lista.map(a => `${(a.patientName || "").split(" ")[0]} ${horas[a.id]}`).join(", ")}${definitivo ? ", daqui pra frente" : ", só neste dia"}.` });
