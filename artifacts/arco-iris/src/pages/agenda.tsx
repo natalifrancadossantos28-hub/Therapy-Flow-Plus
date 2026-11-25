@@ -744,6 +744,33 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     if (canView && selectedProfId) fetchAppointments();
   }, [selectedProfId, canView]);
 
+  // Remanejar/Remarcar para uma semana fora da janela carregada na grade
+  // (outro mês, por exemplo): busca a agenda daquela semana só para a janela.
+  const [modalRows, setModalRows] = useState<{ week: string; own: Appointment[]; multi: Appointment[] } | null>(null);
+  const modalWeekKey = remanejFlow ? format(startOfWeek(remanejFlow.weekRef, { weekStartsOn: 1 }), "yyyy-MM-dd") : null;
+  useEffect(() => {
+    if (!modalWeekKey || !selectedProfId) { setModalRows(null); return; }
+    const range = loadedRangeRef.current;
+    const weekEnd = format(addDays(new Date(modalWeekKey + "T12:00:00"), 4), "yyyy-MM-dd");
+    if (range && modalWeekKey >= range.from && weekEnd <= range.to) { setModalRows(null); return; }
+    const start = new Date(modalWeekKey + "T12:00:00");
+    const dateFrom = format(addDays(start, -56), "yyyy-MM-dd");
+    const dateTo = format(addDays(start, 14), "yyyy-MM-dd");
+    const profName = professionals.find(p => String(p.id) === selectedProfId)?.name;
+    let vivo = true;
+    Promise.all([
+      listAppointments({ professionalId: parseInt(selectedProfId), dateFrom, dateTo }),
+      profName ? listMultiPartnerAppointments({ professionalName: profName, dateFrom, dateTo }) : Promise.resolve([]),
+    ])
+      .then(([own, multi]) => {
+        if (!vivo) return;
+        const visivel = <T extends { patientStatus?: string | null; date: string }>(l: T[]) => l.filter(a => !isHiddenByPatientStatus(a.patientStatus, a.date, todayBR()));
+        setModalRows({ week: modalWeekKey, own: withCiclo(visivel(own)) as Appointment[], multi: visivel(multi) as Appointment[] });
+      })
+      .catch(err => console.error("modal week fetch error:", err));
+    return () => { vivo = false; };
+  }, [modalWeekKey, selectedProfId]);
+
   // A lista de profissionais chega depois do primeiro fetch: sem o nome não dá
   // para buscar os Multi em que este profissional é o convidado.
   useEffect(() => {
@@ -1597,10 +1624,26 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const abrirBooking = (slot: { date: string; time: string }) => {
     if (!diaBloqueado(slot.date)) setBookingSlot(slot);
   };
-  const handlePickRemanejSlot = (newDate: string, newTime: string) => {
+  const handlePickRemanejSlot = (newDate: string, newTime: string, aptsDaSemana: Appointment[]) => {
     if (diaBloqueado(newDate)) return;
     if (!remanejFlow) return;
-    setRemanejFlow({ ...remanejFlow, step: "carla", newDate, newTime });
+    let apt = remanejFlow.apt;
+    // Remanejar para outra semana: a mudança vale dali em diante, então parte da
+    // ocorrência da série naquela semana (as semanas anteriores ficam como estão).
+    const semana = (d: string) => format(startOfWeek(new Date(d + "T12:00:00"), { weekStartsOn: 1 }), "yyyy-MM-dd");
+    if (remanejFlow.kind === "remanejar" && semana(newDate) !== semana(apt.date)) {
+      const daSerie = (a: Appointment) =>
+        a.patientId === apt.patientId && !a.multiGuest &&
+        (apt.recurrenceGroupId ? a.recurrenceGroupId === apt.recurrenceGroupId : a.time === apt.time) &&
+        !INACTIVE_STATUSES.includes((a.status || "").toLowerCase());
+      // Sem sessão naquela semana (quinzenal/mensal): usa a próxima sessão da série.
+      const occ = aptsDaSemana.find(daSerie)
+        ?? [...appointments, ...(modalRows?.own ?? [])]
+          .filter(a => a.id > 0 && a.date >= semana(newDate) && daSerie(a))
+          .sort((x, y) => x.date.localeCompare(y.date))[0];
+      if (occ) apt = occ;
+    }
+    setRemanejFlow({ ...remanejFlow, apt, step: "carla", newDate, newTime });
   };
 
   const confirmRemanejar = async () => {
@@ -1827,32 +1870,42 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   };
 
   // Slots para remanejar: horários livres E grupos já existentes (transferência direta).
+  const semanaDe = (d: string) => format(startOfWeek(new Date(d + "T12:00:00"), { weekStartsOn: 1 }), "yyyy-MM-dd");
   const slotTimes = TIME_SLOTS.filter(t => isPaula || t !== "12:10");
-  const availableSlots = remanejFlow
+
+  // ── Semana da janela Remanejar/Remarcar (navegável para qualquer semana/mês) ──
+  const modalWeekStart = startOfWeek(remanejFlow?.weekRef ?? weekRef, { weekStartsOn: 1 });
+  const modalWeekDays = Array.from({ length: 5 }, (_, i) => addDays(modalWeekStart, i));
+  const modalWeekDates = modalWeekDays.map(d => format(d, "yyyy-MM-dd"));
+  const modalIsGridWeek = modalWeekDates[0] === weekDates[0];
+  const modalSrc = modalRows && modalRows.week === modalWeekDates[0] ? modalRows : { own: appointments, multi: multiPartnerRows };
+  const modalLoading = !!remanejFlow && !modalIsGridWeek && modalSrc.own === appointments && (() => {
+    const r = loadedRangeRef.current;
+    return !r || modalWeekDates[0] < r.from || modalWeekDates[4] > r.to;
+  })();
+  const modalApts: Appointment[] = (() => {
+    if (!remanejFlow) return [];
+    if (modalIsGridWeek) return expanded;
+    const own = expandRecurrence(modalSrc.own, modalWeekDates, recurrenceCuts);
+    const guests = selectedProf
+      ? (buildMultiGuestAppointments(expandRecurrence(modalSrc.multi, modalWeekDates, recurrenceCuts), own, selectedProf, professionals) as Appointment[])
+      : [];
+    return [...own, ...guests]
+      .filter(a => modalWeekDates.includes(a.date))
+      .filter(a => !isHiddenByPatientStatus(a.patientStatus, a.date, todayBR()))
+      .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias));
+  })();
+  const modalGetApts = (date: string, time: string) =>
+    modalApts.filter(a => a.date === date && a.time === time).sort((a, b) => callOrder(a) - callOrder(b));
+  const modalAvailableSlots = remanejFlow && !modalLoading
     ? buildSlotOptions({
-        dates: weekDates,
+        dates: modalWeekDates,
         times: slotTimes,
-        aptsAt: getApts,
+        aptsAt: modalGetApts,
         patientId: remanejFlow.apt.patientId,
         origin: { date: remanejFlow.apt.date, time: remanejFlow.apt.time },
       })
     : [];
-
-  // ── Modal week for Remarcar (navigable) ──
-  const modalWeekStart = remanejFlow?.kind === "remarcar" && remanejFlow.weekRef
-    ? startOfWeek(remanejFlow.weekRef, { weekStartsOn: 1 })
-    : startOfWeek(weekRef, { weekStartsOn: 1 });
-  const modalWeekDays = Array.from({ length: 5 }, (_, i) => addDays(modalWeekStart, i));
-  const modalWeekDates = modalWeekDays.map(d => format(d, "yyyy-MM-dd"));
-  const modalAvailableSlots = remanejFlow?.kind === "remarcar"
-    ? buildSlotOptions({
-        dates: modalWeekDates,
-        times: slotTimes,
-        aptsAt: getApts,
-        patientId: remanejFlow.apt.patientId,
-        origin: { date: remanejFlow.apt.date, time: remanejFlow.apt.time },
-      })
-    : availableSlots;
 
   const scopeAtual = getCurrentScope();
   const vozPacientes = Array.from(new Map([...appointments, ...expanded].map(a => [a.patientId, { patientId: a.patientId, patientName: a.patientName || "", prontuario: a.prontuario ?? null }])).values())
@@ -3382,8 +3435,10 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       {/* ── Remanejar / Remarcar: Pick Slot ── */}
       {remanejFlow?.step === "slot" && (() => {
         const isRemarcar = remanejFlow.kind === "remarcar";
-        const dias = isRemarcar ? modalWeekDates : weekDates;
-        const diasD = isRemarcar ? modalWeekDays : weekDays;
+        const dias = modalWeekDates;
+        const diasD = modalWeekDays;
+        const podeVoltar = modalWeekDates[0] > semanaDe(today);
+        const irPara = (ref: Date, dia?: string) => setRemanejFlow({ ...remanejFlow, dia, weekRef: ref });
         const nDia = (d: string) => modalAvailableSlots.filter(s => s.date === d).length;
         const dia = remanejFlow.dia && dias.includes(remanejFlow.dia) ? remanejFlow.dia
           : dias.includes(remanejFlow.apt.date) && nDia(remanejFlow.apt.date) ? remanejFlow.apt.date
@@ -3399,15 +3454,19 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 ? "Só nesta data: na semana seguinte volta ao horário de sempre."
                 : "Todas as semanas daqui pra frente: o novo dia e horário ficam fixos."}
             </p>
-            {isRemarcar && (
-              <div className="flex items-center justify-between gap-2">
-                <button type="button" aria-label="Semana anterior" onClick={() => setRemanejFlow({ ...remanejFlow, dia: undefined, weekRef: addDays(remanejFlow.weekRef, -7) })}
-                  className="grid place-items-center w-11 h-11 rounded-full bg-violet-50 text-violet-800"><ChevronLeft className="w-5 h-5" /></button>
-                <p className="text-lg font-bold">{format(modalWeekDays[0], "dd/MM")} a {format(modalWeekDays[4], "dd/MM/yyyy")}</p>
-                <button type="button" aria-label="Próxima semana" onClick={() => setRemanejFlow({ ...remanejFlow, dia: undefined, weekRef: addDays(remanejFlow.weekRef, 7) })}
-                  className="grid place-items-center w-11 h-11 rounded-full bg-violet-50 text-violet-800"><ChevronRight className="w-5 h-5" /></button>
-              </div>
-            )}
+            <div className="flex items-center justify-between gap-2">
+              <button type="button" aria-label="Semana anterior" disabled={!podeVoltar} onClick={() => irPara(addDays(modalWeekStart, -7))}
+                className="grid place-items-center w-11 h-11 rounded-full bg-violet-50 text-violet-800 disabled:opacity-30"><ChevronLeft className="w-5 h-5" /></button>
+              <p className="text-lg font-bold text-center">{format(modalWeekDays[0], "dd/MM")} a {format(modalWeekDays[4], "dd/MM/yyyy")}</p>
+              <button type="button" aria-label="Próxima semana" onClick={() => irPara(addDays(modalWeekStart, 7))}
+                className="grid place-items-center w-11 h-11 rounded-full bg-violet-50 text-violet-800"><ChevronRight className="w-5 h-5" /></button>
+            </div>
+            <label className="flex items-center justify-between gap-2 rounded-2xl border border-violet-200 bg-white px-3 py-2 text-base text-[#3b3561]">
+              <span className="flex items-center gap-2"><CalendarDays className="w-5 h-5 text-violet-700" /> Outro dia ou mês:</span>
+              <input type="date" min={today} value={dia}
+                onChange={e => { const v = e.target.value; if (v) irPara(new Date(v + "T12:00:00"), v); }}
+                className="rounded-xl border border-violet-200 px-2 py-1 text-base text-[#1e1b4b]" />
+            </label>
             <div className="flex flex-wrap gap-2">
               {dias.map((d, i) => {
                 const sel = d === dia;
@@ -3422,15 +3481,17 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                 );
               })}
             </div>
-            {slotsDia.length === 0 ? (
-              <p className="rounded-2xl bg-violet-50 p-4 text-lg text-[#3b3561]">Nenhum horário disponível neste dia.</p>
+            {modalLoading ? (
+              <p className="rounded-2xl bg-violet-50 p-4 text-lg text-[#3b3561]">Carregando os horários dessa semana…</p>
+            ) : slotsDia.length === 0 ? (
+              <p className="rounded-2xl bg-violet-50 p-4 text-lg text-[#3b3561]">{dayBlock(dia) ?? "Nenhum horário disponível neste dia."}</p>
             ) : (
               <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-80 overflow-y-auto pr-1">
                 {slotsDia.map(slot => {
                   const grupo = slot.group.length > 0;
                   return (
                     <li key={slot.time}>
-                      <button type="button" onClick={() => handlePickRemanejSlot(slot.date, slot.time)}
+                      <button type="button" onClick={() => handlePickRemanejSlot(slot.date, slot.time, modalApts)}
                         title={grupo ? `Entrar no grupo: ${slot.group.join(", ")}` : "Horário livre"}
                         className={cn("w-full h-full text-left rounded-2xl border px-3 py-2 hover:border-violet-600", grupo ? "border-violet-200 bg-violet-50" : "border-violet-200 bg-white")}>
                         <span className="flex items-center gap-1.5 text-xl font-bold tabular-nums">
