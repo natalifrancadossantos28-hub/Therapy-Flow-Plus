@@ -40,6 +40,7 @@ declare
   v_freq     text;
   v_step     integer;
   v_ref      public.appointments%rowtype;
+  v_rem      public.appointments%rowtype;
   v_ref_date date;
   v_first    date;
   v_lower    date;
@@ -58,17 +59,32 @@ begin
   v_step := case v_freq when 'quinzenal' then 14 when 'mensal' then 28 else 7 end;
 
   -- Referência = próxima sessão em aberto (dia/horário atuais do paciente).
+  -- Se o trecho vigente começou numa sessão remanejada (mesmo dia da semana e
+  -- horário), ela é a referência, para o passo contar a partir dela.
   select * into v_ref
     from public.appointments
    where company_id = p_company_id
      and recurrence_group_id = p_recurrence_group_id
      and "date"::date >= v_today
-     and (public._is_open_appointment_status(status)
-          or lower(coalesce(status, '')) = 'remanejado')
+     and public._is_open_appointment_status(status)
    order by "date", "time", id
    limit 1;
+  if found then
+    select * into v_rem
+      from public.appointments
+     where company_id = p_company_id
+       and recurrence_group_id = p_recurrence_group_id
+       and "date"::date >= v_today
+       and "date"::date < v_ref."date"::date
+       and lower(coalesce(status, '')) = 'remanejado'
+       and "time" = v_ref."time"
+       and extract(dow from "date"::date) = extract(dow from v_ref."date"::date)
+     order by "date", id
+     limit 1;
+    if found then v_ref := v_rem; end if;
+  end if;
   -- Sem sessão futura: última sessão real (exclui remarcação/desmarcação pontual).
-  if not found then
+  if v_ref.id is null then
     select * into v_ref
       from public.appointments
      where company_id = p_company_id
@@ -77,7 +93,7 @@ begin
      order by "date" desc, id desc
      limit 1;
   end if;
-  if not found then
+  if v_ref.id is null then
     select * into v_ref
       from public.appointments
      where company_id = p_company_id
@@ -85,7 +101,7 @@ begin
      order by "date" desc, id desc
      limit 1;
   end if;
-  if not found then
+  if v_ref.id is null then
     return jsonb_build_object('deletedCount', 0, 'createdCount', 0);
   end if;
   v_ref_date := v_ref."date"::date;
