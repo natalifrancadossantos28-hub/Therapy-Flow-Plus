@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Plane, Pencil, Trash2, Loader2, Lock } from "lucide-react";
 import { glass, neon } from "@/components/AgendaNeon";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,9 @@ function separar(texto: string): { tipo: (typeof MOTIVOS)[number]; detalhe: stri
 }
 
 /** Ausências do próprio profissional: grava em "Feriados & Ausências" e bloqueia a agenda dele. */
-export function MinhasAusencias({ professionalId }: { professionalId: number }) {
+export type AusenciaVoz = { motivo: string | null; inicio: string | null; fim: string | null; observacao: string | null; chave?: number };
+
+export function MinhasAusencias({ professionalId, voz }: { professionalId: number; voz?: AusenciaVoz | null }) {
   const { toast } = useToast();
   const [pin, setPin] = useState(() => sessionStorage.getItem(chavePin(professionalId)) ?? "");
   const [pinOk, setPinOk] = useState(!!sessionStorage.getItem(chavePin(professionalId)));
@@ -33,6 +35,7 @@ export function MinhasAusencias({ professionalId }: { professionalId: number }) 
   const [tipo, setTipo] = useState<(typeof MOTIVOS)[number]>("Férias");
   const [detalhe, setDetalhe] = useState("");
 
+  const iniAtual = ini, fimAtual = fim, tipoAtual = tipo, detalheAtual = detalhe;
   const erro = (e: any) => toast({ title: "Não foi possível", description: e?.message ?? String(e), variant: "destructive" });
 
   const carregar = useCallback(() => {
@@ -57,7 +60,8 @@ export function MinhasAusencias({ professionalId }: { professionalId: number }) 
 
   const limpar = () => { setEditId(null); setIni(""); setFim(""); setTipo("Férias"); setDetalhe(""); };
 
-  const salvar = async () => {
+  const salvar = async (v?: { ini: string; fim: string; tipo: (typeof MOTIVOS)[number]; detalhe: string }) => {
+    const { ini, fim, tipo, detalhe } = v ?? { ini: iniAtual, fim: fimAtual, tipo: tipoAtual, detalhe: detalheAtual };
     if (!ini) { toast({ title: "Escolha a data inicial", variant: "destructive" }); return; }
     if (fim && fim < ini) { toast({ title: "A data final não pode ser antes da inicial", variant: "destructive" }); return; }
     const motivo = detalhe.trim() ? `${tipo} — ${detalhe.trim()}` : tipo;
@@ -69,6 +73,17 @@ export function MinhasAusencias({ professionalId }: { professionalId: number }) 
       window.dispatchEvent(new Event("ausencias-mudaram"));
     } catch (e) { erro(e); } finally { setSalvando(false); }
   };
+
+  // Pedido por voz (já confirmado na janela do microfone): preenche e registra; sem PIN, só preenche.
+  const vozFeita = useRef<number | null>(null);
+  useEffect(() => {
+    if (!voz?.inicio || vozFeita.current === (voz.chave ?? 0)) return;
+    vozFeita.current = voz.chave ?? 0;
+    const v = { ini: voz.inicio, fim: voz.fim ?? "", tipo: (MOTIVOS.find(m => m === voz.motivo) ?? "Outro") as (typeof MOTIVOS)[number], detalhe: voz.observacao ?? "" };
+    setEditId(null); setIni(v.ini); setFim(v.fim); setTipo(v.tipo); setDetalhe(v.detalhe);
+    if (pinOk) void salvar(v);
+    else toast({ title: "Digite seu PIN", description: "Depois toque em Registrar Ausência." });
+  }, [voz?.chave, pinOk]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const editar = (a: Ausencia) => {
     const s = separar(a.motivo);
@@ -120,7 +135,7 @@ export function MinhasAusencias({ professionalId }: { professionalId: number }) 
               placeholder={tipo === "Outro" ? "Escreva o motivo" : "Observação (opcional)"} aria-label="Observação" />
             <p className="text-sm text-[#3b3561]">Deixe a data final vazia para um dia só. Nesse período a sua agenda fica bloqueada para novos agendamentos.</p>
             <div className="flex gap-2">
-              <button type="button" onClick={salvar} disabled={salvando}
+              <button type="button" onClick={() => salvar()} disabled={salvando}
                 className="flex-1 flex items-center justify-center gap-2 rounded-2xl py-3 text-lg font-bold text-white bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_10px_24px_-8px_rgba(109,40,217,.7)] disabled:opacity-60">
                 {salvando && <Loader2 className="animate-spin" size={20} />} {editId ? "Salvar alteração" : "Registrar Ausência"}
               </button>
