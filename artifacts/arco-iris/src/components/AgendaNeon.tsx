@@ -220,7 +220,7 @@ export function NeonMenuInferior({ itens, ativo, onItem }: { itens: NeonMenuItem
           </button>
         ) : (
           <button type="button" key={it.id} onClick={() => onItem(it.id)} aria-current={ativo === it.id ? "page" : undefined}
-            className={`h-16 min-w-0 px-0.5 rounded-3xl flex flex-col items-center justify-center gap-1 text-[13px] leading-none font-semibold transition ${ativo === it.id ? "text-white bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_8px_20px_-6px_rgba(109,40,217,.6)]" : "text-[#1e1b4b]"}`}>
+            className={`h-16 min-w-0 px-0.5 rounded-3xl flex flex-col items-center justify-center gap-1 text-[12px] min-[400px]:text-[13px] tracking-tight leading-none font-semibold transition ${ativo === it.id ? "text-white bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_8px_20px_-6px_rgba(109,40,217,.6)]" : "text-[#1e1b4b]"}`}>
             {it.icon}<span className="max-w-full truncate">{it.label}</span>
           </button>
         ))}

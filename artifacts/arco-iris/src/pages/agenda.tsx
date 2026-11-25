@@ -2300,7 +2300,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                         )}
                                     </span>
                                     <AbsenceBadge count={absenceCount(apt.patientId)} compact />
-                                    <span title={getStatusLabel(apptStatus(apt))} className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold w-fit max-w-full leading-tight break-words", getStatusColor(apptStatus(apt)))}>
+                                    <span lang="pt-BR" title={getStatusLabel(apptStatus(apt))} className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold w-fit max-w-full leading-tight break-words hyphens-auto", getStatusColor(apptStatus(apt)))}>
                                       {getStatusLabel(apptStatus(apt))}
                                     </span>
                                     {apt.paused && (
