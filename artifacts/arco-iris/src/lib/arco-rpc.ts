@@ -1675,16 +1675,17 @@ export async function remanejarRecurrenceForward(params: {
     a.recurrenceGroupId === params.recurrenceGroupId &&
     a.date > params.fromDate &&
     !INACTIVE.includes((a.status || "").toLowerCase())
-  ).sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
-  // As próximas sessões seguem o passo da série a partir da data nova. Somar a
-  // diferença de dia da semana jogava a sessão seguinte em cima da nova
-  // (ex.: quinta 26 -> segunda 30: a quinta 03 virava segunda 30 de novo).
+  );
+  // Desloca cada sessão pelos dias reais entre a data antiga e a nova, mantendo
+  // as lacunas (desmarcadas, feriados). Somar só a diferença de dia da semana
+  // jogava a sessão seguinte em cima da nova (quinta 26 -> segunda 30: a quinta
+  // 03 virava segunda 30 de novo).
+  const dia = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+  const deltaDias = Math.round((dia(params.newDate) - dia(params.fromDate)) / 86400000);
   const moved: Array<{ id: number; date: string; time: string }> = [];
-  for (const [i, a] of future.entries()) {
-    const freq = (a.frequency || "semanal").toLowerCase();
-    const step = freq === "quinzenal" ? 14 : freq === "mensal" ? 28 : 7;
-    const d = new Date(params.newDate + "T12:00:00");
-    d.setDate(d.getDate() + (i + 1) * step);
+  for (const a of future) {
+    const d = new Date(a.date + "T12:00:00");
+    d.setDate(d.getDate() + deltaDias);
     const nd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     await updateAppointment(a.id, { date: nd, time: params.newTime });
     moved.push({ id: a.id, date: nd, time: params.newTime });
