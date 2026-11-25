@@ -1979,7 +1979,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     return { min: base, max: format(fim, "HH:mm") };
   };
   const aptsAjuste = (date: string, time: string) => getApts(date, time)
-    .filter(a => !a.multiGuest && !["desmarcado", "cancelado", "remanejado", "remarcado"].includes((a.status || "").toLowerCase()));
+    .filter(a => !a.multiGuest && !["desmarcado", "cancelado"].includes((a.status || "").toLowerCase()));
   const abrirAjusteHora = (time: string, dataEscolhida?: string) => {
     const comPaciente = weekDates.find(d => aptsAjuste(d, time).length > 0);
     const date = dataEscolhida ?? (diaFoco !== null ? weekDates[diaFoco] : (comPaciente ?? (weekDates.includes(today) ? today : weekDates[0])));
@@ -2570,7 +2570,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
                                       <AcaoBotao cor="laranja" icon={RotateCcw} onClick={() => handleStartRemanejar(apt)}>Remanejar</AcaoBotao>
                                       <AcaoBotao cor="roxo" icon={CalendarDays} onClick={() => handleStartRemarcar(apt)}>Remarcar</AcaoBotao>
-                                      {!["desmarcado", "cancelado", "remanejado", "remarcado"].includes((apt.status || "").toLowerCase()) && (
+                                      {!["desmarcado", "cancelado"].includes((apt.status || "").toLowerCase()) && (
                                         <AcaoBotao cor="roxo" icon={Clock} onClick={() => { setActionMenuId(null); abrirAjusteHora(apt.time, apt.date); }}>Trocar horário (mesmo dia)</AcaoBotao>
                                       )}
 
