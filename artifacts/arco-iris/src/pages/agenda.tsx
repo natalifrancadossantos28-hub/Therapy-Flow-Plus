@@ -1662,7 +1662,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         const conflict = sameDay.find(a =>
           a.time === remanejFlow.newTime &&
           a.professionalId !== parseInt(selectedProfId) &&
-          ["agendado", "atendimento", "presente"].includes(a.status.toLowerCase()) &&
+          ["agendado", "atendimento", "presente", "remanejado", "remarcado"].includes(a.status.toLowerCase()) &&
           !(a.notes ?? "").startsWith("Atendimento Multi com ") &&
           !isPilatesAppointment(a.notes) &&
           !allowsSameSlotAsPatient(professionals.find(p => p.id === a.professionalId)?.specialty),
@@ -2002,7 +2002,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           const conflict = sameDay.find(a =>
             a.time === novo &&
             a.professionalId !== parseInt(selectedProfId) &&
-            ["agendado", "atendimento", "presente"].includes(a.status.toLowerCase()) &&
+            ["agendado", "atendimento", "presente", "remanejado", "remarcado"].includes(a.status.toLowerCase()) &&
             !(a.notes ?? "").startsWith("Atendimento Multi com ") &&
             !isPilatesAppointment(a.notes) &&
             !allowsSameSlotAsPatient(professionals.find(p => p.id === a.professionalId)?.specialty),
@@ -2043,6 +2043,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
             newTime: novo,
             excludeId: realId,
           });
+        }
+        // Remanejado/remarcado com aviso para a recepção: o aviso passa a ter a hora nova.
+        const st = (apt.status || "").toLowerCase();
+        if (st === "remanejado" || st === "remarcado") {
+          await markNotificacoesLidoByAppointment(realId);
+          await logNotificacao({ ...apt, id: realId, time: novo }, st === "remanejado" ? "Remanejado" : "Remarcado");
         }
       }
       toast({ title: "Horário trocado", description: `${lista.map(a => `${(a.patientName || "").split(" ")[0]} ${horas[a.id]}`).join(", ")}${definitivo ? ", daqui pra frente" : ", só neste dia"}.` });
