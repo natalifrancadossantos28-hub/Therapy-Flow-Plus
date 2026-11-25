@@ -2186,28 +2186,25 @@ export async function markNotificacoesLidoByAppointment(appointmentId: number): 
 }
 
 /**
- * Avisos de Remarcado/Remanejado ainda pendentes de um atendimento. No Atendimento
- * Multi também acha o aviso do parceiro (outro ID, mesmo paciente/dia/hora).
+ * Avisos de Remarcado/Remanejado ainda pendentes dos agendamentos movidos por uma
+ * troca de horário (o próprio e os que o banco sincronizou: parceiro do Multi, transporte).
  */
 export async function avisosRemanejoPendentes(p: {
   appointmentId: number;
-  patientName: string;
+  patientId: number;
   date: string;
-  time: string;
-  multiPartner?: string | null;
+  oldTime: string;
+  newTime: string;
 }): Promise<NotificacaoRecepcao[]> {
-  const parceiro = (p.multiPartner || "").trim().toLowerCase();
   try {
-    const all = await listNotificacoes();
+    const [all, doDia] = await Promise.all([listNotificacoes(), listAppointments({ patientId: p.patientId, date: p.date })]);
+    const movidos = new Set(doDia.filter((a) => a.time.slice(0, 5) === p.newTime.slice(0, 5)).map((a) => a.id));
     return all.filter((n) =>
       !n.lido &&
       ["remarcado", "remanejado"].includes((n.acao || "").toLowerCase()) &&
       (n.appointmentId === p.appointmentId ||
-        (!!parceiro &&
-          (n.professionalName || "").trim().toLowerCase() === parceiro &&
-          n.patientName === p.patientName &&
-          (n.dataConsulta || "").slice(0, 10) === p.date &&
-          (n.horaConsulta || "").slice(0, 5) === p.time.slice(0, 5)))
+        (n.appointmentId != null && movidos.has(n.appointmentId) &&
+          (n.horaConsulta || "").slice(0, 5) === p.oldTime.slice(0, 5)))
     );
   } catch {
     return [];
