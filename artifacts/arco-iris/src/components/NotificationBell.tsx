@@ -216,7 +216,7 @@ export default function NotificationBell() {
       {open && (
         <div
           ref={panelRef}
-          className="absolute right-0 mt-2 w-[420px] max-h-[78vh] overflow-hidden rounded-2xl shadow-2xl z-50 flex flex-col"
+          className="absolute right-0 mt-2 w-[420px] max-w-[calc(100vw-1.5rem)] max-h-[78vh] overflow-hidden rounded-2xl shadow-2xl z-50 flex flex-col"
           style={{
             background: "rgba(5,8,16,0.98)",
             border: "1px solid rgba(249,115,22,0.35)",

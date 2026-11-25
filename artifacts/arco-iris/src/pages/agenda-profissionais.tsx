@@ -3,7 +3,7 @@ import { SuporteBotao } from "@/components/SuporteBotao";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Home, CalendarCheck, User, Plus, Mic, Plane } from "lucide-react";
-import { MinhasAusencias, lembrarPinProfissional } from "@/components/MinhasAusencias";
+import { MinhasAusencias, lembrarPinProfissional, type AusenciaVoz } from "@/components/MinhasAusencias";
 import { NeonCabecalho, useFonteAgenda, NeonMes, NeonTelas, NeonMenuInferior, glass, neon, CORES_NEON } from "@/components/AgendaNeon";
 import { Saudacao } from "@/components/Saudacao";
 import { Calendar as CalendarIcon, Lock, LogOut } from "lucide-react";
@@ -247,6 +247,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
   onSair: () => void; agenda: React.ReactNode;
 }) {
   const [pagina, setPagina] = useState(0);
+  const [ausenciaVoz, setAusenciaVoz] = useState<AusenciaVoz | null>(null);
   const fonte = useFonteAgenda();
   const hoje = format(new Date(), "yyyy-MM-dd");
   const [mes, setMes] = useState(() => startOfMonth(new Date()));
@@ -283,6 +284,14 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
   const doDia = porDia.get(diaSel) ?? [];
   const titDia = diaSel === hoje ? "Hoje" : format(new Date(diaSel + "T12:00:00"), "EEEE", { locale: ptBR });
   const ir = (n: number) => { setPagina(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  // Comando de voz: "ir para ausências", "registrar férias de 10 a 20 de dezembro"...
+  useEffect(() => {
+    const irPara = (e: Event) => { const i = MENU_IDS.indexOf((e as CustomEvent<string>).detail); if (i >= 0) ir(i); };
+    const ausencia = (e: Event) => { setAusenciaVoz({ ...(e as CustomEvent<AusenciaVoz>).detail, chave: Date.now() }); ir(2); };
+    window.addEventListener("agenda-voz-ir", irPara);
+    window.addEventListener("agenda-voz-ausencia", ausencia);
+    return () => { window.removeEventListener("agenda-voz-ir", irPara); window.removeEventListener("agenda-voz-ausencia", ausencia); };
+  }, []);
 
   const inicio = (
     <div className="agenda-neon space-y-4" style={{ zoom: fonte.zoom }}>
@@ -334,7 +343,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
     </div>
   );
 
-  const ausencias = prof && !isAdminViewing ? <MinhasAusencias professionalId={prof.id} /> : (
+  const ausencias = prof && !isAdminViewing ? <MinhasAusencias professionalId={prof.id} voz={ausenciaVoz} /> : (
     <div className="agenda-neon"><div className={glass} style={neon("#a855f7")}><p className="text-lg text-[#1e1b4b]">{isAdminViewing ? "As ausências de todos os profissionais ficam em Feriados & Ausências, no painel." : "Escolha o profissional na tela Agenda."}</p></div></div>
   );
   const perfil = (
@@ -365,7 +374,7 @@ function PortalNeon({ prof, bgUrl, bgKey, isAdminViewing, portalProfName, onSair
 
   return (
     <div className={`min-h-screen text-foreground ${bgUrl ? "has-app-bg" : "agenda-neon-fundo"}`} style={appBackgroundStyle(bgUrl)}>
-      <div className="max-w-[1500px] mx-auto px-3 sm:px-5 pt-5 pb-36">
+      <div className="max-w-[1500px] mx-auto px-3 sm:px-5 pt-5 pb-[calc(13rem+env(safe-area-inset-bottom))]">
         <NeonTelas titulos={TELAS} pagina={pagina} setPagina={ir}>
           {[inicio, agenda, ausencias, perfil]}
         </NeonTelas>

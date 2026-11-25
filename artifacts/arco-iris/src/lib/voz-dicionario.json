@@ -1,0 +1,461 @@
+{
+  "_como_editar": "Palavras sem acento e em minúsculas. Termine com * para aceitar o começo da palavra (ex.: desist* = desistiu, desistência). Comece com = para valer só quando a frase inteira for exatamente aquela. Quando duas frases combinam, vale a mais comprida.",
+  "acoes": {
+    "presente": [
+      "presente",
+      "presenca",
+      "marcar presenca",
+      "chegou",
+      "veio",
+      "esta aqui",
+      "ta aqui",
+      "ja chegou"
+    ],
+    "em_atendimento": [
+      "em atendimento",
+      "iniciar atendimento",
+      "comecar atendimento",
+      "comecou",
+      "entrou"
+    ],
+    "avaliacao_entrada": [
+      "avaliacao de entrada",
+      "avaliacao inicial",
+      "entrada"
+    ],
+    "falta": [
+      "falta",
+      "nao veio",
+      "nao compareceu"
+    ],
+    "falta_justificada": [
+      "falta justificada",
+      "faltou com justificativa",
+      "faltou justificado",
+      "faltou justificada",
+      "justificar a falta",
+      "justificar falta",
+      "falta com atestado",
+      "faltou com atestado",
+      "atestado"
+    ],
+    "falta_nao_justificada": [
+      "falta nao justificada",
+      "falta n justificada",
+      "faltou sem justificar",
+      "faltou sem justificativa",
+      "falta sem justificativa",
+      "faltou"
+    ],
+    "desmarcar": [
+      "desmarc*",
+      "cancelar",
+      "cancela",
+      "tirar da agenda",
+      "nao vem",
+      "nao vai vir"
+    ],
+    "remanejar": [
+      "remanej*",
+      "mudar o dia",
+      "mudar de dia",
+      "passar para",
+      "passar pra",
+      "passa para",
+      "passa pra",
+      "transferir",
+      "transfere",
+      "trocar",
+      "troca",
+      "mudar",
+      "muda",
+      "passar",
+      "passa",
+      "levar para",
+      "levar pra",
+      "jogar para",
+      "jogar pra"
+    ],
+    "remarcar": [
+      "remarc*",
+      "marcar de novo",
+      "marcar para outro dia",
+      "marcar pra outro dia",
+      "reagend*"
+    ],
+    "trocar_horario": [
+      "trocar horario",
+      "trocar o horario",
+      "troca o horario",
+      "mudar o horario",
+      "mudar horario",
+      "muda o horario",
+      "trocar de horario",
+      "mudar de horario",
+      "trocar para as",
+      "trocar pras",
+      "mudar para as"
+    ],
+    "agendar": [
+      "novo atendimento",
+      "adicionar paciente",
+      "marcar paciente",
+      "agendar",
+      "agenda o",
+      "agenda a",
+      "encaixar"
+    ],
+    "semanal": [
+      "semanal",
+      "toda semana",
+      "mudar para semanal"
+    ],
+    "quinzenal": [
+      "quinzenal",
+      "de quinze em quinze dias",
+      "de 15 em 15 dias",
+      "a cada 2 semanas",
+      "a cada 14 dias",
+      "mudar para quinzenal"
+    ],
+    "mensal": [
+      "mensal",
+      "1 vez por mes",
+      "1x por mes",
+      "mudar para mensal"
+    ],
+    "alta": [
+      "dar alta",
+      "de alta",
+      "alta"
+    ],
+    "desistencia": [
+      "desist*"
+    ],
+    "obito": [
+      "obito",
+      "faleceu",
+      "falecimento"
+    ],
+    "encaminhamento": [
+      "encaminhamento interno",
+      "encaminhar para outro profissional",
+      "encaminhar para outro setor",
+      "encaminhar"
+    ],
+    "multi": [
+      "atendimento multi",
+      "multi",
+      "multiprofissional",
+      "atendimento em grupo"
+    ],
+    "transporte": [
+      "transporte",
+      "motorista",
+      "precisa de transporte"
+    ],
+    "pausar": [
+      "pausar",
+      "pausar atendimento",
+      "pausa",
+      "suspender",
+      "congelar"
+    ],
+    "busca_ativa": [
+      "busca ativa",
+      "encaminhar para busca ativa",
+      "encaminhar pra busca ativa"
+    ],
+    "excluir": [
+      "excluir agendamento",
+      "apagar agendamento",
+      "excluir",
+      "apagar",
+      "deletar"
+    ],
+    "ausencia": [
+      "registrar ausencia",
+      "nova ausencia",
+      "vou faltar",
+      "vou tirar ferias",
+      "tirar ferias",
+      "ferias",
+      "folga",
+      "vou de folga",
+      "estou de atestado",
+      "vou estar de atestado"
+    ],
+    "consultar": [
+      "quais pacientes",
+      "quais atendimentos",
+      "quem eu tenho",
+      "o que eu tenho",
+      "quantos pacientes",
+      "quantos atendimentos",
+      "meus pacientes",
+      "quem vem"
+    ],
+    "imprimir": [
+      "imprimir",
+      "imprime"
+    ],
+    "fonte_maior": [
+      "aumentar letra",
+      "aumentar a letra",
+      "letra maior",
+      "aumenta a letra",
+      "a mais"
+    ],
+    "fonte_menor": [
+      "diminuir letra",
+      "diminuir a letra",
+      "letra menor",
+      "diminui a letra",
+      "a menos"
+    ],
+    "navegar": [
+      "ir para",
+      "ir pra",
+      "vai para",
+      "vai pra",
+      "abrir",
+      "abre",
+      "mostrar",
+      "mostra",
+      "voltar para",
+      "voltar pra",
+      "=inicio",
+      "=home",
+      "=agenda",
+      "=ausencias",
+      "=minhas ausencias",
+      "=perfil",
+      "agenda do dia",
+      "agenda da semana",
+      "agenda do mes",
+      "=hoje",
+      "proximo dia",
+      "dia seguinte",
+      "dia anterior",
+      "=semana que vem",
+      "=proxima semana",
+      "=semana passada",
+      "=semana anterior",
+      "=dia",
+      "=semana",
+      "=mes"
+    ]
+  },
+  "destinos": {
+    "inicio": [
+      "inicio",
+      "home",
+      "tela inicial"
+    ],
+    "ausencias": [
+      "ausencias",
+      "minhas ausencias"
+    ],
+    "perfil": [
+      "perfil"
+    ],
+    "dia": [
+      "agenda do dia",
+      "dia",
+      "o dia",
+      "modo dia"
+    ],
+    "semana": [
+      "agenda da semana",
+      "semana",
+      "a semana",
+      "modo semana"
+    ],
+    "mes": [
+      "agenda do mes",
+      "mes",
+      "o mes"
+    ],
+    "hoje": [
+      "hoje"
+    ],
+    "proximo_dia": [
+      "proximo dia",
+      "dia seguinte",
+      "amanha"
+    ],
+    "dia_anterior": [
+      "dia anterior",
+      "ontem"
+    ],
+    "proxima_semana": [
+      "semana que vem",
+      "proxima semana"
+    ],
+    "semana_anterior": [
+      "semana passada",
+      "semana anterior"
+    ],
+    "agenda": [
+      "agenda"
+    ]
+  },
+  "impressao": {
+    "rascunho": [
+      "em branco",
+      "rascunho"
+    ],
+    "mes": [
+      "do mes",
+      "mensal"
+    ],
+    "semana": [
+      "da semana",
+      "semanal"
+    ],
+    "dia": [
+      "do dia",
+      "de hoje"
+    ]
+  },
+  "cores": {
+    "presente": [
+      "verde"
+    ],
+    "em_atendimento": [
+      "azul"
+    ],
+    "avaliacao_entrada|remarcar|trocar_horario": [
+      "roxo claro",
+      "lilas",
+      "roxo"
+    ],
+    "falta_justificada": [
+      "amarelo",
+      "dourado"
+    ],
+    "falta_nao_justificada": [
+      "vermelho",
+      "rosa claro"
+    ],
+    "desmarcar": [
+      "cinza"
+    ],
+    "remanejar|desistencia": [
+      "laranja"
+    ],
+    "obito|busca_ativa": [
+      "rosa"
+    ],
+    "multi|pausar": [
+      "turquesa",
+      "azul turquesa"
+    ],
+    "transporte": [
+      "azul escuro",
+      "marinho"
+    ],
+    "excluir": [
+      "vermelho escuro"
+    ]
+  },
+  "escopo": {
+    "dia": [
+      "so neste dia",
+      "so nesse dia",
+      "so hoje",
+      "so dessa vez",
+      "so desta vez",
+      "so essa vez",
+      "so esta vez",
+      "so nesta semana",
+      "so nessa semana",
+      "so naquele dia",
+      "so este dia",
+      "pontual"
+    ],
+    "sempre": [
+      "todas as semanas",
+      "toda semana",
+      "daqui pra frente",
+      "daqui para frente",
+      "fixo",
+      "fixa",
+      "definitivo",
+      "definitiva",
+      "de vez",
+      "sempre"
+    ]
+  },
+  "motivosAusencia": {
+    "Férias": [
+      "ferias"
+    ],
+    "Folga": [
+      "folga"
+    ],
+    "Falta": [
+      "falta",
+      "faltar"
+    ],
+    "Atestado": [
+      "atestado"
+    ],
+    "Outro": [
+      "outro",
+      "outra coisa"
+    ]
+  },
+  "sim": [
+    "sim",
+    "isso",
+    "confirma",
+    "confirmar",
+    "pode",
+    "pode ser",
+    "ok",
+    "certo",
+    "correto",
+    "isso mesmo"
+  ],
+  "nao": [
+    "nao",
+    "cancela",
+    "deixa",
+    "errado"
+  ],
+  "ligacao": [
+    "da",
+    "de",
+    "do",
+    "das",
+    "dos",
+    "e",
+    "a",
+    "o",
+    "as",
+    "os",
+    "na",
+    "no",
+    "para",
+    "pra",
+    "pro",
+    "com",
+    "em",
+    "um",
+    "uma",
+    "que",
+    "eu",
+    "ela",
+    "ele",
+    "hoje",
+    "agora"
+  ],
+  "exemplos": [
+    "desmarcar a Lauany hoje",
+    "falta justificada do Marcos",
+    "remanejar a Lauany para quinta às 11:20, todas as semanas",
+    "registrar férias de 10 a 20 de dezembro",
+    "imprimir agenda da semana"
+  ]
+}

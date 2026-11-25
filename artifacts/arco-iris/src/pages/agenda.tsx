@@ -13,10 +13,10 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, getStatusColor, getStatusLabel, displayApptStatus, firstEvalKey, todayBR } from "@/lib/utils";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { NeonCabecalho, useFonteAgenda } from "@/components/AgendaNeon";
 import { VozClinica } from "@/components/VozClinica";
-import type { ComandoClinico } from "@/lib/agenda-clinica-voz";
+import { MOVER, type ComandoClinico, type Contexto } from "@/lib/agenda-clinica-voz";
 import { getCurrentScope } from "@/lib/portal-session";
 import { useToast } from "@/hooks/use-toast";
 import BookingModal from "@/components/BookingModal";
@@ -131,15 +131,6 @@ const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
 const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
 
 /** Abbreviate long names keeping first + second name: "Isis Godinho Lima" → "Isis Godinho L." */
-function abbreviateName(name: string | undefined | null, maxLen = 22): string {
-  if (!name) return "";
-  if (name.length <= maxLen) return name;
-  const parts = name.trim().split(/\s+/);
-  if (parts.length <= 2) return name;
-  const abbreviated = parts[0] + " " + parts[1] + " " + parts.slice(2).map(p => p[0]?.toUpperCase() + ".").join(" ");
-  return abbreviated;
-}
-
 /** Deterministic negative ID for virtual appointments so menus stay open across re-renders. */
 function stableVirtualId(date: string, time: string, patientId: number, groupId: string): number {
   let h = 0;
@@ -554,6 +545,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
   const [ajusteSalvando, setAjusteSalvando] = useState(false);
   const fonte = useFonteAgenda();
   const [vozAberta, setVozAberta] = useState(false);
+  const [vozPendente, setVozPendente] = useState<ComandoClinico | null>(null);
+  const [, navegar] = useLocation();
   useEffect(() => {
     const abrir = () => setVozAberta(true);
     window.addEventListener("agenda-voz-abrir", abrir);
@@ -1915,10 +1908,66 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     : [];
 
   const scopeAtual = getCurrentScope();
-  const vozPacientes = Array.from(new Map(expanded.map(a => [a.patientId, { patientId: a.patientId, patientName: a.patientName || "", prontuario: a.prontuario ?? null }])).values());
+  const vozPacientes = Array.from(new Map([...appointments, ...expanded].map(a => [a.patientId, { patientId: a.patientId, patientName: a.patientName || "", prontuario: a.prontuario ?? null }])).values())
+    .filter(p => p.patientName);
   const vozListarDia = (data: string) => withExtraTimes(expanded.filter(a => a.date === data).map(a => a.time)).flatMap(t => getApts(data, t))
     .filter(a => apptStatus(a)?.toLowerCase() !== "desmarcado")
     .map(a => ({ time: a.time, nome: a.patientName || `Paciente #${a.patientId}`, status: getStatusLabel(apptStatus(a)) }));
+  // Voz: atendimentos de qualquer semana já carregada (sem trocar a tela).
+  const vozSemana = (date: string): Appointment[] => {
+    if (weekDates.includes(date)) return expanded;
+    const seg = startOfWeek(new Date(date + "T12:00:00"), { weekStartsOn: 1 });
+    const dates = Array.from({ length: 5 }, (_, i) => format(addDays(seg, i), "yyyy-MM-dd"));
+    return expandRecurrence(appointments, dates, recurrenceCuts)
+      .filter(a => !isHiddenByPatientStatus(a.patientStatus, a.date, todayBR()))
+      .filter(a => !isBlocked(a.date, a.professionalId, feriados, ausencias)) as Appointment[];
+  };
+  const vozAncora = (cmd: ComandoClinico): string | null => {
+    if (cmd.acao === "agendar") return cmd.novaData;
+    return cmd.data ?? (cmd.acao && MOVER.has(cmd.acao) ? cmd.novaData : null);
+  };
+  const vozAlvoApt = (cmd: ComandoClinico): Appointment | null => {
+    if (!cmd.paciente) return null;
+    const ancora = vozAncora(cmd) ?? today;
+    const doPaciente = vozSemana(ancora)
+      .filter(a => a.patientId === cmd.paciente!.patientId && !["desmarcado", "cancelado", "remanejado", "remarcado"].includes((apptStatus(a) || "").toLowerCase()))
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    return (cmd.data ? doPaciente.find(a => a.date === cmd.data && (!cmd.hora || a.time === cmd.hora)) ?? doPaciente.find(a => a.date === cmd.data) : null)
+      ?? (cmd.data ? null : doPaciente.find(a => a.date === today))
+      ?? (cmd.data ? null : doPaciente.find(a => a.date >= today))
+      ?? (cmd.data ? null : doPaciente[0])
+      ?? null;
+  };
+  const vozBloqueio = (cmd: ComandoClinico): string | null => {
+    const a = cmd.acao;
+    if (!a) return null;
+    const recepcao = "Essa opção fica com a recepção. No acesso do profissional ela não aparece no menu.";
+    if (isProfessionalProfile && (a === "desmarcar" || a === "transporte" || a === "excluir")) return recepcao;
+    if (!isAdmin && ["falta_justificada", "falta_nao_justificada", "desmarcar", "multi", "transporte", "excluir", "semanal", "quinzenal", "mensal"].includes(a)) return "Faltas e desmarcações ficam na Recepção.";
+    if (a === "transporte" && (drivers.length === 0 || isTransportSpecialty(selectedProf?.specialty))) return "Transporte não está disponível nesta agenda.";
+    if (a === "ausencia" && (!portal || portal.allowPickProfessional)) return "As ausências de todos os profissionais ficam em Feriados & Ausências, no painel.";
+    if (cmd.paciente && ["presente", "em_atendimento", "avaliacao_entrada", "falta_justificada", "falta_nao_justificada", "desmarcar", "remanejar", "remarcar", "trocar_horario", "semanal", "quinzenal", "mensal", "pausar", "busca_ativa", "alta", "desistencia", "obito", "encaminhamento", "multi", "transporte", "excluir"].includes(a)) {
+      const apt = vozAlvoApt(cmd);
+      if (!apt) return cmd.data ? `${cmd.paciente.patientName} não tem atendimento em ${format(new Date(cmd.data + "T12:00:00"), "EEEE dd/MM", { locale: ptBR })}.` : `${cmd.paciente.patientName} não tem atendimento nesta semana.`;
+      if (a === "presente" && apt.date > today) return "Presente só no dia do atendimento (ou depois).";
+      if (a === "presente" && (apt.status || "").toLowerCase() === "presente") return "Esse atendimento já está como Presente.";
+      if ((a === "semanal" || a === "quinzenal" || a === "mensal") && !apt.recurrenceGroupId) return "Esse atendimento não é recorrente.";
+      if (a === "busca_ativa" && buscaByPatient.has(apt.patientId)) return "Esse paciente já está na Busca Ativa.";
+      if (a === "pausar" && (apt.paused || (apt.status || "").toLowerCase() === "pausado")) return "Esse atendimento já está pausado.";
+    }
+    return null;
+  };
+  const vozContexto: Contexto = {
+    grade: TIME_SLOTS.filter(t => isPaula || t !== "12:10"),
+    situacao: (date, time) => {
+      if (!weekDates.includes(date) && !vozSemana(date).length) return null;
+      const lista = (weekDates.includes(date) ? getApts(date, time) : vozSemana(date).filter(a => a.date === date && a.time === time))
+        .filter(a => !["desmarcado", "cancelado", "remanejado", "remarcado"].includes((a.status || "").toLowerCase()));
+      return lista.length ? `Grupo: ${lista.map(a => (a.patientName || "").split(" ")[0]).join(", ")}` : "Livre";
+    },
+    bloqueio: vozBloqueio,
+  };
+  const vozAlvo = (cmd: ComandoClinico) => { const a = vozAlvoApt(cmd); return a ? { date: a.date, time: a.time } : null; };
   // Faixa = do horário padrão da linha até 1 min antes do próximo (vale também para horários já ajustados).
   const limitesFaixa = (time: string) => {
     let i = -1;
@@ -2006,38 +2055,85 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     }
   };
   // Voz: só chama os mesmos comandos do menu do paciente (cada um com suas confirmações).
+  const vozIrDia = (delta: number) => {
+    const base = diaFoco !== null ? diaFoco : Math.max(0, weekDates.indexOf(today));
+    const n = base + delta;
+    if (n > 4) { goNextWeek(); setDiaFoco(0); } else if (n < 0) { goPrevWeek(); setDiaFoco(4); } else setDiaFoco(n);
+  };
   const executarVoz = (cmd: ComandoClinico) => {
     setVozAberta(false);
     const acao = cmd.acao;
     if (!acao) return;
+    switch (acao) {
+      case "fonte_maior": return fonte.maior();
+      case "fonte_menor": return fonte.menor();
+      case "imprimir": return handlePrint(cmd.impressao ?? "dia");
+      case "ausencia":
+        window.dispatchEvent(new CustomEvent("agenda-voz-ausencia", { detail: cmd.ausencia }));
+        return;
+      case "navegar": {
+        const d = cmd.destino;
+        if (d === "inicio" || d === "ausencias" || d === "perfil" || d === "agenda") {
+          if (portal) window.dispatchEvent(new CustomEvent("agenda-voz-ir", { detail: d }));
+          else if (d === "inicio") navegar("/");
+          return;
+        }
+        if (d === "mes") { if (portal) window.dispatchEvent(new CustomEvent("agenda-voz-ir", { detail: "inicio" })); else navegar("/agenda-mensal"); return; }
+        if (d === "semana") return setDiaFoco(null);
+        if (d === "dia" || d === "hoje") { goThisWeek(); const dow = new Date().getDay(); setDiaFoco(dow >= 1 && dow <= 5 ? dow - 1 : 0); return; }
+        if (d === "proximo_dia") return vozIrDia(1);
+        if (d === "dia_anterior") return vozIrDia(-1);
+        if (d === "proxima_semana") return goNextWeek();
+        if (d === "semana_anterior") return goPrevWeek();
+        return;
+      }
+    }
+    // Ação em outra semana: abre aquela semana e executa quando ela aparecer.
+    const ancora = vozAncora(cmd);
+    if (ancora && !weekDates.includes(ancora)) {
+      setWeekRef(new Date(ancora + "T12:00:00"));
+      setVozPendente(cmd);
+      return;
+    }
+    executarVozNaSemana(cmd);
+  };
+  const executarVozNaSemana = (cmd: ComandoClinico) => {
+    const acao = cmd.acao;
+    if (!acao) return;
     if (acao === "agendar") {
-      const date = cmd.data && weekDates.includes(cmd.data) ? cmd.data : diaNovo;
-      if (cmd.hora && TIME_SLOTS.includes(cmd.hora)) abrirBooking({ date, time: cmd.hora });
+      const date = cmd.novaData && weekDates.includes(cmd.novaData) ? cmd.novaData : diaNovo;
+      if (cmd.novaHora && TIME_SLOTS.includes(cmd.novaHora)) abrirBooking({ date, time: cmd.novaHora });
       else setNovoAberto({ date, time: TIME_SLOTS.find(t => t !== "12:10" || isPaula) ?? TIME_SLOTS[0] });
       return;
     }
-    if (!cmd.paciente) return;
-    const doPaciente = expanded.filter(a => a.patientId === cmd.paciente!.patientId && apptStatus(a)?.toLowerCase() !== "desmarcado")
-      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-    const destino = acao === "remanejar" || acao === "remarcar";
-    const apt = (!destino && cmd.data ? doPaciente.find(a => a.date === cmd.data && (!cmd.hora || a.time === cmd.hora)) : null)
-      ?? doPaciente.find(a => a.date === today)
-      ?? doPaciente.find(a => a.date >= today)
-      ?? doPaciente[0];
-    if (!apt) { toast({ title: "Paciente sem atendimento nesta semana", variant: "destructive" }); return; }
-    const soRecepcao = () => toast({ title: "Essa opção fica com a recepção", description: "No acesso do profissional ela não aparece no menu.", variant: "destructive" });
+    const apt = vozAlvoApt(cmd);
+    if (!apt) { toast({ title: "Não achei o atendimento desse paciente nesta semana", variant: "destructive" }); return; }
+    const bloq = vozBloqueio(cmd);
+    if (bloq) { toast({ title: bloq, variant: "destructive" }); return; }
     switch (acao) {
+      case "presente": return void handlePresente(apt);
       case "em_atendimento": return void handleAtendimento(apt);
       case "avaliacao_entrada": return setAvfEntradaApt(apt);
       case "falta_justificada": return void handleFaltaJustificada(apt);
       case "falta_nao_justificada": return void handleFaltaNaoJustificada(apt);
-      case "desmarcar": return isProfessionalProfile ? soRecepcao() : void handleDesmarcado(apt, selectedProf?.name || "");
+      case "desmarcar": return void handleDesmarcado(apt, selectedProf?.name || "");
+      case "trocar_horario":
+        setActionMenuId(null);
+        setAjusteHora({ time: apt.time, date: apt.date, horas: cmd.novaHora ? { [apt.id]: cmd.novaHora } : {}, definitivo: cmd.escopo === "sempre" });
+        return;
       case "remanejar": case "remarcar": {
         setActionMenuId(null);
-        const ref = cmd.data ? new Date(cmd.data + "T12:00:00") : (acao === "remarcar" ? new Date(apt.date + "T12:00:00") : weekRef);
-        setRemanejFlow({ apt, kind: acao, step: "slot", weekRef: ref, dia: cmd.data ?? undefined });
         setRemanejDone(false);
-        if (cmd.data || cmd.hora) toast({ title: "Escolha o novo horário", description: `Toque em ${[cmd.data?.split("-").reverse().slice(0, 2).join("/"), cmd.hora].filter(Boolean).join(" às ")} para confirmar.` });
+        const ref = new Date((cmd.novaData ?? apt.date) + "T12:00:00");
+        const livre = cmd.novaData && cmd.novaHora && weekDates.includes(cmd.novaData) && buildSlotOptions({
+          dates: [cmd.novaData], times: [cmd.novaHora], aptsAt: getApts, patientId: apt.patientId, origin: { date: apt.date, time: apt.time },
+        }).length > 0;
+        if (livre && !dayBlock(cmd.novaData!)) {
+          setRemanejFlow({ apt, kind: acao, step: "carla", weekRef: ref, dia: cmd.novaData!, newDate: cmd.novaData!, newTime: cmd.novaHora! });
+          return;
+        }
+        setRemanejFlow({ apt, kind: acao, step: "slot", weekRef: ref, dia: cmd.novaData ?? undefined });
+        if (cmd.novaData && cmd.novaHora) toast({ title: "Esse horário não está disponível", description: "Escolha outro horário na lista.", variant: "destructive" });
         return;
       }
       case "semanal": case "quinzenal": case "mensal": return void handleChangeFrequency(apt, acao);
@@ -2048,10 +2144,18 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       case "obito": return handleSaida(apt, "Óbito");
       case "encaminhamento": return handleEncaminhamento(apt);
       case "multi": return handleMultiAtendimento(apt);
-      case "transporte": return isProfessionalProfile ? soRecepcao() : handleTransporte(apt);
-      case "excluir": return isProfessionalProfile ? soRecepcao() : handleExcluirAdmin(apt);
+      case "transporte": return handleTransporte(apt);
+      case "excluir": return handleExcluirAdmin(apt);
     }
   };
+  useEffect(() => {
+    if (!vozPendente) return;
+    const ancora = vozAncora(vozPendente);
+    if (ancora && !weekDates.includes(ancora)) return;
+    const c = vozPendente;
+    setVozPendente(null);
+    executarVozNaSemana(c);
+  }, [weekDates[0], vozPendente]); // eslint-disable-line react-hooks/exhaustive-deps
   const visaoBtn = (ativo: boolean) => cn(
     "px-4 py-2 rounded-xl text-base font-semibold transition-all",
     ativo ? "text-white bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_6px_16px_-6px_rgba(109,40,217,.7)]" : "text-[#1e1b4b] bg-white hover:bg-violet-50",
@@ -2177,7 +2281,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   {novoAberto && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setNovoAberto(null)} />
-                      <div className="absolute right-0 mt-2 w-72 bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3">
+                      <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3">
                         <p className="font-bold text-foreground">Escolha o dia e o horário</p>
                         <Select value={novoAberto.date} onChange={e => setNovoAberto({ ...novoAberto, date: e.target.value })}>
                           {weekDays.map((d, i) => <option key={i} value={weekDates[i]}>{format(d, "EEEE, dd/MM", { locale: ptBR })}</option>)}
@@ -2317,7 +2421,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                   <div
                                     onClick={() => setActionMenuId(actionMenuId === apt.id ? null : apt.id)}
                                     className={cn(
-                                      "cartao-paciente px-2 py-1.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none hover:-translate-y-px hover:shadow-md",
+                                      "cartao-paciente min-w-0 px-2 py-1.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none hover:-translate-y-px hover:shadow-md",
                                       isMultiGuest && "border-dashed",
                                       isGhost && "bg-amber-950/20 border-amber-500/60 animate-pulse",
                                       !isGhost && isDesmarcado && "bg-red-950/10 border-red-500/40",
@@ -2348,30 +2452,30 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     <div className="flex items-center gap-1.5 min-w-0">
                                       <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={30} />
                                       {(isGroup || apt.prontuario) && (
-                                        <span className="text-[13px] font-extrabold leading-tight truncate">
+                                        <span className="text-[13px] font-extrabold leading-tight min-w-0 break-all">
                                           {isGroup && <span className="text-cyan-300 mr-1">{ordem + 1}º</span>}
                                           {apt.prontuario && <span className="text-cyan-400">[{apt.prontuario}]</span>}
                                         </span>
                                       )}
                                     </div>
-                                    <span className="font-semibold text-foreground text-[13px] leading-tight line-clamp-2 break-words" title={apt.patientName || undefined}>
+                                    <span className="font-semibold text-foreground text-[13px] leading-tight break-normal [overflow-wrap:anywhere]" title={apt.patientName || undefined}>
                                         {isGhost ? (
                                           <span className="text-amber-400">⚠ Sem dados</span>
                                         ) : (
-                                          abbreviateName(apt.patientName, 34) || `#${apt.patientId}`
+                                          apt.patientName || `#${apt.patientId}`
                                         )}
                                     </span>
                                     <AbsenceBadge count={absenceCount(apt.patientId)} compact />
-                                    <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
+                                    <span lang="pt-BR" title={getStatusLabel(apptStatus(apt))} className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold w-fit max-w-full leading-tight break-words hyphens-auto", getStatusColor(apptStatus(apt)))}>
                                       {getStatusLabel(apptStatus(apt))}
                                     </span>
                                     {apt.paused && (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5 w-max">
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5 w-fit max-w-full">
                                         <Snowflake className="w-2.5 h-2.5" /> Pausado
                                       </span>
                                     )}
                                     {buscaByPatient.has(apt.patientId) && (
-                                      <span title={buscaTitle(apt.patientId)} className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-0.5 w-max">
+                                      <span title={buscaTitle(apt.patientId)} className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-0.5 w-fit max-w-full">
                                         <ShieldAlert className="w-2.5 h-2.5" /> Busca Ativa
                                       </span>
                                     )}
@@ -2402,12 +2506,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     )}
                                     {/* Parental/Pilates: show guardian/mother name */}
                                     {isPilatesAppointment(apt.notes) && (
-                                      <span className="text-[9px] font-black text-pink-300 bg-pink-500/20 border border-pink-400/40 rounded px-1 truncate" title="Atendimento da mãe/responsável (Pilates)">
+                                      <span className="text-[9px] font-black text-pink-300 bg-pink-500/20 border border-pink-400/40 rounded px-1 break-words" title="Atendimento da mãe/responsável (Pilates)">
                                         👩 MÃE/RESPONSÁVEL — PILATES
                                       </span>
                                     )}
                                     {apt.guardianName && (isParentalSpecialty(selectedProf?.specialty) || isPilatesAppointment(apt.notes)) && (
-                                      <span className="text-[9px] text-pink-400/80 font-semibold truncate">
+                                      <span className="text-[9px] text-pink-400/80 font-semibold break-words">
                                         Mãe: {apt.guardianName}
                                       </span>
                                     )}
@@ -2574,7 +2678,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       </div>
 
       {canView && selectedProfId && (
-        <aside className="space-y-4 xl:sticky xl:top-4">
+        <aside className="space-y-4 min-w-0">
           <Card className="p-5 !rounded-3xl text-center">
             <h3 className="font-extrabold text-[#1e1b4b] text-xl mb-3 flex items-center justify-center gap-2">
               <Clock className="w-5 h-5 text-violet-700" /> Próximo atendimento
@@ -2611,12 +2715,13 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
             {hojeApts.length === 0 ? (
               <p className="text-muted-foreground">Nenhum atendimento hoje.</p>
             ) : (
-              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+              <div className="space-y-2">
                 {hojeApts.map(apt => (
-                  <div key={`${apt.id}-${apt.time}`} className={cn("flex items-center gap-3 rounded-2xl px-2 py-2", apt.time >= agoraHM ? "bg-violet-50" : "bg-white")}>
+                  // flex-wrap + largura mínima do nome: em coluna estreita o horário e as faltas vão para outra linha, em vez de o nome quebrar letra por letra.
+                  <div key={`${apt.id}-${apt.time}`} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl px-2 py-2", apt.time >= agoraHM ? "bg-violet-50" : "bg-white")}>
                     <span className="rounded-xl bg-violet-100 text-violet-800 font-bold tabular-nums px-2.5 py-1.5 shrink-0">{apt.time}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-semibold text-[#1e1b4b] leading-snug break-words">{apt.patientName || `Paciente #${apt.patientId}`}</span>
+                    <span className="min-w-[9rem] flex-1 basis-[9rem]">
+                      <span className="block font-semibold text-[#1e1b4b] leading-snug break-normal [overflow-wrap:break-word]">{apt.patientName || `Paciente #${apt.patientId}`}</span>
                       <span className={cn("inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>
                     </span>
                     <AbsenceBadge count={absenceCount(apt.patientId)} />
@@ -2640,7 +2745,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         const mudou = lista.filter(a => horaDe(a.id) !== ajusteHora.time).length;
         const setHora = (id: number, h: string) => setAjusteHora({ ...ajusteHora, horas: { ...ajusteHora.horas, [id]: h } });
         return (
-          <div className="agenda-neon fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-label="Trocar horário" onClick={() => !ajusteSalvando && setAjusteHora(null)}>
+          <div className="agenda-neon fixed inset-0 overflow-y-auto z-[60] flex items-end-safe sm:items-center-safe justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-label="Trocar horário" onClick={() => !ajusteSalvando && setAjusteHora(null)}>
             <div className="w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl space-y-4 text-[#1e1b4b]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center gap-3">
                 <span className="grid place-items-center w-12 h-12 rounded-2xl bg-violet-100 text-violet-700 shrink-0"><Clock className="w-6 h-6" /></span>
@@ -2699,7 +2804,8 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       })()}
 
       {vozAberta && canView && selectedProfId && (
-        <VozClinica pacientes={vozPacientes} listarDia={vozListarDia} onConfirmar={executarVoz} onFechar={() => setVozAberta(false)} />
+        <VozClinica pacientes={vozPacientes} listarDia={vozListarDia} contexto={vozContexto} alvo={vozAlvo} onConfirmar={executarVoz} onFechar={() => setVozAberta(false)}
+          tela={portal ? "agenda-profissional" : "agenda-administracao"} professionalId={selectedProfIdNum || null} mostrarLog={!isProfessionalProfile} />
       )}
 
       {/* ── BookingModal ── */}
@@ -2722,7 +2828,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
       {/* ── Modal de Exclusão Administrativa (sem vínculo clínico) ── */}
       {excluirConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -2779,7 +2885,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         />
       )}
       {pauseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,20,0.97)", border: "1px solid rgba(56,189,248,0.3)" }}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -2963,7 +3069,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       )}
 
       {altaConfirm && (saidaTipo !== "Alta" || altaAvf) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -3032,7 +3138,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
       {/* ── Encaminhamento Interno Modal ── */}
       {encApt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEncApt(null)}>
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEncApt(null)}>
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,5,0.97)", border: "1px solid rgba(192,38,211,0.3)" }} onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -3172,7 +3278,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
       {/* ── Transporte (Motorista) Modal ── */}
       {transporteApt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setTransporteApt(null)}>
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setTransporteApt(null)}>
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,4,12,0.97)", border: "1px solid rgba(59,130,246,0.35)" }} onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -3224,7 +3330,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
       {/* ── Alerta de Ausência ── */}
       {absenceAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{
             background: absenceAlert.consecutive >= 3 ? "rgba(10,0,0,0.97)" : "rgba(10,8,0,0.97)",
             border: absenceAlert.consecutive >= 3 ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(234,179,8,0.5)",

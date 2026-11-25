@@ -1377,7 +1377,7 @@ export default function PatientDetail() {
       )}
 
       {triagemEdit && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center-safe justify-center p-4 overflow-y-auto">
           <MotionCard className="w-full max-w-lg p-6 my-4" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <h2 className="text-2xl font-bold font-display mb-1">{triagemFeita ? "Editar Triagem" : "Registrar Triagem"}</h2>
             <p className="text-sm text-muted-foreground mb-5">Preencha a nota de cada área (0–{AREA_MAX_UI}, mesma escala da Triagem). O score total é exibido em escala padronizada (máx. {SCORE_MAX_DISPLAY}).</p>
@@ -1460,7 +1460,7 @@ export default function PatientDetail() {
 
       {/* ── Modal Afastamento ── */}
       {afastOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setAfastOpen(false)}>
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setAfastOpen(false)}>
           <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl bg-card border border-border" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5">
               <div className="flex items-center justify-between mb-6">
@@ -1524,7 +1524,7 @@ export default function PatientDetail() {
 
       {/* ── Modal Editar Dados ── */}
       {editOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEditOpen(false)}>
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEditOpen(false)}>
           <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl bg-card border border-border max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5">
               <div className="flex items-center justify-between mb-6">

@@ -10,7 +10,8 @@ import { AgendaClaudiaAlarme } from "@/components/AgendaClaudiaAlarme";
 import * as api from "@/lib/agenda-exec-rpc";
 import { CATEGORIAS, categoria, type AgxCompromisso, type AgxInput, type AgxSessao, type Categoria, type Pessoa } from "@/lib/agenda-exec-rpc";
 import { interpretarFrase, comandoVoz, intencaoLocal, type Interpretacao } from "@/lib/agenda-exec-voz";
-import { acordarIA, entenderVoz, gravar, gravadorSuportado, liberarMicrofone, type Gravacao, type VozIA } from "@/lib/agenda-exec-ia";
+import type { VozIA } from "@/lib/agenda-exec-ia";
+import { registrarNaoEntendido } from "@/lib/voz-regras";
 import { ativarAvisos, assinaturaAtual, desativarAvisos, ehAndroid, ehIOS, instalado, pushSuportado } from "@/lib/agenda-exec-push";
 import { APARENCIA_PADRAO, OPCOES_FUNDO, ROTINA_MAX, arquivoParaFoto, estiloFundo, useAparencia, type Aparencia, type AtividadeRotina } from "@/lib/agenda-exec-aparencia";
 import { getCompanySession } from "@/lib/portal-session";
@@ -1082,7 +1083,7 @@ function Semana({ base, setBase, onDia, doDia, hoje }: { base: string; setBase: 
 // ---------------------------------------------------------------- formulário
 function Folha({ titulo, onFechar, children, leve = false }: { titulo: string; onFechar: () => void; children: React.ReactNode; leve?: boolean }) {
   return (
-    <div className={`fixed inset-0 z-40 flex items-end md:items-center justify-center ${leve ? "bg-black/20" : "bg-black/60 backdrop-blur-sm"}`} onClick={onFechar}>
+    <div className={`fixed inset-0 overflow-y-auto z-40 flex items-end-safe md:items-center-safe justify-center ${leve ? "bg-black/20" : "bg-black/60 backdrop-blur-sm"}`} onClick={onFechar}>
       <div role="dialog" aria-label={titulo} onClick={(e) => e.stopPropagation()}
         className={`agx-entrar w-full md:max-w-xl ${leve ? "max-h-[68dvh]" : "max-h-[92dvh]"} overflow-y-auto overscroll-contain rounded-t-3xl md:rounded-3xl border border-violet-400/50 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white text-base shadow-2xl`}
         style={{ background: "rgba(12,18,52,.96)", backdropFilter: "blur(20px)", boxShadow: "0 0 30px rgba(139,92,246,.35)" }}>
@@ -1195,14 +1196,13 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
   const [lista, setLista] = useState<AgxCompromisso[]>(() => api.lerOffline(sessao.dona.id)?.lista ?? []);
   const [outra, setOutra] = useState<{ acao: "desmarcar" | "remarcar" | "concluir"; alvo: AgxCompromisso; data: string; hora: string | null } | null>(null);
   const [extra, setExtra] = useState<{ observacao: string | null; antecedenciaMin: number | null }>({ observacao: null, antecedenciaMin: null });
-  const [pensando, setPensando] = useState(false);
-  const grav = useRef<Gravacao | null>(null);
+  const pensando = false;
+  const caixa = useRef<HTMLTextAreaElement | null>(null);
   const recarregar = useCallback(() => {
     const d = (n: number) => { const x = new Date(); x.setDate(x.getDate() + n); return ISO(x); };
     api.listar(d(-7), d(180)).then(setLista).catch(() => {});
   }, []);
   useEffect(recarregar, [recarregar]);
-  useEffect(() => { acordarIA(); return () => liberarMicrofone(); }, []);
   const w = window as unknown as { SpeechRecognition?: new () => Reconhecedor; webkitSpeechRecognition?: new () => Reconhecedor };
   const Rec = w.SpeechRecognition ?? w.webkitSpeechRecognition;
   useEffect(() => () => rec.current?.stop(), []);
@@ -1226,7 +1226,6 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
   const pararEscuta = () => {
     continuarEscuta.current=false;
     if(repeticao.current)clearTimeout(repeticao.current);
-    grav.current?.cancelar();grav.current=null;
     rec.current?.stop();setOuvindo(false);
   };
   useEffect(()=>()=>{
@@ -1282,14 +1281,13 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
     }
     setSalvo("");
     if(!t.trim())return false;
-    setTxt(t);setOutra(null);setRes(null);setDica("");setPensando(true);
-    entenderVoz({ texto: t }, lista).then(aplicarIA).catch((e) => {
-      if (api.sessaoInvalida(e)) { onSair(); return; }
-      const l = intencaoLocal(t, lista);
-      if (l) { aplicarIA({ transcricao: t, comando: null, titulo: null, data: null, hora: null, diaTodo: false, local: null, observacao: null, categoria: "outro", antecedenciaMin: null, ...l }); return; }
-      const resultado=interpretarFrase(t);setRes(resultado);setExtra({ observacao: null, antecedenciaMin: null });
-      setDica(resultado.falta.length ? "Faltou o dia ou o horário. Diga o compromisso completo ou toque em Corrigir." : "Confira os dados. Diga salvar, corrigir ou cancelar.");
-    }).finally(() => setPensando(false));
+    setTxt(t);setOutra(null);setRes(null);setDica("");
+    // Só regras (sem IA): desmarcar/remarcar/concluir um compromisso existente, senão é um compromisso novo.
+    const l = intencaoLocal(t, lista);
+    if (l) { aplicarIA({ transcricao: t, comando: null, titulo: null, data: null, hora: null, diaTodo: false, local: null, observacao: null, categoria: "outro", antecedenciaMin: null, ...l }); return true; }
+    const resultado=interpretarFrase(t);setRes(resultado);setExtra({ observacao: null, antecedenciaMin: null });
+    if (resultado.falta.length === 2) registrarNaoEntendido(t, "minha-agenda");
+    setDica(resultado.falta.length ? "Faltou o dia ou o horário. Diga o compromisso completo ou toque em Corrigir." : "Confira os dados. Diga salvar, corrigir ou cancelar.");
     return true;
   };
   const aplicarIA = (ia: VozIA) => {
@@ -1314,36 +1312,16 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
     }
     setDica("Não entendi. Fale de novo, por exemplo: “festa de aniversário da Ana sábado às 8 da noite”.");
   };
-  // Reconhecimento do próprio celular (rápido, sem IA de áudio). No app Android (WebView) ele não existe,
-  // e no iPhone pode estar desligado: nesses casos grava e manda o áudio para a IA.
-  const [recFalhou, setRecFalhou] = useState(false);
-  const usarGravador = gravadorSuportado() && (ehAppNativo() || !Rec || recFalhou);
-  const mandarAudio = async (blob: Blob) => {
-    if (blob.size < 1500) { setDica("Não ouvi nada. Toque e fale de novo."); return; }
-    setPensando(true); setDica("");
-    try { aplicarIA(await entenderVoz({ audio: blob, confirmando: Boolean(res || outra) }, lista)); }
-    catch (e) { if (api.sessaoInvalida(e)) onSair(); else setDica("Não consegui entender o áudio agora. Tente de novo ou escreva abaixo."); }
-    finally { setPensando(false); }
-  };
-  const ouvirGravando = async () => {
-    if (trava.current || pensando) return;
-    if (grav.current) { const g = grav.current; grav.current = null; setOuvindo(false); await mandarAudio(await g.parar()); return; }
-    try {
-      setDica(""); setSalvo("");
-      const g = await gravar(25, () => { const g = grav.current; grav.current = null; setOuvindo(false); if (g) void g.parar().then(mandarAudio); });
-      if (!montado.current) { g.cancelar(); liberarMicrofone(); return; }
-      grav.current = g;
-      setOuvindo(true);
-    } catch (e) {
-      setDica((e as Error)?.name === "NotAllowedError"
-        ? "O microfone está bloqueado. No iPhone: Ajustes → Safari → Microfone → Permitir. Depois toque de novo."
-        : "Não consegui usar o microfone. Escreva o compromisso abaixo.");
-    }
+  // Só o reconhecimento de voz do próprio aparelho (grátis). Onde ele não existe (app Android, iPhone na Tela de Início),
+  // usa o microfone do teclado na caixa de texto.
+  const usarTeclado = () => {
+    setDica("Toque no microfone do teclado e fale o compromisso. Depois toque em Continuar.");
+    window.setTimeout(() => caixa.current?.focus(), 50);
   };
   receber.current=entender;
   const ouvir = () => {
     if(trava.current)return;
-    if (!Rec) { setDica("Use o microfone do teclado para ditar o compromisso e depois toque em Continuar."); return; }
+    if (!Rec || ehAppNativo()) { usarTeclado(); return; }
     try {
       if(repeticao.current)clearTimeout(repeticao.current);
       const r = new Rec();
@@ -1356,11 +1334,7 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
       };
       r.onerror = (e) => {
         continuarEscuta.current=false;
-        if ((e.error === "service-not-allowed" || e.error === "not-allowed" || e.error === "network") && gravadorSuportado() && !recFalhou) {
-          setRecFalhou(true); rec.current = null; setOuvindo(false);
-          window.setTimeout(() => void ouvirGravando(), 50);
-          return;
-        }
+        if (e.error === "service-not-allowed" || e.error === "network") { rec.current = null; setOuvindo(false); usarTeclado(); return; }
         setDica(e.error === "not-allowed" || e.error === "service-not-allowed"
           ? "O microfone está bloqueado. Libere o microfone para a agenda nas configurações, ou use o microfone do teclado."
           : e.error === "no-speech" ? "Não ouvi nada. Toque no microfone para falar, ou use os botões abaixo."
@@ -1376,8 +1350,7 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
       rec.current = r; r.start(); setOuvindo(true);
     } catch {
       continuarEscuta.current=false;setOuvindo(false);rec.current=null;
-      if (gravadorSuportado()) { setRecFalhou(true); void ouvirGravando(); return; }
-      setDica("Toque no microfone para tentar de novo, ou use os botões abaixo.");
+      usarTeclado();
     }
   };
   iniciar.current=ouvir;
@@ -1391,7 +1364,7 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
     if (!auto.current) return;
     auto.current = false;
     bip();
-    autoTimer.current = window.setTimeout(() => { autoTimer.current = null; if (usarGravador) void ouvirGravando(); else ouvir(); }, 250);
+    autoTimer.current = window.setTimeout(() => { autoTimer.current = null; ouvir(); }, 250);
   });
   useEffect(() => () => { if (autoTimer.current) window.clearTimeout(autoTimer.current); }, []);
   return (
@@ -1402,9 +1375,9 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
           ? <button onClick={() => { pararEscuta(); onFechar(); }} aria-label="Fechar e voltar para a agenda" className="grid place-items-center w-12 h-12 shrink-0 rounded-full agx-card border border-violet-400/50 shadow-[0_0_14px_rgba(139,92,246,.45)]"><X size={22} /></button>
           : <a href="/agenda-claudia" className={`${btnBase} inline-flex items-center gap-2 px-4 py-3 text-sm agx-card border border-violet-400/50 shadow-[0_0_14px_rgba(139,92,246,.45)]`}><CalendarCheck size={18} /> Ver agenda</a>}
       </div>
-      <button data-native-recognition="react" disabled={pensando} onClick={usarGravador ? () => void ouvirGravando() : ouvindo ? pararEscuta : ouvir} aria-label={ouvindo ? "Parar de ouvir" : "Tocar e falar"}
+      <button data-native-recognition="react" disabled={pensando} onClick={ouvindo ? pararEscuta : ouvir} aria-label={ouvindo ? "Parar de ouvir" : "Tocar e falar"}
         className={`mx-auto mt-4 flex flex-col items-center justify-center w-44 h-44 rounded-full transition active:scale-95 ${ouvindo ? "bg-gradient-to-br from-rose-500 to-pink-600 animate-pulse shadow-[0_0_40px_rgba(244,63,94,.8)]" : "bg-gradient-to-br from-sky-400 via-violet-500 to-pink-500 agx-mic"}`}>
-        <Mic size={64} /><span className="text-base font-bold mt-2 px-3 text-center leading-tight">{pensando ? "Entendendo…" : ouvindo ? (usarGravador ? "Toque p/ terminar" : "Ouvindo…") : res || outra ? "Diga sua opção" : "Toque e fale"}</span>
+        <Mic size={64} /><span className="text-base font-bold mt-2 px-3 text-center leading-tight">{pensando ? "Entendendo…" : ouvindo ? "Ouvindo…" : res || outra ? "Diga sua opção" : "Toque e fale"}</span>
       </button>
       {txt.trim() && (ouvindo || pensando || res || outra) && (
         <div className={`${glass} !p-3 text-center`} style={neon("#38bdf8")} aria-live="polite">
@@ -1451,7 +1424,7 @@ function TelaFalar({ sessao, onSair, onFechar }: { sessao: AgxSessao; onSair: ()
           </div>
         </div>
       )}
-      <textarea className={`${campo} h-24 py-3 !rounded-2xl !border-violet-400/40`} value={txt} onChange={(e) => { setTxt(e.target.value); setRes(null); }} placeholder="Ou escreva aqui o compromisso…" />
+      <textarea ref={caixa} className={`${campo} h-24 py-3 !rounded-2xl !border-violet-400/40`} value={txt} onChange={(e) => { setTxt(e.target.value); setRes(null); }} placeholder="Ou escreva aqui o compromisso…" />
       {!res && txt.trim() && <button onClick={() => entender()} className={`${btnPrimario} w-full h-12 text-lg`}>Continuar</button>}
       {!instalado() && ehAndroid() && podeInstalar && (
         <button onClick={async () => { await installEvt?.prompt(); installEvt = null; setPodeInstalar(false); }}

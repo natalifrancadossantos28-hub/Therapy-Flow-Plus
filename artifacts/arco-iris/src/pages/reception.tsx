@@ -31,8 +31,10 @@ import {
   Printer, ShieldCheck, CheckCircle,
   UserPlus, PhoneOff, FileCheck, Bell, MessageSquare, Copy,
   BellRing, Undo2, Bus, Search, FileText,
-  Plane,
+  Plane, Mic,
 } from "lucide-react";
+import { VozClinica } from "@/components/VozClinica";
+import type { ComandoClinico, Contexto } from "@/lib/agenda-clinica-voz";
 import { DeclaracaoModal, type DeclaracaoTarget } from "@/components/DeclaracaoModal";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
@@ -114,7 +116,7 @@ function FirstAppointmentMessageModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 overflow-y-auto bg-black/40 backdrop-blur-sm z-50 flex items-center-safe justify-center p-4" onClick={onClose}>
       <MotionCard
         className="w-full max-w-lg p-6 shadow-2xl space-y-5"
         initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -225,7 +227,7 @@ function AbsenceBellModal({
   const regularColor = absenceCount >= 3 ? "text-rose-400" : absenceCount === 2 ? "text-amber-400" : "text-orange-400";
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 overflow-y-auto bg-black/40 backdrop-blur-sm z-50 flex items-center-safe justify-center p-4" onClick={onClose}>
       <MotionCard
         className="w-full max-w-lg p-6 shadow-2xl space-y-5"
         initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -1038,6 +1040,38 @@ export default function Reception() {
     ["todos", "Todos", buscaAppointments.length],
   ];
 
+  // Voz da recepção: só Presente e Falta dos atendimentos de hoje.
+  const [vozAberta, setVozAberta] = useState(false);
+  const vozApts = appointments.filter(a => a.date === today && (!profIdFilter || String(a.professionalId) === profIdFilter));
+  const vozPacientes = Array.from(new Map(vozApts.map(a => [a.patientId, { patientId: a.patientId, patientName: a.patientName || "", prontuario: a.prontuario || prontuarioMap.get(a.patientId) || null }])).values());
+  const vozDoPaciente = (cmd: ComandoClinico) => vozApts
+    .filter(a => a.patientId === cmd.paciente?.patientId && (!cmd.hora || a.time === cmd.hora))
+    .sort((a, b) => a.time.localeCompare(b.time));
+  const vozContexto: Contexto = {
+    grade: ["07:10", "08:00", "08:50", "09:40", "10:30", "11:20", "12:10", "13:10", "14:00", "14:50", "15:40", "16:30"],
+    bloqueio: (cmd) => {
+      if (!cmd.acao) return null;
+      if (!["presente", "falta_justificada", "falta_nao_justificada", "consultar"].includes(cmd.acao)) return "Na recepção a voz marca Presente ou Falta. O resto fica na agenda do profissional.";
+      if (cmd.acao === "consultar" || !cmd.paciente) return null;
+      if (cmd.data && cmd.data !== today) return "A recepção marca só os atendimentos de hoje.";
+      const l = vozDoPaciente(cmd);
+      if (!l.length) return `${cmd.paciente.patientName} não tem atendimento hoje${cmd.hora ? ` às ${cmd.hora}` : ""}.`;
+      if (l.length > 1) return `${cmd.paciente.patientName} tem ${l.length} atendimentos hoje (${l.map(a => `${a.time} ${a.professionalName.split(" ")[0]}`).join(", ")}). Fale de novo com o horário, ex.: “presente ${cmd.paciente.patientName.split(" ")[0].toLowerCase()} às ${l[0].time}”.`;
+      return null;
+    },
+  };
+  const vozConfirmar = async (cmd: ComandoClinico) => {
+    setVozAberta(false);
+    const apt = vozDoPaciente(cmd)[0];
+    if (!apt || !cmd.acao || cmd.acao === "consultar") return;
+    const status = cmd.acao === "presente" ? "presente" : cmd.acao;
+    await handleStatusChange(apt.id, status);
+    if (status === "falta_nao_justificada") {
+      const n = (specialtyAbsences.get(`${apt.patientId}::${apt.professionalSpecialty}`) ?? 0) + 1;
+      if (n >= 3) setAbsenceBellData({ apt: apt as unknown as Appointment, absenceCount: n });
+    }
+  };
+
   // Marcado (presente/ausente/em atendimento) sai da lista de pendentes; em
   // "Todos" ele desce para o fim, para a recepção não perder o próximo paciente.
   const visibleAppointments = useMemo(() => {
@@ -1252,6 +1286,16 @@ export default function Reception() {
             <Button variant="outline" className="gap-2" onClick={handlePrintUnique}>
               <Printer className="w-4 h-4" /> Lista por paciente (único)
             </Button>
+            <Button variant="outline" className="gap-2" onClick={() => setVozAberta(true)}>
+              <Mic className="w-4 h-4" /> Falar
+            </Button>
+            {vozAberta && (
+              <VozClinica pacientes={vozPacientes} contexto={vozContexto} tela="recepcao" mostrarLog
+                alvo={(cmd) => { const a = vozDoPaciente(cmd); return a.length === 1 ? { date: a[0].date, time: a[0].time } : null; }}
+                listarDia={() => vozApts.map(a => ({ time: a.time, nome: `${a.patientName} · ${a.professionalName.split(" ")[0]}`, status: getStatusLabel(a.status) }))}
+                exemplos={["presente da Maria", "falta justificada do João", "faltou o Pedro às 8 horas", "quem vem hoje?"]}
+                onConfirmar={(cmd) => void vozConfirmar(cmd)} onFechar={() => setVozAberta(false)} />
+            )}
           </div>
         </div>
 
@@ -1329,7 +1373,7 @@ export default function Reception() {
 
       {/* ── Carla: Abonar Dialog ── */}
       {abonarDialog && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-end-safe sm:items-center-safe justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
             {/* Header Assistente */}
             <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-amber-500 to-yellow-500">

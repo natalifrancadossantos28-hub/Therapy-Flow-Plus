@@ -107,6 +107,73 @@ export default function BuscaAtivaPage() {
     return patients.filter(p => p.name.toLowerCase().includes(q) || (p.prontuario || "").toLowerCase().includes(q)).slice(0, 8);
   }, [patients, pickQuery]);
 
+  const pacienteInfo = (c: BuscaAtivaCaso) => (
+    <>
+      <Link href={`/patients/${c.patientId}`} className="font-semibold hover:underline">{c.patientName}</Link>
+      <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2">
+        {c.prontuario && <span>Pront. {c.prontuario}</span>}
+        {c.patientPhone && <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" />{c.patientPhone}</span>}
+      </div>
+    </>
+  );
+
+  const motivoInfo = (c: BuscaAtivaCaso) => (
+    <>
+      {c.motivo}
+      <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-1 items-center">
+        {c.origem === "pausa" && <Badge className="text-[10px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">Veio da pausa</Badge>}
+        {c.encaminhadoPor && <span>por {c.encaminhadoPor}</span>}
+      </div>
+    </>
+  );
+
+  const periodo = (c: BuscaAtivaCaso) => (
+    <>{formatDate(c.createdAt)}{!casoAberto(c) && c.finalizadoAt ? <> até {formatDate(c.finalizadoAt)}</> : null}</>
+  );
+
+  const acompanhamento = (c: BuscaAtivaCaso) => (
+    <>
+      {casoAberto(c) ? (
+        <div className="grid grid-cols-2 @3xl:grid-cols-4 @5xl:grid-cols-2 rounded-lg border border-border overflow-hidden text-xs bg-border gap-px">
+          {BUSCA_STATUS.map(b => {
+            const Icon = b.icon;
+            const active = c.status === b.v;
+            return (
+              <button key={b.v} type="button" disabled={savingId === c.id}
+                onClick={() => !active && salvar(c, b.v, c.obs)}
+                className={cn("inline-flex items-center gap-1 px-1.5 py-1.5 font-semibold whitespace-nowrap transition-colors bg-card", active ? b.on : "hover:bg-secondary/70 text-muted-foreground")}>
+                <Icon className="w-3.5 h-3.5 shrink-0" /> {b.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <span className="text-xs text-emerald-400">{c.saida || "Finalizada"}</span>
+      )}
+      <button type="button" onClick={() => editObs(c)} className="mt-1.5 flex items-start gap-1 text-xs text-left text-muted-foreground hover:text-foreground w-full">
+        <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <span className="min-w-0 break-words whitespace-pre-wrap">{c.obs || "Adicionar observação"}</span>
+      </button>
+    </>
+  );
+
+  const acoes = (c: BuscaAtivaCaso) => casoAberto(c) ? (
+    <>
+      <Button size="sm" className="gap-1 w-full whitespace-normal leading-tight text-center bg-rose-600 hover:bg-rose-500 text-white" disabled={savingId === c.id} onClick={() => finalizar(c)}>
+        <Archive className="w-3.5 h-3.5 shrink-0" /> Finalizar e tirar da lista
+      </Button>
+      {c.origem === "pausa" && (
+        <Button size="sm" variant="outline" className="gap-1 w-full whitespace-normal leading-tight text-center" disabled={savingId === c.id} onClick={() => soPausa(c)}>
+          <Snowflake className="w-3.5 h-3.5 shrink-0" /> É só pausa
+        </Button>
+      )}
+    </>
+  ) : (
+    <Button size="sm" variant="outline" className="gap-1 w-full whitespace-normal leading-tight text-center" disabled={savingId === c.id} onClick={() => salvar(c, "pendente", c.obs)}>
+      <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Reabrir busca
+    </Button>
+  );
+
   return (
     <div className="space-y-6">
       <HeroTela img="busca-ativa" titulo="Busca Ativa" subtitulo="Casos para a assistente social." />
@@ -166,96 +233,79 @@ export default function BuscaAtivaPage() {
         <Input className="pl-9" placeholder="Buscar por nome ou prontuário…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
-              <tr>
-                <th className="px-5 py-3">Nº</th>
-                <th className="px-5 py-3">Paciente</th>
-                <th className="px-5 py-3">Especialidade</th>
-                <th className="px-5 py-3">Motivo</th>
-                <th className="px-5 py-3">{filter === "finalizado" ? "Período" : "Desde"}</th>
-                <th className="px-5 py-3">Acompanhamento</th>
-                <th className="px-5 py-3 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {loading && items.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">Carregando…</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">Nenhum caso{search || filter ? " com esse filtro" : " na Busca Ativa"}.</td></tr>
-              ) : filtered.map((c, idx) => {
-                const aberto = casoAberto(c);
-                return (
-                  <tr key={c.id} className="hover:bg-secondary/30">
-                    <td className="px-5 py-3 font-bold text-rose-400 whitespace-nowrap">{idx + 1}º</td>
-                    <td className="px-5 py-3">
-                      <Link href={`/patients/${c.patientId}`} className="font-semibold hover:underline">{c.patientName}</Link>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        {c.prontuario && <span>Pront. {c.prontuario}</span>}
-                        {c.patientPhone && <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" />{c.patientPhone}</span>}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3">{c.specialty || "—"}{c.professionalName && <div className="text-xs text-muted-foreground">{c.professionalName}</div>}</td>
-                    <td className="px-5 py-3 max-w-[280px]">
-                      {c.motivo}
-                      <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-1 items-center">
-                        {c.origem === "pausa" && <Badge className="text-[10px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">Veio da pausa</Badge>}
-                        {c.encaminhadoPor && <span>por {c.encaminhadoPor}</span>}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 whitespace-nowrap text-muted-foreground">
-                      {formatDate(c.createdAt)}{!aberto && c.finalizadoAt ? ` até ${formatDate(c.finalizadoAt)}` : ""}
-                    </td>
-                    <td className="px-5 py-3 min-w-[260px]">
-                      {aberto ? (
-                        <div className="inline-flex flex-wrap rounded-lg border border-border overflow-hidden text-xs">
-                          {BUSCA_STATUS.map((b, i) => {
-                            const Icon = b.icon;
-                            const active = c.status === b.v;
-                            return (
-                              <button key={b.v} type="button" disabled={savingId === c.id}
-                                onClick={() => !active && salvar(c, b.v, c.obs)}
-                                className={cn("inline-flex items-center gap-1 px-2 py-1.5 font-semibold transition-colors", i > 0 && "border-l border-border", active ? b.on : "hover:bg-secondary/70 text-muted-foreground")}>
-                                <Icon className="w-3.5 h-3.5" /> {b.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-emerald-400">{c.saida || "Finalizada"}</span>
-                      )}
-                      <button type="button" onClick={() => editObs(c)} className="mt-1.5 flex items-start gap-1 text-xs text-left text-muted-foreground hover:text-foreground">
-                        <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                        <span>{c.obs || "Adicionar observação"}</span>
-                      </button>
-                    </td>
-                    <td className="px-5 py-3 text-right space-y-1.5">
-                      {aberto ? (
-                        <>
-                          <Button size="sm" className="gap-1 w-full bg-rose-600 hover:bg-rose-500 text-white" disabled={savingId === c.id} onClick={() => finalizar(c)}>
-                            <Archive className="w-3.5 h-3.5" /> Finalizar e tirar da lista
-                          </Button>
-                          {c.origem === "pausa" && (
-                            <Button size="sm" variant="outline" className="gap-1 w-full" disabled={savingId === c.id} onClick={() => soPausa(c)}>
-                              <Snowflake className="w-3.5 h-3.5" /> É só pausa
-                            </Button>
-                          )}
-                        </>
-                      ) : (
-                        <Button size="sm" variant="outline" className="gap-1 w-full" disabled={savingId === c.id} onClick={() => salvar(c, "pendente", c.obs)}>
-                          <RotateCcw className="w-3.5 h-3.5" /> Reabrir busca
-                        </Button>
-                      )}
-                    </td>
+      {/* Tabela com colunas de largura fixa quando há espaço; em telas/janelas estreitas
+          (ou com o menu lateral aberto) cada caso vira um card empilhado. */}
+      <div className="@container">
+        {loading && items.length === 0 ? (
+          <Card className="px-5 py-10 text-center text-muted-foreground">Carregando…</Card>
+        ) : filtered.length === 0 ? (
+          <Card className="px-5 py-10 text-center text-muted-foreground">Nenhum caso{search || filter ? " com esse filtro" : " na Busca Ativa"}.</Card>
+        ) : (
+          <>
+            <Card className="overflow-hidden hidden @5xl:block">
+              <table className="w-full table-fixed text-sm text-left">
+                <colgroup>
+                  <col className="w-12" />
+                  <col className="w-[20%]" />
+                  <col className="w-[14%]" />
+                  <col />
+                  <col className="w-28" />
+                  <col className="w-64" />
+                  <col className="w-48" />
+                </colgroup>
+                <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
+                  <tr>
+                    <th className="px-3 py-3">Nº</th>
+                    <th className="px-3 py-3">Paciente</th>
+                    <th className="px-3 py-3">Especialidade</th>
+                    <th className="px-3 py-3">Motivo</th>
+                    <th className="px-3 py-3">{filter === "finalizado" ? "Período" : "Desde"}</th>
+                    <th className="px-3 py-3">Acompanhamento</th>
+                    <th className="px-3 py-3 text-right">Ações</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filtered.map((c, idx) => (
+                    <tr key={c.id} className="hover:bg-secondary/30 align-top">
+                      <td className="px-3 py-3 font-bold text-rose-400 whitespace-nowrap">{idx + 1}º</td>
+                      <td className="px-3 py-3 break-words">{pacienteInfo(c)}</td>
+                      <td className="px-3 py-3 break-words">{c.specialty || "—"}{c.professionalName && <div className="text-xs text-muted-foreground">{c.professionalName}</div>}</td>
+                      <td className="px-3 py-3 break-words">{motivoInfo(c)}</td>
+                      <td className="px-3 py-3 text-muted-foreground">{periodo(c)}</td>
+                      <td className="px-3 py-3">{acompanhamento(c)}</td>
+                      <td className="px-3 py-3"><div className="flex flex-col gap-1.5">{acoes(c)}</div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+
+            <div className="space-y-3 @5xl:hidden">
+              {filtered.map((c, idx) => (
+                <Card key={c.id} className="p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="font-bold text-rose-400 shrink-0">{idx + 1}º</span>
+                    <div className="min-w-0 flex-1 break-words">{pacienteInfo(c)}</div>
+                    <span className="text-xs text-muted-foreground text-right shrink-0">{periodo(c)}</span>
+                  </div>
+                  <div className="grid gap-3 @lg:grid-cols-2 text-sm">
+                    <div className="break-words">
+                      <div className="text-[11px] uppercase font-semibold text-muted-foreground">Especialidade</div>
+                      {c.specialty || "—"}{c.professionalName && <div className="text-xs text-muted-foreground">{c.professionalName}</div>}
+                    </div>
+                    <div className="break-words">
+                      <div className="text-[11px] uppercase font-semibold text-muted-foreground">Motivo</div>
+                      {motivoInfo(c)}
+                    </div>
+                  </div>
+                  <div>{acompanhamento(c)}</div>
+                  <div className="flex flex-col @md:flex-row gap-2 [&>*]:@md:w-auto">{acoes(c)}</div>
+                </Card>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       {encaminhar && (
         <EncaminharBuscaAtivaModal

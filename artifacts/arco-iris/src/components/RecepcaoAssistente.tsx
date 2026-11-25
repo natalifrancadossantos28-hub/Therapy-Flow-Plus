@@ -186,7 +186,7 @@ export function EnvioEmMassaModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 overflow-y-auto bg-black/50 backdrop-blur-sm z-50 flex items-center-safe justify-center p-4" onClick={onClose}>
       <MotionCard
         className="w-full max-w-2xl max-h-[88vh] flex flex-col shadow-2xl"
         initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -345,7 +345,7 @@ function ModeloEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 overflow-y-auto bg-black/50 backdrop-blur-sm z-[60] flex items-center-safe justify-center p-4" onClick={onClose}>
       <MotionCard
         className="w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl"
         initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
