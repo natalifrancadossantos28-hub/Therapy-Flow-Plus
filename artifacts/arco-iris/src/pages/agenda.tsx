@@ -1529,6 +1529,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     if (!driver) return;
     setTransporteSending(true);
     try {
+      const jaTem = (await listAppointments({ patientId: transporteApt.patientId, professionalId: driver.id, date: transporteApt.date }))
+        .some(a => a.time === transporteApt.time && !["desmarcado", "cancelado"].includes((a.status || "").toLowerCase()));
+      if (jaTem) {
+        toast({ title: "Transporte já agendado", description: `${transporteApt.patientName} já tem transporte com ${driver.name} às ${transporteApt.time}.`, variant: "destructive" });
+        return;
+      }
       await createAppointments({
         patientId: transporteApt.patientId,
         professionalId: driver.id,
