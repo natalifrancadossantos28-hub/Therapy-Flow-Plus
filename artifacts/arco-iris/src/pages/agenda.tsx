@@ -2049,7 +2049,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         // Remanejado/remarcado: o aviso da recepção passa a ter a hora nova (os outros avisos ficam).
         const st = (apt.status || "").toLowerCase();
         if (st === "remanejado" || st === "remarcado") {
-          const pend = await avisosRemanejoPendentes({ appointmentId: realId, patientName: apt.patientName || `Paciente #${apt.patientId}`, date, time: apt.time });
+          const pend = await avisosRemanejoPendentes({ appointmentId: realId, patientName: apt.patientName || `Paciente #${apt.patientId}`, date, time: apt.time,
+            multiPartner: (apt.notes ?? "").startsWith("Atendimento Multi com ") ? apt.notes!.replace("Atendimento Multi com ", "").replace(/\s*\(.*\)$/, "") : null,
+          });
           await Promise.all(pend.map(n => markNotificacaoLido(n.id).catch(() => {})));
           await logNotificacao(
             { ...apt, id: pend[0]?.appointmentId ?? realId, time: novo, professionalName: pend[0]?.professionalName ?? apt.professionalName },

@@ -2186,22 +2186,26 @@ export async function markNotificacoesLidoByAppointment(appointmentId: number): 
 }
 
 /**
- * Avisos de Remarcado/Remanejado ainda pendentes de um atendimento. Também acha o
- * aviso criado pelo parceiro do Atendimento Multi (outro ID, mesmo paciente/dia/hora).
+ * Avisos de Remarcado/Remanejado ainda pendentes de um atendimento. No Atendimento
+ * Multi também acha o aviso do parceiro (outro ID, mesmo paciente/dia/hora).
  */
 export async function avisosRemanejoPendentes(p: {
   appointmentId: number;
   patientName: string;
   date: string;
   time: string;
+  multiPartner?: string | null;
 }): Promise<NotificacaoRecepcao[]> {
+  const parceiro = (p.multiPartner || "").trim().toLowerCase();
   try {
     const all = await listNotificacoes();
     return all.filter((n) =>
       !n.lido &&
       ["remarcado", "remanejado"].includes((n.acao || "").toLowerCase()) &&
       (n.appointmentId === p.appointmentId ||
-        (n.patientName === p.patientName &&
+        (!!parceiro &&
+          (n.professionalName || "").trim().toLowerCase() === parceiro &&
+          n.patientName === p.patientName &&
           (n.dataConsulta || "").slice(0, 10) === p.date &&
           (n.horaConsulta || "").slice(0, 5) === p.time.slice(0, 5)))
     );
