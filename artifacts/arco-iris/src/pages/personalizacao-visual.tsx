@@ -407,7 +407,7 @@ export default function PersonalizacaoVisual() {
       </div>
 
       {pwOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => !busy && setPwOpen(false)}>
+        <div className="fixed inset-0 overflow-y-auto z-50 bg-black/70 flex items-center-safe justify-center p-4" onClick={() => !busy && setPwOpen(false)}>
           <div className="w-full max-w-sm rounded-2xl border border-cyan-400/40 bg-card p-5 shadow-[0_0_40px_-10px_rgba(34,211,238,0.8)]" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-display font-bold text-lg flex items-center gap-2"><Lock className="w-4 h-4 text-cyan-400" /> Confirmar administrador</h3>
             <p className="text-sm text-muted-foreground mt-1">Digite a senha de administrador da empresa ou a senha do Painel Master. O servidor só aceita a alteração com a senha correta.</p>
@@ -424,7 +424,7 @@ export default function PersonalizacaoVisual() {
       )}
 
       {viewer && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setViewer(null)}>
+        <div className="fixed inset-0 overflow-y-auto z-50 bg-black/80 flex items-center-safe justify-center p-4" onClick={() => setViewer(null)}>
           <img src={viewer} alt="Visualização" className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl" />
         </div>
       )}

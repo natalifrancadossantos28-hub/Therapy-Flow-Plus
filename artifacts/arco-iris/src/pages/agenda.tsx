@@ -131,15 +131,6 @@ const TERMINAL_STATUSES = ["alta", "desistência", "óbito", "desistencia"];
 const INACTIVE_STATUSES = [...TERMINAL_STATUSES, "desmarcado", "cancelado", "remanejado", "remarcado"];
 
 /** Abbreviate long names keeping first + second name: "Isis Godinho Lima" → "Isis Godinho L." */
-function abbreviateName(name: string | undefined | null, maxLen = 22): string {
-  if (!name) return "";
-  if (name.length <= maxLen) return name;
-  const parts = name.trim().split(/\s+/);
-  if (parts.length <= 2) return name;
-  const abbreviated = parts[0] + " " + parts[1] + " " + parts.slice(2).map(p => p[0]?.toUpperCase() + ".").join(" ");
-  return abbreviated;
-}
-
 /** Deterministic negative ID for virtual appointments so menus stay open across re-renders. */
 function stableVirtualId(date: string, time: string, patientId: number, groupId: string): number {
   let h = 0;
@@ -2237,7 +2228,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                   {novoAberto && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setNovoAberto(null)} />
-                      <div className="absolute right-0 mt-2 w-72 bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3">
+                      <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3">
                         <p className="font-bold text-foreground">Escolha o dia e o horário</p>
                         <Select value={novoAberto.date} onChange={e => setNovoAberto({ ...novoAberto, date: e.target.value })}>
                           {weekDays.map((d, i) => <option key={i} value={weekDates[i]}>{format(d, "EEEE, dd/MM", { locale: ptBR })}</option>)}
@@ -2377,7 +2368,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                   <div
                                     onClick={() => setActionMenuId(actionMenuId === apt.id ? null : apt.id)}
                                     className={cn(
-                                      "cartao-paciente px-2 py-1.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none hover:-translate-y-px hover:shadow-md",
+                                      "cartao-paciente min-w-0 px-2 py-1.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all select-none hover:-translate-y-px hover:shadow-md",
                                       isMultiGuest && "border-dashed",
                                       isGhost && "bg-amber-950/20 border-amber-500/60 animate-pulse",
                                       !isGhost && isDesmarcado && "bg-red-950/10 border-red-500/40",
@@ -2408,30 +2399,30 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     <div className="flex items-center gap-1.5 min-w-0">
                                       <PatientAvatar url={photoById.get(apt.patientId)} name={apt.patientName} size={30} />
                                       {(isGroup || apt.prontuario) && (
-                                        <span className="text-[13px] font-extrabold leading-tight truncate">
+                                        <span className="text-[13px] font-extrabold leading-tight min-w-0 break-all">
                                           {isGroup && <span className="text-cyan-300 mr-1">{ordem + 1}º</span>}
                                           {apt.prontuario && <span className="text-cyan-400">[{apt.prontuario}]</span>}
                                         </span>
                                       )}
                                     </div>
-                                    <span className="font-semibold text-foreground text-[13px] leading-tight line-clamp-2 break-words" title={apt.patientName || undefined}>
+                                    <span className="font-semibold text-foreground text-[13px] leading-tight break-normal [overflow-wrap:anywhere]" title={apt.patientName || undefined}>
                                         {isGhost ? (
                                           <span className="text-amber-400">⚠ Sem dados</span>
                                         ) : (
-                                          abbreviateName(apt.patientName, 34) || `#${apt.patientId}`
+                                          apt.patientName || `#${apt.patientId}`
                                         )}
                                     </span>
                                     <AbsenceBadge count={absenceCount(apt.patientId)} compact />
-                                    <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold w-max max-w-full truncate", getStatusColor(apptStatus(apt)))}>
+                                    <span lang="pt-BR" title={getStatusLabel(apptStatus(apt))} className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold w-fit max-w-full leading-tight break-words hyphens-auto", getStatusColor(apptStatus(apt)))}>
                                       {getStatusLabel(apptStatus(apt))}
                                     </span>
                                     {apt.paused && (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5 w-max">
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5 w-fit max-w-full">
                                         <Snowflake className="w-2.5 h-2.5" /> Pausado
                                       </span>
                                     )}
                                     {buscaByPatient.has(apt.patientId) && (
-                                      <span title={buscaTitle(apt.patientId)} className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-0.5 w-max">
+                                      <span title={buscaTitle(apt.patientId)} className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-0.5 w-fit max-w-full">
                                         <ShieldAlert className="w-2.5 h-2.5" /> Busca Ativa
                                       </span>
                                     )}
@@ -2462,12 +2453,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
                                     )}
                                     {/* Parental/Pilates: show guardian/mother name */}
                                     {isPilatesAppointment(apt.notes) && (
-                                      <span className="text-[9px] font-black text-pink-300 bg-pink-500/20 border border-pink-400/40 rounded px-1 truncate" title="Atendimento da mãe/responsável (Pilates)">
+                                      <span className="text-[9px] font-black text-pink-300 bg-pink-500/20 border border-pink-400/40 rounded px-1 break-words" title="Atendimento da mãe/responsável (Pilates)">
                                         👩 MÃE/RESPONSÁVEL — PILATES
                                       </span>
                                     )}
                                     {apt.guardianName && (isParentalSpecialty(selectedProf?.specialty) || isPilatesAppointment(apt.notes)) && (
-                                      <span className="text-[9px] text-pink-400/80 font-semibold truncate">
+                                      <span className="text-[9px] text-pink-400/80 font-semibold break-words">
                                         Mãe: {apt.guardianName}
                                       </span>
                                     )}
@@ -2634,7 +2625,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       </div>
 
       {canView && selectedProfId && (
-        <aside className="space-y-4 xl:sticky xl:top-4">
+        <aside className="space-y-4 min-w-0">
           <Card className="p-5 !rounded-3xl text-center">
             <h3 className="font-extrabold text-[#1e1b4b] text-xl mb-3 flex items-center justify-center gap-2">
               <Clock className="w-5 h-5 text-violet-700" /> Próximo atendimento
@@ -2671,12 +2662,13 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
             {hojeApts.length === 0 ? (
               <p className="text-muted-foreground">Nenhum atendimento hoje.</p>
             ) : (
-              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+              <div className="space-y-2">
                 {hojeApts.map(apt => (
-                  <div key={`${apt.id}-${apt.time}`} className={cn("flex items-center gap-3 rounded-2xl px-2 py-2", apt.time >= agoraHM ? "bg-violet-50" : "bg-white")}>
+                  // flex-wrap + largura mínima do nome: em coluna estreita o horário e as faltas vão para outra linha, em vez de o nome quebrar letra por letra.
+                  <div key={`${apt.id}-${apt.time}`} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl px-2 py-2", apt.time >= agoraHM ? "bg-violet-50" : "bg-white")}>
                     <span className="rounded-xl bg-violet-100 text-violet-800 font-bold tabular-nums px-2.5 py-1.5 shrink-0">{apt.time}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-semibold text-[#1e1b4b] leading-snug break-words">{apt.patientName || `Paciente #${apt.patientId}`}</span>
+                    <span className="min-w-[9rem] flex-1 basis-[9rem]">
+                      <span className="block font-semibold text-[#1e1b4b] leading-snug break-normal [overflow-wrap:break-word]">{apt.patientName || `Paciente #${apt.patientId}`}</span>
                       <span className={cn("inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>
                     </span>
                     <AbsenceBadge count={absenceCount(apt.patientId)} />
@@ -2700,7 +2692,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         const mudou = lista.filter(a => horaDe(a.id) !== ajusteHora.time).length;
         const setHora = (id: number, h: string) => setAjusteHora({ ...ajusteHora, horas: { ...ajusteHora.horas, [id]: h } });
         return (
-          <div className="agenda-neon fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-label="Trocar horário" onClick={() => !ajusteSalvando && setAjusteHora(null)}>
+          <div className="agenda-neon fixed inset-0 overflow-y-auto z-[60] flex items-end-safe sm:items-center-safe justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-label="Trocar horário" onClick={() => !ajusteSalvando && setAjusteHora(null)}>
             <div className="w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl space-y-4 text-[#1e1b4b]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center gap-3">
                 <span className="grid place-items-center w-12 h-12 rounded-2xl bg-violet-100 text-violet-700 shrink-0"><Clock className="w-6 h-6" /></span>
@@ -2783,7 +2775,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
       {/* ── Modal de Exclusão Administrativa (sem vínculo clínico) ── */}
       {excluirConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -2840,7 +2832,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         />
       )}
       {pauseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,20,0.97)", border: "1px solid rgba(56,189,248,0.3)" }}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -3024,7 +3016,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       )}
 
       {altaConfirm && (saidaTipo !== "Alta" || altaAvf) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,0,0.97)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -3093,7 +3085,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
       {/* ── Encaminhamento Interno Modal ── */}
       {encApt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEncApt(null)}>
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEncApt(null)}>
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(5,0,5,0.97)", border: "1px solid rgba(192,38,211,0.3)" }} onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -3233,7 +3225,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
       {/* ── Transporte (Motorista) Modal ── */}
       {transporteApt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setTransporteApt(null)}>
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setTransporteApt(null)}>
           <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl" style={{ background: "rgba(0,4,12,0.97)", border: "1px solid rgba(59,130,246,0.35)" }} onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-4">
@@ -3285,7 +3277,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
 
       {/* ── Alerta de Ausência ── */}
       {absenceAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center-safe justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{
             background: absenceAlert.consecutive >= 3 ? "rgba(10,0,0,0.97)" : "rgba(10,8,0,0.97)",
             border: absenceAlert.consecutive >= 3 ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(234,179,8,0.5)",

@@ -1083,7 +1083,7 @@ function Semana({ base, setBase, onDia, doDia, hoje }: { base: string; setBase: 
 // ---------------------------------------------------------------- formulário
 function Folha({ titulo, onFechar, children, leve = false }: { titulo: string; onFechar: () => void; children: React.ReactNode; leve?: boolean }) {
   return (
-    <div className={`fixed inset-0 z-40 flex items-end md:items-center justify-center ${leve ? "bg-black/20" : "bg-black/60 backdrop-blur-sm"}`} onClick={onFechar}>
+    <div className={`fixed inset-0 overflow-y-auto z-40 flex items-end-safe md:items-center-safe justify-center ${leve ? "bg-black/20" : "bg-black/60 backdrop-blur-sm"}`} onClick={onFechar}>
       <div role="dialog" aria-label={titulo} onClick={(e) => e.stopPropagation()}
         className={`agx-entrar w-full md:max-w-xl ${leve ? "max-h-[68dvh]" : "max-h-[92dvh]"} overflow-y-auto overscroll-contain rounded-t-3xl md:rounded-3xl border border-violet-400/50 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white text-base shadow-2xl`}
         style={{ background: "rgba(12,18,52,.96)", backdropFilter: "blur(20px)", boxShadow: "0 0 30px rgba(139,92,246,.35)" }}>

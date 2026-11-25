@@ -125,12 +125,12 @@ export function NeonResumo({ itens }: { itens: { label: string; valor: number | 
       {itens.map((i, n) => {
         const ic = ICONES[i.label];
         return (
-          <div key={i.label} className="lilas-card !rounded-3xl p-3 sm:p-4 flex items-center gap-3">
-            {ic ? <img src={ICONE_URL(ic)} alt="" aria-hidden width={64} height={64} className="w-16 h-16 shrink-0 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,.18)]" />
-              : <span className="grid place-items-center w-14 h-14 rounded-full shrink-0 shadow-md text-white" style={{ background: CORES_NEON[n % CORES_NEON.length] }}><CalendarDays size={28} /></span>}
+          <div key={i.label} className="lilas-card !rounded-3xl p-3 sm:p-4 flex items-center gap-2 sm:gap-3 min-w-0">
+            {ic ? <img src={ICONE_URL(ic)} alt="" aria-hidden width={64} height={64} className="w-11 h-11 sm:w-16 sm:h-16 shrink-0 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,.18)]" />
+              : <span className="grid place-items-center w-11 h-11 sm:w-14 sm:h-14 rounded-full shrink-0 shadow-md text-white" style={{ background: CORES_NEON[n % CORES_NEON.length] }}><CalendarDays size={28} /></span>}
             <span className="min-w-0">
               <span className="block text-3xl font-extrabold tabular-nums leading-none text-[#1e1b4b]">{i.valor}</span>
-              <span className="block text-base text-[#3b3561] leading-tight mt-1">{i.label}</span>
+              <span className="block text-sm sm:text-base text-[#3b3561] leading-tight mt-1 break-words hyphens-auto" lang="pt-BR">{i.label}</span>
             </span>
           </div>
         );
@@ -220,7 +220,7 @@ export function NeonMenuInferior({ itens, ativo, onItem }: { itens: NeonMenuItem
           </button>
         ) : (
           <button type="button" key={it.id} onClick={() => onItem(it.id)} aria-current={ativo === it.id ? "page" : undefined}
-            className={`h-16 min-w-0 px-0.5 rounded-3xl flex flex-col items-center justify-center gap-1 text-[13px] leading-none font-semibold transition ${ativo === it.id ? "text-white bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_8px_20px_-6px_rgba(109,40,217,.6)]" : "text-[#1e1b4b]"}`}>
+            className={`h-16 min-w-0 px-0.5 rounded-3xl flex flex-col items-center justify-center gap-1 text-[12px] min-[400px]:text-[13px] tracking-tight leading-none font-semibold transition ${ativo === it.id ? "text-white bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_8px_20px_-6px_rgba(109,40,217,.6)]" : "text-[#1e1b4b]"}`}>
             {it.icon}<span className="max-w-full truncate">{it.label}</span>
           </button>
         ))}

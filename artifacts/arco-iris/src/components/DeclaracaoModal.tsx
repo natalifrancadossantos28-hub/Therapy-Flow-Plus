@@ -241,7 +241,7 @@ export function DeclaracaoModal({ target, onClose }: { target: DeclaracaoTarget;
     setDias((prev) => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; });
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 overflow-y-auto bg-black/40 backdrop-blur-sm z-50 flex items-center-safe justify-center p-4" onClick={onClose}>
       <MotionCard
         className="w-full max-w-2xl p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto"
         initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}

@@ -260,7 +260,8 @@ export default function PainelGestao() {
       <div className="space-y-2">
         <h2 className="font-bold text-sm text-muted-foreground uppercase tracking-wide">Detalhes (clique para abrir)</h2>
         <Detalhe id="prof" titulo="Ocupação e atendimentos por profissional" resumo={`${capF.length} profissionais`} aberto={aberto} setAberto={setAberto}>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm [&_th]:px-2 [&_td]:px-2 [&_th]:whitespace-nowrap">
             <thead className="text-xs text-muted-foreground uppercase"><tr><th className="text-left py-2">Profissional</th><th className="text-left">Especialidade</th><th className="text-right">Pacientes</th><th className="text-right">Capacidade</th><th className="text-right">Atend. período</th><th className="text-right">Faltas</th></tr></thead>
             <tbody>
               {[...capF].sort((a, b) => a.name.localeCompare(b.name)).map((c) => {
@@ -274,9 +275,11 @@ export default function PainelGestao() {
               })}
             </tbody>
           </table>
+          </div>
         </Detalhe>
         <Detalhe id="fila" titulo="Fila de espera por especialidade" resumo={`${filaAtiva.length} ativos · ${filaCongelados} congelados`} aberto={aberto} setAberto={setAberto}>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm [&_th]:px-2 [&_td]:px-2 [&_th]:whitespace-nowrap">
             <thead className="text-xs text-muted-foreground uppercase"><tr><th className="text-left py-2">Especialidade</th><th className="text-right">Ativos</th><th className="text-right">Congelados</th></tr></thead>
             <tbody>
               {Array.from(new Set(filaF.map((w) => (w.specialty || "").trim() || "Sem especialidade"))).sort().map((s) => (
@@ -286,10 +289,12 @@ export default function PainelGestao() {
               ))}
             </tbody>
           </table>
+          </div>
           <Link href="/waiting-list" className="text-xs text-primary font-semibold mt-3 inline-block">Abrir Fila de Espera →</Link>
         </Detalhe>
         <Detalhe id="pausa" titulo="Pausados por motivo" resumo={`${pausedItems?.length ?? 0} pausas ativas`} aberto={aberto} setAberto={setAberto}>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm [&_th]:px-2 [&_td]:px-2 [&_th]:whitespace-nowrap">
             <thead className="text-xs text-muted-foreground uppercase"><tr><th className="text-left py-2">Motivo</th><th className="text-right">Fila</th><th className="text-right">Agenda</th></tr></thead>
             <tbody>
               {Array.from(new Set((pausedItems ?? []).map((i) => i.pausedReason || "Sem motivo"))).sort().map((m) => (
@@ -299,6 +304,7 @@ export default function PainelGestao() {
               ))}
             </tbody>
           </table>
+          </div>
           <Link href="/pausados" className="text-xs text-primary font-semibold mt-3 inline-block">Abrir Pausados →</Link>
         </Detalhe>
       </div>

@@ -138,7 +138,7 @@ export function VozClinica({ pacientes, listarDia, contexto, alvo, onConfirmar, 
   const log = verLog ? lerNaoEntendidos() : [];
 
   return (
-    <div className="agenda-neon fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-label="Comando de voz">
+    <div className="agenda-neon fixed inset-0 overflow-y-auto z-[60] flex items-end-safe sm:items-center-safe justify-center p-3 bg-black/40 backdrop-blur-sm" role="dialog" aria-label="Comando de voz">
       <div className="w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl space-y-4 text-[#1e1b4b]">
         <div className="flex items-center gap-3">
           <button type="button" onClick={ouvindo ? () => rec.current?.stop() : ouvir} aria-label={ouvindo ? "Parar de ouvir" : "Falar"}

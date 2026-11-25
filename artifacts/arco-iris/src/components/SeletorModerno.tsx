@@ -90,7 +90,7 @@ export function SeletorModerno() {
   let ultimoGrupo: string | null = null;
 
   return createPortal(
-    <div className="seletor-moderno fixed inset-0 z-[100] flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label={rotulo}>
+    <div className="seletor-moderno fixed inset-0 overflow-y-auto z-[100] flex items-end-safe sm:items-center-safe justify-center" role="dialog" aria-modal="true" aria-label={rotulo}>
       <button type="button" aria-label="Fechar" className="absolute inset-0 bg-[#06041a]/70 backdrop-blur-sm" onClick={fechar} />
       <div className="relative w-full sm:max-w-lg max-h-[82dvh] flex flex-col rounded-t-[28px] sm:rounded-[28px] border border-violet-400/40 bg-gradient-to-b from-[#221a52] to-[#110d2c] text-white shadow-[0_0_40px_-8px_rgba(139,92,246,.7)] pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto mt-2.5 h-1.5 w-12 rounded-full bg-white/25 sm:hidden" />

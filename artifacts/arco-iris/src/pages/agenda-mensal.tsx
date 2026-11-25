@@ -455,7 +455,7 @@ function DayDetailModal({
   const d = new Date(dateKey + "T00:00:00");
   const label = format(d, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR });
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 overflow-y-auto z-50 bg-black/70 backdrop-blur-sm flex items-center-safe justify-center p-4" onClick={onClose}>
       <div
         className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}

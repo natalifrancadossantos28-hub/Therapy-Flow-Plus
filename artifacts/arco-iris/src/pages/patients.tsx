@@ -903,7 +903,7 @@ export default function Patients() {
       })()}
 
       {isDialogOpen && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 overflow-y-auto bg-background/80 backdrop-blur-sm z-50 flex items-center-safe justify-center p-4">
           <MotionCard className="w-full max-w-5xl p-8 overflow-y-auto max-h-[92vh] leitura-ampliada" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             {fromWhatsapp && (
               <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl text-xs font-medium"

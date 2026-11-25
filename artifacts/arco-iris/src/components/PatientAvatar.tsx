@@ -29,7 +29,7 @@ export function PatientAvatar({ url, name, size = 32, className = "", zoomable =
         />
         {open && canZoom && createPortal(
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+            className="fixed inset-0 overflow-y-auto z-[100] flex items-center-safe justify-center bg-black/80 p-4"
             onClick={(e) => { e.stopPropagation(); setOpen(false); }}
           >
             <div className="relative flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
