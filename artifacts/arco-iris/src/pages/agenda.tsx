@@ -40,6 +40,8 @@ import {
   removeProfessionalFromPatientAgenda,
   createNotificacao,
   markNotificacoesLidoByAppointment,
+  markNotificacaoLido,
+  avisosRemanejoPendentes,
   createAppointments,
   listWaitingList,
   deleteWaitingListEntry,
@@ -1662,7 +1664,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         const conflict = sameDay.find(a =>
           a.time === remanejFlow.newTime &&
           a.professionalId !== parseInt(selectedProfId) &&
-          ["agendado", "atendimento", "presente"].includes(a.status.toLowerCase()) &&
+          ["agendado", "atendimento", "presente", "remanejado", "remarcado"].includes(a.status.toLowerCase()) &&
           !(a.notes ?? "").startsWith("Atendimento Multi com ") &&
           !isPilatesAppointment(a.notes) &&
           !allowsSameSlotAsPatient(professionals.find(p => p.id === a.professionalId)?.specialty),
@@ -2002,7 +2004,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           const conflict = sameDay.find(a =>
             a.time === novo &&
             a.professionalId !== parseInt(selectedProfId) &&
-            ["agendado", "atendimento", "presente"].includes(a.status.toLowerCase()) &&
+            ["agendado", "atendimento", "presente", "remanejado", "remarcado"].includes(a.status.toLowerCase()) &&
             !(a.notes ?? "").startsWith("Atendimento Multi com ") &&
             !isPilatesAppointment(a.notes) &&
             !allowsSameSlotAsPatient(professionals.find(p => p.id === a.professionalId)?.specialty),
@@ -2043,6 +2045,16 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
             newTime: novo,
             excludeId: realId,
           });
+        }
+        // Remanejado/remarcado: o aviso da recepção passa a ter a hora nova (os outros avisos ficam).
+        const st = (apt.status || "").toLowerCase();
+        if (st === "remanejado" || st === "remarcado") {
+          const pend = await avisosRemanejoPendentes({ appointmentId: realId, patientId: apt.patientId, date, oldTime: apt.time, newTime: novo });
+          await Promise.all(pend.map(n => markNotificacaoLido(n.id).catch(() => {})));
+          await logNotificacao(
+            { ...apt, id: pend[0]?.appointmentId ?? realId, time: novo, professionalName: pend[0]?.professionalName ?? apt.professionalName },
+            pend[0]?.acao ?? (st === "remanejado" ? "Remanejado" : "Remarcado"),
+          );
         }
       }
       toast({ title: "Horário trocado", description: `${lista.map(a => `${(a.patientName || "").split(" ")[0]} ${horas[a.id]}`).join(", ")}${definitivo ? ", daqui pra frente" : ", só neste dia"}.` });
