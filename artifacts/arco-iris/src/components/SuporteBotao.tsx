@@ -15,7 +15,10 @@ export function SuporteBotao({ className, profissional }: { className?: string; 
   const [mensagem, setMensagem] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [minimizado, setMinimizado] = useState(() => {
-    try { return localStorage.getItem("nfs_suporte_min") === "1"; } catch { return false; }
+    try {
+      const v = localStorage.getItem("nfs_suporte_min");
+      return v === null ? window.innerWidth < 640 : v === "1";
+    } catch { return false; }
   });
   const minimizar = (v: boolean) => {
     setMinimizado(v);
