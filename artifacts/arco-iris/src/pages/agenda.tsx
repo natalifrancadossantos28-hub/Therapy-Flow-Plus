@@ -1643,7 +1643,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       const daSerie = (a: Appointment) =>
         a.patientId === apt.patientId && !a.multiGuest &&
         (apt.recurrenceGroupId ? a.recurrenceGroupId === apt.recurrenceGroupId : a.time === apt.time) &&
-        !INACTIVE_STATUSES.includes((a.status || "").toLowerCase());
+        ![...TERMINAL_STATUSES, "desmarcado", "cancelado"].includes((a.status || "").toLowerCase());
       // Sem sessão naquela semana (quinzenal/mensal): usa a próxima sessão da série.
       const occ = aptsDaSemana.find(daSerie)
         ?? [...appointments, ...(modalRows?.own ?? [])]
@@ -1679,6 +1679,31 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           toast({
             title: "Paciente já tem horário neste dia/hora",
             description: `${remanejFlow.apt.patientName ?? "O paciente"} já está com ${conflict.professionalName ?? "outro profissional"} às ${remanejFlow.newTime}.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      // Ninguém repete: o paciente não pode ficar 2x no mesmo dia com este
+      // profissional (exceto Multi e Pilates da mãe/responsável).
+      {
+        const pilates = isPilatesAppointment(remanejFlow.apt.notes);
+        const sameDayProf = await listAppointments({
+          patientId: remanejFlow.apt.patientId,
+          professionalId: parseInt(selectedProfId),
+          date: remanejFlow.newDate,
+        });
+        const repetido = sameDayProf.find(a =>
+          a.id !== remanejFlow.apt.id &&
+          a.date === remanejFlow.newDate &&
+          !["desmarcado", "cancelado"].includes((a.status || "").toLowerCase()) &&
+          !(a.notes ?? "").startsWith("Atendimento Multi com ") &&
+          isPilatesAppointment(a.notes) === pilates,
+        );
+        if (repetido) {
+          toast({
+            title: "Paciente já tem sessão neste dia",
+            description: `${remanejFlow.apt.patientName ?? "O paciente"} já está às ${repetido.time} neste dia. Mexa nessa sessão em vez de criar outra.`,
             variant: "destructive",
           });
           return;
