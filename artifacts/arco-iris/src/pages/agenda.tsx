@@ -1643,7 +1643,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       const daSerie = (a: Appointment) =>
         a.patientId === apt.patientId && !a.multiGuest &&
         (apt.recurrenceGroupId ? a.recurrenceGroupId === apt.recurrenceGroupId : a.time === apt.time) &&
-        ![...TERMINAL_STATUSES, "desmarcado", "cancelado"].includes((a.status || "").toLowerCase());
+        ![...TERMINAL_STATUSES, "desmarcado", "cancelado", "remarcado"].includes((a.status || "").toLowerCase());
       // Sem sessão naquela semana (quinzenal/mensal): usa a próxima sessão da série.
       const occ = aptsDaSemana.find(daSerie)
         ?? [...appointments, ...(modalRows?.own ?? [])]
@@ -1685,8 +1685,9 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         }
       }
       // Ninguém repete: o paciente não pode ficar 2x no mesmo dia com este
-      // profissional (exceto Multi e Pilates da mãe/responsável).
-      {
+      // profissional (exceto Multi, Pilates da mãe/responsável, Oficina e transporte).
+      const selfSpec = professionals.find(p => p.id === parseInt(selectedProfId))?.specialty;
+      if (!isTransportSpecialty(selfSpec) && !(selfSpec ?? "").toLowerCase().includes("oficina")) {
         const pilates = isPilatesAppointment(remanejFlow.apt.notes);
         const sameDayProf = await listAppointments({
           patientId: remanejFlow.apt.patientId,
