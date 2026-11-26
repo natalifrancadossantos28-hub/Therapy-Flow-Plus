@@ -3,6 +3,7 @@ import { HeroTela } from "@/components/HeroTela";
 import { Card, MotionCard, Button, Input, Label, Badge, Select } from "@/components/ui-custom";
 import { Users, Plus, Search, AlertCircle, MessageCircle, Trash2, Download, User, Printer, Stethoscope, ClipboardCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cpfDuplicateMessage, cpfDuplicates, cpfProblem } from "@/lib/cpf";
 import { getStatusColor, cn, calcIdade } from "@/lib/utils";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PatientPhotoUploader } from "@/components/PatientPhotoUploader";
@@ -475,6 +476,15 @@ export default function Patients() {
       toast({ title: "Prontuário duplicado", description: prontuarioAlerta, variant: "destructive" });
       return;
     }
+    const cpfErro = cpfProblem(formData.cpf);
+    if (cpfErro) {
+      toast({ title: "CPF inválido", description: `${cpfErro} Corrija ou deixe em branco.`, variant: "destructive" });
+      return;
+    }
+    const cpfDups = cpfDuplicates(formData.cpf, patients);
+    if (cpfDups.length && !confirm(
+      `${cpfDuplicateMessage(cpfDups)}\n\nSe for a mesma criança, não cadastre de novo: use o cadastro que já existe.\nSe for outra pessoa (ex.: irmão com o CPF do responsável), clique OK para salvar mesmo assim.`,
+    )) return;
     setSaving(true);
     try {
       const created = await upsertPatient(null, {
@@ -984,6 +994,13 @@ export default function Patients() {
                 <div>
                   <Label>CPF</Label>
                   <Input value={formData.cpf} onChange={e => setFormData({ ...formData, cpf: e.target.value })} placeholder="000.000.000-00" />
+                  {(() => {
+                    const erro = cpfProblem(formData.cpf);
+                    if (erro) return <p className="text-xs font-semibold text-rose-500 mt-1">{erro}</p>;
+                    const dups = cpfDuplicates(formData.cpf, patients);
+                    if (dups.length) return <p className="text-xs font-semibold text-amber-600 mt-1">⚠️ {cpfDuplicateMessage(dups)}</p>;
+                    return null;
+                  })()}
                 </div>
                 <div>
                   <Label>CNS (Cartão SUS)</Label>
