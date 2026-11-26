@@ -4,6 +4,7 @@ import { Card, Button, Badge, MotionCard, Input, Label, Select } from "@/compone
 import { generatePatientPdf } from "@/hooks/use-pdf";
 import { ArrowLeft, Download, UserMinus, AlertCircle, FileText, CalendarX, ClipboardCheck, ListPlus, CheckCircle2, Clock, Pencil, X as XIcon, ShieldOff, Users, Undo2, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cpfDigits, cpfDuplicateMessage, cpfDuplicates, cpfProblem } from "@/lib/cpf";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
 import { PatientPhotoUploader } from "@/components/PatientPhotoUploader";
 import {
@@ -11,6 +12,7 @@ import {
   getPatientPdf,
   getPatientAbsences,
   upsertPatient,
+  listPatients,
   deletePatient,
   addPatientToFila,
   enqueueAfterAbcEntrada,
@@ -310,6 +312,18 @@ export default function PatientDetail() {
 
   const saveEdit = async () => {
     if (!patient || !editName.trim()) return;
+    const cpfMudou = cpfDigits(editCpf) !== cpfDigits(patient.cpf);
+    const cpfErro = cpfMudou ? cpfProblem(editCpf) : null;
+    if (cpfErro) {
+      toast({ title: "CPF inválido", description: `${cpfErro} Corrija ou deixe em branco.`, variant: "destructive" });
+      return;
+    }
+    if (cpfMudou && cpfDigits(editCpf).length === 11) {
+      const dups = cpfDuplicates(editCpf, await listPatients().catch(() => []), patientId);
+      if (dups.length && !confirm(
+        `${cpfDuplicateMessage(dups)}\n\nSe for outra pessoa (ex.: irmão com o CPF do responsável), clique OK para salvar mesmo assim.`,
+      )) return;
+    }
     setSavingEdit(true);
     try {
       const updated = await upsertPatient(patientId, {
@@ -1601,6 +1615,7 @@ export default function PatientDetail() {
                   <div>
                     <Label className="text-sm font-semibold">CPF</Label>
                     <Input value={editCpf} onChange={e => setEditCpf(e.target.value)} placeholder="000.000.000-00" className="mt-1" />
+                    {cpfProblem(editCpf) && <p className="text-xs font-semibold text-rose-500 mt-1">{cpfProblem(editCpf)}</p>}
                   </div>
                 </div>
                 <div>
