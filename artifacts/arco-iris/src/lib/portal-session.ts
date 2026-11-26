@@ -3,11 +3,8 @@
 // Scope "reception"   -> empresa com acesso restrito ao painel da Recepcao e Fila.
 // Scope "professional" -> profissional autenticado via PIN, so ve a propria agenda.
 //
-// Enrollment de dispositivo: quando um admin faz login no portal, as credenciais
-// da empresa tambem sao salvas em localStorage (DEVICE_KEY). Quando um
-// profissional loga depois via PIN, reusamos essas credenciais para permitir
-// que a pagina /agenda-profissionais chame as RPCs protegidas da empresa
-// (listAppointments, updateAppointment, etc) sem exigir a senha de novo.
+// O aparelho guarda só qual empresa usa (DEVICE_KEY), sem token. Cada login
+// (senha ou PIN) recebe o próprio token do banco.
 
 const SESSION_KEY = "nfs_ponto_session";
 const LEGACY_KEY = "nfs_admin_auth";
@@ -40,11 +37,6 @@ type DeviceCompany = {
   companyId: number;
   companyName: string;
   companySlug: string;
-  adminToken: string;
-  moduleArcoIris?: boolean;
-  moduleTriagem?: boolean;
-  modulePonto?: boolean;
-  epoch?: number;
 };
 
 function readDeviceCompany(): DeviceCompany | null {
@@ -57,16 +49,11 @@ function readDeviceCompany(): DeviceCompany | null {
 }
 
 function writeDeviceCompany(session: CompanySession) {
-  if (!session.companyId || !session.companySlug || !session.adminToken) return;
+  if (!session.companyId || !session.companySlug) return;
   const payload: DeviceCompany = {
     companyId: session.companyId,
     companyName: session.companyName ?? "",
     companySlug: session.companySlug,
-    adminToken: session.adminToken,
-    moduleArcoIris: session.moduleArcoIris,
-    moduleTriagem: session.moduleTriagem,
-    modulePonto: session.modulePonto,
-    epoch: session.epoch,
   };
   try {
     localStorage.setItem(DEVICE_KEY, JSON.stringify(payload));
@@ -92,8 +79,6 @@ export function getCompanySession(): CompanySession | null {
 export function setCompanySession(session: CompanySession) {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
   sessionStorage.setItem(LEGACY_KEY, "true");
-  // Enrollment: persiste credenciais da empresa no dispositivo para reaproveitar
-  // em logins de profissional via PIN.
   writeDeviceCompany(session);
 }
 
@@ -108,30 +93,6 @@ export function getProfessionalSession(): ProfessionalSession | null {
 
 export function setProfessionalSession(session: ProfessionalSession) {
   sessionStorage.setItem(PROFESSIONAL_KEY, JSON.stringify(session));
-}
-
-// Fase 6: usado pelo card Profissional do portal para restaurar a sessao da
-// empresa a partir do enrollment do dispositivo. Retorna true se conseguiu.
-export function restoreCompanyFromDevice(): boolean {
-  const existing = getCompanySession();
-  if (existing?.companySlug && existing.adminToken) return true;
-  const dev = readDeviceCompany();
-  if (!dev) return false;
-  const session: CompanySession = {
-    type: "company",
-    scope: "reception", // escopo neutro; o scope real vem do professional.
-    companyId: dev.companyId,
-    companyName: dev.companyName,
-    companySlug: dev.companySlug,
-    adminToken: dev.adminToken,
-    moduleArcoIris: dev.moduleArcoIris,
-    moduleTriagem: dev.moduleTriagem,
-    modulePonto: dev.modulePonto,
-    epoch: dev.epoch,
-  };
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  sessionStorage.setItem(LEGACY_KEY, "true");
-  return true;
 }
 
 export function getCurrentScope(): PortalScope | null {

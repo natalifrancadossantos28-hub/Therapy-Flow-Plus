@@ -12,7 +12,7 @@ import { BackgroundPicker } from "@/components/BackgroundPicker";
 import { appBackgroundStyle, useBackground } from "@/lib/background";
 import { MensagensComemorativas } from "@/components/MensagensComemorativas";
 import { RecadoEquipeComposer } from "@/components/RecadoEquipeComposer";
-import { listProfessionals, verifyProfessionalPin, listAppointments, type AppointmentListItem } from "@/lib/arco-rpc";
+import { listProfessionals, loginProfissional, listAppointments, type AppointmentListItem } from "@/lib/arco-rpc";
 import { getProfessionalSession, getCurrentScope, clearAllSessions } from "@/lib/portal-session";
 import { useLocation } from "wouter";
 import Agenda from "@/pages/agenda";
@@ -75,8 +75,8 @@ export default function AgendaProfissionais() {
     if (!selectedProfId || pinInput.length !== 4) return;
     setPinLoading(true); setPinError("");
     try {
-      const prof = await verifyProfessionalPin(parseInt(selectedProfId), pinInput);
-      if (prof) { lembrarPinProfissional(parseInt(selectedProfId), pinInput); setPinVerified(true); }
+      const token = await loginProfissional(parseInt(selectedProfId), pinInput);
+      if (token) { lembrarPinProfissional(parseInt(selectedProfId), token); setPinVerified(true); }
       else { setPinError("PIN incorreto"); setPinInput(""); }
     } catch { setPinError("Erro ao verificar PIN."); }
     finally { setPinLoading(false); }

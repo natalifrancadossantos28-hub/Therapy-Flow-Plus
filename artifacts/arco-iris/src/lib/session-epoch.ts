@@ -36,11 +36,22 @@ export async function logoutAllDevices(): Promise<void> {
   if (typeof data === "number") setCompanySession({ ...session, epoch: data });
 }
 
+// Token vencido (7 dias) ou derrubado no banco. Erro de rede não desloga.
+async function tokenVencido(token: string | undefined, companyId: number | undefined): Promise<boolean> {
+  if (!supabase || !token) return false;
+  const { data, error } = await supabase.rpc("session_company_id", {
+    p_token: token,
+    p_company_id: companyId ?? null,
+  });
+  return !error && data == null;
+}
+
 async function checkSessionEpoch() {
   const session = getCompanySession();
   if (!session?.companySlug || session.type !== "company") return;
   const epoch = await fetchSessionEpoch(session.companySlug);
-  if (epoch === null || session.epoch === epoch) return;
+  const epochMudou = epoch !== null && session.epoch !== epoch;
+  if (!epochMudou && !(await tokenVencido(session.adminToken, session.companyId))) return;
   sessionStorage.clear();
   clearDeviceEnrollment();
   window.location.href = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/portal`;

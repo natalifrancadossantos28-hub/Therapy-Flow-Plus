@@ -1,18 +1,30 @@
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export function getCompanyId(req) {
-  const h = req.headers["x-company-id"];
-  if (!h) return null;
-  const n = Number(h);
-  return isNaN(n) ? null : n;
+const supabaseUrl = () => process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "";
+
+/** Empresa do token de login (x-company-auth), conferido no banco. null = sessão inválida. */
+export async function getCompanyId(req) {
+  const token = req.headers["x-company-auth"];
+  if (!token) return null;
+  const key = process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (!supabaseUrl() || !key) throw new Error("Supabase não configurado");
+  const hinted = Number(req.headers["x-company-id"]);
+  const { data, error } = await createClient(supabaseUrl(), key).rpc("session_company_id", {
+    p_token: String(token),
+    p_company_id: Number.isFinite(hinted) ? hinted : null,
+  });
+  if (error || data == null) return null;
+  return Number(data);
 }
 
+// Pacientes, fila e agenda não são legíveis pela chave pública: sem a chave de
+// serviço os relatórios dariam zero, então falha com mensagem clara.
 export function getSupabase() {
-  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "";
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? "";
-  if (!url || !key) throw new Error("Supabase não configurado");
-  return createClient(url, key);
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (!supabaseUrl()) throw new Error("Supabase não configurado");
+  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada no servidor");
+  return createClient(supabaseUrl(), key);
 }
 
 // Tenta os modelos em ordem: o Google desliga versões antigas (404) e às vezes um modelo fica sem vaga (503/429).

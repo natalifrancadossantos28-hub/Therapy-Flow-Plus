@@ -6,12 +6,6 @@ const SESSION_KEY = "nfs_ponto_session";
 
 const DEFAULT_SLUG = (import.meta.env.VITE_DEFAULT_COMPANY_SLUG as string | undefined) || "clinica-nfs";
 
-// Senha fixa do app (mesma da Administração na Gestão). Não usa a senha da
-// empresa no banco, então trocar aqui não afeta outros módulos (ex.: Ponto).
-// Pode ser sobrescrita por env (VITE_PORTAL_PASSWORD).
-const PORTAL_PASSWORD =
-  (import.meta.env.VITE_PORTAL_PASSWORD as string | undefined) || "Ntl102030";
-
 // Compara ignorando case, espaços e zero-width chars que o auto-complete costuma colar.
 function normalizePassword(value: string): string {
   return value
@@ -111,7 +105,15 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
       const s = getSession();
       if (!s || s.type !== "company" || !s.companySlug) return;
       const epoch = await fetchSessionEpoch(s.companySlug);
-      if (epoch === null || s.epoch === epoch) return;
+      const epochMudou = epoch !== null && s.epoch !== epoch;
+      if (!epochMudou) {
+        // Token vencido (7 dias) ou derrubado no banco. Erro de rede não desloga.
+        const { data, error } = await requireSupabase().rpc("session_company_id", {
+          p_token: s.adminToken ?? "",
+          p_company_id: s.companyId ?? null,
+        });
+        if (error || data != null) return;
+      }
       sessionStorage.removeItem(SESSION_KEY);
       setSession(null);
     };
@@ -125,17 +127,17 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
     setLoading(true);
     setError("");
     try {
-      if (normalizePassword(password) !== normalizePassword(PORTAL_PASSWORD)) {
-        setError("Senha incorreta.");
-        return;
-      }
       const supabase = requireSupabase();
-      const { data, error: rpcError } = await supabase.rpc("lookup_company_by_slug", {
+      // Senha conferida no banco (mesma da Recepção da Gestão); volta um token.
+      const { data, error: rpcError } = await supabase.rpc("company_login", {
         p_slug: (slug.trim() || DEFAULT_SLUG).toLowerCase(),
+        p_password: normalizePassword(password),
+        p_scope: "reception",
       });
       if (rpcError) { setError(describeAuthError(rpcError)); return; }
-      const company = Array.isArray(data) ? data[0] : data;
-      if (!company?.id) { setError("Empresa não encontrada."); return; }
+      const result = data as { ok: boolean; error?: string; token?: string; epoch?: number; company?: any } | null;
+      const company = result?.company;
+      if (!result?.ok || !result.token || !company?.id) { setError(result?.error || "Senha incorreta."); return; }
       // RPC returns snake_case columns; check the requested module by matching
       // on the camelCase prop the caller passed in ("moduleTriagem", etc.).
       const moduleCol = module.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
@@ -148,12 +150,11 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
         companyId: company.id,
         companyName: company.name,
         companySlug: company.slug,
-        // Token de bypass aceito pelas RPCs (senha real fica só no app).
-        adminToken: "__noauth__",
+        adminToken: result.token,
         moduleTriagem: company.module_triagem,
         moduleArcoIris: company.module_arco_iris,
         modulePonto: company.module_ponto,
-        epoch: (await fetchSessionEpoch(company.slug)) ?? undefined,
+        epoch: result.epoch,
       };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
       setSession(s);

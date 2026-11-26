@@ -146,7 +146,7 @@ export default function AgendaMensal() {
       .channel("agenda-mensal-admin")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "appointments" },
+        { event: "INSERT", schema: "public", table: "realtime_sinais", filter: "tabela=eq.appointments" },
         scheduleReload
       )
       .subscribe();

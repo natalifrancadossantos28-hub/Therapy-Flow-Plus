@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Plane, Pencil, Trash2, Loader2, Lock } from "lucide-react";
 import { glass, neon } from "@/components/AgendaNeon";
 import { useToast } from "@/hooks/use-toast";
-import { listMinhasAusencias, salvarMinhaAusencia, cancelarMinhaAusencia, verifyProfessionalPin, type Ausencia } from "@/lib/arco-rpc";
+import { listMinhasAusencias, salvarMinhaAusencia, cancelarMinhaAusencia, loginProfissional, type Ausencia } from "@/lib/arco-rpc";
 
 const MOTIVOS = ["Férias", "Folga", "Falta", "Atestado", "Outro"] as const;
 const chavePin = (id: number) => `nfs_prof_pin_${id}`;
-/** Guarda o PIN verificado nesta aba, para as RPCs de "Minhas Ausências". */
-export const lembrarPinProfissional = (id: number, pin: string) => sessionStorage.setItem(chavePin(id), pin);
+/** Guarda nesta aba o token do login com PIN, para as RPCs de "Minhas Ausências". */
+export const lembrarPinProfissional = (id: number, token: string) => sessionStorage.setItem(chavePin(id), token);
 
 const fmt = (d: string) => d.split("-").reverse().join("/");
 const campo = "w-full rounded-2xl border border-violet-200 bg-white px-3 py-2.5 text-lg text-[#1e1b4b] focus:outline-none focus:ring-2 focus:ring-violet-400";
@@ -51,10 +51,10 @@ export function MinhasAusencias({ professionalId, voz }: { professionalId: numbe
 
   const confirmarPin = async () => {
     try {
-      const ok = await verifyProfessionalPin(professionalId, pinDigitado);
-      if (!ok) { toast({ title: "PIN incorreto", variant: "destructive" }); return; }
-      lembrarPinProfissional(professionalId, pinDigitado);
-      setPin(pinDigitado); setPinOk(true); setPinDigitado("");
+      const token = await loginProfissional(professionalId, pinDigitado);
+      if (!token) { toast({ title: "PIN incorreto", variant: "destructive" }); return; }
+      lembrarPinProfissional(professionalId, token);
+      setPin(token); setPinOk(true); setPinDigitado("");
     } catch (e) { erro(e); }
   };
 
