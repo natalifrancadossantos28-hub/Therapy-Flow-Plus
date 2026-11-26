@@ -242,9 +242,19 @@ on conflict (company_id, recurrence_group_id) do update
 -- do `create_appointments`); a mais antiga é cortada na primeira data em
 -- comum. Ex.: João Victor / Karla (08:00 e 14:50), David / Claudia (14:50 e
 -- 15:40).
+-- Origem da série = primeira inserção do grupo (inclui o histórico), pra
+-- não confundir com sessões que a extensão automática criou depois.
 create temp table _serie_antiga on commit drop as
+with origem as (
+  select company_id, recurrence_group_id, min(created_at) as criada_em
+    from public.appointments
+   where recurrence_group_id is not null and btrim(recurrence_group_id) <> ''
+   group by company_id, recurrence_group_id
+)
 select a.company_id, a.recurrence_group_id, min(a."date") as cut_from
   from public.appointments a
+  join origem oa
+    on oa.company_id = a.company_id and oa.recurrence_group_id = a.recurrence_group_id
   join public.professionals pr
     on pr.id = a.professional_id and pr.company_id = a.company_id
   join public.appointments k
@@ -255,7 +265,11 @@ select a.company_id, a.recurrence_group_id, min(a."date") as cut_from
    and k.recurrence_group_id is not null
    and btrim(k.recurrence_group_id) <> ''
    and k.recurrence_group_id <> a.recurrence_group_id
-   and (k.created_at, k.id) > (a.created_at, a.id)
+   and k.recurrence_group_id in (
+     select ok.recurrence_group_id from origem ok
+      where ok.company_id = k.company_id
+        and ok.criada_em > oa.criada_em
+   )
    and lower(coalesce(k.status, 'agendado')) in ('agendado', 'agendada', 'scheduled')
    and coalesce(k.notes, '') not like 'Atendimento Multi com %'
    and coalesce(k.notes, '') not like 'Transporte de %'
