@@ -1696,12 +1696,20 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
           const spec = professionals.find(p => p.id === profId)?.specialty;
           return isTransportSpecialty(spec) || (spec ?? "").toLowerCase().includes("oficina");
         };
-        const origem = await listAppointments({ patientId: moving.patientId, date: moving.date });
+        // Mesmo critério de _atendimento_do_responsavel (0141): o salvamento não
+        // move junto as sessões do responsável, nem a da criança a partir delas.
+        const doResponsavel = (a: Appointment) => {
+          const spec = (professionals.find(p => p.id === a.professionalId)?.specialty ?? "").toLowerCase();
+          return isPilatesAppointment(a.notes) || spec.includes("parental") || spec.includes("pilates") || spec.includes("oficina");
+        };
+        const origem = doResponsavel(moving)
+          ? []
+          : await listAppointments({ patientId: moving.patientId, date: moving.date });
         const juntas = [
           moving,
           ...origem.filter(a =>
             a.id !== moving.id && a.date === moving.date && a.time === moving.time &&
-            a.professionalId !== moving.professionalId && ativo(a) && !isPilatesAppointment(a.notes)),
+            a.professionalId !== moving.professionalId && ativo(a) && !doResponsavel(a)),
         ];
         const ids = new Set(juntas.map(a => a.id));
         for (const m of juntas) {
