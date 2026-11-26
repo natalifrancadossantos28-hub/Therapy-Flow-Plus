@@ -261,17 +261,17 @@ export default function WaitingList() {
       .channel("arco-fila-espera")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "waiting_list" },
+        { event: "INSERT", schema: "public", table: "realtime_sinais", filter: "tabela=eq.waiting_list" },
         () => scheduleReload()
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "patients" },
+        { event: "INSERT", schema: "public", table: "realtime_sinais", filter: "tabela=eq.patients" },
         () => scheduleReload()
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "appointments" },
+        { event: "INSERT", schema: "public", table: "realtime_sinais", filter: "tabela=eq.appointments" },
         () => scheduleReload()
       )
       .subscribe();

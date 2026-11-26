@@ -11,10 +11,9 @@ import {
   setProfessionalSession,
   getCurrentScope,
   clearAllSessions,
-  restoreCompanyFromDevice,
 } from "@/lib/portal-session";
 import { stampSessionEpoch } from "@/lib/session-epoch";
-import { listProfessionalsPublic, verifyProfessionalPinWithSlug } from "@/lib/arco-rpc";
+import { listProfessionalsPublic } from "@/lib/arco-rpc";
 import { isTransportSpecialty } from "@/lib/specialty-colors";
 
 type CardKey = "reception" | "professional" | "admin";
@@ -25,15 +24,6 @@ type ProfOption = { id: number; name: string; specialty: string | null };
 // Quando houver multi-tenant, expor um campo dedicado no card.
 const DEFAULT_SLUG = (import.meta.env.VITE_DEFAULT_COMPANY_SLUG as string | undefined) || "clinica-nfs";
 
-// Senha da Recepcao. O profissional continua usando PIN.
-// Pode ser sobrescrita por env (VITE_PORTAL_PASSWORD) por empresa.
-const PORTAL_PASSWORD =
-  (import.meta.env.VITE_PORTAL_PASSWORD as string | undefined) || "Ntl102030";
-
-// A Administracao tem senha propria (nao e a mesma da Recepcao/Triagem).
-const ADMIN_PASSWORD =
-  (import.meta.env.VITE_ADMIN_PASSWORD as string | undefined) || "Ntl102030";
-
 // Compara ignorando case, espacos e zero-width chars que o auto-complete
 // do celular costuma colar (ex.: "Clinica123 ", "clinica 123").
 function normalizePassword(value: string): string {
@@ -42,6 +32,22 @@ function normalizePassword(value: string): string {
     .replace(/[\s\u200b-\u200f\u2028\u2029\ufeff]/g, "")
     .toLowerCase();
 }
+
+// Resposta de company_login / professional_login (senha e PIN conferidos no banco).
+type LoginResult = {
+  ok: boolean;
+  error?: string;
+  token?: string;
+  epoch?: number;
+  company?: {
+    id: number;
+    name: string;
+    slug: string;
+    module_arco_iris: boolean;
+    module_triagem: boolean;
+    module_ponto: boolean;
+  };
+};
 
 // Fase 6: Portal unificado com 3 cards.
 // - Recepcao: login empresa, session scope = "reception" -> /reception.
@@ -94,23 +100,21 @@ export default function Portal() {
     setLoading(true);
     setError("");
     try {
-      const expected = scope === "admin" ? ADMIN_PASSWORD : PORTAL_PASSWORD;
-      if (normalizePassword(passwordInput) !== normalizePassword(expected)) {
-        setError("Senha incorreta.");
-        return;
-      }
       if (!isSupabaseConfigured) {
         setError("Supabase nao configurado.");
         return;
       }
       const supabase = requireSupabase();
-      const { data, error: rpcError } = await supabase.rpc("lookup_company_by_slug", {
+      const { data, error: rpcError } = await supabase.rpc("company_login", {
         p_slug: slug.trim().toLowerCase(),
+        p_password: normalizePassword(passwordInput),
+        p_scope: scope,
       });
       if (rpcError) throw rpcError;
-      const company = Array.isArray(data) ? data[0] : data;
-      if (!company?.id) {
-        setError("Empresa nao encontrada.");
+      const result = data as LoginResult | null;
+      const company = result?.company;
+      if (!result?.ok || !result.token || !company) {
+        setError(result?.error || "Senha incorreta.");
         return;
       }
       if (!company.module_arco_iris) {
@@ -125,8 +129,8 @@ export default function Portal() {
         companyId: Number(company.id),
         companyName: company.name,
         companySlug: company.slug,
-        // Token de bypass aceito pelas RPCs (Recepcao/Admin nao pedem senha).
-        adminToken: "__noauth__",
+        adminToken: result.token,
+        epoch: result.epoch,
         moduleArcoIris: Boolean(company.module_arco_iris),
         moduleTriagem: Boolean(company.module_triagem),
         modulePonto: Boolean(company.module_ponto),
@@ -151,41 +155,32 @@ export default function Portal() {
         setError("Selecione seu nome.");
         return;
       }
-      const ok = await verifyProfessionalPinWithSlug(DEFAULT_SLUG, prof.id, pinInput);
-      if (!ok) {
-        setError("PIN incorreto.");
+      const supabase = requireSupabase();
+      const { data, error: rpcError } = await supabase.rpc("professional_login", {
+        p_slug: DEFAULT_SLUG.trim().toLowerCase(),
+        p_professional_id: prof.id,
+        p_pin: pinInput,
+      });
+      if (rpcError) throw rpcError;
+      const result = data as LoginResult | null;
+      const company = result?.company;
+      if (!result?.ok || !result.token || !company) {
+        setError(result?.error || "PIN incorreto.");
         return;
       }
       clearAllSessions();
-      // Restaura credenciais da empresa do enrollment do dispositivo para que
-      // /agenda-profissionais consiga chamar as RPCs protegidas (listAppointments,
-      // updateAppointment, etc). Se o dispositivo nunca teve um admin logado,
-      // monta a sessao da empresa direto pelo slug (as RPCs aceitam o token de
-      // bypass __noauth__) — assim o profissional entra so com o PIN, sem
-      // precisar que o admin configure o dispositivo antes.
-      if (!restoreCompanyFromDevice()) {
-        const supabase = requireSupabase();
-        const { data, error: rpcError } = await supabase.rpc("lookup_company_by_slug", {
-          p_slug: DEFAULT_SLUG.trim().toLowerCase(),
-        });
-        if (rpcError) throw rpcError;
-        const company = Array.isArray(data) ? data[0] : data;
-        if (!company?.id) {
-          setError("Empresa nao encontrada.");
-          return;
-        }
-        setCompanySession({
-          type: "company",
-          scope: "reception", // escopo neutro; o scope real vem do professional.
-          companyId: Number(company.id),
-          companyName: company.name,
-          companySlug: company.slug,
-          adminToken: "__noauth__",
-          moduleArcoIris: Boolean(company.module_arco_iris),
-          moduleTriagem: Boolean(company.module_triagem),
-          modulePonto: Boolean(company.module_ponto),
-        });
-      }
+      setCompanySession({
+        type: "company",
+        scope: "reception", // escopo neutro; o scope real vem do professional.
+        companyId: Number(company.id),
+        companyName: company.name,
+        companySlug: company.slug,
+        adminToken: result.token,
+        epoch: result.epoch,
+        moduleArcoIris: Boolean(company.module_arco_iris),
+        moduleTriagem: Boolean(company.module_triagem),
+        modulePonto: Boolean(company.module_ponto),
+      });
       await stampSessionEpoch();
       setProfessionalSession({
         professionalId: prof.id,

@@ -83,12 +83,12 @@ export default function NotificationBell() {
       .channel("recepcao-notificacoes-bell")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notificacoes_recepcao" },
+        { event: "INSERT", schema: "public", table: "realtime_sinais", filter: "tabela=eq.notificacoes_recepcao" },
         () => void reload()
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "notificacoes_recepcao" },
+        { event: "INSERT", schema: "public", table: "realtime_sinais", filter: "tabela=eq.notificacoes_recepcao" },
         () => void reload()
       )
       .subscribe();

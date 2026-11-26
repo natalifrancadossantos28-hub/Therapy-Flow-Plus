@@ -849,12 +849,12 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       .channel(`agenda-recepcao-${profId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "appointments", filter: `professional_id=eq.${profId}` },
+        { event: "INSERT", schema: "public", table: "realtime_sinais", filter: `professional_id=eq.${profId}` },
         scheduleReload
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "waiting_list" },
+        { event: "INSERT", schema: "public", table: "realtime_sinais", filter: "tabela=eq.waiting_list" },
         scheduleReload
       )
       .subscribe();

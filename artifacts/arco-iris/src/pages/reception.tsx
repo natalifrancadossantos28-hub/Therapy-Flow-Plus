@@ -20,6 +20,7 @@ import {
   type Feriado,
   type Ausencia,
   type Patient,
+  listNotificacoes,
 } from "@/lib/arco-rpc";
 import { isBlocked, holidayOn } from "@/lib/blocked-dates";
 import { supabase } from "@/lib/supabase";
@@ -757,22 +758,27 @@ export default function Reception() {
       .channel("recepcao-realtime")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "appointments" },
+        { event: "INSERT", schema: "public", table: "realtime_sinais", filter: "tabela=eq.appointments" },
         scheduleReload
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notificacoes_recepcao" },
+        { event: "INSERT", schema: "public", table: "realtime_sinais", filter: "tabela=eq.notificacoes_recepcao" },
         (payload: { new: Record<string, unknown> }) => {
-          const row = payload.new ?? {};
-          setRealtimeAlert({
-            patientName:      String(row.patient_name      ?? "Paciente"),
-            professionalName: String(row.professional_name ?? "—"),
-            acao:             String(row.acao              ?? "Ação"),
-            at:               Date.now(),
-          });
-          if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
-          alertTimerRef.current = setTimeout(() => setRealtimeAlert(null), 12_000);
+          if (payload.new?.operacao !== "INSERT") return;
+          // O sinal não traz dados do paciente: busca a notificação mais nova.
+          void listNotificacoes().then((list) => {
+            const row = list[0];
+            if (!row) return;
+            setRealtimeAlert({
+              patientName:      row.patientName      || "Paciente",
+              professionalName: row.professionalName || "—",
+              acao:             row.acao             || "Ação",
+              at:               Date.now(),
+            });
+            if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+            alertTimerRef.current = setTimeout(() => setRealtimeAlert(null), 12_000);
+          }).catch(() => {});
           void reloadAppointments();
         }
       )
