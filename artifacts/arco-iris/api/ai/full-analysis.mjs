@@ -4,8 +4,8 @@ import { getCompanyId, getSupabase, getModel, calcAge, todayStr, parseAIResponse
 export default async function handler(req, res) {
   if (cors(req, res)) return;
   try {
-    const companyId = getCompanyId(req);
-    if (!companyId) return res.status(400).json({ error: "x-company-id required" });
+    const companyId = await getCompanyId(req);
+    if (!companyId) return res.status(401).json({ error: "Sessão expirada. Faça login novamente." });
 
     const sb = getSupabase();
 

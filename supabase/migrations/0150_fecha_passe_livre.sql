@@ -5,7 +5,8 @@
 -- (1) _verify_company_admin deixa de aceitar '__noauth__'.
 -- (2) Pacientes, agenda, fila e notificações deixam de ser legíveis sem
 --     login (o tempo real passa a usar realtime_sinais).
--- (3) Derruba as sessões antigas (todo mundo entra de novo com senha).
+-- (3) Minhas Ausências passa a aceitar só o token (PIN direto desliga).
+-- (4) Derruba as sessões antigas (todo mundo entra de novo com senha).
 
 begin;
 
@@ -37,7 +38,6 @@ begin
     if found then
       return v_row.id;
     end if;
-    raise exception 'invalid credentials' using errcode = '28P01';
   end if;
 
   if v_row.admin_password_hash <> crypt(p_password, v_row.admin_password_hash) then

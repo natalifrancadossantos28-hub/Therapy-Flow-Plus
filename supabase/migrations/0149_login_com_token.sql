@@ -5,7 +5,8 @@
 -- (1) Senhas do portal (Administração / Recepção) guardadas com bcrypt.
 -- (2) company_login / professional_login conferem senha/PIN e devolvem um
 --     token de sessão (7 dias; cai com "Desconectar todos os computadores").
---     10 erros em 15 minutos bloqueiam novas tentativas por 15 minutos.
+--     10 erros do mesmo IP em 15 minutos bloqueiam esse IP por 15 minutos
+--     (200 de vários IPs bloqueiam o alvo). Vale também para o PIN.
 -- (3) _verify_company_admin aceita o token. O passe livre '__noauth__'
 --     continua até a 0150 (rodar depois que o site novo estiver no ar).
 -- (4) realtime_sinais: aviso "algo mudou" sem dados de paciente, para o
@@ -48,6 +49,7 @@ create table if not exists public.login_falhas (
   alvo       text        not null,
   created_at timestamptz not null default now()
 );
+alter table public.login_falhas add column if not exists ip text;
 create index if not exists login_falhas_alvo_idx on public.login_falhas (company_id, alvo, created_at);
 
 alter table public.company_portal_passwords enable row level security;
@@ -96,6 +98,18 @@ $$;
 revoke all on function public.set_portal_password(text, text, text) from public, anon, authenticated;
 
 -- (2) Login ------------------------------------------------------------------------
+-- IP de quem chamou (o Supabase repassa os headers da requisição).
+create or replace function public._req_ip()
+returns text
+language sql
+stable
+as $$
+  select coalesce(nullif(trim(split_part(coalesce(
+    nullif(current_setting('request.headers', true), '')::json ->> 'x-forwarded-for', ''), ',', 1)), ''), '?');
+$$;
+
+-- 10 erros do mesmo IP bloqueiam esse IP; 200 erros de vários IPs bloqueiam o alvo.
+-- Assim um visitante errando a senha não trava a clínica inteira.
 create or replace function public._login_bloqueado(p_company_id bigint, p_alvo text)
 returns boolean
 language sql
@@ -103,11 +117,12 @@ stable
 security definer
 set search_path = public, pg_temp
 as $$
-  select count(*) >= 10
-    from public.login_falhas
-   where company_id = p_company_id
-     and alvo = p_alvo
-     and created_at > now() - interval '15 minutes';
+  select (select count(*) from public.login_falhas
+           where company_id = p_company_id and alvo = p_alvo and ip = public._req_ip()
+             and created_at > now() - interval '15 minutes') >= 10
+      or (select count(*) from public.login_falhas
+           where company_id = p_company_id and alvo = p_alvo
+             and created_at > now() - interval '15 minutes') >= 200;
 $$;
 revoke all on function public._login_bloqueado(bigint, text) from public, anon, authenticated;
 
@@ -162,7 +177,7 @@ begin
   ) into v_ok;
 
   if not v_ok or v_pw = '' then
-    insert into public.login_falhas (company_id, alvo) values (v_row.id, p_scope);
+    insert into public.login_falhas (company_id, alvo, ip) values (v_row.id, p_scope, public._req_ip());
     return jsonb_build_object('ok', false, 'error', 'Senha incorreta.');
   end if;
 
@@ -205,7 +220,7 @@ begin
      and pin is not null and pin <> '' and pin = p_pin
    limit 1;
   if not found then
-    insert into public.login_falhas (company_id, alvo) values (v_row.id, v_alvo);
+    insert into public.login_falhas (company_id, alvo, ip) values (v_row.id, v_alvo, public._req_ip());
     return jsonb_build_object('ok', false, 'error', 'PIN incorreto.');
   end if;
 
@@ -265,7 +280,6 @@ begin
     if found then
       return v_row.id;
     end if;
-    raise exception 'invalid credentials' using errcode = '28P01';
   end if;
 
   -- Temporário: a 0150 desliga este passe livre.
@@ -292,6 +306,10 @@ declare
   v_epoch      integer;
 begin
   v_company_id := public._verify_company_admin(p_slug, p_password);
+  if exists (select 1 from public.company_sessions
+              where token = p_password and scope = 'professional') then
+    raise exception 'Só a Administração ou a Recepção podem desconectar todos.' using errcode = '42501';
+  end if;
   update public.ponto_companies
      set session_epoch = session_epoch + 1
    where id = v_company_id
@@ -304,6 +322,106 @@ end;
 $$;
 revoke all on function public.logout_all_devices(text, text) from public;
 grant execute on function public.logout_all_devices(text, text) to anon, authenticated;
+
+-- Sessão ainda vale? (o site usa para voltar ao login quando o token vence)
+create or replace function public.session_company_id(p_token text, p_company_id bigint default null)
+returns bigint
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select case
+    when p_token = '__noauth__' then
+      (select c.id from public.ponto_companies c
+        where c.id = p_company_id and c.active and c.passe_livre)
+    else
+      (select s.company_id from public.company_sessions s
+         join public.ponto_companies c on c.id = s.company_id
+        where s.token = p_token and s.expires_at > now()
+          and s.epoch = c.session_epoch and c.active)
+  end;
+$$;
+revoke all on function public.session_company_id(text, bigint) from public;
+grant execute on function public.session_company_id(text, bigint) to anon, authenticated;
+
+-- PIN do profissional (tela do PIN da agenda): mesmo limite de tentativas.
+create or replace function public.verify_professional_pin(
+  p_slug            text,
+  p_professional_id bigint,
+  p_pin             text
+)
+returns public.professionals
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare
+  v_company_id bigint;
+  v_row        public.professionals%rowtype;
+  v_alvo       text := 'prof:' || coalesce(p_professional_id::text, '');
+begin
+  select id into v_company_id from public.ponto_companies
+   where slug = lower(trim(coalesce(p_slug, ''))) limit 1;
+  if v_company_id is null or public._login_bloqueado(v_company_id, v_alvo) then
+    return null;
+  end if;
+  select * into v_row from public.professionals
+   where id = p_professional_id and company_id = v_company_id
+     and pin is not null and pin <> '' and pin = p_pin
+   limit 1;
+  if not found then
+    insert into public.login_falhas (company_id, alvo, ip) values (v_company_id, v_alvo, public._req_ip());
+    return null;
+  end if;
+  return v_row;
+end;
+$$;
+
+-- Minhas Ausências: aceita o token do profissional. PIN direto só enquanto
+-- houver passe livre (até a 0150), e respeitando o limite de tentativas.
+create or replace function public._verify_professional_pin_company(
+  p_slug text, p_professional_id bigint, p_pin text
+)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare
+  v_row public.ponto_companies%rowtype;
+begin
+  select * into v_row from public.ponto_companies
+   where slug = lower(trim(coalesce(p_slug, ''))) and active = true limit 1;
+  if not found then
+    raise exception 'PIN inválido.' using errcode = '28P01';
+  end if;
+
+  if p_pin like 'tk\_%' then
+    perform 1 from public.company_sessions s
+     where s.token = p_pin and s.company_id = v_row.id
+       and s.professional_id = p_professional_id
+       and s.expires_at > now() and s.epoch = v_row.session_epoch;
+    if found then
+      return v_row.id;
+    end if;
+    raise exception 'PIN inválido.' using errcode = '28P01';
+  end if;
+
+  if not v_row.passe_livre
+     or public._login_bloqueado(v_row.id, 'prof:' || coalesce(p_professional_id::text, '')) then
+    raise exception 'PIN inválido.' using errcode = '28P01';
+  end if;
+  perform 1 from public.professionals p
+   where p.id = p_professional_id and p.company_id = v_row.id
+     and p.pin is not null and p.pin <> '' and p.pin = p_pin;
+  if not found then
+    raise exception 'PIN inválido.' using errcode = '28P01';
+  end if;
+  return v_row.id;
+end;
+$$;
+revoke all on function public._verify_professional_pin_company(text, bigint, text) from public, anon, authenticated;
 
 -- (4) Tempo real sem dados de paciente ------------------------------------------
 create table if not exists public.realtime_sinais (

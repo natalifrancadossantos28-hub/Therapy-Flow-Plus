@@ -2947,11 +2947,22 @@ export async function updateAusencia(id: number, dataInicio: string, dataFim: st
   return mapAusencia(r as AusenciaRow);
 }
 
-// Ausências do próprio profissional (validadas pelo PIN dele no banco).
+// Ausências do próprio profissional (validadas no banco pelo token do login com PIN).
 function profSlug(): string {
   const slug = readSession()?.companySlug;
   if (!slug) throw new Error("Sessão de empresa expirada. Faça login novamente.");
   return slug;
+}
+
+/** Confere o PIN no banco e devolve o token do profissional (null se PIN errado). */
+export async function loginProfissional(professionalId: number, pin: string): Promise<string | null> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("professional_login", {
+    p_slug: profSlug(), p_professional_id: professionalId, p_pin: pin,
+  });
+  if (error) throw error;
+  const r = data as { ok?: boolean; token?: string } | null;
+  return r?.ok && r.token ? r.token : null;
 }
 
 export async function listMinhasAusencias(professionalId: number, pin: string): Promise<Ausencia[]> {

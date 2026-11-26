@@ -105,7 +105,15 @@ export default function CompanyGuard({ children, module, appName }: CompanyGuard
       const s = getSession();
       if (!s || s.type !== "company" || !s.companySlug) return;
       const epoch = await fetchSessionEpoch(s.companySlug);
-      if (epoch === null || s.epoch === epoch) return;
+      const epochMudou = epoch !== null && s.epoch !== epoch;
+      if (!epochMudou) {
+        // Token vencido (7 dias) ou derrubado no banco. Erro de rede não desloga.
+        const { data, error } = await requireSupabase().rpc("session_company_id", {
+          p_token: s.adminToken ?? "",
+          p_company_id: s.companyId ?? null,
+        });
+        if (error || data != null) return;
+      }
       sessionStorage.removeItem(SESSION_KEY);
       setSession(null);
     };

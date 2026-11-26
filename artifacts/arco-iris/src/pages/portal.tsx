@@ -189,7 +189,7 @@ export default function Portal() {
       });
       // Mantem compatibilidade com o fluxo antigo em agenda-profissionais.
       sessionStorage.setItem(`professional_pin_${prof.id}`, "verified");
-      sessionStorage.setItem(`nfs_prof_pin_${prof.id}`, pinInput);
+      sessionStorage.setItem(`nfs_prof_pin_${prof.id}`, result.token);
       sessionStorage.setItem("nfs_professional_slug", DEFAULT_SLUG);
       setLocation("/agenda-profissionais");
     } catch (err: any) {
