@@ -2179,11 +2179,6 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
     ativo ? "text-white bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_6px_16px_-6px_rgba(109,40,217,.7)]" : "text-[#1e1b4b] bg-white hover:bg-violet-50",
   );
   const navRedondo = "w-10 h-10 rounded-full border border-violet-200 bg-white hover:bg-violet-50 text-violet-800 transition-colors flex items-center justify-center";
-  const agoraHM = format(new Date(), "HH:mm");
-  const hojeApts = withExtraTimes(expanded.filter(a => a.date === today).map(a => a.time)).filter(t => isPaula || t !== "12:10")
-    .flatMap(t => getApts(today, t))
-    .filter(a => apptStatus(a)?.toLowerCase() !== "desmarcado");
-  const pacienteDoDia = hojeApts.find(a => a.time >= agoraHM) ?? null;
   const diaNovo = diaFoco !== null ? weekDates[diaFoco] : (weekDates.includes(today) ? today : weekDates[0]);
   return (
     <div style={{ zoom: fonte.zoom }}>
@@ -2246,7 +2241,6 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         )}
       </Card>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] items-start">
       <div className="min-w-0 space-y-4">
 
       {!selectedProfId ? (
@@ -2693,63 +2687,6 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
         </Card>
       )}
 
-      </div>
-
-      {canView && selectedProfId && (
-        <aside className="space-y-4 min-w-0">
-          <Card className="p-5 !rounded-3xl text-center">
-            <h3 className="font-extrabold text-[#1e1b4b] text-xl mb-3 flex items-center justify-center gap-2">
-              <Clock className="w-5 h-5 text-violet-700" /> Próximo atendimento
-            </h3>
-            {pacienteDoDia ? (
-              <>
-                <div className="mx-auto w-fit rounded-full p-1 bg-gradient-to-br from-violet-400 to-violet-700">
-                  <div className="rounded-full bg-white p-0.5">
-                    <PatientAvatar url={photoById.get(pacienteDoDia.patientId)} name={pacienteDoDia.patientName} size={96} />
-                  </div>
-                </div>
-                <p className="mt-3 text-4xl font-extrabold text-violet-700 tabular-nums leading-none">{pacienteDoDia.time}</p>
-                <p className="mt-2 text-xl font-extrabold text-[#1e1b4b] leading-tight break-words">{pacienteDoDia.patientName || `Paciente #${pacienteDoDia.patientId}`}</p>
-                <span className={cn("inline-block mt-2 px-3 py-0.5 rounded-full text-xs uppercase font-bold", getStatusColor(apptStatus(pacienteDoDia)))}>{getStatusLabel(apptStatus(pacienteDoDia))}</span>
-                <div className="mt-3 space-y-1.5 text-left text-base text-[#3b3561]">
-                  {pacienteDoDia.prontuario && <p className="flex items-center gap-2"><FileText className="w-4 h-4 text-violet-700" /> Prontuário: {pacienteDoDia.prontuario}</p>}
-                  <p className="flex items-center gap-2"><Clock className="w-4 h-4 text-violet-700" /> Hoje, {format(new Date(today + "T12:00:00"), "dd/MM")}</p>
-                </div>
-                {!portal && (
-                  <Link href={`/patients/${pacienteDoDia.patientId}`}>
-                    <Button className="mt-4 w-full rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white">Ver Detalhes →</Button>
-                  </Link>
-                )}
-              </>
-            ) : (
-              <p className="text-muted-foreground">{hojeApts.length ? "Os atendimentos de hoje já passaram." : "Nenhum atendimento hoje."}</p>
-            )}
-          </Card>
-
-          <Card className="p-5 !rounded-3xl">
-            <h3 className="font-extrabold text-[#1e1b4b] text-lg mb-3 flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5 text-violet-700" /> Atendimentos de Hoje
-            </h3>
-            {hojeApts.length === 0 ? (
-              <p className="text-muted-foreground">Nenhum atendimento hoje.</p>
-            ) : (
-              <div className="space-y-2">
-                {hojeApts.map(apt => (
-                  // flex-wrap + largura mínima do nome: em coluna estreita o horário e as faltas vão para outra linha, em vez de o nome quebrar letra por letra.
-                  <div key={`${apt.id}-${apt.time}`} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl px-2 py-2", apt.time >= agoraHM ? "bg-violet-50" : "bg-white")}>
-                    <span className="rounded-xl bg-violet-100 text-violet-800 font-bold tabular-nums px-2.5 py-1.5 shrink-0">{apt.time}</span>
-                    <span className="min-w-[9rem] flex-1 basis-[9rem]">
-                      <span className="block font-semibold text-[#1e1b4b] leading-snug break-normal [overflow-wrap:break-word]">{apt.patientName || `Paciente #${apt.patientId}`}</span>
-                      <span className={cn("inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] uppercase font-bold", getStatusColor(apptStatus(apt)))}>{getStatusLabel(apptStatus(apt))}</span>
-                    </span>
-                    <AbsenceBadge count={absenceCount(apt.patientId)} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </aside>
-      )}
       </div>
 
     </div>
