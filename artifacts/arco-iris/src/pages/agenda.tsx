@@ -1643,7 +1643,7 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
       const daSerie = (a: Appointment) =>
         a.patientId === apt.patientId && !a.multiGuest &&
         (apt.recurrenceGroupId ? a.recurrenceGroupId === apt.recurrenceGroupId : a.time === apt.time) &&
-        !INACTIVE_STATUSES.includes((a.status || "").toLowerCase());
+        ![...TERMINAL_STATUSES, "desmarcado", "cancelado", "remarcado"].includes((a.status || "").toLowerCase());
       // Sem sessão naquela semana (quinzenal/mensal): usa a próxima sessão da série.
       const occ = aptsDaSemana.find(daSerie)
         ?? [...appointments, ...(modalRows?.own ?? [])]
@@ -1682,6 +1682,57 @@ export default function Agenda({ portal }: { portal?: AgendaPortalMode }) {
             variant: "destructive",
           });
           return;
+        }
+      }
+      // Ninguém repete: o paciente não pode ficar 2x no mesmo dia com o mesmo
+      // profissional. Vale para esta sessão e para as que o salvamento move
+      // junto (Multi/transporte no mesmo horário). Fora: Multi, Pilates da
+      // mãe/responsável, Oficina e transporte.
+      {
+        const { apt: moving, newDate: destino } = remanejFlow;
+        const ativo = (a: Appointment) => !["desmarcado", "cancelado"].includes((a.status || "").toLowerCase());
+        const isMulti = (a: Appointment) => (a.notes ?? "").startsWith("Atendimento Multi com ");
+        const isento = (profId: number) => {
+          const spec = professionals.find(p => p.id === profId)?.specialty;
+          return isTransportSpecialty(spec) || (spec ?? "").toLowerCase().includes("oficina");
+        };
+        // Mesmo critério de _atendimento_do_responsavel (0141): o salvamento não
+        // move junto as sessões do responsável, nem a da criança a partir delas.
+        const doResponsavel = (a: Appointment) => {
+          const spec = (professionals.find(p => p.id === a.professionalId)?.specialty ?? "").toLowerCase();
+          return isPilatesAppointment(a.notes) || spec.includes("parental") || spec.includes("pilates") || spec.includes("oficina");
+        };
+        const origem = doResponsavel(moving)
+          ? []
+          : await listAppointments({ patientId: moving.patientId, date: moving.date });
+        const juntas = [
+          moving,
+          ...origem.filter(a =>
+            a.id !== moving.id && a.date === moving.date && a.time === moving.time &&
+            a.professionalId !== moving.professionalId && ativo(a) && !doResponsavel(a)),
+        ];
+        const ids = new Set(juntas.map(a => a.id));
+        for (const m of juntas) {
+          if (isento(m.professionalId) || isMulti(m)) continue;
+          const pilates = isPilatesAppointment(m.notes);
+          const sameDayProf = await listAppointments({
+            patientId: moving.patientId,
+            professionalId: m.professionalId,
+            date: destino,
+          });
+          const repetido = sameDayProf.find(a =>
+            !ids.has(a.id) && a.date === destino && ativo(a) && !isMulti(a) &&
+            isPilatesAppointment(a.notes) === pilates,
+          );
+          if (repetido) {
+            const nomeProf = professionals.find(p => p.id === m.professionalId)?.name ?? "este profissional";
+            toast({
+              title: "Paciente já tem sessão neste dia",
+              description: `${moving.patientName ?? "O paciente"} já está às ${repetido.time} com ${nomeProf} neste dia. Mexa nessa sessão em vez de criar outra.`,
+              variant: "destructive",
+            });
+            return;
+          }
         }
       }
       // Se a ocorrência clicada é virtual (projeção de semana futura, id negativo),
